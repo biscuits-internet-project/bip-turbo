@@ -29,6 +29,7 @@ grace_period = "10s"
 method = "GET"
 path = "/health"
 protocol = "http"
+port = 8080
 
 [[vm]]
 cpu_kind = "shared"
