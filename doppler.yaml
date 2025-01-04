@@ -1,0 +1,9 @@
+setup:
+  project: bip
+  config: dev
+
+# Configure integrations for each package that needs environment variables
+includes:
+  - path: "packages/database"
+    project: bip
+    config: dev

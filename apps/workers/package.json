@@ -1,0 +1,20 @@
+{
+  "name": "@bip/workers",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node src/worker.ts",
+    "build": "tsc",
+    "start": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@temporalio/activity": "^1.11.5",
+    "@temporalio/client": "^1.11.5",
+    "@temporalio/worker": "^1.11.5",
+    "@temporalio/workflow": "^1.11.5",
+    "@bip/database": "workspace:*"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2"
+  }
+}

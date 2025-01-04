@@ -8,7 +8,7 @@ datasource db {
 }
 
 model ActiveStorageAttachment {
-  id         String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name       String   @db.VarChar
   recordType String   @map("record_type") @db.VarChar
   recordId   String   @map("record_id") @db.Uuid
@@ -21,7 +21,7 @@ model ActiveStorageAttachment {
 }
 
 model ActiveStorageBlob {
-  id          String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   key         String   @unique(map: "index_active_storage_blobs_on_key") @db.VarChar
   filename    String   @db.VarChar
   contentType String?  @map("content_type") @db.VarChar
@@ -34,7 +34,7 @@ model ActiveStorageBlob {
 }
 
 model Annotation {
-  id        String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   trackId   String   @map("track_id") @db.Uuid
   desc      String?
   createdAt DateTime @map("created_at") @db.Timestamp(6)
@@ -54,7 +54,7 @@ model ArInternalMetadata {
 }
 
 model Attendance {
-  id        String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   showId    String   @map("show_id") @db.Uuid
   createdAt DateTime @map("created_at") @db.Timestamp(6)
@@ -98,7 +98,7 @@ model Author {
   slug      String   @db.VarChar
   createdAt DateTime @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @map("updated_at") @db.Timestamp(6)
-  id        String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   songs     Song[]
 
   @@index([slug], map: "index_authors_on_slug")
@@ -106,7 +106,7 @@ model Author {
 }
 
 model Band {
-  id        String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String?  @db.VarChar
   slug      String   @unique(map: "index_bands_on_slug") @db.VarChar
   legacyId  Int?     @map("legacy_id")
@@ -118,7 +118,7 @@ model Band {
 }
 
 model BlogPost {
-  id          String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
   blurb       String?
   slug        String
@@ -139,7 +139,7 @@ model BlogPost {
 }
 
 model Comment {
-  id              String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   commentableId   String   @map("commentable_id") @db.Uuid
   commentableType String   @map("commentable_type") @db.VarChar
   content         String
@@ -164,7 +164,7 @@ model Faq {
 }
 
 model Favorite {
-  id         String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId     String   @map("user_id") @db.Uuid
   showId     String   @map("show_id") @db.Uuid
   created_at DateTime @map("created_at") @db.Timestamp(6)
@@ -178,7 +178,7 @@ model Favorite {
 }
 
 model FriendlyIdSlug {
-  id            String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   slug          String    @db.VarChar
   sluggableType String    @map("sluggable_type") @db.VarChar
   sluggableId   String    @map("sluggable_id") @db.Uuid
@@ -192,7 +192,7 @@ model FriendlyIdSlug {
 }
 
 model Like {
-  id           String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   likeableId   String   @map("likeable_id") @db.Uuid
   likeableType String   @map("likeable_type") @db.VarChar
   userId       String   @map("user_id") @db.Uuid
@@ -207,7 +207,7 @@ model Like {
 }
 
 model MediaContent {
-  id          String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   year        Int?
   url         String?   @db.VarChar
   mediaType   String    @map("media_type") @db.VarChar
@@ -232,7 +232,7 @@ model PgSearchDocument {
 }
 
 model Rating {
-  id           String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   value        Float    @default(0.0)
   userId       String   @map("user_id") @db.Uuid
   createdAt    DateTime @map("created_at") @db.Timestamp(6)
@@ -247,7 +247,7 @@ model Rating {
 }
 
 model Review {
-  id         String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   content    String
   status     String   @default("draft") @db.VarChar
   userId     String   @map("user_id") @db.Uuid
@@ -264,7 +264,7 @@ model Review {
 }
 
 model Role {
-  id           String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name         String?  @db.VarChar
   resourceId   String?  @map("resource_id") @db.Uuid
   resourceType String?  @map("resource_type") @db.VarChar
@@ -277,7 +277,7 @@ model Role {
 }
 
 model ShowPhoto {
-  id        String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   label     String?  @db.VarChar
   source    String?  @db.VarChar
   userId    String   @map("user_id") @db.Uuid
@@ -293,7 +293,7 @@ model ShowPhoto {
 }
 
 model ShowYoutube {
-  id        String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   showId    String   @map("show_id") @db.Uuid
   videoId   String   @map("video_id") @db.VarChar
   createdAt DateTime @map("created_at") @db.Timestamp(6)
@@ -305,7 +305,7 @@ model ShowYoutube {
 }
 
 model Show {
-  id                String        @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   slug              String?       @unique(map: "index_shows_on_slug") @db.VarChar
   date              DateTime      @db.Date
   venueId           String?       @map("venue_id") @db.Uuid
@@ -333,7 +333,7 @@ model Show {
 }
 
 model SideProject {
-  id        String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String?   @db.VarChar
   dates     String?   @db.VarChar
   notes     String?
@@ -351,7 +351,7 @@ model SideProject {
 }
 
 model Song {
-  id              String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title           String    @db.VarChar
   slug            String    @unique(map: "index_songs_on_slug") @db.VarChar
   createdAt       DateTime  @map("created_at") @db.Timestamp(6)
@@ -382,7 +382,7 @@ model Song {
 }
 
 model Tagging {
-  id           String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tagId        String?   @map("tag_id") @db.Uuid
   taggableType String?   @map("taggable_type") @db.VarChar
   taggableId   String?   @map("taggable_id") @db.Uuid
@@ -407,7 +407,7 @@ model Tagging {
 }
 
 model Tag {
-  id            String    @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name          String?   @unique(map: "index_tags_on_name") @db.VarChar
   createdAt     DateTime  @map("created_at") @db.Timestamp(6)
   updatedAt     DateTime  @map("updated_at") @db.Timestamp(6)
@@ -418,7 +418,7 @@ model Tag {
 }
 
 model Track {
-  id              String       @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   showId          String       @map("show_id") @db.Uuid
   songId          String       @map("song_id") @db.Uuid
   set             String       @db.VarChar
@@ -444,7 +444,7 @@ model Track {
 }
 
 model User {
-  id                  String       @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   firstName           String?      @map("first_name") @db.VarChar
   lastName            String?      @map("last_name") @db.VarChar
   createdAt           DateTime     @map("created_at") @db.Timestamp(6)
@@ -480,7 +480,7 @@ model UserRole {
 }
 
 model Venue {
-  id          String   @id @default(dbgenerated("public.gen_random_uuid()")) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String?  @db.VarChar
   slug        String   @db.VarChar
   street      String?  @db.VarChar

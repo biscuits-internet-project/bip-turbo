@@ -5,9 +5,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:generate": "doppler run -- prisma generate",
+    "db:push": "doppler run -- prisma db push",
+    "db:studio": "doppler run -- prisma studio",
+    "db:migrate": "doppler run -- prisma migrate dev --name init"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0"
