@@ -14,6 +14,12 @@ import { renderToPipeableStream } from "react-dom/server";
 
 const ABORT_DELAY = 5_000;
 
+// Add server configuration
+const SERVER_CONFIG = {
+  host: process.env.HOST || "0.0.0.0",
+  port: Number.parseInt(process.env.PORT || "8080", 10),
+};
+
 export default function handleRequest(
   request: Request,
   responseStatusCode: number,
