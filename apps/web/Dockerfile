@@ -32,17 +32,14 @@ RUN pnpm --filter @bip/web build
 FROM base
 WORKDIR /app
 
-# Copy workspace files first
+# Copy necessary files for pnpm
 COPY --from=build /app/package.json ./
 COPY --from=build /app/pnpm-lock.yaml ./
-COPY --from=build /app/pnpm-workspace.yaml ./
-
-# Copy the web app files
 COPY --from=build /app/apps/web/package.json ./apps/web/
 COPY --from=build /app/apps/web/build ./apps/web/build
 COPY --from=build /app/apps/web/public ./apps/web/public
 
-# Install production dependencies with workspace structure
+# Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile
 
 # Switch to node user after installing dependencies
@@ -50,7 +47,7 @@ USER node
 
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV HOST=0.0.0.0
 
-# Change working directory to the web app and use direct path to remix-serve
 WORKDIR /app/apps/web
-CMD ["pnpm", "exec", "remix-serve", "./build/server/index.js"]
+CMD ["pnpm", "exec", "remix-serve", "--host", "0.0.0.0", "./build/server/index.js"]
