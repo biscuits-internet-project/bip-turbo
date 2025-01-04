@@ -1,7 +1,6 @@
 # Base node image
 FROM node:22-slim as base
 RUN apt-get update && apt-get install -y openssl
-
 # Setup pnpm
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -10,30 +9,48 @@ RUN corepack enable
 # Install dependencies
 FROM base as deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-COPY apps/web/package.json ./apps/web/
+# Copy root workspace files
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+# Copy all package.json files at once
+COPY **/package.json ./**/
+# Install all dependencies including dev dependencies
 RUN pnpm install --frozen-lockfile
+# Generate Prisma client
 RUN pnpm --filter database generate
 
 # Build the app
 FROM deps as build
 WORKDIR /app
+# Copy all source files
 COPY . .
-RUN pnpm run build
+# Install dependencies with dev dependencies to ensure build tools are available
+RUN pnpm install --frozen-lockfile
+# Build only the web package
+RUN pnpm --filter @bip/web build
 
 # Production image
 FROM base
 WORKDIR /app
-USER node
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+# Copy workspace files first
+COPY --from=build /app/package.json ./
+COPY --from=build /app/pnpm-lock.yaml ./
+COPY --from=build /app/pnpm-workspace.yaml ./
+
+# Copy the web app files
+COPY --from=build /app/apps/web/package.json ./apps/web/
 COPY --from=build /app/apps/web/build ./apps/web/build
 COPY --from=build /app/apps/web/public ./apps/web/public
-COPY --from=build /app/package.json ./
-COPY --from=build /app/apps/web/package.json ./apps/web/
+
+# Install production dependencies with workspace structure
+RUN pnpm install --prod --frozen-lockfile
+
+# Switch to node user after installing dependencies
+USER node
 
 ENV NODE_ENV=production
 ENV PORT=8080
 
-CMD ["pnpm", "run", "--filter", "web", "start"] 
+# Change working directory to the web app and use direct path to remix-serve
+WORKDIR /app/apps/web
+CMD ["pnpm", "exec", "remix-serve", "./build/server/index.js"]
