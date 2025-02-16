@@ -3,18 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node src/worker.ts",
     "build": "tsc",
-    "start": "node dist/worker.js"
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "biome lint .",
+    "clean": "rm -rf .turbo && rm -rf node_modules && rm -rf dist"
   },
   "dependencies": {
-    "@temporalio/activity": "^1.11.5",
-    "@temporalio/client": "^1.11.5",
-    "@temporalio/worker": "^1.11.5",
-    "@temporalio/workflow": "^1.11.5",
-    "@bip/database": "workspace:*"
+    "@bip/core": "workspace:*",
+    "@bip/domain": "workspace:*",
+    "@temporalio/client": "*",
+    "@temporalio/worker": "*",
+    "@temporalio/workflow": "*"
   },
   "devDependencies": {
-    "ts-node": "^10.9.2"
+    "@bip/ts-config": "workspace:*",
+    "typescript": "*"
   }
 }

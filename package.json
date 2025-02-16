@@ -4,27 +4,28 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
-    "lint": "turbo lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "lint": "biome lint .",
+    "format": "biome format . --write",
+    "check": "biome check ."
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.19.0",
-    "@typescript-eslint/parser": "^8.19.0",
-    "@types/react": "^18.2.20",
-    "@types/react-dom": "^18.2.7",
-    "eslint": "^9.17.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-react": "^7.37.3",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "typescript": "^5.7.2",
-    "prettier": "^3.4.2",
-    "turbo": "^2.3.3",
-    "vite": "^5.1.6",
-    "vite-tsconfig-paths": "^4.2.1"
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.7.3",
+    "turbo": "^2.4.2",
+    "vite": "^6.1.0",
+    "vite-tsconfig-paths": "^5.1.4"
   },
-  "packageManager": "pnpm@9.15.2",
+  "pnpm": {
+    "overrides": {
+      "zod": "^3.24.2",
+      "drizzle-orm": "^0.39.3",
+      "drizzle-kit": "^0.30.4",
+      "pg": "^8.13.3",
+      "@types/pg": "^8.11.11",
+      "typescript": "^5.7.3"
+    }
+  },
+  "packageManager": "pnpm@10.4.0",
   "engines": {
     "node": ">=22"
   }

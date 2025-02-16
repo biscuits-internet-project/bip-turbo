@@ -1,3 +1,5 @@
+name: bip
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -6,15 +8,11 @@ services:
       POSTGRES_PASSWORD: "password"
       POSTGRES_DB: "bip_dev"
     ports:
-      - "5435:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U development -d bip_dev"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    container_name: bip-postgres
+    networks:
+      - bip-network
 
   redis:
     image: redis:7-alpine
@@ -22,12 +20,22 @@ services:
       - "6380:6379"
     volumes:
       - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    container_name: bip-redis
+    networks:
+      - bip-network
+
+  temporal:
+    image: temporalio/server
+    entrypoint: temporal
+    command: server start-dev --ip 0.0.0.0
+    ports:
+      - "7235:7233"
+      - "8089:8233"
+    networks:
+      - bip-network
+
+networks:
+  bip-network:
+    driver: bridge
 
 volumes:
   postgres_data:

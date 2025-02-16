@@ -4,6 +4,12 @@ install:
 build:
 	turbo run build
 
+tc:
+	turbo run typecheck
+
+clean:
+	turbo run clean
+
 web:
 	turbo run dev --filter=@bip/web
 
@@ -15,3 +21,6 @@ db:
 
 db-studio:
 	turbo run db:studio --filter=@bip/database
+
+db-generate:
+	turbo run db:generate --filter=@bip/database
