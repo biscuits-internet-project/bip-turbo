@@ -1,14 +1,19 @@
-import type { Venue } from "@bip/domain";
-import type { SQL } from "drizzle-orm";
-import type { NewVenue, VenueRow } from "../_shared/drizzle/types";
+import type { Logger } from "@bip/domain";
+import { BaseService } from "../_shared/base-service";
+import type { NewVenue } from "../_shared/drizzle/types";
 import type { VenueRepository } from "./venue-repository";
 
 export interface VenueFilter {
   name?: string;
 }
 
-export class VenueService {
-  constructor(private readonly repository: VenueRepository) {}
+export class VenueService extends BaseService {
+  constructor(
+    private readonly repository: VenueRepository,
+    logger: Logger,
+  ) {
+    super(logger);
+  }
 
   async find(id: string) {
     return this.repository.findById(id);

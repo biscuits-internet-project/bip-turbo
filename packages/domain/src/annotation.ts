@@ -8,4 +8,4 @@ export const annotationSchema = z.object({
   updatedAt: z.date(),
 });
 
-export type Annotation = z.infer<typeof annotationSchema>; 
+export type Annotation = z.infer<typeof annotationSchema>;

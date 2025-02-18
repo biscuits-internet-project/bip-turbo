@@ -1,16 +1,19 @@
-import type { Show } from "@bip/domain";
+import type { Logger, Show } from "@bip/domain";
+import { BaseService } from "../_shared/base-service";
 import type { NewShow } from "../_shared/drizzle/types";
 import type { ShowRepository } from "./show-repository";
 
 export interface ShowFilter {
-  dateRange?: {
-    start?: Date;
-    end?: Date;
-  };
+  year: number;
 }
 
-export class ShowService {
-  constructor(private readonly repository: ShowRepository) {}
+export class ShowService extends BaseService {
+  constructor(
+    private readonly repository: ShowRepository,
+    logger: Logger,
+  ) {
+    super(logger);
+  }
 
   async find(id: string): Promise<Show | null> {
     return this.repository.findById(id);

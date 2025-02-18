@@ -10,6 +10,9 @@ if (!connectionString) {
 const queryClient = postgres(connectionString);
 
 // Drizzle client instance
-export const db = drizzle(queryClient, { schema });
+export const db = drizzle(queryClient, {
+  schema,
+  logger: true,
+});
 
 export type Database = typeof db;

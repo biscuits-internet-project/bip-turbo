@@ -1,22 +1,30 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse } from "react-router-dom";
 import type { Route } from "./+types/root";
+import { RootLayout } from "./components/layout/root-layout";
+import "./styles.css";
+
+export const beforeLoad = ({ request }: { request: Request }) => {
+  console.log("⚡️ beforeLoad:", request.method, new URL(request.url).pathname);
+};
 
 export const loader = async ({ request }: Route.LoaderArgs) => {
+  console.log("⚡️ root loader:", request.method, new URL(request.url).pathname);
   return {};
 };
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  // const { apiUrl } = useLoaderData<typeof loader>();
   return (
-    <html lang="en" className="font-quicksand">
+    <html lang="en" className="font-quicksand dark">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body>
-        <Outlet />
+      <body className="min-h-screen bg-background font-sans antialiased">
+        <RootLayout>
+          <Outlet />
+        </RootLayout>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -43,11 +51,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
+      <h1 className="text-4xl font-bold mb-4">{message}</h1>
+      <p className="text-muted-foreground mb-4">{details}</p>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
-          <code>{stack}</code>
+        <pre className="w-full p-4 overflow-x-auto bg-muted rounded-lg">
+          <code className="text-sm">{stack}</code>
         </pre>
       )}
     </main>

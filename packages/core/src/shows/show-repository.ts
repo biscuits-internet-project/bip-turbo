@@ -1,8 +1,8 @@
 import type { Show } from "@bip/domain";
 import type { SQL } from "drizzle-orm";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, between, eq } from "drizzle-orm";
 import { transformShow } from "..";
-import { shows } from "../_shared/drizzle/schema";
+import { shows, songs, tracks, venues } from "../_shared/drizzle/schema";
 import type { NewShow } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 import type { ShowFilter } from "./show-service";
@@ -16,11 +16,10 @@ export class ShowRepository extends BaseRepository<Show, NewShow, ShowFilter> {
   async findMany(filter?: ShowFilter): Promise<Show[]> {
     const conditions: SQL<unknown>[] = [];
 
-    if (filter?.dateRange?.start) {
-      conditions.push(gte(shows.date, filter.dateRange.start.toISOString()));
-    }
-    if (filter?.dateRange?.end) {
-      conditions.push(lte(shows.date, filter.dateRange.end.toISOString()));
+    if (filter?.year) {
+      const startDate = new Date(filter.year, 0, 1);
+      const endDate = new Date(filter.year + 1, 0, 1);
+      conditions.push(between(shows.date, startDate.toISOString(), endDate.toISOString()));
     }
 
     const result = await this.db

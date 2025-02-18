@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "shadcn": "*",
     "typescript": "^5.7.3",
     "turbo": "^2.4.2",
     "vite": "^6.1.0",

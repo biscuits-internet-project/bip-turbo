@@ -1,4 +1,4 @@
-import type { bands, likes, ratings, shows, songs, tags, tracks, users, venues } from "./schema";
+import type { annotations, bands, likes, ratings, shows, songs, tracks, users, venues } from "./schema";
 
 export type UserRow = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -6,7 +6,10 @@ export type NewUser = typeof users.$inferInsert;
 export type ShowRow = typeof shows.$inferSelect;
 export type NewShow = typeof shows.$inferInsert;
 
-export type TrackRow = typeof tracks.$inferSelect;
+export type TrackRow = typeof tracks.$inferSelect & {
+  annotations?: AnnotationRow[];
+  song?: SongRow | null;
+};
 export type NewTrack = typeof tracks.$inferInsert;
 
 export type LikeRow = typeof likes.$inferSelect;
@@ -23,3 +26,6 @@ export type NewVenue = typeof venues.$inferInsert;
 
 export type SongRow = typeof songs.$inferSelect;
 export type NewSong = typeof songs.$inferInsert;
+
+export type AnnotationRow = typeof annotations.$inferSelect;
+export type NewAnnotation = typeof annotations.$inferInsert;

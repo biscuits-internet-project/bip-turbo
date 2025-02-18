@@ -1,16 +1,20 @@
-import type { Song } from "@bip/domain";
-import type { SQL } from "drizzle-orm";
+import type { Logger, Song } from "@bip/domain";
+import { BaseService } from "../_shared/base-service";
 import type { NewSong } from "../_shared/drizzle/types";
 import type { SongRepository } from "./song-repository";
-import { transformSong } from "./song-transformer";
 
 export interface SongFilter {
   title?: string;
   legacyId?: number;
 }
 
-export class SongService {
-  constructor(private readonly repository: SongRepository) {}
+export class SongService extends BaseService {
+  constructor(
+    private readonly repository: SongRepository,
+    logger: Logger,
+  ) {
+    super(logger);
+  }
 
   async find(id: string): Promise<Song | null> {
     return this.repository.findById(id);

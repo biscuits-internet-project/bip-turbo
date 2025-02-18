@@ -1,5 +1,7 @@
 export * from "./annotation";
 export * from "./band";
+export * from "./logger";
+export * from "./setlist";
 export * from "./show";
 export * from "./song";
 export * from "./track";

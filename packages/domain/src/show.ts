@@ -9,7 +9,6 @@ export const showSchema = z.object({
   venueId: z.string().uuid().nullable(),
   bandId: z.string().uuid().nullable(),
   notes: z.string().nullable(),
-  legacyId: z.number().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   likesCount: z.number().default(0),

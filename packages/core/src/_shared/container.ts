@@ -1,4 +1,5 @@
 import { BandRepository } from "../bands/band-repository";
+import { SetlistRepository } from "../setlists/setlist-repository";
 import { ShowRepository } from "../shows/show-repository";
 import { SongRepository } from "../songs/song-repository";
 import { TrackRepository } from "../tracks/track-repository";
@@ -10,6 +11,7 @@ export interface ServiceContainer {
   db: Database;
   repositories: {
     bands: BandRepository;
+    setlists: SetlistRepository;
     shows: ShowRepository;
     songs: SongRepository;
     tracks: TrackRepository;
@@ -22,6 +24,7 @@ export function createContainer(db: Database): ServiceContainer {
   // Create repositories
   const repositories = {
     bands: new BandRepository(db),
+    setlists: new SetlistRepository(db),
     shows: new ShowRepository(db),
     songs: new SongRepository(db),
     tracks: new TrackRepository(db),

@@ -1,4 +1,5 @@
-import type { Track } from "@bip/domain";
+import type { Logger, Track } from "@bip/domain";
+import { BaseService } from "../_shared/base-service";
 import type { NewTrack } from "../_shared/drizzle/types";
 import type { TrackRepository } from "./track-repository";
 
@@ -6,8 +7,13 @@ export type TrackFilter = {
   showId?: string;
 };
 
-export class TrackService {
-  constructor(private readonly repository: TrackRepository) {}
+export class TrackService extends BaseService {
+  constructor(
+    private readonly repository: TrackRepository,
+    logger: Logger,
+  ) {
+    super(logger);
+  }
 
   async find(id: string): Promise<Track | null> {
     return this.repository.findById(id);
