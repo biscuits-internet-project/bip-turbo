@@ -1,33 +1,43 @@
-// packages/core/src/redis/client.ts
 import { type RedisClientType, createClient } from "redis";
 
-let client: RedisClientType | null = null;
+export class RedisService {
+  private client!: RedisClientType;
+  private isConnected = false;
 
-export const getRedisClient = async (url = "redis://localhost:6380") => {
-  if (!client) {
-    client = createClient({
-      url,
-    });
-
-    await client.connect();
+  constructor(private readonly url: string) {
+    if (!url) {
+      throw new Error("Redis URL is required");
+    }
+    this.client = createClient({ url: this.url });
   }
 
-  return client;
-};
+  async connect(): Promise<void> {
+    if (!this.isConnected) {
+      await this.client.connect();
+      this.isConnected = true;
+    }
+  }
 
-// You can still have your helper functions here
-export const get = async <T>(key: string): Promise<T | null> => {
-  const redis = await getRedisClient();
-  const value = await redis.get(key);
-  return value ? JSON.parse(value) : null;
-};
+  async get<T>(key: string): Promise<T | null> {
+    await this.connect();
+    const value = await this.client.get(key);
+    return value ? JSON.parse(value) : null;
+  }
 
-export const set = async <T>(key: string, value: T) => {
-  const redis = await getRedisClient();
-  await redis.set(key, JSON.stringify(value));
-};
+  async set<T>(key: string, value: T): Promise<void> {
+    await this.connect();
+    await this.client.set(key, JSON.stringify(value));
+  }
 
-export const del = async (key: string) => {
-  const redis = await getRedisClient();
-  await redis.del(key);
-};
+  async del(key: string): Promise<void> {
+    await this.connect();
+    await this.client.del(key);
+  }
+
+  getClient(): RedisClientType {
+    if (!this.isConnected) {
+      throw new Error("Redis client not connected. Call connect() first");
+    }
+    return this.client;
+  }
+}

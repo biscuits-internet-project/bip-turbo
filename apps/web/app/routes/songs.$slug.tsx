@@ -1,10 +1,14 @@
 import type { Song } from "@bip/domain";
 import type { LoaderFunctionArgs } from "react-router";
-import { Form, Link, useLoaderData, useSearchParams } from "react-router-dom";
-import superjson from "superjson";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { publicLoader } from "../lib/base-loaders";
 import { services } from "../server/services";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+interface LoaderData {
+  song: Song;
+}
+
+export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const slug = params.slug;
   if (!slug) throw new Response("Not Found", { status: 404 });
 
@@ -13,9 +17,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Not Found", { status: 404 });
   }
 
-  const { json: data, meta } = superjson.serialize({ song });
-  return { data, meta };
-}
+  return { song };
+});
 
 interface StatBoxProps {
   label: string;
@@ -36,8 +39,7 @@ function StatBox({ label, value, sublabel }: StatBoxProps) {
 }
 
 export default function SongPage() {
-  const { data, meta } = useLoaderData<typeof loader>();
-  const { song } = superjson.deserialize({ json: data, meta }) as { song: Song };
+  const { song } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div className="p-6">
@@ -62,7 +64,10 @@ export default function SongPage() {
         {/* Stats Grid */}
         <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatBox label="Times Played" value={song.timesPlayed} sublabel="total plays" />
-          <StatBox label="Last Played" value={song.dateLastPlayed ? new Date(song.dateLastPlayed).toLocaleDateString() : "Never"} />
+          <StatBox
+            label="Last Played"
+            value={song.dateLastPlayed ? new Date(song.dateLastPlayed).toLocaleDateString() : "Never"}
+          />
           <StatBox label="Most Common Year" value={song.mostCommonYear || "—"} />
           <StatBox label="Least Common Year" value={song.leastCommonYear || "—"} />
         </dl>
@@ -92,9 +97,16 @@ export default function SongPage() {
             {(song.tabs || song.guitarTabsUrl) && (
               <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
                 <h2 className="text-xl font-semibold text-white mb-4">Guitar Tabs</h2>
-                {song.tabs && <pre className="text-sm text-gray-400 font-mono whitespace-pre-wrap mb-4">{song.tabs}</pre>}
+                {song.tabs && (
+                  <pre className="text-sm text-gray-400 font-mono whitespace-pre-wrap mb-4">{song.tabs}</pre>
+                )}
                 {song.guitarTabsUrl && (
-                  <a href={song.guitarTabsUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                  <a
+                    href={song.guitarTabsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300"
+                  >
                     View External Guitar Tabs
                   </a>
                 )}

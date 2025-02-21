@@ -1,15 +1,21 @@
 import type { Setlist } from "@bip/domain";
 import { Search } from "lucide-react";
-import { Link, useLoaderData } from "react-router-dom";
+import { Link } from "react-router-dom";
+import superjson from "superjson";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { services } from "~/server/services";
 import { publicLoader } from "../lib/base-loaders";
 
+interface LoaderData {
+  setlists: Setlist[];
+  year: number;
+}
+
 const years = Array.from({ length: 30 }, (_, i) => 2025 - i);
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-export const loader = publicLoader(async ({ request }) => {
+export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
   console.log("⚡️ shows loader start:", request.method, new URL(request.url).pathname);
 
   const url = new URL(request.url);
@@ -18,16 +24,32 @@ export const loader = publicLoader(async ({ request }) => {
 
   console.log("⚡️ shows loader - fetching setlists for year:", yearInt);
 
+  const cacheKey = `shows-${yearInt}`;
+  try {
+    const cachedSetlists = await services.redis.get<Setlist[]>(cacheKey);
+    if (cachedSetlists) {
+      console.log("⚡️ shows loader - found cached setlists:", cachedSetlists.length);
+      return { setlists: cachedSetlists, year: yearInt };
+    }
+  } catch (error) {
+    console.error("Redis cache error:", error);
+    // Continue to database query
+  }
+
   const setlists = await services.setlists.findMany({
     year: yearInt,
   });
-  console.log("⚡️ shows loader - found setlists:", setlists.length);
 
-  return { setlists, year };
+  if (setlists.length > 0) {
+    await services.redis.set<Setlist[]>(cacheKey, setlists);
+  }
+
+  console.log("⚡️ shows loader - found setlists:", setlists.length);
+  return { setlists, year: yearInt };
 });
 
 export default function Shows() {
-  const { setlists, year } = useSerializedLoaderData<typeof loader>();
+  const { setlists, year } = useSerializedLoaderData<LoaderData>();
 
   return (
     <>

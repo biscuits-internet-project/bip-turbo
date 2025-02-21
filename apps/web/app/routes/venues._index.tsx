@@ -1,15 +1,18 @@
-import type { Song, Venue } from "@bip/domain";
-import type { LoaderFunctionArgs } from "react-router";
-import { Form, Link, useLoaderData, useSearchParams } from "react-router-dom";
-import superjson from "superjson";
+import type { Venue } from "@bip/domain";
+import { Form, Link, useSearchParams } from "react-router-dom";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { publicLoader } from "../lib/base-loaders";
 import { services } from "../server/services";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const venues = await services.venues.findMany({});
-  const { json: data, meta } = superjson.serialize({ venues });
-  return { data, meta };
+interface LoaderData {
+  venues: Venue[];
 }
+
+export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
+  const venues = await services.venues.findMany({});
+  return { venues };
+});
 
 interface VenueCardProps {
   venue: Venue;
@@ -56,8 +59,7 @@ function SearchForm() {
 }
 
 export default function Venues() {
-  const { data, meta } = useLoaderData<typeof loader>();
-  const { venues } = superjson.deserialize({ json: data, meta }) as { venues: Venue[] };
+  const { venues } = useSerializedLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("q") || "";
 

@@ -1,23 +1,25 @@
-import type { Song, Venue } from "@bip/domain";
+import type { Venue } from "@bip/domain";
 import type { LoaderFunctionArgs } from "react-router";
-import { Form, Link, useLoaderData, useSearchParams } from "react-router-dom";
-import superjson from "superjson";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { publicLoader } from "../lib/base-loaders";
 import { services } from "../server/services";
 
-export async function loader({ params }: LoaderFunctionArgs) {
+interface LoaderData {
+  venue: Venue;
+}
+
+export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const slug = params.slug;
   if (!slug) throw new Error("Slug is required");
 
   const venue = await services.venues.findBySlug(slug);
   if (!venue) throw new Error("Venue not found");
 
-  const { json: data, meta } = superjson.serialize({ venue });
-  return { data, meta };
-}
+  return { venue };
+});
 
 export default function VenuePage() {
-  const { data, meta } = useLoaderData<typeof loader>();
-  const { venue } = superjson.deserialize({ json: data, meta }) as { venue: Venue };
+  const { venue } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div className="p-6">

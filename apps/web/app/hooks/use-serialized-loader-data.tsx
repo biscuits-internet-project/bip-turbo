@@ -1,12 +1,8 @@
-import type { LoaderFunction } from "react-router";
 import { useLoaderData } from "react-router-dom";
-import { deserialize } from "superjson";
 import type { SuperJSONResult } from "superjson";
+import superjson from "superjson";
 
-// Helper type to unwrap the loader return type
-type LoaderReturnType<T> = T extends (...args: unknown[]) => Promise<infer R> ? R : never;
-
-export function useSerializedLoaderData<T extends LoaderFunction>() {
-  const serialized = useLoaderData() as SuperJSONResult;
-  return deserialize(serialized) as LoaderReturnType<T>;
+export function useSerializedLoaderData<T>() {
+  const result = useLoaderData() as SuperJSONResult;
+  return superjson.deserialize(result) as T;
 }

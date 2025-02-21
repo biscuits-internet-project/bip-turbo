@@ -1,33 +1,29 @@
 import type { TrendingSong } from "@bip/core";
 import type { Song } from "@bip/domain";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { LoaderFunctionArgs } from "react-router";
-import { Link, useLoaderData } from "react-router-dom";
-import superjson from "superjson";
+import { Link } from "react-router-dom";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { publicLoader } from "../lib/base-loaders";
 import { services } from "../server/services";
-
-// Add this to your root layout or main CSS file:
-// <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 const ITEMS_PER_PAGE = 50; // Number of items to show initially and each time "Load More" is clicked
 
-type LoaderData = {
+interface LoaderData {
   songs: Song[];
   trendingSongs: TrendingSong[];
   yearlyTrendingSongs: TrendingSong[];
-};
+}
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
   const [songs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
     services.songs.findMany({}),
     services.songs.findTrending(),
     services.songs.findTrendingLastYear(),
   ]);
 
-  const data: LoaderData = { songs, trendingSongs, yearlyTrendingSongs };
-  return superjson.serialize(data);
-}
+  return { songs, trendingSongs, yearlyTrendingSongs };
+});
 
 interface SongCardProps {
   song: Song;
@@ -110,8 +106,7 @@ function SearchForm({ onSearch }: { onSearch: (query: string) => void }) {
 }
 
 function YearlyTrendingSongs() {
-  const result = useLoaderData<typeof loader>();
-  const { yearlyTrendingSongs } = superjson.deserialize(result) as LoaderData;
+  const { yearlyTrendingSongs } = useSerializedLoaderData<LoaderData>();
 
   if (yearlyTrendingSongs.length === 0) {
     return null;
@@ -123,7 +118,7 @@ function YearlyTrendingSongs() {
       <Card>
         <CardContent className="p-4">
           <div className="divide-y divide-border">
-            {yearlyTrendingSongs.map((song, index) => (
+            {yearlyTrendingSongs.map((song: TrendingSong, index: number) => (
               <div key={song.id} className="py-2 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="text-muted-foreground font-medium w-5">{index + 1}</span>
@@ -142,8 +137,7 @@ function YearlyTrendingSongs() {
 }
 
 export default function Songs() {
-  const result = useLoaderData<typeof loader>();
-  const { songs, trendingSongs, yearlyTrendingSongs } = superjson.deserialize(result) as LoaderData;
+  const { songs, trendingSongs, yearlyTrendingSongs } = useSerializedLoaderData<LoaderData>();
 
   const [filteredSongs, setFilteredSongs] = useState(songs);
   const [searchQuery, setSearchQuery] = useState("");
@@ -159,7 +153,6 @@ export default function Songs() {
 
       if (scrolledToBottom && displayCount < filteredSongs.length) {
         setIsLoading(true);
-        console.log("Loading more songs...", displayCount, filteredSongs.length);
         setTimeout(() => {
           setDisplayCount((prev) => prev + ITEMS_PER_PAGE);
           setIsLoading(false);
@@ -183,7 +176,7 @@ export default function Songs() {
         setFilteredSongs(songs);
       } else {
         const lowerQuery = query.toLowerCase();
-        const filtered = songs.filter((song) => song.title.toLowerCase().includes(lowerQuery));
+        const filtered = songs.filter((song: Song) => song.title.toLowerCase().includes(lowerQuery));
         setFilteredSongs(filtered);
       }
       setDisplayCount(ITEMS_PER_PAGE); // Reset display count when searching
@@ -208,7 +201,7 @@ export default function Songs() {
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-4 text-foreground">Trending in Recent Shows</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {trendingSongs.map((song) => (
+                  {trendingSongs.map((song: TrendingSong) => (
                     <TrendingSongCard key={song.id} song={song} />
                   ))}
                 </div>
@@ -227,7 +220,7 @@ export default function Songs() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visibleSongs.map((song) => (
+              {visibleSongs.map((song: Song) => (
                 <SongCard key={song.id} song={song} />
               ))}
             </div>
