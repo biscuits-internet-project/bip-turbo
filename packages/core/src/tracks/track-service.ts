@@ -15,8 +15,12 @@ export class TrackService extends BaseService {
     super(logger);
   }
 
-  async find(id: string): Promise<Track | null> {
+  async findById(id: string): Promise<Track | null> {
     return this.repository.findById(id);
+  }
+
+  async findBySlug(slug: string): Promise<Track | null> {
+    return this.repository.findBySlug(slug);
   }
 
   async findMany(filter: TrackFilter): Promise<Track[]> {

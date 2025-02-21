@@ -11,6 +11,11 @@ export class UserRepository extends BaseRepository<User, NewUser> {
     return result[0] ? transformUser(result[0]) : null;
   }
 
+  async findBySlug(username: string): Promise<User | null> {
+    const result = await this.db.select().from(users).where(eq(users.username, username));
+    return result[0] ? transformUser(result[0]) : null;
+  }
+
   async findMany(where = undefined): Promise<User[]> {
     const result = await this.db
       .select()

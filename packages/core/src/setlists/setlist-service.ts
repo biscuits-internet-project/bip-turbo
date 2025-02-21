@@ -14,7 +14,7 @@ export class SetlistService extends BaseService {
     super(logger);
   }
 
-  async find(id: string): Promise<Setlist | null> {
+  async findById(id: string): Promise<Setlist | null> {
     return this.repository.findById(id);
   }
 

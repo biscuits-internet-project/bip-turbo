@@ -15,8 +15,12 @@ export class VenueService extends BaseService {
     super(logger);
   }
 
-  async find(id: string) {
+  async findById(id: string) {
     return this.repository.findById(id);
+  }
+
+  async findBySlug(slug: string) {
+    return this.repository.findBySlug(slug);
   }
 
   async findMany(filter: VenueFilter) {

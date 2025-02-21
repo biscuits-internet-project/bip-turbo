@@ -8,6 +8,10 @@ export interface SongFilter {
   legacyId?: number;
 }
 
+export interface TrendingSong extends Song {
+  count: number;
+}
+
 export class SongService extends BaseService {
   constructor(
     private readonly repository: SongRepository,
@@ -16,12 +20,24 @@ export class SongService extends BaseService {
     super(logger);
   }
 
-  async find(id: string): Promise<Song | null> {
+  async findById(id: string): Promise<Song | null> {
     return this.repository.findById(id);
+  }
+
+  async findBySlug(slug: string): Promise<Song | null> {
+    return this.repository.findBySlug(slug);
   }
 
   async findMany(filter: SongFilter): Promise<Song[]> {
     return this.repository.findMany(filter);
+  }
+
+  async findTrending(): Promise<TrendingSong[]> {
+    return this.repository.findTrending();
+  }
+
+  async findTrendingLastYear(): Promise<TrendingSong[]> {
+    return this.repository.findTrendingLastYear();
   }
 
   async create(song: NewSong): Promise<Song> {

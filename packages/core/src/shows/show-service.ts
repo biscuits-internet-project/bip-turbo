@@ -15,8 +15,12 @@ export class ShowService extends BaseService {
     super(logger);
   }
 
-  async find(id: string): Promise<Show | null> {
+  async findById(id: string): Promise<Show | null> {
     return this.repository.findById(id);
+  }
+
+  async findBySlug(slug: string): Promise<Show | null> {
+    return this.repository.findBySlug(slug);
   }
 
   async findMany(filter: ShowFilter): Promise<Show[]> {

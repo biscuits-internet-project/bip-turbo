@@ -1,40 +1,33 @@
 import type { Setlist } from "@bip/domain";
 import { Search } from "lucide-react";
-import type { LoaderFunctionArgs } from "react-router-dom";
 import { Link, useLoaderData } from "react-router-dom";
-import superjson from "superjson";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { services } from "~/server/services";
+import { publicLoader } from "../lib/base-loaders";
 
 const years = Array.from({ length: 30 }, (_, i) => 2025 - i);
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  try {
-    console.log("⚡️ shows loader start:", request.method, new URL(request.url).pathname);
+export const loader = publicLoader(async ({ request }) => {
+  console.log("⚡️ shows loader start:", request.method, new URL(request.url).pathname);
 
-    const url = new URL(request.url);
-    const year = url.searchParams.get("year") || new Date().getFullYear() - 1;
-    const yearInt = Number.parseInt(year as string);
+  const url = new URL(request.url);
+  const year = url.searchParams.get("year") || new Date().getFullYear() - 1;
+  const yearInt = Number.parseInt(year as string);
 
-    console.log("⚡️ shows loader - fetching setlists for year:", yearInt);
-    const setlists = await services.setlists.findMany({
-      year: yearInt,
-    });
-    console.log("⚡️ shows loader - found setlists:", setlists.length);
+  console.log("⚡️ shows loader - fetching setlists for year:", yearInt);
 
-    const { json: data, meta } = superjson.serialize({ setlists, year });
-    console.log("⚡️ shows loader end - success");
-    return { data, meta };
-  } catch (error) {
-    console.error("⚡️ shows loader error:", error);
-    throw error;
-  }
-}
+  const setlists = await services.setlists.findMany({
+    year: yearInt,
+  });
+  console.log("⚡️ shows loader - found setlists:", setlists.length);
+
+  return { setlists, year };
+});
 
 export default function Shows() {
-  const { data, meta } = useLoaderData<typeof loader>();
-  const { setlists, year } = superjson.deserialize({ json: data, meta }) as { setlists: Setlist[]; year: string };
+  const { setlists, year } = useSerializedLoaderData<typeof loader>();
 
   return (
     <>
@@ -51,7 +44,11 @@ export default function Shows() {
       {/* Year navigation */}
       <div className="mb-8 flex flex-wrap gap-2">
         {years.map((year) => (
-          <Link key={year} to={`/shows?year=${year}`} className="px-3 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground">
+          <Link
+            key={year}
+            to={`/shows?year=${year}`}
+            className="px-3 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
+          >
             {year}
           </Link>
         ))}
@@ -60,17 +57,14 @@ export default function Shows() {
       {/* Month navigation */}
       <div className="mb-8 flex gap-2">
         {months.map((month) => (
-          <Link key={month} to={`/shows?month=${month}`} className="px-3 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground">
+          <Link
+            key={month}
+            to={`/shows?month=${month}`}
+            className="px-3 py-1 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
+          >
             {month}
           </Link>
         ))}
-      </div>
-
-      {/* View options */}
-      <div className="mb-8 flex justify-end">
-        <button type="button" className="text-sm text-muted-foreground hover:text-foreground">
-          VIEW COMPACT LIST
-        </button>
       </div>
 
       {/* Setlist cards */}

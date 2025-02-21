@@ -12,6 +12,11 @@ export class TrackRepository extends BaseRepository<Track, NewTrack> {
     return result[0] ? transformTrack(result[0]) : null;
   }
 
+  async findBySlug(slug: string): Promise<Track | null> {
+    const result = await this.db.select().from(tracks).where(eq(tracks.slug, slug));
+    return result[0] ? transformTrack(result[0]) : null;
+  }
+
   async findMany(filter: TrackFilter): Promise<Track[]> {
     const conditions: SQL<unknown>[] = [];
 

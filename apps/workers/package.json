@@ -17,7 +17,6 @@
     "@temporalio/workflow": "*"
   },
   "devDependencies": {
-    "@bip/ts-config": "workspace:*",
     "typescript": "*"
   }
 }

@@ -10,11 +10,12 @@
     "push": "drizzle-kit push:pg",
     "studio": "drizzle-kit studio",
     "introspect": "mkdir -p src/shared/database && doppler run -- drizzle-kit introspect:pg > src/shared/database/schema.ts",
-    "build": "pnpm generate"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
     "drizzle-orm": "*",
+    "redis": "*",
     "postgres": "*",
     "zod": "*"
   },

@@ -2,6 +2,7 @@ import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse }
 import type { Route } from "./+types/root";
 import { RootLayout } from "./components/layout/root-layout";
 import "./styles.css";
+import { SidebarProvider } from "./components/ui/sidebar";
 
 export const beforeLoad = ({ request }: { request: Request }) => {
   console.log("⚡️ beforeLoad:", request.method, new URL(request.url).pathname);
@@ -22,9 +23,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <RootLayout>
-          <Outlet />
-        </RootLayout>
+        <SidebarProvider defaultOpen>
+          <RootLayout>
+            <Outlet />
+          </RootLayout>
+        </SidebarProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -61,3 +64,5 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     </main>
   );
 }
+
+export const links = () => [];

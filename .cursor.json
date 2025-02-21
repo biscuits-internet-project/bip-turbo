@@ -1,0 +1,181 @@
+{
+  "name": "bip-turbo",
+  "description": "Monorepo for BIP application using modern web technologies",
+  "techStack": {
+    "framework": "react",
+    "router": "react-router@7",
+    "packageManager": "pnpm",
+    "buildTool": "turbo",
+    "styling": "tailwindcss",
+    "language": "typescript",
+    "validation": "zod",
+    "testing": "vitest",
+    "components": "shadcn-ui"
+  },
+  "rules": {
+    "imports": {
+      "react-router-dom": {
+        "preferredImports": [
+          "Form",
+          "Link",
+          "useLoaderData",
+          "useNavigate",
+          "useSearchParams",
+          "type LoaderFunctionArgs"
+        ]
+      },
+      "zod": {
+        "preferredImports": ["z"]
+      }
+    },
+    "typescript": {
+      "strict": true,
+      "noUncheckedIndexedAccess": true
+    },
+    "react": {
+      "preferFunctionComponents": true,
+      "preferConstOverFunction": true,
+      "hooksPrefix": "use",
+      "componentSuffix": false
+    },
+    "tailwind": {
+      "preferredColors": {
+        "primary": "text-foreground",
+        "secondary": "text-muted-foreground",
+        "accent": "text-primary"
+      },
+      "preferredComponents": {
+        "card": ["Card", "CardHeader", "CardTitle", "CardContent", "CardFooter"],
+        "input": ["Input"],
+        "button": ["Button"],
+        "select": ["Select", "SelectTrigger", "SelectValue", "SelectContent", "SelectItem"]
+      }
+    },
+    "shadcn": {
+      "location": "apps/web/app/components/ui",
+      "components": {
+        "card": {
+          "parts": ["Card", "CardHeader", "CardTitle", "CardContent", "CardFooter"],
+          "usage": "Used for containing related content with a consistent style"
+        },
+        "input": {
+          "parts": ["Input"],
+          "usage": "Form inputs with consistent styling"
+        },
+        "button": {
+          "parts": ["Button"],
+          "variants": ["default", "secondary", "ghost", "link"],
+          "usage": "Interactive elements with consistent styling"
+        },
+        "select": {
+          "parts": ["Select", "SelectTrigger", "SelectValue", "SelectContent", "SelectItem"],
+          "usage": "Dropdown selection with consistent styling"
+        }
+      },
+      "theme": {
+        "colors": {
+          "background": "Dark mode optimized background",
+          "foreground": "Primary text color",
+          "muted": "Secondary/subtle text",
+          "accent": "Highlight color",
+          "border": "Subtle borders",
+          "input": "Form input borders"
+        }
+      }
+    },
+    "monorepo": {
+      "workspaces": [
+        "apps/*",
+        "packages/*"
+      ],
+      "apps": {
+        "web": {
+          "path": "apps/web",
+          "type": "react",
+          "port": 3000
+        }
+      },
+      "packages": {
+        "core": {
+          "path": "packages/core",
+          "type": "library",
+          "structure": {
+            "src": {
+              "_shared": {
+                "drizzle": "Database schema and types",
+                "repository": "Base repository patterns",
+                "base-service": "Base service patterns"
+              },
+              "songs": {
+                "song-service.ts": "Song business logic",
+                "song-repository.ts": "Song data access",
+                "song-transformer.ts": "Song data transformations"
+              },
+              "venues": {
+                "venue-service.ts": "Venue business logic",
+                "venue-repository.ts": "Venue data access",
+                "venue-transformer.ts": "Venue data transformations"
+              },
+              "shows": {
+                "show-service.ts": "Show business logic",
+                "show-repository.ts": "Show data access",
+                "show-transformer.ts": "Show data transformations"
+              }
+            }
+          },
+          "patterns": {
+            "repository": {
+              "naming": "{entity}-repository.ts",
+              "methods": ["findMany", "findById", "findBySlug", "create", "update", "delete"]
+            },
+            "service": {
+              "naming": "{entity}-service.ts",
+              "methods": ["findMany", "findById", "findBySlug", "create", "update", "delete"]
+            },
+            "transformer": {
+              "naming": "{entity}-transformer.ts",
+              "purpose": "Transform database entities to domain models"
+            }
+          }
+        },
+        "domain": {
+          "path": "packages/domain",
+          "type": "types",
+          "entities": {
+            "Song": {
+              "fields": ["id", "title", "slug", "timesPlayed", "dateLastPlayed"],
+              "relations": ["shows", "venues"]
+            },
+            "Venue": {
+              "fields": ["id", "name", "slug", "city", "state", "timesPlayed"],
+              "relations": ["shows", "songs"]
+            },
+            "Show": {
+              "fields": ["id", "date", "venueId", "setlist"],
+              "relations": ["venue", "songs"]
+            }
+          }
+        }
+      }
+    },
+    "fileStructure": {
+      "apps/web": {
+        "routes": "app/routes",
+        "components": "app/components",
+        "styles": "app/styles",
+        "server": "app/server"
+      }
+    },
+    "conventions": {
+      "routes": {
+        "naming": "kebab-case",
+        "loaderNaming": "loader",
+        "actionNaming": "action"
+      },
+      "components": {
+        "location": "app/components/ui",
+        "naming": "PascalCase"
+      }
+    }
+  }
+} 

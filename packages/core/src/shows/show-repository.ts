@@ -13,6 +13,11 @@ export class ShowRepository extends BaseRepository<Show, NewShow, ShowFilter> {
     return result[0] ? transformShow(result[0]) : null;
   }
 
+  async findBySlug(slug: string): Promise<Show | null> {
+    const result = await this.db.select().from(shows).where(eq(shows.slug, slug));
+    return result[0] ? transformShow(result[0]) : null;
+  }
+
   async findMany(filter?: ShowFilter): Promise<Show[]> {
     const conditions: SQL<unknown>[] = [];
 

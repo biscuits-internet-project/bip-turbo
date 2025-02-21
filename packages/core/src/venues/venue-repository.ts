@@ -1,6 +1,6 @@
 import type { Venue } from "@bip/domain";
 import type { SQL } from "drizzle-orm";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { venues } from "../_shared/drizzle/schema";
 import type { NewVenue } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
@@ -10,6 +10,11 @@ import { transformVenue } from "./venue-transformer";
 export class VenueRepository extends BaseRepository<Venue, NewVenue> {
   async findById(id: string): Promise<Venue | null> {
     const result = await this.db.select().from(venues).where(eq(venues.id, id));
+    return result[0] ? transformVenue(result[0]) : null;
+  }
+
+  async findBySlug(slug: string): Promise<Venue | null> {
+    const result = await this.db.select().from(venues).where(eq(venues.slug, slug));
     return result[0] ? transformVenue(result[0]) : null;
   }
 
@@ -23,7 +28,8 @@ export class VenueRepository extends BaseRepository<Venue, NewVenue> {
     const result = await this.db
       .select()
       .from(venues)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(venues.timesPlayed));
     return result.map(transformVenue);
   }
 

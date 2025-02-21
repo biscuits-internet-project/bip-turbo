@@ -1,4 +1,5 @@
-import { BandRepository } from "../bands/band-repository";
+import type { Logger } from "@bip/domain";
+import type { RedisClientType } from "redis";
 import { SetlistRepository } from "../setlists/setlist-repository";
 import { ShowRepository } from "../shows/show-repository";
 import { SongRepository } from "../songs/song-repository";
@@ -9,8 +10,9 @@ import type { Database } from "./drizzle/client";
 
 export interface ServiceContainer {
   db: Database;
+  redis: RedisClientType;
+  logger: Logger;
   repositories: {
-    bands: BandRepository;
     setlists: SetlistRepository;
     shows: ShowRepository;
     songs: SongRepository;
@@ -20,10 +22,20 @@ export interface ServiceContainer {
   };
 }
 
-export function createContainer(db: Database): ServiceContainer {
+export interface ContainerArgs {
+  db?: Database;
+  redis?: RedisClientType;
+  logger: Logger;
+}
+
+export function createContainer(args: ContainerArgs): ServiceContainer {
+  const { db, redis, logger } = args;
+
+  if (!db) throw new Error("Database connection required for container initialization");
+  if (!redis) throw new Error("Redis connection required for container initialization");
+
   // Create repositories
   const repositories = {
-    bands: new BandRepository(db),
     setlists: new SetlistRepository(db),
     shows: new ShowRepository(db),
     songs: new SongRepository(db),
@@ -34,6 +46,8 @@ export function createContainer(db: Database): ServiceContainer {
 
   return {
     db,
+    redis,
+    logger,
     repositories,
   };
 }
@@ -41,10 +55,9 @@ export function createContainer(db: Database): ServiceContainer {
 // Singleton instance
 let container: ServiceContainer | undefined;
 
-export function getContainer(db?: Database): ServiceContainer {
+export function getContainer(args: ContainerArgs): ServiceContainer {
   if (!container) {
-    if (!db) throw new Error("Database connection required for container initialization");
-    container = createContainer(db);
+    container = createContainer(args);
   }
   return container;
 }

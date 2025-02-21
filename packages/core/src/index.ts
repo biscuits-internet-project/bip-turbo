@@ -1,7 +1,4 @@
 // Domain exports
-export * from "./bands/band-service";
-export * from "./bands/band-transformer";
-
 export * from "./shows/show-service";
 export * from "./shows/show-transformer";
 
@@ -19,6 +16,7 @@ export * from "./users/user-transformer";
 
 // Shared exports
 export * from "./_shared/drizzle";
+export * from "./_shared/redis";
 export * from "./_shared/container";
 export * from "./_shared/services";
 
