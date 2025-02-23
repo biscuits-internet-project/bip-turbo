@@ -28,19 +28,16 @@ jobs:
         run: pnpm install
       
       - name: Type Check
-        run: pnpm typecheck
+        run: turbo typecheck
       
       - name: Biome Check
-        run: pnpm biome check .
-      
-      - name: Biome Format Check
-        run: pnpm biome format . --check
+        run: turbo lint
       
       - name: Run tests
-        run: pnpm test
+        run: turbo test
       
       - name: Build
-        run: pnpm build
+        run: turbo build
       
       - name: Install Fly
         uses: superfly/flyctl-actions/setup-flyctl@master
