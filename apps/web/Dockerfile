@@ -23,6 +23,10 @@ RUN pnpm run build --filter=@bip/web...
 FROM base AS runner
 WORKDIR /app
 COPY --from=builder /app .
+
+RUN chown -R node:node .
+USER node
+
 WORKDIR /app/apps/web
 EXPOSE 8080
 CMD ["pnpm", "start"]
