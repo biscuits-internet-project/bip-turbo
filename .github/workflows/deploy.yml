@@ -46,6 +46,9 @@ jobs:
 
       - name: Type Check
         run: |
+          # Build domain first
+          pnpm --filter @bip/domain build
+          # Then run typechecks in order
           pnpm --filter @bip/domain typecheck
           pnpm --filter @bip/core typecheck
           pnpm --filter @bip/web typecheck
