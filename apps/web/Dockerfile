@@ -24,8 +24,14 @@ FROM base AS runner
 WORKDIR /app
 COPY --from=builder /app .
 
-RUN chown -R node:node .
+# Set up permissions properly
+RUN chown -R node:node /app
+RUN chmod +x /app/packages/core/node_modules/.bin/*
 USER node
+
+# Add migrations script explicitly
+RUN echo "#!/bin/sh\ncd /app/packages/core && pnpm drizzle-kit push:pg" > /app/migrate.sh
+RUN chmod +x /app/migrate.sh
 
 WORKDIR /app/apps/web
 EXPOSE 8080

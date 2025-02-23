@@ -10,8 +10,7 @@ kill_timeout = "5s"
   dockerfile = "Dockerfile"
 
 [deploy]
-  release_command = "pnpm --dir /app/packages/core migrate"
-
+  release_command = "sh /app/migrate.sh"
 
 [env]
   PORT = "8080"
