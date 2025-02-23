@@ -14,6 +14,7 @@ type Params = {
   "/venues/:slug": {
     "slug": string;
   };
+  "/healthcheck": {};
   "/shows/:slug": {
     "slug": string;
   };
@@ -21,5 +22,4 @@ type Params = {
     "slug": string;
   };
   "/tour-dates": {};
-  "/health": {};
 };
