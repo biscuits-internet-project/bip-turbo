@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "pnpm --filter @bip/core exec tsc --noEmit",
+    "lint": "biome lint",
     "generate": "drizzle-kit generate:pg",
     "push": "drizzle-kit push:pg",
     "studio": "drizzle-kit studio",

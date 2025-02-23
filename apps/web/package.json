@@ -7,7 +7,7 @@
     "dev": "doppler run -- react-router dev",
     "start": "doppler run -- react-router-serve ./build/server/index.js --port 3000 | pino-pretty",
     "typecheck": "react-router typegen && tsc",
-    "lint": "biome lint .",
+    "lint": "biome lint",
     "format": "biome format . --write"
   },
   "dependencies": {

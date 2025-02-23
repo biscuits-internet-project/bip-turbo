@@ -7,6 +7,9 @@ build:
 tc:
 	turbo run typecheck
 
+lint:
+	turbo run lint
+
 clean:
 	turbo run clean
 
