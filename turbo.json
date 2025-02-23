@@ -7,12 +7,10 @@
       "outputs": ["dist/**", ".next/**", "build/**"]
     },
     "lint": {
-      "outputs": [],
-      "cache": true
+      "outputs": []
     },
     "format": {
-      "outputs": [],
-      "cache": true
+      "outputs": []
     },
     "dev": {
       "cache": false,

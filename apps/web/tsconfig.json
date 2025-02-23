@@ -1,9 +1,23 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "include": ["**/*", "**/.server/**/*", "**/.client/**/*", ".react-router/types/**/*", ".react-router/dev/**/*"],
   "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "react-jsx",
+
+    // Language Features
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+
+    // React Router specific
     "types": ["node", "vite/client"],
     "rootDirs": [".", "./.react-router/types"],
+
+    // Path aliases
     "baseUrl": ".",
     "paths": {
       "~/*": ["./app/*"],
@@ -11,6 +25,10 @@
       "@/components/*": ["app/components/*"],
       "@/lib/*": ["app/lib/*"],
       "@/ui/*": ["app/components/ui/*"]
-    }
-  }
+    },
+
+    // Output
+    "noEmit": true // Since React Router handles the build
+  },
+  "include": ["**/*", "**/.server/**/*", "**/.client/**/*", ".react-router/types/**/*", ".react-router/dev/**/*"]
 }
