@@ -68,6 +68,6 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
       
       - name: Deploy to Fly
-        run: flyctl deploy --remote-only --config apps/web/fly.toml --dockerfile apps/web/Dockerfile
+        run: flyctl deploy --strategy bluegreen --remote-only --config apps/web/fly.toml --dockerfile apps/web/Dockerfile
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }} 
