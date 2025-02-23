@@ -1,5 +1,4 @@
 import type { Logger } from "@bip/domain";
-import type { RedisClientType } from "redis";
 import { SetlistRepository } from "../setlists/setlist-repository";
 import { ShowRepository } from "../shows/show-repository";
 import { SongRepository } from "../songs/song-repository";

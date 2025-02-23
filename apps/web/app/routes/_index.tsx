@@ -3,20 +3,31 @@ import { Link } from "react-router-dom";
 
 export default function Index() {
   return (
-    <div className="container max-w-6xl">
+    <div className="min-h-screen">
       {/* Hero section */}
-      <div className="py-12 text-center">
-        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent">Welcome to BiP 3.0</h1>
-        <p className="text-xl text-muted-foreground mb-8">Your ultimate resource for the Disco Biscuits - shows, setlists, stats, and more.</p>
+      <div className="px-4 py-12 text-center">
+        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent">
+          Welcome to BiP 3.0
+        </h1>
+        <p className="text-xl text-muted-foreground mb-8">
+          Your ultimate resource for the Disco Biscuits - shows, setlists, stats, and more.
+        </p>
         <div className="relative max-w-2xl mx-auto mb-12">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <input type="search" placeholder="Search shows, songs, venues..." className="w-full rounded-lg border border-input bg-background pl-10 pr-4 py-3 text-lg" />
+          <input
+            type="search"
+            placeholder="Search shows, songs, venues..."
+            className="w-full rounded-lg border border-input bg-background pl-10 pr-4 py-3 text-lg"
+          />
         </div>
       </div>
 
       {/* Quick access grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-        <Link to="/shows" className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors">
+      <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        <Link
+          to="/shows"
+          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
+        >
           <div className="flex items-center justify-between mb-4">
             <Music className="h-6 w-6 text-purple-500" />
             <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
@@ -25,7 +36,10 @@ export default function Index() {
           <p className="text-muted-foreground">Browse through our comprehensive database of shows and setlists.</p>
         </Link>
 
-        <Link to="/songs" className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors">
+        <Link
+          to="/songs"
+          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
+        >
           <div className="flex items-center justify-between mb-4">
             <Music className="h-6 w-6 text-purple-500" />
             <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
@@ -34,7 +48,10 @@ export default function Index() {
           <p className="text-muted-foreground">Explore the complete catalog of Disco Biscuits songs.</p>
         </Link>
 
-        <Link to="/venues" className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors">
+        <Link
+          to="/venues"
+          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
+        >
           <div className="flex items-center justify-between mb-4">
             <MapPin className="h-6 w-6 text-purple-500" />
             <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
@@ -43,7 +60,10 @@ export default function Index() {
           <p className="text-muted-foreground">Discover where the band has played throughout their history.</p>
         </Link>
 
-        <Link to="/tour-dates" className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors">
+        <Link
+          to="/tour-dates"
+          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
+        >
           <div className="flex items-center justify-between mb-4">
             <Calendar className="h-6 w-6 text-purple-500" />
             <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
@@ -54,7 +74,7 @@ export default function Index() {
       </div>
 
       {/* Stats section */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+      <div className="px-4 grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
         <div className="p-4 text-center rounded-lg border border-border bg-card">
           <div className="text-3xl font-bold text-purple-500 mb-1">2,000+</div>
           <div className="text-sm text-muted-foreground">Shows</div>

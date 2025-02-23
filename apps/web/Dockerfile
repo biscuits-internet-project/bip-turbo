@@ -1,22 +1,26 @@
-FROM node:20-alpine AS development-dependencies-env
-COPY . /app
-WORKDIR /app
-RUN npm ci
+FROM node:22-alpine AS base
+RUN npm install -g pnpm
+RUN npm install -g turbo
 
-FROM node:20-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
+FROM base AS builder
 WORKDIR /app
-RUN npm ci --omit=dev
+# Copy all files needed for building
+COPY . .
+# Install all dependencies (including devDependencies)
+RUN pnpm install
+# Build web and all its dependencies
+RUN turbo run build --filter=@bip/web...
 
-FROM node:20-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
+FROM base AS runner
 WORKDIR /app
-RUN npm run build
+# Copy production dependencies and built files
+COPY --from=builder /app/package.json /app/package.json
+COPY --from=builder /app/pnpm-lock.yaml /app/pnpm-lock.yaml
+COPY --from=builder /app/apps/web/package.json /app/apps/web/package.json
+# Copy all package build outputs
+COPY --from=builder /app/packages/*/dist /app/packages/*/dist
+COPY --from=builder /app/apps/web/build /app/apps/web/build
 
-FROM node:20-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
-WORKDIR /app
-CMD ["npm", "run", "start"]
+# Install production dependencies only
+RUN pnpm install --prod
+CMD ["pnpm", "start"]

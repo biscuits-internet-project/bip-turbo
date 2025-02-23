@@ -23,3 +23,13 @@ export const trackSchema = z.object({
 });
 
 export type Track = z.infer<typeof trackSchema>;
+
+export const trackMinimalSchema = z.object({
+  id: z.string().uuid(),
+  songId: z.string().uuid(),
+  songSlug: z.string().nullable(),
+  songTitle: z.string(),
+  segue: z.string().nullable(),
+});
+
+export type TrackMinimal = z.infer<typeof trackMinimalSchema>;

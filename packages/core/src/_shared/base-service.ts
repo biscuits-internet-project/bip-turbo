@@ -1,9 +1,9 @@
 import type { Logger } from "@bip/domain";
+import type { BaseRepository } from "./repository/base";
 
-export abstract class BaseService {
-  protected logger: Logger;
-
-  constructor(logger: Logger) {
-    this.logger = logger.child({ service: this.constructor.name });
-  }
+export class BaseService<T, TNew, TFilter> {
+  constructor(
+    protected repository: BaseRepository<T, TNew, TFilter>,
+    protected logger: Logger,
+  ) {}
 }

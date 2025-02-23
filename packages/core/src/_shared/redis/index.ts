@@ -24,9 +24,9 @@ export class RedisService {
     return value ? JSON.parse(value) : null;
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
+  async set<T>(key: string, value: T, options?: { EX?: number }): Promise<void> {
     await this.connect();
-    await this.client.set(key, JSON.stringify(value));
+    await this.client.set(key, JSON.stringify(value), options);
   }
 
   async del(key: string): Promise<void> {

@@ -3,9 +3,9 @@ import { Search } from "lucide-react";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { notFound } from "~/lib/errors";
 import { services } from "~/server/services";
 import { publicLoader } from "../lib/base-loaders";
-
 interface ShowLoaderData {
   setlist: Setlist;
 }
@@ -13,15 +13,11 @@ interface ShowLoaderData {
 export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> => {
   console.log("⚡️ shows.$slug loader:", params.slug);
   const slug = params.slug;
-  if (!slug) {
-    throw new Error("slug is required");
-  }
+  if (!slug) throw notFound();
 
   // retrieve shows for the given year using drizzle SQL<Shows>
   const setlist = await services.setlists.findBySlug(slug);
-  if (!setlist) {
-    throw new Error("setlist not found");
-  }
+  if (!setlist) throw notFound();
 
   return { setlist };
 });

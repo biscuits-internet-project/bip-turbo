@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { trackSchema } from "./track";
-import { venueSchema } from "./venue";
+import { venueMinimalSchema, venueSchema } from "./venue";
 
 export const showSchema = z.object({
   id: z.string().uuid(),
@@ -21,4 +21,21 @@ export const showSchema = z.object({
   venue: venueSchema.nullable().optional(),
 });
 
+export const showMinimalSchema = showSchema.pick({
+  id: true,
+  slug: true,
+  date: true,
+  venueId: true,
+});
+
+export interface TourDate {
+  venueName: string;
+  formattedStartDate: string;
+  formattedEndDate: string;
+  date: string;
+  details: string;
+  address: string;
+}
+
 export type Show = z.infer<typeof showSchema>;
+export type ShowMinimal = z.infer<typeof showMinimalSchema>;

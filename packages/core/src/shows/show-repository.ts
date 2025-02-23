@@ -1,8 +1,8 @@
-import type { Show } from "@bip/domain";
-import type { SQL } from "drizzle-orm";
-import { and, between, eq } from "drizzle-orm";
+import type { Show, SongPageView } from "@bip/domain";
+import { between, eq } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { transformShow } from "..";
-import { shows, songs, tracks, venues } from "../_shared/drizzle/schema";
+import { annotations, shows, songs, tracks, venues } from "../_shared/drizzle/schema";
 import type { NewShow } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 import type { ShowFilter } from "./show-service";
@@ -19,20 +19,22 @@ export class ShowRepository extends BaseRepository<Show, NewShow, ShowFilter> {
   }
 
   async findMany(filter?: ShowFilter): Promise<Show[]> {
-    const conditions: SQL<unknown>[] = [];
+    let baseQuery = this.db
+      .select({
+        show: shows,
+      })
+      .from(shows);
 
     if (filter?.year) {
       const startDate = new Date(filter.year, 0, 1);
       const endDate = new Date(filter.year + 1, 0, 1);
-      conditions.push(between(shows.date, startDate.toISOString(), endDate.toISOString()));
+      baseQuery = baseQuery.where(
+        between(shows.date, startDate.toISOString(), endDate.toISOString()),
+      ) as unknown as typeof baseQuery;
     }
 
-    const result = await this.db
-      .select()
-      .from(shows)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    return result.map(transformShow);
+    const result = await baseQuery;
+    return result.map((row) => transformShow(row.show));
   }
 
   async create(data: NewShow): Promise<Show> {

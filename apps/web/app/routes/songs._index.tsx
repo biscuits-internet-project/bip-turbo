@@ -1,9 +1,11 @@
 import type { TrendingSong } from "@bip/core";
 import type { Song } from "@bip/domain";
+import { Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
 import { publicLoader } from "../lib/base-loaders";
 import { services } from "../server/services";
 
@@ -18,7 +20,7 @@ interface LoaderData {
 export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
   const [songs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
     services.songs.findMany({}),
-    services.songs.findTrending(),
+    services.songs.findTrendingLastXShows(10, 6),
     services.songs.findTrendingLastYear(),
   ]);
 
@@ -31,19 +33,24 @@ interface SongCardProps {
 
 function SongCard({ song }: SongCardProps) {
   return (
-    <Card className="hover:bg-accent/50 transition-colors">
+    <Card className="bg-gray-900 border-gray-800 hover:bg-accent/10 transition-colors">
       <CardHeader>
         <CardTitle className="text-xl">
-          <Link to={`/songs/${song.slug}`} className="text-foreground hover:text-primary">
+          <Link to={`/songs/${song.slug}`} className="text-white hover:text-purple-400">
             {song.title}
           </Link>
         </CardTitle>
       </CardHeader>
       {song.timesPlayed > 0 && (
         <CardContent>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-gray-400 text-sm">
             Played {song.timesPlayed} times
-            {song.dateLastPlayed && ` (Last: ${song.dateLastPlayed.toLocaleDateString()})`}
+            {song.dateLastPlayed && (
+              <span className="text-gray-500">
+                {" "}
+                (Last: {new Date(song.dateLastPlayed).toLocaleDateString("en-US", { timeZone: "UTC" })})
+              </span>
+            )}
           </p>
         </CardContent>
       )}
@@ -57,17 +64,17 @@ interface TrendingSongCardProps {
 
 function TrendingSongCard({ song }: TrendingSongCardProps) {
   return (
-    <Card className="hover:bg-accent/50 transition-colors">
+    <Card className="bg-gray-900 border-gray-800 hover:bg-accent/10 transition-colors">
       <CardHeader>
         <CardTitle className="text-lg">
-          <Link to={`/songs/${song.slug}`} className="text-foreground hover:text-primary">
+          <Link to={`/songs/${song.slug}`} className="text-white hover:text-purple-400">
             {song.title}
           </Link>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-primary">Played in {song.count} of the last 10 shows</p>
-        <p className="text-muted-foreground text-sm">{song.timesPlayed} times total</p>
+        <p className="text-purple-400">{song.count} of the last 10 shows</p>
+        <p className="text-gray-400 text-sm">{song.timesPlayed} times total</p>
       </CardContent>
     </Card>
   );
@@ -76,31 +83,25 @@ function TrendingSongCard({ song }: TrendingSongCardProps) {
 function SearchForm({ onSearch }: { onSearch: (query: string) => void }) {
   const [searchValue, setSearchValue] = useState("");
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchValue.length >= 3 || searchValue.length === 0) {
-        onSearch(searchValue);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchValue, onSearch]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(e.target.value);
-  }, []);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setSearchValue(value);
+      onSearch(value);
+    },
+    [onSearch],
+  );
 
   return (
-    <div className="w-full max-w-lg mx-auto">
-      <div className="relative">
-        <input
-          type="text"
-          value={searchValue}
-          onChange={handleChange}
-          placeholder="Search songs..."
-          className="input"
-        />
-      </div>
+    <div className="relative max-w-2xl mx-auto">
+      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+      <Input
+        type="search"
+        value={searchValue}
+        onChange={handleChange}
+        placeholder="Search songs..."
+        className="w-full pl-10 bg-gray-900 border-gray-800 text-white placeholder:text-gray-400"
+      />
     </div>
   );
 }
@@ -114,19 +115,19 @@ function YearlyTrendingSongs() {
 
   return (
     <div className="mb-6">
-      <h2 className="text-xl font-semibold mb-4 text-foreground">Popular This Year</h2>
-      <Card>
+      <h2 className="text-xl font-semibold mb-4 text-white">Popular This Year</h2>
+      <Card className="bg-gray-900 border-gray-800">
         <CardContent className="p-4">
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-gray-800">
             {yearlyTrendingSongs.map((song: TrendingSong, index: number) => (
               <div key={song.id} className="py-2 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground font-medium w-5">{index + 1}</span>
-                  <Link to={`/songs/${song.slug}`} className="text-foreground hover:text-primary">
+                  <span className="text-gray-400 font-medium w-5">{index + 1}</span>
+                  <Link to={`/songs/${song.slug}`} className="text-white hover:text-purple-400">
                     {song.title}
                   </Link>
                 </div>
-                <span className="text-muted-foreground text-sm">{song.count} shows</span>
+                <span className="text-gray-400 text-sm">{song.count} shows</span>
               </div>
             ))}
           </div>
@@ -144,30 +145,28 @@ export default function Songs() {
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      if (isLoading) return;
+  const loadMoreRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return;
 
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 800;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const first = entries[0];
+          if (first.isIntersecting && !isLoading && displayCount < filteredSongs.length) {
+            setIsLoading(true);
+            setTimeout(() => {
+              setDisplayCount((prev) => Math.min(prev + ITEMS_PER_PAGE, filteredSongs.length));
+              setIsLoading(false);
+            }, 100);
+          }
+        },
+        { rootMargin: "800px" },
+      );
 
-      if (scrolledToBottom && displayCount < filteredSongs.length) {
-        setIsLoading(true);
-        setTimeout(() => {
-          setDisplayCount((prev) => prev + ITEMS_PER_PAGE);
-          setIsLoading(false);
-        }, 100);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [displayCount, filteredSongs.length, isLoading]);
-
-  // Update filtered songs when songs change
-  useEffect(() => {
-    setFilteredSongs(songs);
-  }, [songs]);
+      observer.observe(node);
+    },
+    [displayCount, filteredSongs.length, isLoading],
+  );
 
   const handleSearch = useCallback(
     (query: string) => {
@@ -179,7 +178,7 @@ export default function Songs() {
         const filtered = songs.filter((song: Song) => song.title.toLowerCase().includes(lowerQuery));
         setFilteredSongs(filtered);
       }
-      setDisplayCount(ITEMS_PER_PAGE); // Reset display count when searching
+      setDisplayCount(ITEMS_PER_PAGE);
     },
     [songs],
   );
@@ -189,17 +188,17 @@ export default function Songs() {
   const hasMore = displayCount < filteredSongs.length;
 
   return (
-    <div className="p-6">
-      <div className="space-y-6">
+    <div className="p-4 md:p-6">
+      <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Songs</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-white">Songs</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
             {trendingSongs.length > 0 && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-4 text-foreground">Trending in Recent Shows</h2>
+                <h2 className="text-xl font-semibold mb-4 text-white">Trending in Recent Shows</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {trendingSongs.map((song: TrendingSong) => (
                     <TrendingSongCard key={song.id} song={song} />
@@ -214,9 +213,7 @@ export default function Songs() {
         <SearchForm onSearch={handleSearch} />
 
         {filteredSongs.length === 0 ? (
-          <p className="text-muted-foreground">
-            {searchQuery ? `No songs found matching "${searchQuery}"` : "No songs found"}
-          </p>
+          <p className="text-gray-400">{searchQuery ? `No songs found matching "${searchQuery}"` : "No songs found"}</p>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -226,7 +223,7 @@ export default function Songs() {
             </div>
 
             {hasMore && (
-              <div className="py-8 text-center text-muted-foreground">
+              <div ref={loadMoreRef} className="py-8 text-center text-gray-400">
                 {isLoading ? "Loading more songs..." : `${filteredSongs.length - displayCount} more songs`}
               </div>
             )}

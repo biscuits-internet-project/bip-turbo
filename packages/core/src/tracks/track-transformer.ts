@@ -1,5 +1,5 @@
-import type { Annotation, Track } from "@bip/domain";
-import type { AnnotationRow, TrackRow } from "../_shared/drizzle/types";
+import type { Annotation, Track, TrackMinimal } from "@bip/domain";
+import type { AnnotationRow, SongRow, TrackRow } from "../_shared/drizzle/types";
 import { transformSong } from "../songs/song-transformer";
 
 export function transformAnnotation(annotation: AnnotationRow): Annotation {
@@ -18,5 +18,15 @@ export function transformTrack(track: TrackRow): Track {
     songId: track.songId as string,
     annotations: track.annotations?.map((a) => transformAnnotation(a)) ?? [],
     song: track.song ? transformSong(track.song) : null,
+  };
+}
+
+export function transformTrackMinimal(track: TrackRow, song: SongRow): TrackMinimal {
+  return {
+    id: track.id,
+    songId: track.songId as string,
+    songSlug: track.song?.slug ?? null,
+    songTitle: track.song?.title ?? "",
+    segue: track.segue ?? null,
   };
 }

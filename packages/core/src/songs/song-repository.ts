@@ -34,9 +34,9 @@ export class SongRepository extends BaseRepository<Song, NewSong, SongFilter> {
     return result.map(transformSong);
   }
 
-  async findTrending() {
+  async findTrendingLastXShows(lastXShows: number, limit: number) {
     // First get the IDs of the last 10 shows
-    const recentShows = await this.db.select({ id: shows.id }).from(shows).orderBy(desc(shows.date)).limit(10);
+    const recentShows = await this.db.select({ id: shows.id }).from(shows).orderBy(desc(shows.date)).limit(lastXShows);
     const recentShowIds = recentShows.map((show) => show.id);
 
     const result = await this.db
@@ -50,7 +50,7 @@ export class SongRepository extends BaseRepository<Song, NewSong, SongFilter> {
       .where(inArray(shows.id, recentShowIds))
       .groupBy(songs.id)
       .orderBy(desc(count()))
-      .limit(3);
+      .limit(limit);
 
     return result.map((row) => ({
       ...transformSong(row.song),

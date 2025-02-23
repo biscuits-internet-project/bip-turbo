@@ -1,5 +1,6 @@
 import type { LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import superjson from "superjson";
+import { logger } from "~/lib/logger";
 
 interface LoaderContext {
   auth?: {
@@ -48,14 +49,14 @@ export function createLoader<T>(
       // Metrics logging
       if (options?.metrics) {
         const duration = performance.now() - startTime;
-        console.log(`✅ Request ${context.requestId} completed in ${duration}ms`);
+        logger.info(`✅ Request completed in ${duration}ms`);
       }
 
       return superjson.serialize(result);
     } catch (error) {
       // Error handling middleware
       if (options?.metrics) {
-        console.error(`❌ Request ${context.requestId} failed:`, error);
+        logger.error("❌ Request failed:", error);
       }
       throw error;
     }

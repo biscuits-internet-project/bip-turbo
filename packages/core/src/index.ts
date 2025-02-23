@@ -20,4 +20,5 @@ export * from "./_shared/redis";
 export * from "./_shared/container";
 export * from "./_shared/services";
 
-// Re-export any other core types/modules here
+// Views
+export * from "./page-composers/song-page-composer";

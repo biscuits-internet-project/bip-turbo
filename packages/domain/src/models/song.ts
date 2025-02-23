@@ -25,4 +25,11 @@ export const songSchema = z.object({
   guitarTabsUrl: z.string().nullable(),
 });
 
-export type Song = z.infer<typeof songSchema>; 
+export const songMinimalSchema = songSchema.pick({
+  id: true,
+  title: true,
+  slug: true,
+});
+
+export type Song = z.infer<typeof songSchema>;
+export type SongMinimal = z.infer<typeof songMinimalSchema>;

@@ -19,4 +19,14 @@ export const venueSchema = z.object({
   timesPlayed: z.number().default(0),
 });
 
-export type Venue = z.infer<typeof venueSchema>; 
+export const venueMinimalSchema = venueSchema.pick({
+  id: true,
+  name: true,
+  slug: true,
+  city: true,
+  state: true,
+  country: true,
+});
+
+export type Venue = z.infer<typeof venueSchema>;
+export type VenueMinimal = z.infer<typeof venueMinimalSchema>;
