@@ -1,7 +1,7 @@
 import type { Song } from "@bip/domain";
 import type { SQL } from "drizzle-orm";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
-import { shows, songs, tracks } from "../_shared/drizzle/schema";
+import { shows, songs, tracks } from "../_shared/drizzle";
 import type { NewSong } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 import type { SongFilter } from "./song-service";

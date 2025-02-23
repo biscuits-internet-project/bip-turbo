@@ -4,6 +4,6 @@ setup:
 
 # Configure integrations for each package that needs environment variables
 includes:
-  - path: "packages/database"
+  - path: "packages/core"
     project: bip
     config: dev

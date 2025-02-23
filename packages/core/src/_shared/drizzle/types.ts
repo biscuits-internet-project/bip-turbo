@@ -1,4 +1,4 @@
-import type { annotations, bands, likes, ratings, shows, songs, tracks, users, venues } from "./schema";
+import type { annotations, bands, likes, ratings, shows, songs, tracks, users, venues } from "./migrations/schema";
 
 export type UserRow = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

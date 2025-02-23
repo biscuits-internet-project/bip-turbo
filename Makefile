@@ -19,11 +19,6 @@ web:
 workers:
 	turbo run dev --filter=@bip/workers
 
-db:
-	turbo run db:migrate --filter=@bip/database
+migrate:
+	turbo run migrate --filter=@bip/core
 
-db-studio:
-	turbo run db:studio --filter=@bip/database
-
-db-generate:
-	turbo run db:generate --filter=@bip/database

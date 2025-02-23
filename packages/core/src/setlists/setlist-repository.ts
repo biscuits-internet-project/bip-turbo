@@ -1,7 +1,7 @@
 import type { Annotation, Setlist, Show, Song, Track, Venue } from "@bip/domain";
 import type { SQL } from "drizzle-orm";
 import { and, asc, between, eq } from "drizzle-orm";
-import { annotations, shows, songs, tracks, venues } from "../_shared/drizzle/schema";
+import { annotations, shows, songs, tracks, venues } from "../_shared/drizzle";
 import type { AnnotationRow, ShowRow, SongRow, TrackRow, VenueRow } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 import type { ShowFilter } from "../shows/show-service";

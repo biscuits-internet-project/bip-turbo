@@ -1,7 +1,7 @@
 import type { Venue } from "@bip/domain";
 import type { SQL } from "drizzle-orm";
 import { and, desc, eq } from "drizzle-orm";
-import { venues } from "../_shared/drizzle/schema";
+import { venues } from "../_shared/drizzle";
 import type { NewVenue } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 import type { VenueFilter } from "./venue-service";

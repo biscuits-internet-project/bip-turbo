@@ -2,7 +2,7 @@ import type { Track } from "@bip/domain";
 import type { SQL } from "drizzle-orm";
 import { and, eq } from "drizzle-orm";
 import { type TrackFilter, transformTrack } from "..";
-import { tracks } from "../_shared/drizzle/schema";
+import { tracks } from "../_shared/drizzle";
 import type { NewTrack } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 

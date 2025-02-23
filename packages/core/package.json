@@ -14,7 +14,8 @@
     "push": "drizzle-kit push:pg",
     "studio": "drizzle-kit studio",
     "introspect": "mkdir -p src/shared/database && doppler run -- drizzle-kit introspect:pg > src/shared/database/schema.ts",
-    "migrate": "drizzle-kit migrate"
+    "db:migrate": "doppler run -- drizzle-kit push",
+    "db:pull": "doppler run -- drizzle-kit pull"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",

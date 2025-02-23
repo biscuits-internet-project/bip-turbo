@@ -1,7 +1,7 @@
 import type { User } from "@bip/domain";
 import { eq } from "drizzle-orm";
 import { transformUser } from "..";
-import { users } from "../_shared/drizzle/schema";
+import { users } from "../_shared/drizzle";
 import type { NewUser } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 

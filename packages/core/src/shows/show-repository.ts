@@ -2,7 +2,7 @@ import type { Show, SongPageView } from "@bip/domain";
 import { between, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { transformShow } from "..";
-import { annotations, shows, songs, tracks, venues } from "../_shared/drizzle/schema";
+import { annotations, shows, songs, tracks, venues } from "../_shared/drizzle";
 import type { NewShow } from "../_shared/drizzle/types";
 import { BaseRepository } from "../_shared/repository/base";
 import type { ShowFilter } from "./show-service";
