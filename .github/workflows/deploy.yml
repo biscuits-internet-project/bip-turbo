@@ -44,6 +44,6 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
       
       - name: Deploy to Fly
-        run: flyctl deploy --remote-only
+        run: flyctl -a bip-web-prd deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }} 
