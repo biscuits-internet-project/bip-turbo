@@ -6,12 +6,12 @@ export interface SetlistFilter {
   year: number;
 }
 
-export class SetlistService extends BaseService {
+export class SetlistService extends BaseService<Setlist, Setlist, SetlistFilter> {
   constructor(
-    private readonly repository: SetlistRepository,
+    protected readonly repository: SetlistRepository,
     logger: Logger,
   ) {
-    super(logger);
+    super(repository, logger);
   }
 
   async findById(id: string): Promise<Setlist | null> {

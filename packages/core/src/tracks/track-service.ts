@@ -7,12 +7,12 @@ export type TrackFilter = {
   showId?: string;
 };
 
-export class TrackService extends BaseService {
+export class TrackService extends BaseService<Track, NewTrack, TrackFilter> {
   constructor(
-    private readonly repository: TrackRepository,
+    protected readonly repository: TrackRepository,
     logger: Logger,
   ) {
-    super(logger);
+    super(repository, logger);
   }
 
   async findById(id: string): Promise<Track | null> {

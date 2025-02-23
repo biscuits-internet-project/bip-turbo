@@ -6,23 +6,23 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "typecheck": "pnpm --filter @bip/core exec tsc --noEmit",
     "generate": "drizzle-kit generate:pg",
     "push": "drizzle-kit push:pg",
     "studio": "drizzle-kit studio",
-    "introspect": "mkdir -p src/shared/database && doppler run -- drizzle-kit introspect:pg > src/shared/database/schema.ts",
-    "typecheck": "tsc --noEmit"
+    "introspect": "mkdir -p src/shared/database && doppler run -- drizzle-kit introspect:pg > src/shared/database/schema.ts"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
-    "drizzle-orm": "*",
-    "redis": "*",
-    "postgres": "*",
-    "zod": "*"
+    "drizzle-orm": "^0.39.3",
+    "redis": "^4.7.0",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
-    "drizzle-kit": "*",
-    "pg": "*",
-    "@types/pg": "*",
-    "typescript": "*"
+    "drizzle-kit": "^0.30.4",
+    "pg": "^8.13.3",
+    "@types/pg": "^8.11.11",
+    "typescript": "^5.7.3"
   }
 } 

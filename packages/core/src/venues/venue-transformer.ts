@@ -14,5 +14,8 @@ export function transformVenueMinimal(venue: VenueRow): VenueMinimal {
     id: venue.id,
     name: venue.name,
     slug: venue.slug,
+    country: venue.country,
+    state: venue.state,
+    city: venue.city,
   };
 }

@@ -1,4 +1,4 @@
-import type { Logger } from "@bip/domain";
+import type { Logger, Venue } from "@bip/domain";
 import { BaseService } from "../_shared/base-service";
 import type { NewVenue } from "../_shared/drizzle/types";
 import type { VenueRepository } from "./venue-repository";
@@ -7,12 +7,12 @@ export interface VenueFilter {
   name?: string;
 }
 
-export class VenueService extends BaseService {
+export class VenueService extends BaseService<Venue, NewVenue, VenueFilter> {
   constructor(
-    private readonly repository: VenueRepository,
+    protected readonly repository: VenueRepository,
     logger: Logger,
   ) {
-    super(logger);
+    super(repository, logger);
   }
 
   async findById(id: string) {

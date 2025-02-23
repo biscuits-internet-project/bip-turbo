@@ -1,13 +1,14 @@
 import type { Logger, User } from "@bip/domain";
 import { BaseService } from "../_shared/base-service";
-import type { UserRepository } from "../_shared/repository";
+import type { NewUser } from "../_shared/drizzle/types";
+import type { UserRepository } from "./user-repository";
 
-export class UserService extends BaseService {
+export class UserService extends BaseService<User, NewUser, undefined> {
   constructor(
-    private readonly repository: UserRepository,
+    protected readonly repository: UserRepository,
     logger: Logger,
   ) {
-    super(logger);
+    super(repository, logger);
   }
 
   async find(id: string): Promise<User | null> {
