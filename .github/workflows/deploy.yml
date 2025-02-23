@@ -6,6 +6,7 @@ on:
       - 'apps/web/**'
       - 'packages/**'
       - 'pnpm-lock.yaml'
+      - '.github/**'
 
 jobs:
   deploy:
