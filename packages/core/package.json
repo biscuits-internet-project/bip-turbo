@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "typecheck": "pnpm --filter @bip/core exec tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "build": "tsup src/index.ts --format esm --dts",
     "dev": "tsup src/index.ts --watch",
     "lint": "biome lint",
