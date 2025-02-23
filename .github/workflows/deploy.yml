@@ -7,27 +7,42 @@ on:
       - 'packages/**'
       - 'pnpm-lock.yaml'
       - '.github/**'
-
 jobs:
   deploy:
     name: Deploy Web App
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
       
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-      
+
+      # Setup node with built-in pnpm caching
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
-      
+
+      # Cache the pnpm store
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - uses: actions/cache@v4
+        name: Setup pnpm cache
+        with:
+          path: |
+            ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+            node_modules
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install dependencies
-        run: pnpm install
-      
+        run: pnpm install --frozen-lockfile --prefer-offline
+
       - name: Type Check
         run: pnpm typecheck
       
@@ -44,6 +59,6 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
       
       - name: Deploy to Fly
-        run: flyctl -a bip-web-prd deploy --remote-only
+        run: flyctl deploy --remote-only --config apps/web/fly.toml --dockerfile apps/web/Dockerfile
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }} 
