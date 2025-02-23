@@ -5,7 +5,7 @@
   "scripts": {
     "build": "react-router build",
     "dev": "doppler run -- react-router dev",
-    "start": "doppler run -- react-router-serve ./build/server/index.js --port 3000 | pino-pretty",
+    "start": "react-router-serve ./build/server/index.js --port 8080",
     "typecheck": "react-router typegen && tsc",
     "lint": "biome lint",
     "format": "biome format . --write"

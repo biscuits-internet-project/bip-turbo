@@ -13,14 +13,17 @@ RUN turbo run build --filter=@bip/web...
 
 FROM base AS runner
 WORKDIR /app
-# Copy production dependencies and built files
-COPY --from=builder /app/package.json /app/package.json
-COPY --from=builder /app/pnpm-lock.yaml /app/pnpm-lock.yaml
-COPY --from=builder /app/apps/web/package.json /app/apps/web/package.json
-# Copy all package build outputs
-COPY --from=builder /app/packages/*/dist /app/packages/*/dist
-COPY --from=builder /app/apps/web/build /app/apps/web/build
+# Copy root workspace files
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
 
-# Install production dependencies only
+# Create directories based on the source structure
+COPY --from=builder /app/packages /app/packages
+COPY --from=builder /app/apps/web /app/apps/web
+
+# Install production dependencies
 RUN pnpm install --prod
+
+WORKDIR /app/apps/web
 CMD ["pnpm", "start"]
