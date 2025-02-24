@@ -23,6 +23,10 @@ RUN pnpm run build --filter=@bip/web...
 FROM base AS runner
 WORKDIR /app
 
+# Copy migration script first and set permissions
+COPY --chown=node:node packages/core/scripts/migrate.sh /app/migrate.sh
+RUN chmod +x /app/migrate.sh
+
 # Copy all files from builder
 COPY --from=builder /app .
 
@@ -32,10 +36,6 @@ RUN pnpm install --frozen-lockfile --prod
 # Set up permissions properly
 RUN chown -R node:node /app
 USER node
-
-# Add migrations script
-RUN echo "#!/bin/sh\ncd /app/packages/core && pnpm drizzle-kit push:pg" > /app/migrate.sh
-RUN chmod +x /app/migrate.sh
 
 WORKDIR /app/apps/web
 EXPOSE 8080

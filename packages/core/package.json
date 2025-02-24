@@ -14,8 +14,11 @@
     "push": "drizzle-kit push:pg",
     "studio": "drizzle-kit studio",
     "introspect": "mkdir -p src/shared/database && doppler run -- drizzle-kit introspect:pg > src/shared/database/schema.ts",
-    "db:migrate": "doppler run -- drizzle-kit push",
-    "db:pull": "doppler run -- drizzle-kit pull"
+    "db:generate": "doppler run -- drizzle-kit generate",
+    "db:push": "doppler run -- drizzle-kit push",
+    "db:pull": "doppler run -- drizzle-kit pull",
+    "db:migrate": "doppler run -- drizzle-kit migrate",
+    "migrate": "node --loader ts-node/esm src/_shared/drizzle/migrate.ts"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
@@ -29,6 +32,7 @@
     "pg": "^8.13.3",
     "@types/pg": "^8.11.11",
     "tsup": "^8.3.6",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "ts-node": "^10.9.2"
   }
 } 

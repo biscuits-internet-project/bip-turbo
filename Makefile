@@ -20,5 +20,13 @@ workers:
 	turbo run dev --filter=@bip/workers
 
 migrate:
-	turbo run migrate --filter=@bip/core
+	turbo run db:migrate --filter=@bip/core
 
+generate:
+	turbo run db:generate --filter=@bip/core
+
+push:
+	turbo run db:push --filter=@bip/core
+
+pull:
+	turbo run db:pull --filter=@bip/core

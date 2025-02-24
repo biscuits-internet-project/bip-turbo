@@ -42,7 +42,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
 
         {/* Footer */}
         <div className="absolute bottom-0 left-0 right-0 border-t border-border/40 p-4 bg-[#0a0a0a]">
-          <p className="mb-2 text-xs text-muted-foreground">Help keep the BiP ad-free</p>
+          <p className="mb-2 text-xs text-muted-foreground">Help keep the BIP ad-free</p>
           <Button variant="secondary" className="w-full">
             Donate
           </Button>

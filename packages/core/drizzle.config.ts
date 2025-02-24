@@ -7,10 +7,15 @@ if (!databaseUrl) {
 }
 
 export default defineConfig({
-  out: "./src/_shared/drizzle",
-  schema: "./src/_shared/drizzle/schema.ts",
+  out: "./src/_shared/drizzle/migrations",
+  schema: ["./src/_shared/drizzle/schema/schema.ts"],
   dialect: "postgresql",
   dbCredentials: {
     url: databaseUrl,
+  },
+  schemaFilter: ["public"],
+  migrations: {
+    table: "__drizzle_migrations",
+    schema: "public",
   },
 });
