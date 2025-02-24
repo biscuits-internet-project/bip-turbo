@@ -1,3 +1,3 @@
 export * from "./client";
-export * from "./migrations/schema";
-export * from "./migrations/relations";
+export * from "./schema/schema";
+export * from "./schema/relations";
