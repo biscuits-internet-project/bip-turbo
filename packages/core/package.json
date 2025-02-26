@@ -9,7 +9,13 @@
     "typecheck": "tsc --noEmit",
     "build": "tsup src/index.ts --format esm --dts",
     "dev": "tsup src/index.ts --watch",
-    "lint": "biome lint"
+    "lint": "biome lint",
+    "prisma:generate": "doppler run -- prisma generate --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:migrate:dev": "doppler run -- prisma migrate dev --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:migrate:create": "doppler run -- prisma migrate dev --create-only --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:migrate:baseline": "doppler run -- prisma migrate resolve --applied 0_init --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:introspect": "doppler run -- prisma db pull --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:studio": "doppler run -- prisma studio --schema=./src/_shared/prisma/schema.prisma"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
