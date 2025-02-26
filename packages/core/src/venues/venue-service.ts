@@ -1,13 +1,10 @@
 import type { Logger, Venue } from "@bip/domain";
 import { BaseService } from "../_shared/base-service";
-import type { NewVenue } from "../_shared/drizzle/types";
+import type { DbVenue } from "../_shared/database/models";
+import type { QueryOptions } from "../_shared/database/types";
 import type { VenueRepository } from "./venue-repository";
 
-export interface VenueFilter {
-  name?: string;
-}
-
-export class VenueService extends BaseService<Venue, NewVenue, VenueFilter> {
+export class VenueService extends BaseService<Venue, DbVenue> {
   constructor(
     protected readonly repository: VenueRepository,
     logger: Logger,
@@ -23,16 +20,8 @@ export class VenueService extends BaseService<Venue, NewVenue, VenueFilter> {
     return this.repository.findBySlug(slug);
   }
 
-  async findMany(filter: VenueFilter) {
+  async findMany(filter: QueryOptions<Venue>) {
     return this.repository.findMany(filter);
-  }
-
-  async create(data: NewVenue) {
-    return this.repository.create(data);
-  }
-
-  async update(id: string, data: Partial<NewVenue>) {
-    return this.repository.update(id, data);
   }
 
   async delete(id: string) {

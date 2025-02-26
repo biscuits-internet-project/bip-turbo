@@ -19,14 +19,23 @@ web:
 workers:
 	turbo run dev --filter=@bip/workers
 
+doppler:
+	doppler setup
+
 migrate:
-	turbo run db:migrate --filter=@bip/core
+	cd packages/core && pnpm prisma:migrate:dev
 
-generate:
-	turbo run db:generate --filter=@bip/core
+migrate-create:
+	cd packages/core && pnpm prisma:migrate:create
 
-push:
-	turbo run db:push --filter=@bip/core
+migrate-baseline:
+	cd packages/core && pnpm prisma:migrate:baseline
 
-pull:
-	turbo run db:pull --filter=@bip/core
+db-generate:
+	cd packages/core && pnpm prisma:generate
+
+db-introspect:
+	cd packages/core && pnpm prisma:introspect
+
+db-studio:
+	cd packages/core && pnpm prisma:studio

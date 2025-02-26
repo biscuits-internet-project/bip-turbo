@@ -10,7 +10,7 @@ kill_timeout = "5s"
   dockerfile = "Dockerfile"
 
 [deploy]
-  release_command = "sh /app/migrate.sh"
+  release_command = "cd /app/packages/core && npx prisma migrate deploy --schema=./src/_shared/prisma/schema.prisma"
 
 [env]
   PORT = "8080"

@@ -19,8 +19,6 @@
   "pnpm": {
     "overrides": {
       "zod": "^3.24.2",
-      "drizzle-orm": "^0.39.3",
-      "drizzle-kit": "^0.30.4",
       "pg": "^8.13.3",
       "@types/pg": "^8.11.11"
     }

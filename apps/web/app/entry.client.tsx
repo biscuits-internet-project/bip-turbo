@@ -1,18 +1,12 @@
-import { StrictMode } from "react";
+import { StrictMode, startTransition } from "react";
 import { hydrateRoot } from "react-dom/client";
-import { RouterProvider, createBrowserRouter } from "react-router-dom";
-import App from "./root";
+import { HydratedRouter } from "react-router/dom";
 
-const router = createBrowserRouter([
-  {
-    path: "*",
-    Component: App,
-  },
-]);
-
-hydrateRoot(
-  document,
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-);
+startTransition(() => {
+  hydrateRoot(
+    document,
+    <StrictMode>
+      <HydratedRouter />
+    </StrictMode>,
+  );
+});

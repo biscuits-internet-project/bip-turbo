@@ -12,13 +12,13 @@ export const trackSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   likesCount: z.number().default(0),
-  slug: z.string().nullable(),
+  slug: z.string(),
   note: z.string().nullable(),
   allTimer: z.boolean().nullable().default(false),
   previousTrackId: z.string().uuid().nullable(),
   nextTrackId: z.string().uuid().nullable(),
   averageRating: z.number().default(0.0).nullable(),
-  song: songSchema.nullable().optional(),
+  song: songSchema.optional(),
   annotations: z.array(annotationSchema).optional(),
 });
 
@@ -27,7 +27,7 @@ export type Track = z.infer<typeof trackSchema>;
 export const trackMinimalSchema = z.object({
   id: z.string().uuid(),
   songId: z.string().uuid(),
-  songSlug: z.string().nullable(),
+  songSlug: z.string(),
   songTitle: z.string(),
   segue: z.string().nullable(),
 });

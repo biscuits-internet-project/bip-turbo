@@ -5,12 +5,12 @@ import { SongRepository } from "../songs/song-repository";
 import { TrackRepository } from "../tracks/track-repository";
 import { UserRepository } from "../users/user-repository";
 import { VenueRepository } from "../venues/venue-repository";
-import type { Database } from "./drizzle/client";
+import type { DbClient } from "./database/models";
 import type { Env } from "./env";
 import { RedisService } from "./redis";
 
 export interface ServiceContainer {
-  db: Database;
+  db: DbClient;
   redis: RedisService;
   logger: Logger;
   repositories: {
@@ -24,7 +24,7 @@ export interface ServiceContainer {
 }
 
 export interface ContainerArgs {
-  db?: Database;
+  db?: DbClient;
   logger: Logger;
   env: Env;
 }

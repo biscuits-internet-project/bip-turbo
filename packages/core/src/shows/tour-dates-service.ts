@@ -30,8 +30,6 @@ export class TourDatesService {
     );
     const data: TourResponse = await response.json();
 
-    console.log(data);
-
     const tourDates: TourDate[] = data.included.map((obj) => ({
       venueName: obj.attributes["venue-name"],
       formattedStartDate: obj.attributes["starts-at-short"],

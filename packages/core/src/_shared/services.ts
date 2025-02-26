@@ -20,15 +20,14 @@ export interface Services {
 }
 
 export function createServices(container: ServiceContainer): Services {
-  const redis = container.redis;
   return {
     shows: new ShowService(container.repositories.shows, container.logger),
     songs: new SongService(container.repositories.songs, container.logger),
-    setlists: new SetlistService(container.repositories.setlists, container.logger),
+    setlists: new SetlistService(container.repositories.setlists),
     venues: new VenueService(container.repositories.venues, container.logger),
     songPageComposer: new SongPageComposer(container.db, container.repositories.songs),
-    tourDatesService: new TourDatesService(redis),
-    redis,
+    tourDatesService: new TourDatesService(container.redis),
+    redis: container.redis,
     logger: container.logger,
   };
 }

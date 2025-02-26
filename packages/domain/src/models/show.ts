@@ -1,13 +1,13 @@
 import { z } from "zod";
 import { trackSchema } from "./track";
-import { venueMinimalSchema, venueSchema } from "./venue";
+import { venueSchema } from "./venue";
 
 export const showSchema = z.object({
   id: z.string().uuid(),
-  slug: z.string().nullable(),
+  slug: z.string(),
   date: z.date(),
-  venueId: z.string().uuid().nullable(),
-  bandId: z.string().uuid().nullable(),
+  venueId: z.string().uuid(),
+  bandId: z.string().uuid(),
   notes: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -18,7 +18,7 @@ export const showSchema = z.object({
   showYoutubesCount: z.number().default(0),
   reviewsCount: z.number().default(0),
   tracks: z.array(trackSchema).nullable().optional(),
-  venue: venueSchema.nullable().optional(),
+  venue: venueSchema.optional(),
 });
 
 export const showMinimalSchema = showSchema.pick({

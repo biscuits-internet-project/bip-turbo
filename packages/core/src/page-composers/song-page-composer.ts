@@ -1,11 +1,10 @@
 import type { SongPagePerformance, SongPageView } from "@bip/domain";
-import { sql } from "drizzle-orm";
-import type { Database } from "../_shared/drizzle/client";
+import type { DbClient } from "../_shared/database/models";
 import type { SongRepository } from "../songs/song-repository";
 
 export class SongPageComposer {
   constructor(
-    private db: Database,
+    private db: DbClient,
     private songRepository: SongRepository,
   ) {}
 
@@ -14,7 +13,7 @@ export class SongPageComposer {
 
     if (!song) throw new Error("Song not found");
 
-    const result = await this.db.execute<PerformanceDto>(sql`
+    const result = await this.db.$queryRaw<PerformanceDto[]>`
       SELECT
         shows.id,
         shows.date,
@@ -53,7 +52,8 @@ export class SongPageComposer {
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
       WHERE tracks.song_id = ${song.id}
       ORDER BY shows.date DESC, tracks.set, tracks.position
-    `);
+    `;
+
     const performances = result.map((row) => this.transformToSongPagePerformanceView(row));
 
     return {
