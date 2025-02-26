@@ -4,16 +4,17 @@
  * This file re-exports Prisma types with generic names to decouple the repository
  * from Prisma. If you switch to a different ORM, you only need to update this file.
  */
+import type { PrismaClient } from "@prisma/client";
+
+// Import the actual types from the generated Prisma client
 import type {
   Annotation as PrismaAnnotation,
   Author as PrismaAuthor,
-  PrismaClient,
   Show as PrismaShow,
   Song as PrismaSong,
   Track as PrismaTrack,
   User as PrismaUser,
   Venue as PrismaVenue,
-  // Add other Prisma models as needed
 } from "@prisma/client";
 
 // Re-export the Prisma types with generic names

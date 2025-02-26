@@ -17,6 +17,10 @@ COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile
 # Copy source code after installing dependencies
 COPY --from=pruner /app/out/full/ .
+
+# Generate Prisma client before building
+RUN pnpm --filter @bip/core prisma:generate:prod
+
 RUN pnpm run build --filter=@bip/web...
 
 # Production image
