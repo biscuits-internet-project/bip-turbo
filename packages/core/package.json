@@ -11,6 +11,7 @@
     "dev": "tsup src/index.ts --watch",
     "lint": "biome lint",
     "prisma:generate": "doppler run -- prisma generate --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:generate:prod": "prisma generate --schema=./src/_shared/prisma/schema.prisma",
     "prisma:migrate:dev": "doppler run -- prisma migrate dev --schema=./src/_shared/prisma/schema.prisma",
     "prisma:migrate:create": "doppler run -- prisma migrate dev --create-only --schema=./src/_shared/prisma/schema.prisma",
     "prisma:migrate:baseline": "doppler run -- prisma migrate resolve --applied 0_init --schema=./src/_shared/prisma/schema.prisma",
