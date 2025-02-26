@@ -19,6 +19,9 @@ web:
 workers:
 	turbo run dev --filter=@bip/workers
 
+doppler:
+	doppler setup
+
 migrate:
 	turbo run db:migrate --filter=@bip/core
 

@@ -1,28 +1,23 @@
-import type { Logger, Setlist } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
+import type { Setlist, Show } from "@bip/domain";
+import type { FilterCondition, PaginationOptions, SortOptions } from "../_shared/database/types";
 import type { SetlistRepository } from "./setlist-repository";
 
-export interface SetlistFilter {
-  year: number;
-}
+export class SetlistService {
+  constructor(private readonly repository: SetlistRepository) {}
 
-export class SetlistService extends BaseService<Setlist, Setlist, SetlistFilter> {
-  constructor(
-    protected readonly repository: SetlistRepository,
-    logger: Logger,
-  ) {
-    super(repository, logger);
+  async findByShowId(id: string): Promise<Setlist | null> {
+    return this.repository.findByShowId(id);
   }
 
-  async findById(id: string): Promise<Setlist | null> {
-    return this.repository.findById(id);
+  async findByShowSlug(slug: string): Promise<Setlist | null> {
+    return this.repository.findByShowSlug(slug);
   }
 
-  async findBySlug(slug: string): Promise<Setlist | null> {
-    return this.repository.findBySlug(slug);
-  }
-
-  async findMany(filter: SetlistFilter): Promise<Setlist[]> {
-    return this.repository.findMany(filter);
+  async findMany(options?: {
+    pagination?: PaginationOptions;
+    sort?: SortOptions<Show>[];
+    filters?: FilterCondition<Show>[];
+  }): Promise<Setlist[]> {
+    return this.repository.findMany(options);
   }
 }

@@ -102,7 +102,6 @@
           "structure": {
             "src": {
               "_shared": {
-                "drizzle": "Database schema and types",
                 "repository": "Base repository patterns",
                 "base-service": "Base service patterns"
               },

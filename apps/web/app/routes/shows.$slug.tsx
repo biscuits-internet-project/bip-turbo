@@ -15,8 +15,7 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
   const slug = params.slug;
   if (!slug) throw notFound();
 
-  // retrieve shows for the given year using drizzle SQL<Shows>
-  const setlist = await services.setlists.findBySlug(slug);
+  const setlist = await services.setlists.findByShowSlug(slug);
   if (!setlist) throw notFound();
 
   return { setlist };

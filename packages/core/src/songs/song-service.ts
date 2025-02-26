@@ -1,6 +1,7 @@
-import type { Logger, Song } from "@bip/domain";
+import type { Logger, Song, TrendingSong } from "@bip/domain";
 import { BaseService } from "../_shared/base-service";
-import type { NewSong } from "../_shared/drizzle/types";
+import type { DbSong } from "../_shared/database/models";
+import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import type { SongRepository } from "./song-repository";
 
 export interface SongFilter {
@@ -8,11 +9,7 @@ export interface SongFilter {
   legacyId?: number;
 }
 
-export interface TrendingSong extends Song {
-  count: number;
-}
-
-export class SongService extends BaseService<Song, NewSong, SongFilter> {
+export class SongService extends BaseService<Song, DbSong> {
   constructor(
     protected repository: SongRepository,
     logger: Logger,
@@ -29,7 +26,15 @@ export class SongService extends BaseService<Song, NewSong, SongFilter> {
   }
 
   async findMany(filter: SongFilter): Promise<Song[]> {
-    return this.repository.findMany(filter);
+    const queryOptions: QueryOptions<Song> = {
+      filters: Object.entries(filter).map(([field, value]) => ({
+        field: field as keyof Song,
+        operator: "eq",
+        value,
+      })) as FilterCondition<Song>[],
+    };
+
+    return this.repository.findMany(queryOptions);
   }
 
   async findTrendingLastXShows(lastXShows: number, limit: number): Promise<TrendingSong[]> {
@@ -40,15 +45,7 @@ export class SongService extends BaseService<Song, NewSong, SongFilter> {
     return this.repository.findTrendingLastYear();
   }
 
-  async create(song: NewSong): Promise<Song> {
-    return this.repository.create(song);
-  }
-
-  async update(id: string, song: Partial<NewSong>): Promise<Song> {
-    return this.repository.update(id, song);
-  }
-
   async delete(id: string): Promise<void> {
-    return this.repository.delete(id);
+    await this.repository.delete(id);
   }
 }

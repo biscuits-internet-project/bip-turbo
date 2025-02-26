@@ -9,11 +9,8 @@ export const songSchema = z.object({
   lyrics: z.string().nullable(),
   tabs: z.string().nullable(),
   notes: z.string().nullable(),
-  legacyAbbr: z.string().nullable(),
-  legacyId: z.number().nullable(),
   cover: z.boolean().nullable().default(false),
   authorId: z.string().uuid().nullable(),
-  legacyAuthor: z.string().nullable(),
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   timesPlayed: z.number().default(0),
@@ -23,6 +20,9 @@ export const songSchema = z.object({
   mostCommonYear: z.number().nullable(),
   leastCommonYear: z.number().nullable(),
   guitarTabsUrl: z.string().nullable(),
+
+  // Relations
+  authorName: z.string().nullable().optional(),
 });
 
 export const songMinimalSchema = songSchema.pick({
@@ -33,3 +33,6 @@ export const songMinimalSchema = songSchema.pick({
 
 export type Song = z.infer<typeof songSchema>;
 export type SongMinimal = z.infer<typeof songMinimalSchema>;
+export interface TrendingSong extends Song {
+  count: number;
+}

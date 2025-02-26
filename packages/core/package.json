@@ -9,30 +9,21 @@
     "typecheck": "tsc --noEmit",
     "build": "tsup src/index.ts --format esm --dts",
     "dev": "tsup src/index.ts --watch",
-    "lint": "biome lint",
-    "generate": "drizzle-kit generate:pg",
-    "push": "drizzle-kit push:pg",
-    "studio": "drizzle-kit studio",
-    "introspect": "mkdir -p src/shared/database && doppler run -- drizzle-kit introspect:pg > src/shared/database/schema.ts",
-    "db:generate": "doppler run -- drizzle-kit generate",
-    "db:push": "doppler run -- drizzle-kit push",
-    "db:pull": "doppler run -- drizzle-kit pull",
-    "db:migrate": "doppler run -- drizzle-kit migrate",
-    "migrate": "node --loader ts-node/esm src/_shared/drizzle/migrate.ts"
+    "lint": "biome lint"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
-    "drizzle-orm": "^0.39.3",
-    "redis": "^4.7.0",
+    "@prisma/client": "^6.4.1",
     "postgres": "^3.4.5",
+    "redis": "^4.7.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.30.4",
-    "pg": "^8.13.3",
     "@types/pg": "^8.11.11",
+    "pg": "^8.13.3",
+    "prisma": "^6.4.1",
+    "ts-node": "^10.9.2",
     "tsup": "^8.3.6",
-    "typescript": "^5.7.3",
-    "ts-node": "^10.9.2"
+    "typescript": "^5.7.3"
   }
-} 
+}

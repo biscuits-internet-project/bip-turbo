@@ -22,9 +22,9 @@ import Markdown from "react-markdown";
 import Masonry from "react-masonry-css";
 import type { LoaderFunctionArgs } from "react-router";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "~/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { cn } from "~/lib/utils";
 import { publicLoader } from "../lib/base-loaders";
 import { services } from "../server/services";
 
@@ -56,12 +56,18 @@ function StatBox({ label, value, sublabel }: StatBoxProps) {
 function PerformanceTable({ performances: initialPerformances }: { performances: SongPagePerformance[] }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
 
+  const handleSortingChange = (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
+    setSorting(updaterOrValue);
+  };
+
   const columnHelper = createColumnHelper<SongPagePerformance>();
   const columns = [
     columnHelper.accessor("show.date", {
       id: "date",
       header: "Date",
       size: 128,
+      enableSorting: true,
+      sortingFn: "datetime",
       cell: (info) => (
         <a href={`/shows/${info.row.original.show.slug}`} className="">
           {info.getValue().toLocaleDateString("en-US", { timeZone: "UTC" })}
@@ -78,6 +84,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
       {
         id: "venue",
         header: "Venue",
+        enableSorting: false,
         cell: (info) => {
           const venue = info.getValue();
           return venue.city ? (
@@ -100,6 +107,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
         id: "before",
         header: "Before",
         size: 192,
+        enableSorting: false,
         cell: (info) => {
           const song = info.getValue();
           return song.slug ? (
@@ -120,6 +128,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
         id: "after",
         header: "After",
         size: 192,
+        enableSorting: false,
         cell: (info) => {
           const song = info.getValue();
           return song.slug ? (
@@ -133,6 +142,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
     columnHelper.accessor("rating", {
       header: "Rating",
       size: 64,
+      enableSorting: true,
       cell: (info) => {
         const rating = info.getValue();
         return rating && rating > 0 ? (
@@ -150,9 +160,11 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
     state: {
       sorting,
     },
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    enableSorting: true,
+    enableMultiSort: false,
   });
 
   return (
@@ -171,7 +183,10 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
                           ? "cursor-pointer select-none hover:text-white w-full text-left"
                           : "w-full text-left"
                       }
-                      onClick={() => header.column.toggleSorting()}
+                      onClick={(e) => {
+                        console.log("Sort button clicked:", header.id);
+                        header.column.toggleSorting();
+                      }}
                     >
                       <span className={header.column.getIsSorted() ? "text-white font-semibold" : ""}>
                         {flexRender(header.column.columnDef.header, header.getContext())}
@@ -219,9 +234,9 @@ export default function SongPage() {
         <div className="flex flex-col space-y-4">
           <div className="flex flex-wrap items-baseline gap-4">
             <h1 className="text-3xl md:text-4xl font-bold text-white">{song.title}</h1>
-            {song.legacyAuthor && (
+            {song.authorName && (
               <span className="text-gray-400 text-lg">
-                by <span className="text-blue-400">{song.legacyAuthor}</span>
+                by <span className="text-blue-400">{song.authorName}</span>
               </span>
             )}
           </div>
@@ -245,26 +260,55 @@ export default function SongPage() {
         </dl>
 
         <Tabs defaultValue="all-timers" className="w-full">
-          <TabsList>
-            <TabsTrigger value="all-timers" className="flex items-center gap-2">
+          <TabsList className="w-full flex justify-start border-b border-gray-800 rounded-none bg-transparent p-0">
+            <TabsTrigger
+              value="all-timers"
+              onClick={() => console.log("TabsTrigger clicked: all-timers")}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              )}
+            >
               <StarIcon className="h-4 w-4" />
               All-Timers
             </TabsTrigger>
-            <TabsTrigger value="lyrics" className="flex items-center gap-2">
+            <TabsTrigger
+              value="lyrics"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              )}
+            >
               <FileTextIcon className="h-4 w-4" />
               Lyrics
             </TabsTrigger>
-            <TabsTrigger value="yearly-plays" className="flex items-center gap-2">
+            <TabsTrigger
+              value="yearly-plays"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              )}
+            >
               <BarChart2Icon className="h-4 w-4" />
               Yearly Plays
             </TabsTrigger>
-            <TabsTrigger value="guitar-tabs" className="flex items-center gap-2">
+            <TabsTrigger
+              value="guitar-tabs"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              )}
+            >
               <GuitarIcon className="h-4 w-4" />
               Guitar Tabs
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="all-timers">
+          <TabsContent value="all-timers" className="mt-4">
             {allTimers.length > 0 && (
               <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -309,7 +353,7 @@ export default function SongPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="lyrics">
+          <TabsContent value="lyrics" className="mt-4">
             {song.lyrics && (
               <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
                 <div className="overflow-x-auto">
@@ -321,7 +365,7 @@ export default function SongPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="yearly-plays">
+          <TabsContent value="yearly-plays" className="mt-4">
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
               <ChartContainer config={{}} className="min-h-[300px] w-full">
                 <BarChart
@@ -351,23 +395,29 @@ export default function SongPage() {
               </ChartContainer>
             </div>
           </TabsContent>
-          {(song.tabs || song.guitarTabsUrl) && (
-            <TabsContent value="guitar-tabs">
-              <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-                <div className="overflow-x-auto">
-                  <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
-                    {song.tabs ? (
-                      <Markdown>{song.tabs}</Markdown>
-                    ) : (
-                      <a href={song.guitarTabsUrl || ""} target="_blank" rel="noreferrer">
-                        Guitar Tabs
-                      </a>
-                    )}
-                  </div>
+
+          <TabsContent value="guitar-tabs" className="mt-4">
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+              <div className="overflow-x-auto">
+                <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
+                  {song.tabs ? (
+                    <Markdown>{song.tabs}</Markdown>
+                  ) : song.guitarTabsUrl ? (
+                    <a
+                      href={song.guitarTabsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-purple-400 hover:underline"
+                    >
+                      View Guitar Tabs
+                    </a>
+                  ) : (
+                    <p>No guitar tabs available for this song.</p>
+                  )}
                 </div>
               </div>
-            </TabsContent>
-          )}
+            </div>
+          </TabsContent>
         </Tabs>
 
         {/* Performance History */}

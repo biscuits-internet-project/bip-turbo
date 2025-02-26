@@ -1,5 +1,4 @@
-import type { TrendingSong } from "@bip/core";
-import type { Song } from "@bip/domain";
+import type { Song, TrendingSong } from "@bip/domain";
 import { Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";

@@ -1,49 +1,76 @@
 import type { Venue } from "@bip/domain";
-import type { SQL } from "drizzle-orm";
-import { and, desc, eq } from "drizzle-orm";
-import { venues } from "../_shared/drizzle";
-import type { NewVenue } from "../_shared/drizzle/types";
-import { BaseRepository } from "../_shared/repository/base";
-import type { VenueFilter } from "./venue-service";
-import { transformVenue } from "./venue-transformer";
+import { BaseRepository } from "../_shared/database/base-repository";
+import type { DbVenue } from "../_shared/database/models";
+import type { QueryOptions } from "../_shared/database/types";
 
-export class VenueRepository extends BaseRepository<Venue, NewVenue> {
+export function mapVenueToDomainEntity(dbVenue: DbVenue): Venue {
+  const { slug, createdAt, updatedAt, name, ...rest } = dbVenue;
+
+  return {
+    ...rest,
+    slug: slug || "",
+    createdAt: new Date(createdAt),
+    updatedAt: new Date(updatedAt),
+    name: name || "",
+  };
+}
+
+export function mapVenueToDbModel(entity: Partial<Venue>): Partial<DbVenue> {
+  return entity as Partial<DbVenue>;
+}
+
+export class VenueRepository extends BaseRepository<Venue, DbVenue> {
+  protected modelName = "venue" as const;
+
+  protected mapToDomainEntity(dbVenue: DbVenue): Venue {
+    return mapVenueToDomainEntity(dbVenue);
+  }
+
+  protected mapToDbModel(entity: Partial<Venue>): Partial<DbVenue> {
+    return mapVenueToDbModel(entity);
+  }
+
   async findById(id: string): Promise<Venue | null> {
-    const result = await this.db.select().from(venues).where(eq(venues.id, id));
-    return result[0] ? transformVenue(result[0]) : null;
+    const result = await this.db.venue.findUnique({
+      where: { id },
+    });
+    return result ? this.mapToDomainEntity(result) : null;
   }
 
   async findBySlug(slug: string): Promise<Venue | null> {
-    const result = await this.db.select().from(venues).where(eq(venues.slug, slug));
-    return result[0] ? transformVenue(result[0]) : null;
+    const result = await this.db.venue.findFirst({
+      where: { slug },
+    });
+    return result ? this.mapToDomainEntity(result) : null;
   }
 
-  async findMany(filter: VenueFilter): Promise<Venue[]> {
-    const conditions: SQL<unknown>[] = [];
+  async findMany(options?: QueryOptions<Venue>): Promise<Venue[]> {
+    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
+    const skip =
+      options?.pagination?.page && options?.pagination?.limit
+        ? (options.pagination.page - 1) * options.pagination.limit
+        : undefined;
+    const take = options?.pagination?.limit;
 
-    if (filter.name) {
-      conditions.push(eq(venues.name, filter.name));
+    const results = await this.db.venue.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+    });
+
+    return results.map((result: DbVenue) => this.mapToDomainEntity(result));
+  }
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      await this.db.venue.delete({
+        where: { id },
+      });
+      return true;
+    } catch (error) {
+      return false;
     }
-
-    const result = await this.db
-      .select()
-      .from(venues)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(venues.timesPlayed));
-    return result.map(transformVenue);
-  }
-
-  async create(data: NewVenue): Promise<Venue> {
-    const result = await this.db.insert(venues).values(data).returning();
-    return transformVenue(result[0]);
-  }
-
-  async update(id: string, data: Partial<NewVenue>): Promise<Venue> {
-    const result = await this.db.update(venues).set(data).where(eq(venues.id, id)).returning();
-    return transformVenue(result[0]);
-  }
-
-  async delete(id: string): Promise<void> {
-    await this.db.delete(venues).where(eq(venues.id, id));
   }
 }

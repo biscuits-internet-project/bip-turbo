@@ -1,4 +1,4 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteError } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteError } from "react-router-dom";
 import { NotFound, ServerError } from "~/components/layout/errors";
 import { RootLayout } from "~/components/layout/root-layout";
 import { SidebarProvider } from "~/components/ui/sidebar";

@@ -1,86 +1,120 @@
-import type { Annotation, Setlist, Show, Song, Track, Venue } from "@bip/domain";
-import type { SQL } from "drizzle-orm";
-import { and, asc, between, eq } from "drizzle-orm";
-import { annotations, shows, songs, tracks, venues } from "../_shared/drizzle";
-import type { AnnotationRow, ShowRow, SongRow, TrackRow, VenueRow } from "../_shared/drizzle/types";
-import { BaseRepository } from "../_shared/repository/base";
-import type { ShowFilter } from "../shows/show-service";
-import { transformShow } from "../shows/show-transformer";
-import { transformSong } from "../songs/song-transformer";
-import { transformAnnotation, transformTrack } from "../tracks/track-transformer";
-import { transformVenue } from "../venues/venue-transformer";
+import type { Setlist, Show } from "@bip/domain";
+import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
+import { dbClient } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
+import type { FilterCondition, PaginationOptions, SortOptions } from "../_shared/database/types";
+import { mapShowToDomainEntity } from "../shows/show-repository";
+import { mapAnnotationToDomainEntity, mapTrackToDomainEntity } from "../tracks/track-repository";
+import { mapVenueToDomainEntity } from "../venues/venue-repository";
 
-export class SetlistRepository extends BaseRepository<Setlist, never, ShowFilter> {
-  async findById(id: string): Promise<Setlist | null> {
-    const show = await this.db.query.shows.findFirst({
-      with: {
+/**
+ * Repository for Setlists
+ * This is a custom repository that doesn't extend BaseRepository because
+ * Setlist is a composite type that doesn't map 1:1 to a database model
+ */
+export class SetlistRepository {
+  protected db: DbClient;
+
+  constructor(client = dbClient) {
+    this.db = client;
+  }
+
+  async findByShowId(id: string): Promise<Setlist | null> {
+    const show = await this.db.show.findUnique({
+      where: { id },
+      include: {
         tracks: {
-          with: {
+          include: {
             song: true,
             annotations: true,
           },
         },
         venue: true,
-        band: true,
       },
-      where: eq(shows.id, id),
     });
 
-    if (!show) return null;
+    if (!show || !show.venue) return null;
 
-    return this.#transformSetlist(show);
+    return this.#mapSetlistToDomainEntity({
+      ...show,
+      venue: show.venue,
+    });
   }
 
-  async findBySlug(slug: string): Promise<Setlist | null> {
-    const result = await this.db.query.shows.findFirst({
-      with: {
+  async findByShowSlug(slug: string): Promise<Setlist | null> {
+    const result = await this.db.show.findUnique({
+      where: { slug },
+      include: {
         tracks: {
-          with: {
+          include: {
             song: true,
             annotations: true,
           },
         },
         venue: true,
-        band: true,
       },
-      where: eq(shows.slug, slug),
     });
 
-    if (!result) return null;
+    if (!result || !result.venue) return null;
 
-    return this.#transformSetlist(result);
+    return this.#mapSetlistToDomainEntity({
+      ...result,
+      venue: result.venue,
+    });
   }
 
-  async findMany(filter?: ShowFilter): Promise<Setlist[]> {
-    const conditions: SQL<unknown>[] = [];
+  async findMany(options?: {
+    pagination?: PaginationOptions;
+    sort?: SortOptions<Show>[];
+    filters?: FilterCondition<Show>[];
+  }): Promise<Setlist[]> {
+    // Build the query
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
+    const skip =
+      options?.pagination?.page && options?.pagination?.limit
+        ? (options.pagination.page - 1) * options.pagination.limit
+        : undefined;
+    const take = options?.pagination?.limit;
 
-    if (filter?.year) {
-      const startDate = new Date(filter.year, 0, 1);
-      const endDate = new Date(filter.year + 1, 0, 1);
-      conditions.push(between(shows.date, startDate.toISOString(), endDate.toISOString()));
-    }
-
-    const result = await this.db.query.shows.findMany({
-      with: {
+    const results = await this.db.show.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+      include: {
         tracks: {
-          with: {
+          include: {
             song: true,
             annotations: true,
           },
         },
         venue: true,
-        band: true,
       },
-      where: conditions.length > 0 ? and(...conditions) : undefined,
-      orderBy: [asc(shows.date)],
     });
 
-    return result.map((show) => this.#transformSetlist(show));
+    return results
+      .filter((show) => show.venue !== null)
+      .map((show) =>
+        this.#mapSetlistToDomainEntity({
+          ...show,
+          venue: show.venue as DbVenue,
+          tracks: show.tracks.map((track) => ({
+            ...track,
+            annotations: track.annotations || [],
+          })),
+        }),
+      );
   }
 
-  #transformSetlist(show: ShowRow & { tracks: TrackRow[]; venue: VenueRow }): Setlist {
+  #mapSetlistToDomainEntity(
+    show: DbShow & {
+      tracks: (DbTrack & { song: DbSong | null; annotations: DbAnnotation[] })[];
+      venue: DbVenue;
+    },
+  ): Setlist {
     const tracks = show.tracks ?? [];
-    const setGroups = new Map<string, TrackRow[]>();
+    const setGroups = new Map<string, DbTrack[]>();
 
     // Group tracks by set label
     for (const track of tracks) {
@@ -93,17 +127,17 @@ export class SetlistRepository extends BaseRepository<Setlist, never, ShowFilter
     const sets = Array.from(setGroups.entries()).map(([label, setTracks]) => ({
       label,
       sort: this.#getSetSortOrder(label),
-      tracks: setTracks.map((t) => transformTrack(t)),
+      tracks: setTracks.map((t) => mapTrackToDomainEntity(t)),
     }));
 
     // Sort sets by their sort order
     sets.sort((a, b) => a.sort - b.sort);
 
     return {
-      show: transformShow(show),
-      venue: transformVenue(show.venue),
+      show: mapShowToDomainEntity(show),
+      venue: mapVenueToDomainEntity(show.venue),
       sets,
-      annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => transformAnnotation(a)),
+      annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
     };
   }
 
@@ -114,17 +148,5 @@ export class SetlistRepository extends BaseRepository<Setlist, never, ShowFilter
     if (setLabel.match(/^e\d+$/i)) return 100 + Number.parseInt(setLabel.slice(1));
     // Default sort order for unknown set types
     return 999;
-  }
-
-  async create(): Promise<never> {
-    throw new Error("Create operation not supported for Setlist");
-  }
-
-  async update(): Promise<never> {
-    throw new Error("Update operation not supported for Setlist");
-  }
-
-  async delete(): Promise<never> {
-    throw new Error("Delete operation not supported for Setlist");
   }
 }
