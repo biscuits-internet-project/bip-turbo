@@ -7,8 +7,7 @@ on:
       - 'packages/**'
       - 'pnpm-lock.yaml'
       - '.github/**'
-    paths-ignore:
-      - 'README.md'
+      - '!README.md'
 jobs:
   deploy:
     name: Deploy Web App
