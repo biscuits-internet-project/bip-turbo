@@ -23,10 +23,6 @@ RUN pnpm run build --filter=@bip/web...
 FROM base AS runner
 WORKDIR /app
 
-# Copy migration script first and set permissions
-COPY --chown=node:node packages/core/scripts/migrate.sh /app/migrate.sh
-RUN chmod +x /app/migrate.sh
-
 # Copy all files from builder
 COPY --from=builder /app .
 
