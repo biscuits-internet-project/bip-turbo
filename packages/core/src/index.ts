@@ -1,10 +1,11 @@
 // Domain exports
-export * from "./shows/show-service";
-export * from "./tracks/track-service";
-export * from "./venues/venue-service";
+export * from "./blog-posts/blog-post-service";
 export * from "./setlists/setlist-service";
 export * from "./shows/show-service";
+export * from "./shows/show-service";
 export * from "./tracks/track-service";
+export * from "./tracks/track-service";
+export * from "./venues/venue-service";
 export * from "./venues/venue-service";
 
 // Shared exports

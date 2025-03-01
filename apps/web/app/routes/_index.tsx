@@ -1,11 +1,44 @@
+import type { Setlist, TourDate } from "@bip/domain";
 import { ArrowRight, Calendar, MapPin, Music, Search } from "lucide-react";
 import { Link } from "react-router-dom";
+import { SetlistCard } from "~/components/setlist/setlist-card";
+import { Card } from "~/components/ui/card";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { publicLoader } from "~/lib/base-loaders";
+import { services } from "~/server/services";
+
+interface LoaderData {
+  upcomingTourDates: TourDate[];
+  recentShows: Setlist[];
+}
+
+export const loader = publicLoader<LoaderData>(async () => {
+  // Get upcoming tour dates
+  const allTourDates = Array.isArray(await services.tourDatesService.getTourDates())
+    ? await services.tourDatesService.getTourDates()
+    : [];
+
+  // Sort by date and take the first 3
+  const upcomingTourDates = allTourDates
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 3);
+
+  // Get recent shows (last 5)
+  const recentShows = await services.setlists.findMany({
+    pagination: { limit: 5 },
+    sort: [{ field: "date", direction: "desc" }],
+  });
+
+  return { upcomingTourDates, recentShows };
+});
 
 export default function Index() {
+  const { upcomingTourDates = [], recentShows = [] } = useSerializedLoaderData<LoaderData>();
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen p-6 md:p-8 lg:p-10">
       {/* Hero section */}
-      <div className="px-4 py-12 text-center">
+      <div className="py-12 text-center">
         <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent">
           Welcome to BIP 3.0
         </h1>
@@ -22,59 +55,79 @@ export default function Index() {
         </div>
       </div>
 
-      {/* Quick access grid */}
-      <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-        <Link
-          to="/shows"
-          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <Music className="h-6 w-6 text-purple-500" />
-            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
+      {/* Main content grid - Setlists and Tour Dates */}
+      <div className="grid grid-cols-1 lg:grid-cols-7 gap-8 mb-16">
+        {/* Recent Shows Section - Takes 4/7 of the grid on large screens */}
+        <div className="lg:col-span-4 order-2 lg:order-1">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Recent Shows</h2>
+            <Link to="/shows" className="text-purple-500 hover:text-purple-400 flex items-center">
+              View all <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
           </div>
-          <h2 className="text-xl font-semibold mb-2">Shows & Setlists</h2>
-          <p className="text-muted-foreground">Browse through our comprehensive database of shows and setlists.</p>
-        </Link>
 
-        <Link
-          to="/songs"
-          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <Music className="h-6 w-6 text-purple-500" />
-            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Song Database</h2>
-          <p className="text-muted-foreground">Explore the complete catalog of Disco Biscuits songs.</p>
-        </Link>
+          {recentShows.length > 0 ? (
+            <div className="grid gap-6">
+              {recentShows.map((setlist) => (
+                <SetlistCard key={setlist.show.id} setlist={setlist} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center p-8 border border-dashed rounded-lg">
+              <p className="text-muted-foreground">No recent shows available</p>
+            </div>
+          )}
+        </div>
 
-        <Link
-          to="/venues"
-          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <MapPin className="h-6 w-6 text-purple-500" />
-            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
+        {/* Upcoming Tour Dates Section - Takes 3/7 of the grid on large screens */}
+        <div className="lg:col-span-3 order-1 lg:order-2">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
+            <Link to="/tour-dates" className="text-purple-500 hover:text-purple-400 flex items-center">
+              View all <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
           </div>
-          <h2 className="text-xl font-semibold mb-2">Venues</h2>
-          <p className="text-muted-foreground">Discover where the band has played throughout their history.</p>
-        </Link>
 
-        <Link
-          to="/tour-dates"
-          className="group p-6 rounded-lg border border-border bg-card hover:border-purple-500 transition-colors"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <Calendar className="h-6 w-6 text-purple-500" />
-            <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-purple-500 transition-colors" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Upcoming Shows</h2>
-          <p className="text-muted-foreground">See where the band is playing next and plan your shows.</p>
-        </Link>
+          {upcomingTourDates.length > 0 ? (
+            <Card className="bg-gray-900 border-gray-800 h-full">
+              <div className="relative overflow-x-auto">
+                <table className="w-full text-md">
+                  <thead>
+                    <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Venue</th>
+                      <th className="hidden md:table-cell p-4">Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {upcomingTourDates.map((td: TourDate) => (
+                      <tr
+                        key={td.formattedStartDate + td.venueName}
+                        className="border-b border-border/40 hover:bg-accent/5"
+                      >
+                        <td className="p-4 text-white">
+                          {td.formattedStartDate === td.formattedEndDate
+                            ? td.formattedStartDate
+                            : `${td.formattedStartDate} - ${td.formattedEndDate}`}
+                        </td>
+                        <td className="p-4 text-white font-medium">{td.venueName}</td>
+                        <td className="hidden md:table-cell p-4 text-gray-400">{td.address}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <div className="text-center p-8 border border-dashed rounded-lg">
+              <p className="text-muted-foreground">No upcoming tour dates available</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats section */}
-      <div className="px-4 grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
         <div className="p-4 text-center rounded-lg border border-border bg-card">
           <div className="text-3xl font-bold text-purple-500 mb-1">2,000+</div>
           <div className="text-sm text-muted-foreground">Shows</div>

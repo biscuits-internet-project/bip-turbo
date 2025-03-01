@@ -22,4 +22,5 @@ type Params = {
     "slug": string;
   };
   "/tour-dates": {};
+  "/blog": {};
 };

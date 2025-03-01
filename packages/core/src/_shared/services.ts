@@ -1,4 +1,5 @@
 import type { Logger } from "@bip/domain";
+import { BlogPostService } from "../blog-posts/blog-post-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
 import { SetlistService } from "../setlists/setlist-service";
 import { ShowService } from "../shows/show-service";
@@ -9,6 +10,7 @@ import type { ServiceContainer } from "./container";
 import type { RedisService } from "./redis";
 
 export interface Services {
+  blogPosts: BlogPostService;
   shows: ShowService;
   songs: SongService;
   setlists: SetlistService;
@@ -21,6 +23,7 @@ export interface Services {
 
 export function createServices(container: ServiceContainer): Services {
   return {
+    blogPosts: new BlogPostService(container.repositories.blogPosts, container.logger),
     shows: new ShowService(container.repositories.shows, container.logger),
     songs: new SongService(container.repositories.songs, container.logger),
     setlists: new SetlistService(container.repositories.setlists),

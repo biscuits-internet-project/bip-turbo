@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteError } from "react-router-dom";
 import { NotFound, ServerError } from "~/components/layout/errors";
 import { RootLayout } from "~/components/layout/root-layout";
@@ -9,8 +10,37 @@ export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: styl
 
 export const loader = async () => {};
 
+// Client-only component to handle window-dependent logic
+function ClientOnly({ children }: { children: (isDesktop: boolean) => React.ReactNode }) {
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const checkDesktop = () => window.innerWidth >= 768;
+    setIsDesktop(checkDesktop());
+
+    const handleResize = () => {
+      setIsDesktop(checkDesktop());
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  if (!isMounted) {
+    // Return a placeholder with the same structure during SSR
+    return (
+      <SidebarProvider defaultOpen={true}>
+        <RootLayout>{null}</RootLayout>
+      </SidebarProvider>
+    );
+  }
+
+  return children(isDesktop);
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
-  // const { apiUrl } = useLoaderData<typeof loader>();
   return (
     <html lang="en" className="font-quicksand dark">
       <head>
@@ -20,9 +50,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <SidebarProvider defaultOpen>
-          <RootLayout>{children}</RootLayout>
-        </SidebarProvider>
+        <ClientOnly>
+          {(isDesktop) => (
+            <SidebarProvider defaultOpen={isDesktop}>
+              <RootLayout>{children}</RootLayout>
+            </SidebarProvider>
+          )}
+        </ClientOnly>
         <ScrollRestoration />
         <Scripts />
       </body>

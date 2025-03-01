@@ -1,4 +1,5 @@
 import type { Logger } from "@bip/domain";
+import { BlogPostRepository } from "../blog-posts/blog-post-repository";
 import { SetlistRepository } from "../setlists/setlist-repository";
 import { ShowRepository } from "../shows/show-repository";
 import { SongRepository } from "../songs/song-repository";
@@ -20,6 +21,7 @@ export interface ServiceContainer {
     tracks: TrackRepository;
     users: UserRepository;
     venues: VenueRepository;
+    blogPosts: BlogPostRepository;
   };
 }
 
@@ -43,6 +45,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
     tracks: new TrackRepository(db),
     users: new UserRepository(db),
     venues: new VenueRepository(db),
+    blogPosts: new BlogPostRepository(db),
   };
 
   const redis = new RedisService(env.REDIS_URL);

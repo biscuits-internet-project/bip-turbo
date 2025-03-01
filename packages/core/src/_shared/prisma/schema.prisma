@@ -8,12 +8,13 @@ datasource db {
 }
 
 model ActiveStorageAttachment {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String   @db.VarChar
-  recordType String   @map("record_type") @db.VarChar
-  recordId   String   @map("record_id") @db.Uuid
-  blobId     String   @map("blob_id") @db.Uuid
-  createdAt  DateTime @map("created_at") @db.Timestamp(6)
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String            @db.VarChar
+  recordType String            @map("record_type") @db.VarChar
+  recordId   String            @map("record_id") @db.Uuid
+  blobId     String            @map("blob_id") @db.Uuid
+  createdAt  DateTime          @map("created_at") @db.Timestamp(6)
+  blob       ActiveStorageBlob @relation(fields: [blobId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_active_storage_attachments_active_storage_blobs_blob_id")
 
   @@unique([recordType, recordId, name, blobId], map: "active_storage_attachments_record_name_blob_unique")
   @@index([blobId])
@@ -21,14 +22,15 @@ model ActiveStorageAttachment {
 }
 
 model ActiveStorageBlob {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key         String   @unique(map: "active_storage_blobs_key_unique") @db.VarChar
-  filename    String   @db.VarChar
-  contentType String?  @map("content_type") @db.VarChar
+  id          String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String                    @unique(map: "active_storage_blobs_key_unique") @db.VarChar
+  filename    String                    @db.VarChar
+  contentType String?                   @map("content_type") @db.VarChar
   metadata    String?
-  byteSize    BigInt   @map("byte_size")
-  checksum    String   @db.VarChar
-  createdAt   DateTime @map("created_at") @db.Timestamp(6)
+  byteSize    BigInt                    @map("byte_size")
+  checksum    String                    @db.VarChar
+  createdAt   DateTime                  @map("created_at") @db.Timestamp(6)
+  attachments ActiveStorageAttachment[]
 
   @@map("active_storage_blobs")
 }
@@ -121,7 +123,7 @@ model BlogPost {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
   blurb       String?
-  slug        String
+  slug        String    @unique(map: "blog_posts_slug_unique") @db.VarChar
   content     String?
   state       String    @default("draft") @db.VarChar
   publishedAt DateTime? @map("published_at") @db.Timestamp(6)
