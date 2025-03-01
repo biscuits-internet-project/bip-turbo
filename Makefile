@@ -1,3 +1,9 @@
+# Database connection variables - adjust as needed
+DB_NAME ?= bip_development
+DB_USER ?= postgres
+DB_PASSWORD ?= password
+PROD_DATA_PATH ?= ../data/bip.tar
+
 install:
 	pnpm install
 
@@ -30,6 +36,16 @@ migrate-create:
 
 migrate-baseline:
 	cd packages/core && pnpm prisma:migrate:baseline
+
+db-reset:
+	cd packages/core && pnpm prisma:reset
+	@echo "Restoring production data from $(PROD_DATA_PATH)..."
+	@if [ ! -f $(PROD_DATA_PATH) ]; then \
+		echo "Error: Production data file not found at $(PROD_DATA_PATH)"; \
+		exit 1; \
+	fi
+	pg_restore --no-owner --no-acl --data-only -d "$$(doppler secrets get DATABASE_URL --plain)" $(PROD_DATA_PATH) || true
+	@echo "Production data restored successfully."
 
 db-generate:
 	cd packages/core && pnpm prisma:generate
