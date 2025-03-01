@@ -16,7 +16,8 @@
     "prisma:migrate:create": "doppler run -- prisma migrate dev --create-only --schema=./src/_shared/prisma/schema.prisma",
     "prisma:migrate:baseline": "doppler run -- prisma migrate resolve --applied 0_init --schema=./src/_shared/prisma/schema.prisma",
     "prisma:introspect": "doppler run -- prisma db pull --schema=./src/_shared/prisma/schema.prisma",
-    "prisma:studio": "doppler run -- prisma studio --schema=./src/_shared/prisma/schema.prisma"
+    "prisma:studio": "doppler run -- prisma studio --schema=./src/_shared/prisma/schema.prisma",
+    "prisma:reset": "doppler run -- prisma migrate reset --force --schema=./src/_shared/prisma/schema.prisma"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
