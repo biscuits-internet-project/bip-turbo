@@ -1,6 +1,7 @@
-import type { Setlist, TourDate } from "@bip/domain";
-import { ArrowRight, Calendar, MapPin, Music, Search } from "lucide-react";
+import type { BlogPost, Setlist, TourDate } from "@bip/domain";
+import { ArrowRight, Calendar, FileText, MapPin, Music, Search } from "lucide-react";
 import { Link } from "react-router-dom";
+import { BlogCard } from "~/components/blog/blog-card";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Card } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -10,6 +11,7 @@ import { services } from "~/server/services";
 interface LoaderData {
   tourDates: TourDate[];
   recentShows: Setlist[];
+  recentBlogPosts: BlogPost[];
 }
 
 export const loader = publicLoader<LoaderData>(async () => {
@@ -24,11 +26,21 @@ export const loader = publicLoader<LoaderData>(async () => {
     sort: [{ field: "date", direction: "desc" }],
   });
 
-  return { tourDates, recentShows };
+  // Get recent blog posts (last 5)
+  const recentBlogPosts = await services.blogPosts.findMany({
+    pagination: { limit: 5 },
+    sort: [{ field: "createdAt", direction: "desc" }],
+    filters: [
+      { field: "state", operator: "eq", value: "published" },
+      { field: "publishedAt", operator: "lte", value: new Date() },
+    ],
+  });
+
+  return { tourDates, recentShows, recentBlogPosts };
 });
 
 export default function Index() {
-  const { tourDates = [], recentShows = [] } = useSerializedLoaderData<LoaderData>();
+  const { tourDates = [], recentShows = [], recentBlogPosts = [] } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div className="min-h-screen p-6 md:p-8 lg:p-10">
@@ -74,47 +86,72 @@ export default function Index() {
           )}
         </div>
 
-        {/* Upcoming Tour Dates Section - Takes 3/7 of the grid on large screens */}
-        <div className="lg:col-span-3 order-1 lg:order-2">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
+        {/* Right Column - Tour Dates and Blog Posts */}
+        <div className="lg:col-span-3 order-1 lg:order-2 space-y-8">
+          {/* Upcoming Tour Dates Section */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
+            </div>
+
+            {tourDates.length > 0 ? (
+              <Card className="bg-gray-900 border-gray-800">
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-md">
+                    <thead>
+                      <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
+                        <th className="p-4">Date</th>
+                        <th className="p-4">Venue</th>
+                        <th className="hidden md:table-cell p-4">Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tourDates.map((td: TourDate) => (
+                        <tr
+                          key={td.formattedStartDate + td.venueName}
+                          className="border-b border-border/40 hover:bg-accent/5"
+                        >
+                          <td className="p-4 text-white">
+                            {td.formattedStartDate === td.formattedEndDate
+                              ? td.formattedStartDate
+                              : `${td.formattedStartDate} - ${td.formattedEndDate}`}
+                          </td>
+                          <td className="p-4 text-white font-medium">{td.venueName}</td>
+                          <td className="hidden md:table-cell p-4 text-gray-400">{td.address}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            ) : (
+              <div className="text-center p-8 border border-dashed rounded-lg">
+                <p className="text-muted-foreground">No upcoming tour dates available</p>
+              </div>
+            )}
           </div>
 
-          {tourDates.length > 0 ? (
-            <Card className="bg-gray-900 border-gray-800 h-full">
-              <div className="relative overflow-x-auto">
-                <table className="w-full text-md">
-                  <thead>
-                    <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
-                      <th className="p-4">Date</th>
-                      <th className="p-4">Venue</th>
-                      <th className="hidden md:table-cell p-4">Address</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tourDates.map((td: TourDate) => (
-                      <tr
-                        key={td.formattedStartDate + td.venueName}
-                        className="border-b border-border/40 hover:bg-accent/5"
-                      >
-                        <td className="p-4 text-white">
-                          {td.formattedStartDate === td.formattedEndDate
-                            ? td.formattedStartDate
-                            : `${td.formattedStartDate} - ${td.formattedEndDate}`}
-                        </td>
-                        <td className="p-4 text-white font-medium">{td.venueName}</td>
-                        <td className="hidden md:table-cell p-4 text-gray-400">{td.address}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          ) : (
-            <div className="text-center p-8 border border-dashed rounded-lg">
-              <p className="text-muted-foreground">No upcoming tour dates available</p>
+          {/* Recent Blog Posts Section */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Latest from the Blog</h2>
+              <Link to="/blog" className="text-purple-500 hover:text-purple-400 flex items-center">
+                View all <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
             </div>
-          )}
+
+            {recentBlogPosts.length > 0 ? (
+              <div className="grid gap-4">
+                {recentBlogPosts.map((blogPost) => (
+                  <BlogCard key={blogPost.id} blogPost={blogPost} compact={true} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-8 border border-dashed rounded-lg">
+                <p className="text-muted-foreground">No blog posts available</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@ export function mapShowToDomainEntity(show: DbShow): Show {
   const { venueId, bandId, ...rest } = show;
   return {
     ...rest,
-    date: new Date(show.date),
+    date: String(show.date),
     createdAt: new Date(show.createdAt),
     updatedAt: new Date(show.updatedAt),
     slug: show.slug ?? "",

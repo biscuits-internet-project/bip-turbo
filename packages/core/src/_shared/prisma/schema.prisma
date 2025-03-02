@@ -309,7 +309,7 @@ model ShowYoutube {
 model Show {
   id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   slug              String?       @unique(map: "shows_slug_unique") @db.VarChar
-  date              DateTime      @db.Date
+  date              String        @db.VarChar
   venueId           String?       @map("venue_id") @db.Uuid
   bandId            String?       @map("band_id") @db.Uuid
   notes             String?

@@ -1,13 +1,14 @@
 import type { Setlist } from "@bip/domain";
-import { format } from "date-fns";
-import { Flame, Info } from "lucide-react";
-import { Link } from "react-router";
+import { Flame } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
-import { cn } from "~/lib/utils";
+import { cn, formatDateShort } from "~/lib/utils";
 
 export function SetlistCard({ setlist }: { setlist: Setlist }) {
-  const date = new Date(setlist.show.date);
+  // Use the utility function to format the date
+  const formattedDate = formatDateShort(setlist.show.date);
+
   const rating = setlist.show.averageRating;
 
   // Create a map to store unique annotations by description
@@ -63,7 +64,7 @@ export function SetlistCard({ setlist }: { setlist: Setlist }) {
         <div className="flex justify-between items-start">
           <div className="flex flex-col gap-1">
             <div className="text-2xl font-medium text-purple-300 hover:text-purple-200 transition-colors">
-              <Link to={`/shows/${setlist.show.slug}`}>{format(date, "M/d/yyyy")}</Link>
+              <Link to={`/shows/${setlist.show.slug}`}>{formattedDate}</Link>
             </div>
             <div className="text-xl text-gray-200">
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}

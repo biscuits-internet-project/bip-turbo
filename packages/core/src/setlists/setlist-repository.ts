@@ -140,8 +140,8 @@ export class SetlistRepository {
         venueId,
         date: year
           ? {
-              gte: new Date(`${year}-01-01`),
-              lt: new Date(`${year + 1}-01-01`),
+              gte: `${year}-01-01`,
+              lt: `${year + 1}-01-01`,
             }
           : undefined,
       },
@@ -160,11 +160,11 @@ export class SetlistRepository {
     });
 
     return results
-      .filter((show) => show.venue !== null)
+      .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
       .map((show) =>
         this.#mapSetlistToDomainEntity({
           ...show,
-          venue: show.venue as DbVenue,
+          venue: show.venue,
           tracks: show.tracks.map((track) => ({
             ...track,
             annotations: track.annotations || [],
@@ -190,11 +190,21 @@ export class SetlistRepository {
     }
 
     // Convert the grouped tracks into sets
-    const sets = Array.from(setGroups.entries()).map(([label, setTracks]) => ({
-      label,
-      sort: this.#getSetSortOrder(label),
-      tracks: setTracks.map((t) => mapTrackToDomainEntity(t)),
-    }));
+    const sets = Array.from(setGroups.entries()).map(([label, setTracks]) => {
+      // Sort tracks by position within each set
+      const sortedTracks = [...setTracks].sort((a, b) => {
+        // Ensure we're sorting numerically by position
+        const posA = Number(a.position);
+        const posB = Number(b.position);
+        return posA - posB;
+      });
+
+      return {
+        label,
+        sort: this.#getSetSortOrder(label),
+        tracks: sortedTracks.map((t) => mapTrackToDomainEntity(t)),
+      };
+    });
 
     // Sort sets by their sort order
     sets.sort((a, b) => a.sort - b.sort);
@@ -210,8 +220,19 @@ export class SetlistRepository {
   #getSetSortOrder(setLabel: string): number {
     // Handle common set labels
     if (setLabel.toLowerCase() === "soundcheck") return 0;
-    if (setLabel.match(/^s\d+$/i)) return Number.parseInt(setLabel.slice(1));
-    if (setLabel.match(/^e\d+$/i)) return 100 + Number.parseInt(setLabel.slice(1));
+
+    const upperLabel = setLabel.toUpperCase();
+
+    // S sets come first (10-40)
+    if (upperLabel === "S1") return 10;
+    if (upperLabel === "S2") return 20;
+    if (upperLabel === "S3") return 30;
+    if (upperLabel === "S4") return 40;
+
+    // E sets come after (50-60)
+    if (upperLabel === "E1") return 50;
+    if (upperLabel === "E2") return 60;
+
     // Default sort order for unknown set types
     return 999;
   }

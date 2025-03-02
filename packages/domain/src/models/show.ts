@@ -5,7 +5,7 @@ import { venueSchema } from "./venue";
 export const showSchema = z.object({
   id: z.string().uuid(),
   slug: z.string(),
-  date: z.date(),
+  date: z.string(),
   venueId: z.string().uuid(),
   bandId: z.string().uuid(),
   notes: z.string().nullable(),

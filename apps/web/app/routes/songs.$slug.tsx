@@ -70,7 +70,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
       sortingFn: "datetime",
       cell: (info) => (
         <a href={`/shows/${info.row.original.show.slug}`} className="">
-          {info.getValue().toLocaleDateString("en-US", { timeZone: "UTC" })}
+          {info.getValue()}
         </a>
       ),
     }),
@@ -320,14 +320,7 @@ export default function SongPage() {
                     >
                       <div className="p-4">
                         <div className="flex items-start justify-between gap-3 mb-2">
-                          <div className="text-lg font-medium text-white">
-                            {p.show.date.toLocaleDateString("en-US", {
-                              month: "numeric",
-                              day: "numeric",
-                              year: "numeric",
-                              timeZone: "UTC",
-                            })}
-                          </div>
+                          <div className="text-lg font-medium text-white">{p.show.date}</div>
                           {p.rating && p.rating > 0 && (
                             <div className="text-sm text-gray-400">{`★ ${p.rating.toFixed(1)}`}</div>
                           )}

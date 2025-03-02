@@ -68,7 +68,7 @@ export class SongPageComposer {
       show: {
         id: row.id,
         slug: row.slug,
-        date: new Date(row.date),
+        date: row.date,
         venueId: row.venue_id,
       },
       venue:

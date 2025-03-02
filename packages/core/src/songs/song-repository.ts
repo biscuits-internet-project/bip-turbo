@@ -134,8 +134,8 @@ export class SongRepository extends BaseRepository<Song, DbSong> {
     const shows = await this.db.show.findMany({
       where: {
         date: {
-          gte: oneYearAgo,
-          lte: now,
+          gte: `${oneYearAgo.getFullYear()}-${String(oneYearAgo.getMonth() + 1).padStart(2, "0")}-${String(oneYearAgo.getDate()).padStart(2, "0")}`,
+          lte: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
         },
       },
     });

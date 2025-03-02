@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "shows" ALTER COLUMN "date" SET DATA TYPE VARCHAR;
