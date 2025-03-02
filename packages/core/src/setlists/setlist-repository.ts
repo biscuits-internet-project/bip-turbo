@@ -64,6 +64,62 @@ export class SetlistRepository {
     });
   }
 
+  /**
+   * Find setlists by an array of show IDs
+   * @param showIds Array of show IDs to find setlists for
+   * @param options Optional query options for pagination, sorting, etc.
+   * @returns An array of setlists for the specified show IDs
+   */
+  async findManyByShowIds(
+    showIds: string[],
+    options?: {
+      pagination?: PaginationOptions;
+      sort?: SortOptions<Show>[];
+    },
+  ): Promise<Setlist[]> {
+    if (!showIds.length) return [];
+
+    const orderBy = buildOrderByClause(options?.sort, { date: "desc" });
+    const skip =
+      options?.pagination?.page && options?.pagination?.limit
+        ? (options.pagination.page - 1) * options.pagination.limit
+        : undefined;
+    const take = options?.pagination?.limit;
+
+    const results = await this.db.show.findMany({
+      where: {
+        id: {
+          in: showIds,
+        },
+      },
+      orderBy,
+      skip,
+      take,
+      include: {
+        tracks: {
+          include: {
+            song: true,
+            annotations: true,
+          },
+        },
+        venue: true,
+      },
+    });
+
+    return results
+      .filter((show) => show.venue !== null)
+      .map((show) =>
+        this.#mapSetlistToDomainEntity({
+          ...show,
+          venue: show.venue as DbVenue,
+          tracks: show.tracks.map((track) => ({
+            ...track,
+            annotations: track.annotations || [],
+          })),
+        }),
+      );
+  }
+
   async findMany(options?: {
     pagination?: PaginationOptions;
     sort?: SortOptions<Show>[];

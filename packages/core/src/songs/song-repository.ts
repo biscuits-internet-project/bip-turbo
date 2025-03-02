@@ -61,7 +61,7 @@ export class SongRepository extends BaseRepository<Song, DbSong> {
 
   async findMany(options?: QueryOptions<Song>): Promise<Song[]> {
     const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
+    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit

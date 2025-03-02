@@ -60,6 +60,54 @@ export class ShowRepository extends BaseRepository<Show, DbShow> {
     return results.map((result: DbShow) => this.mapToDomainEntity(result));
   }
 
+  /**
+   * Search for shows using the pg_search_documents table
+   * @param query The search query
+   * @param options Optional query options for pagination, sorting, etc.
+   * @returns An array of shows matching the search query
+   */
+  async search(query: string, options?: QueryOptions<Show>): Promise<Show[]> {
+    if (!query.trim()) {
+      return this.findMany(options);
+    }
+
+    // Find show IDs from pg_search_documents that match the query
+    const searchResults = await this.db.$queryRaw<Array<{ searchable_id: string }>>`
+      SELECT searchable_id 
+      FROM pg_search_documents 
+      WHERE searchable_type = 'Show' 
+      AND content ILIKE ${`%${query}%`}
+    `;
+
+    if (!searchResults.length) {
+      return [];
+    }
+
+    // Get the show IDs from the search results
+    const showIds = searchResults.map((result) => result.searchable_id);
+
+    // Fetch the actual shows using the IDs
+    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ date: "desc" }];
+    const skip =
+      options?.pagination?.page && options?.pagination?.limit
+        ? (options.pagination.page - 1) * options.pagination.limit
+        : undefined;
+    const take = options?.pagination?.limit;
+
+    const shows = await this.db.show.findMany({
+      where: {
+        id: {
+          in: showIds,
+        },
+      },
+      orderBy,
+      skip,
+      take,
+    });
+
+    return shows.map((show) => this.mapToDomainEntity(show));
+  }
+
   async delete(id: string): Promise<boolean> {
     try {
       await this.db.show.delete({

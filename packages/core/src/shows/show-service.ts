@@ -1,7 +1,7 @@
 import type { Logger, Show } from "@bip/domain";
 import { BaseService } from "../_shared/base-service";
 import type { DbShow } from "../_shared/database/models";
-import type { FilterCondition } from "../_shared/database/types";
+import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import type { ShowRepository } from "./show-repository";
 
 export interface ShowFilter {
@@ -33,5 +33,16 @@ export class ShowService extends BaseService<Show, DbShow> {
         value,
       })) as FilterCondition<Show>[],
     });
+  }
+
+  /**
+   * Search for shows using the pg_search_documents table
+   * @param query The search query
+   * @param options Optional query options for pagination, sorting, etc.
+   * @returns An array of shows matching the search query
+   */
+  async search(query: string, options?: QueryOptions<Show>): Promise<Show[]> {
+    this.logger.info(`Searching for shows with query: ${query}`);
+    return (this.repository as ShowRepository).search(query, options);
   }
 }

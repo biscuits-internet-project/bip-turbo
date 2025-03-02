@@ -60,6 +60,18 @@ export class ReviewRepository extends BaseRepository<Review, DbReview> {
     return results.map((result) => mapReviewToMinimal(result, result.user));
   }
 
+  async findForTracksByShowId(showId: string): Promise<ReviewMinimal[]> {
+    const results = await this.db.review.findMany({
+      where: { showId },
+      orderBy: [{ createdAt: "desc" }],
+      include: {
+        user: true,
+      },
+    });
+
+    return results.map((result) => mapReviewToMinimal(result, result.user));
+  }
+
   async findByUserId(userId: string, options?: QueryOptions<Review>): Promise<Review[]> {
     const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
     const skip =

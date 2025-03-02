@@ -18,6 +18,22 @@ export class SetlistService {
     return this.repository.findByShowSlug(slug);
   }
 
+  /**
+   * Find setlists by an array of show IDs
+   * @param showIds Array of show IDs to find setlists for
+   * @param options Optional query options for pagination, sorting, etc.
+   * @returns An array of setlists for the specified show IDs
+   */
+  async findManyByShowIds(
+    showIds: string[],
+    options?: {
+      pagination?: PaginationOptions;
+      sort?: SortOptions<Show>[];
+    },
+  ): Promise<Setlist[]> {
+    return this.repository.findManyByShowIds(showIds, options);
+  }
+
   async findMany(options?: {
     pagination?: PaginationOptions;
     sort?: SortOptions<Show>[];
