@@ -1,4 +1,5 @@
 import type React from "react";
+import Markdown from "react-markdown";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
@@ -589,12 +590,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
       {songs.map((song) => (
         <Card key={song.anchor} title={song.name} id={song.anchor}>
           {song.setting && <p>{song.setting}</p>}
-          {song.lyrics && (
-            <div
-              className="mt-4 italic text-gray-400 whitespace-pre-line"
-              dangerouslySetInnerHTML={{ __html: song.lyrics }}
-            />
-          )}
+          {song.lyrics && <Markdown>{song.lyrics}</Markdown>}
         </Card>
       ))}
     </div>

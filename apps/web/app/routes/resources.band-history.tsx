@@ -46,7 +46,11 @@ const BandHistory: React.FC = () => {
     </a>
   );
 
-  return <div className="max-w-4xl mx-auto px-4 py-8"></div>;
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold">Band History</h1>
+    </div>
+  );
 };
 
 export default BandHistory;
