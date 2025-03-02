@@ -58,12 +58,16 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       >
         {/* Header */}
         <div className="border-b border-border/40 p-4">
-          <div className={cn("flex flex-col items-start gap-1", !open && !isMobile && "items-center")}>
-            <div className={cn("text-lg font-bold text-primary", !open && !isMobile && "text-center")}>
-              {!open && !isMobile ? "B" : "biscuits"}
+          <Link to="/">
+            <div className={cn("flex flex-col items-start gap-1", !open && !isMobile && "items-center")}>
+              <div className={cn("text-lg font-bold text-primary", !open && !isMobile && "text-center")}>
+                {!open && !isMobile ? "B" : "biscuits"}
+              </div>
+              <div className={cn("text-sm text-muted-foreground", !open && !isMobile && "hidden")}>
+                internet project
+              </div>
             </div>
-            <div className={cn("text-sm text-muted-foreground", !open && !isMobile && "hidden")}>internet project</div>
-          </div>
+          </Link>
         </div>
 
         {/* Navigation */}

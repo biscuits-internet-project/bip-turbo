@@ -12,40 +12,39 @@ interface LoaderData {
   year: number;
 }
 
-const years = Array.from({ length: 30 }, (_, i) => 2025 - i);
+const years = Array.from({ length: 30 }, (_, i) => 2025 - i).reverse();
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
   console.log("⚡️ shows loader start:", request.method, new URL(request.url).pathname);
 
   const url = new URL(request.url);
-  const year = url.searchParams.get("year") || new Date().getFullYear() - 1;
+  const year = url.searchParams.get("year") || new Date().getFullYear();
   const yearInt = Number.parseInt(year as string);
 
   console.log("⚡️ shows loader - fetching setlists for year:", yearInt);
 
-  const cacheKey = `shows-${yearInt}`;
-  try {
-    const cachedSetlists = await services.redis.get<Setlist[]>(cacheKey);
-    if (cachedSetlists) {
-      console.log("⚡️ shows loader - found cached setlists:", cachedSetlists.length);
-      return { setlists: cachedSetlists, year: yearInt };
-    }
-  } catch (error) {
-    console.error("Redis cache error:", error);
-    // Continue to database query
-  }
+  // const cacheKey = `shows-${yearInt}`;
+  // try {
+  //   const cachedSetlists = await services.redis.get<Setlist[]>(cacheKey);
+  //   if (cachedSetlists) {
+  //     console.log("⚡️ shows loader - found cached setlists:", cachedSetlists.length);
+  //     return { setlists: cachedSetlists, year: yearInt };
+  //   }
+  // } catch (error) {
+  //   console.error("Redis cache error:", error);
+  //   // Continue to database query
+  // }
 
   const setlists = await services.setlists.findMany({
-    filters: [
-      { field: "date", operator: "gte", value: new Date(yearInt, 0, 1) },
-      { field: "date", operator: "lte", value: new Date(yearInt, 11, 31) },
-    ],
+    filters: {
+      year: yearInt,
+    },
   });
 
-  if (setlists.length > 0) {
-    await services.redis.set<Setlist[]>(cacheKey, setlists);
-  }
+  // if (setlists.length > 0) {
+  //   await services.redis.set<Setlist[]>(cacheKey, setlists);
+  // }
 
   console.log("⚡️ shows loader - found setlists:", setlists.length);
   return { setlists, year: yearInt };

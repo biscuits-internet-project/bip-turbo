@@ -25,6 +25,7 @@ export const blogPostSchema = z.object({
   postType: z.enum([BlogPostType.BLOG]).default(BlogPostType.BLOG),
   createdAt: z.date(),
   updatedAt: z.date(),
+  imageUrls: z.array(z.string()).optional(),
 });
 
 export const blogPostCreateSchema = blogPostSchema.omit({ id: true, createdAt: true, updatedAt: true });

@@ -8,4 +8,14 @@ export const userSchema = z.object({
   username: z.string(),
 });
 
+export const userMinimalSchema = userSchema
+  .pick({
+    id: true,
+    username: true,
+  })
+  .extend({
+    avatarUrl: z.string().url().nullable(),
+  });
+
 export type User = z.infer<typeof userSchema>;
+export type UserMinimal = z.infer<typeof userMinimalSchema>;

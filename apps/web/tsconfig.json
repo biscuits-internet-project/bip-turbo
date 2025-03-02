@@ -24,7 +24,11 @@
       "@/*": ["./app/*"],
       "@/components/*": ["app/components/*"],
       "@/lib/*": ["app/lib/*"],
-      "@/ui/*": ["app/components/ui/*"]
+      "@/ui/*": ["app/components/ui/*"],
+      "@bip/domain/*": ["../../packages/domain/src/*"],
+      "@bip/domain": ["../../packages/domain/src"],
+      "@bip/core/*": ["../../packages/core/src/*"],
+      "@bip/core": ["../../packages/core/src"]
     },
 
     // Output

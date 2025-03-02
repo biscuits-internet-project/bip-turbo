@@ -1,17 +1,17 @@
 // React Router generated types for route:
-// routes/blog.tsx
+// routes/resources.chemical-warfare-brigade.tsx
 
 import type * as T from "react-router/route-module"
 
 import type { Info as Parent0 } from "../../+types/root.js"
 
-type Module = typeof import("../blog.js")
+type Module = typeof import("../resources.chemical-warfare-brigade.js")
 
 export type Info = {
   parents: [Parent0],
-  id: "routes/blog"
-  file: "routes/blog.tsx"
-  path: "blog"
+  id: "routes/resources.chemical-warfare-brigade"
+  file: "routes/resources.chemical-warfare-brigade.tsx"
+  path: "resources/chemical-warfare-brigade"
   params: {} & { [key: string]: string | undefined }
   module: Module
   loaderData: T.CreateLoaderData<Module>

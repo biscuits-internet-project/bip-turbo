@@ -11,6 +11,7 @@ import type {
   Annotation as PrismaAnnotation,
   Author as PrismaAuthor,
   BlogPost as PrismaBlogPost,
+  Review as PrismaReview,
   Show as PrismaShow,
   Song as PrismaSong,
   Track as PrismaTrack,
@@ -22,6 +23,7 @@ import type {
 export type DbAnnotation = PrismaAnnotation;
 export type DbBlogPost = PrismaBlogPost;
 export type DbClient = PrismaClient;
+export type DbReview = PrismaReview;
 export type DbSong = PrismaSong;
 export type DbAuthor = PrismaAuthor;
 export type DbShow = PrismaShow;
@@ -33,7 +35,7 @@ export type DbUser = PrismaUser;
 export type ModelName = keyof DbClient;
 
 // Define a generic database model type
-export type DbModel = DbSong | DbAuthor | DbShow | DbTrack | DbVenue | DbUser | DbAnnotation | DbBlogPost;
+export type DbModel = DbSong | DbAuthor | DbShow | DbTrack | DbVenue | DbUser | DbAnnotation | DbBlogPost | DbReview;
 
 // Re-export the Prisma client instance with the generic type
 import { prisma as prismaInstance } from "../prisma";

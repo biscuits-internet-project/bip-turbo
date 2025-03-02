@@ -1,6 +1,11 @@
 import type { Setlist, Show } from "@bip/domain";
-import type { FilterCondition, PaginationOptions, SortOptions } from "../_shared/database/types";
+import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 import type { SetlistRepository } from "./setlist-repository";
+
+export type SetlistFilter = {
+  year?: number;
+  venueId?: string;
+};
 
 export class SetlistService {
   constructor(private readonly repository: SetlistRepository) {}
@@ -16,7 +21,7 @@ export class SetlistService {
   async findMany(options?: {
     pagination?: PaginationOptions;
     sort?: SortOptions<Show>[];
-    filters?: FilterCondition<Show>[];
+    filters?: SetlistFilter;
   }): Promise<Setlist[]> {
     return this.repository.findMany(options);
   }

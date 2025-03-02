@@ -8,20 +8,15 @@ import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
 interface LoaderData {
-  upcomingTourDates: TourDate[];
+  tourDates: TourDate[];
   recentShows: Setlist[];
 }
 
 export const loader = publicLoader<LoaderData>(async () => {
   // Get upcoming tour dates
-  const allTourDates = Array.isArray(await services.tourDatesService.getTourDates())
+  const tourDates = Array.isArray(await services.tourDatesService.getTourDates())
     ? await services.tourDatesService.getTourDates()
     : [];
-
-  // Sort by date and take the first 3
-  const upcomingTourDates = allTourDates
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 3);
 
   // Get recent shows (last 5)
   const recentShows = await services.setlists.findMany({
@@ -29,11 +24,11 @@ export const loader = publicLoader<LoaderData>(async () => {
     sort: [{ field: "date", direction: "desc" }],
   });
 
-  return { upcomingTourDates, recentShows };
+  return { tourDates, recentShows };
 });
 
 export default function Index() {
-  const { upcomingTourDates = [], recentShows = [] } = useSerializedLoaderData<LoaderData>();
+  const { tourDates = [], recentShows = [] } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div className="min-h-screen p-6 md:p-8 lg:p-10">
@@ -83,12 +78,9 @@ export default function Index() {
         <div className="lg:col-span-3 order-1 lg:order-2">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
-            <Link to="/tour-dates" className="text-purple-500 hover:text-purple-400 flex items-center">
-              View all <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
           </div>
 
-          {upcomingTourDates.length > 0 ? (
+          {tourDates.length > 0 ? (
             <Card className="bg-gray-900 border-gray-800 h-full">
               <div className="relative overflow-x-auto">
                 <table className="w-full text-md">
@@ -100,7 +92,7 @@ export default function Index() {
                     </tr>
                   </thead>
                   <tbody>
-                    {upcomingTourDates.map((td: TourDate) => (
+                    {tourDates.map((td: TourDate) => (
                       <tr
                         key={td.formattedStartDate + td.venueName}
                         className="border-b border-border/40 hover:bg-accent/5"
@@ -123,26 +115,6 @@ export default function Index() {
               <p className="text-muted-foreground">No upcoming tour dates available</p>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Stats section */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-        <div className="p-4 text-center rounded-lg border border-border bg-card">
-          <div className="text-3xl font-bold text-purple-500 mb-1">2,000+</div>
-          <div className="text-sm text-muted-foreground">Shows</div>
-        </div>
-        <div className="p-4 text-center rounded-lg border border-border bg-card">
-          <div className="text-3xl font-bold text-purple-500 mb-1">300+</div>
-          <div className="text-sm text-muted-foreground">Songs</div>
-        </div>
-        <div className="p-4 text-center rounded-lg border border-border bg-card">
-          <div className="text-3xl font-bold text-purple-500 mb-1">500+</div>
-          <div className="text-sm text-muted-foreground">Venues</div>
-        </div>
-        <div className="p-4 text-center rounded-lg border border-border bg-card">
-          <div className="text-3xl font-bold text-purple-500 mb-1">25+</div>
-          <div className="text-sm text-muted-foreground">Years</div>
         </div>
       </div>
     </div>

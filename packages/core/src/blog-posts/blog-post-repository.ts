@@ -54,14 +54,34 @@ export class BlogPostRepository extends BaseRepository<BlogPost, DbBlogPost> {
         : undefined;
     const take = options?.pagination?.limit;
 
-    const results = await this.db.blogPost.findMany({
+    const blogPosts = await this.db.blogPost.findMany({
       where,
       orderBy,
       skip,
       take,
     });
 
-    return results.map((result: DbBlogPost) => this.mapToDomainEntity(result));
+    const images = await this.db.activeStorageAttachment.findMany({
+      where: {
+        recordType: "BlogPost",
+        recordId: { in: blogPosts.map((blogPost) => blogPost.id) },
+      },
+      include: {
+        blob: true,
+      },
+    });
+
+    const domainBlogPosts = blogPosts.map((blogPost: DbBlogPost) => this.mapToDomainEntity(blogPost));
+
+    for (const blogPost of domainBlogPosts) {
+      const imgUrls = images
+        .filter((image) => image.recordId === blogPost.id)
+        .map((image) => {
+          return `https://bip-prod.s3.us-east-1.amazonaws.com/${image.blob.key}`;
+        });
+      blogPost.imageUrls = imgUrls;
+    }
+    return domainBlogPosts;
   }
 
   async delete(id: string): Promise<boolean> {

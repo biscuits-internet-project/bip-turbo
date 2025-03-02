@@ -2,10 +2,11 @@ import type { Setlist, Show } from "@bip/domain";
 import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
 import { dbClient } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
-import type { FilterCondition, PaginationOptions, SortOptions } from "../_shared/database/types";
+import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 import { mapShowToDomainEntity } from "../shows/show-repository";
 import { mapAnnotationToDomainEntity, mapTrackToDomainEntity } from "../tracks/track-repository";
 import { mapVenueToDomainEntity } from "../venues/venue-repository";
+import type { SetlistFilter } from "./setlist-service";
 
 /**
  * Repository for Setlists
@@ -66,10 +67,11 @@ export class SetlistRepository {
   async findMany(options?: {
     pagination?: PaginationOptions;
     sort?: SortOptions<Show>[];
-    filters?: FilterCondition<Show>[];
+    filters?: SetlistFilter;
   }): Promise<Setlist[]> {
-    // Build the query
-    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const year = options?.filters?.year;
+    const venueId = options?.filters?.venueId;
+
     const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
     const skip =
       options?.pagination?.page && options?.pagination?.limit
@@ -78,7 +80,15 @@ export class SetlistRepository {
     const take = options?.pagination?.limit;
 
     const results = await this.db.show.findMany({
-      where,
+      where: {
+        venueId,
+        date: year
+          ? {
+              gte: new Date(`${year}-01-01`),
+              lt: new Date(`${year + 1}-01-01`),
+            }
+          : undefined,
+      },
       orderBy,
       skip,
       take,

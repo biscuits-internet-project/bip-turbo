@@ -1,6 +1,7 @@
 import type { Logger } from "@bip/domain";
 import { BlogPostService } from "../blog-posts/blog-post-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
+import { ReviewService } from "../reviews/review-service";
 import { SetlistService } from "../setlists/setlist-service";
 import { ShowService } from "../shows/show-service";
 import { TourDatesService } from "../shows/tour-dates-service";
@@ -15,6 +16,7 @@ export interface Services {
   songs: SongService;
   setlists: SetlistService;
   venues: VenueService;
+  reviews: ReviewService;
   songPageComposer: SongPageComposer;
   tourDatesService: TourDatesService;
   redis: RedisService;
@@ -28,6 +30,7 @@ export function createServices(container: ServiceContainer): Services {
     songs: new SongService(container.repositories.songs, container.logger),
     setlists: new SetlistService(container.repositories.setlists),
     venues: new VenueService(container.repositories.venues, container.logger),
+    reviews: new ReviewService(container.repositories.reviews, container.logger),
     songPageComposer: new SongPageComposer(container.db, container.repositories.songs),
     tourDatesService: new TourDatesService(container.redis),
     redis: container.redis,

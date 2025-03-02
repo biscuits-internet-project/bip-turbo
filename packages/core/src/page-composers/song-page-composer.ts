@@ -50,7 +50,7 @@ export class SongPageComposer {
         and prevTracks.position = tracks.position - 1
         and prevTracks.set = tracks.set
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
-      WHERE tracks.song_id = ${song.id}
+      WHERE tracks.song_id = ${song.id}::uuid
       ORDER BY shows.date DESC, tracks.set, tracks.position
     `;
 

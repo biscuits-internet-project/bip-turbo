@@ -1,4 +1,4 @@
-import type { User } from "@bip/domain";
+import type { User, UserMinimal } from "@bip/domain";
 import { BaseRepository } from "../_shared/database/base-repository";
 import type { DbUser } from "../_shared/database/models";
 import type { QueryOptions } from "../_shared/database/types";
@@ -15,6 +15,14 @@ export function mapUserToDomainEntity(dbUser: DbUser): User {
 
 export function mapUserToDbModel(entity: Partial<User>): Partial<DbUser> {
   return entity as Partial<DbUser>;
+}
+
+export function mapToUserMinimal(dbUser: DbUser): UserMinimal {
+  return {
+    id: dbUser.id,
+    username: dbUser.username ?? "",
+    avatarUrl: "",
+  };
 }
 
 export class UserRepository extends BaseRepository<User, DbUser> {

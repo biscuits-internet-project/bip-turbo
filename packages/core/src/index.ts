@@ -1,5 +1,6 @@
 // Domain exports
 export * from "./blog-posts/blog-post-service";
+export * from "./reviews/review-service";
 export * from "./setlists/setlist-service";
 export * from "./shows/show-service";
 export * from "./shows/show-service";
