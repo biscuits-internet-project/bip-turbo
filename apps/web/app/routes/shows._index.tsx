@@ -153,7 +153,22 @@ export default function Shows() {
       searchInputRef.current.value = "";
     }
 
+    // Set a safety timeout to reset loading state if navigation takes too long
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+    }
+
+    safetyTimeoutRef.current = setTimeout(() => {
+      setIsSearching(false);
+    }, 5000);
+
     setIsSearching(true);
+
+    // Navigate directly to the year page instead of modifying search params
+    const yearParam = year ? `?year=${year}` : "";
+    window.location.href = `/shows${yearParam}`;
+
+    // As a fallback, also update search params (this might not execute if redirect happens quickly)
     const params = new URLSearchParams(searchParams);
     params.delete("q");
     if (year) {
@@ -194,11 +209,19 @@ export default function Shows() {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Set a new timeout for debounce (300ms)
+    const value = searchInputRef.current?.value || "";
+
+    // If input is empty and we were previously searching, clear the search
+    if (value.length === 0 && searchQuery) {
+      clearSearch();
+      return;
+    }
+
+    // Set a new timeout for debounce (800ms)
     searchTimeoutRef.current = setTimeout(() => {
       performSearch();
-    }, 300);
-  }, [performSearch]);
+    }, 800);
+  }, [performSearch, searchQuery, clearSearch]);
 
   // Clean up timeouts on unmount
   useEffect(() => {

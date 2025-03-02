@@ -10,7 +10,7 @@ export default defineConfig({
       transformMixedEsModules: true,
     },
     rollupOptions: {
-      external: ["react-router-dom", "react-router-dom/server"],
+      external: [],
     },
     sourcemap: process.env.NODE_ENV === "development",
   },
