@@ -1,3 +1,4 @@
+import type { User } from "@supabase/supabase-js";
 import {
   BookOpen,
   Building2,
@@ -18,11 +19,14 @@ import {
   X,
 } from "lucide-react";
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useRouteLoaderData } from "react-router-dom";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useIsMobile } from "~/hooks/use-mobile";
+import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
+import type { ClientSideEnv } from "~/root";
 
 const navigation = [
   { name: "shows", href: "/shows", icon: Headphones },
@@ -38,6 +42,9 @@ const navigation = [
 export function RootLayout({ children }: { children: React.ReactNode }) {
   const { open, setOpen, toggleSidebar } = useSidebar();
   const isMobile = useIsMobile();
+  const rootData = useRouteLoaderData("root") as ClientSideEnv;
+  const { SUPABASE_URL, SUPABASE_ANON_KEY } = rootData;
+  const { user } = useSession(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Ensure sidebar is closed on mobile by default
   useEffect(() => {
@@ -133,6 +140,28 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
               )}
               <span className="sr-only">Toggle Sidebar</span>
             </Button>
+
+            {/* User session indicator */}
+            <div className="ml-auto flex items-center gap-4">
+              {user ? (
+                <div className="flex items-center gap-2">
+                  <Avatar>
+                    <AvatarImage src={user.user_metadata?.avatar_url} />
+                    <AvatarFallback className="bg-purple-900/50 text-xs">
+                      {user.email?.split("@")[0].slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm text-muted-foreground">{user.email}</span>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/logout">Logout</Link>
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/auth/login">Login</Link>
+                </Button>
+              )}
+            </div>
           </div>
         </header>
         <main className="w-full">{children}</main>

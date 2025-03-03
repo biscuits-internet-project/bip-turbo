@@ -14,6 +14,7 @@ type Params = {
   "/resources/band-history": {};
   "/resources/movie-scores": {};
   "/resources/tractorbeam": {};
+  "/auth/forgot-password": {};
   "/resources/think-tank": {};
   "/resources/touchdowns": {};
   "/resources/perfume": {};
@@ -21,12 +22,15 @@ type Params = {
   "/resources/media": {};
   "/resources/mixes": {};
   "/resources/music": {};
+  "/auth/callback": {};
+  "/auth/register": {};
   "/venues": {};
   "/shows": {};
   "/songs": {};
   "/venues/:slug": {
     "slug": string;
   };
+  "/auth/logout": {};
   "/blog": {};
   "/healthcheck": {};
   "/shows/:slug": {
@@ -35,6 +39,7 @@ type Params = {
   "/songs/:slug": {
     "slug": string;
   };
+  "/auth/login": {};
   "/blog/:slug": {
     "slug": string;
   };

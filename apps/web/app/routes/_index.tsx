@@ -1,12 +1,13 @@
 import type { BlogPost, Setlist, TourDate } from "@bip/domain";
 import { ArrowRight, Calendar, FileText, MapPin, Music, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, redirect } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Card } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
+import { getServerClient } from "~/server/supabase";
 
 interface LoaderData {
   tourDates: TourDate[];
@@ -14,7 +15,13 @@ interface LoaderData {
   recentBlogPosts: BlogPost[];
 }
 
-export const loader = publicLoader<LoaderData>(async () => {
+export const loader = publicLoader<LoaderData>(async ({ request }) => {
+  const sbServerClient = getServerClient(request);
+  const userResponse = await sbServerClient.auth.getUser();
+
+  console.log("userResponse");
+  console.log(JSON.stringify(userResponse.data.user, null, 2));
+
   // Get upcoming tour dates
   const tourDates = Array.isArray(await services.tourDatesService.getTourDates())
     ? await services.tourDatesService.getTourDates()

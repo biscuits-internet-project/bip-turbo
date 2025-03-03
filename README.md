@@ -33,7 +33,7 @@ This monorepo is structured using pnpm workspaces and Turborepo for efficient bu
 ### Prerequisites
 
 - Node.js 22 or later
-- pnpm 10.4.0 or later
+- pnpm 10.5.2 or later
 - Docker (for local development with PostgreSQL and Redis)
 
 ### Installation

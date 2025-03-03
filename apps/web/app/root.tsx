@@ -1,14 +1,35 @@
 import { useEffect, useState } from "react";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteError } from "react-router-dom";
+import { Toaster } from "sonner";
 import { NotFound, ServerError } from "~/components/layout/errors";
 import { RootLayout } from "~/components/layout/root-layout";
 import { SidebarProvider } from "~/components/ui/sidebar";
+import { env } from "~/server/env";
 import type { Route } from "./+types/root";
 import stylesheet from "./styles.css?url";
 
+export type RootData = {
+  env: ClientSideEnv;
+};
+
+export type ClientSideEnv = {
+  SUPABASE_URL: string;
+  SUPABASE_ANON_KEY: string;
+  BASE_URL: string;
+};
+
 export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
-export const loader = async () => {};
+export async function loader({ request }: LoaderFunctionArgs<RootData>) {
+  return {
+    env: {
+      SUPABASE_URL: env.SUPABASE_URL,
+      SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY,
+      BASE_URL: env.BASE_URL,
+    },
+  };
+}
 
 // Client-only component to handle window-dependent logic
 function ClientOnly({ children }: { children: (isDesktop: boolean) => React.ReactNode }) {
@@ -57,6 +78,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </SidebarProvider>
           )}
         </ClientOnly>
+        <Toaster position="top-right" theme="dark" />
         <ScrollRestoration />
         <Scripts />
       </body>
