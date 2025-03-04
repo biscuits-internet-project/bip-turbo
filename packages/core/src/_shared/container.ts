@@ -1,4 +1,5 @@
 import type { Logger } from "@bip/domain";
+import type { RedisClientType } from "redis";
 import { BlogPostRepository } from "../blog-posts/blog-post-repository";
 import { ReviewRepository } from "../reviews/review-repository";
 import { SetlistRepository } from "../setlists/setlist-repository";
@@ -31,6 +32,7 @@ export interface ContainerArgs {
   db?: DbClient;
   logger: Logger;
   env: Env;
+  redis?: RedisClientType;
 }
 
 export function createContainer(args: ContainerArgs): ServiceContainer {

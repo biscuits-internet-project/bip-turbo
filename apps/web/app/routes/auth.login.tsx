@@ -7,13 +7,13 @@ import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const supabase = getServerClient(request);
+  const { supabase, headers } = getServerClient(request);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) return redirect("/");
+  if (user) return redirect("/", { headers });
 
   return;
 };

@@ -25,7 +25,7 @@ export interface Services {
 
 export function createServices(container: ServiceContainer): Services {
   return {
-    blogPosts: new BlogPostService(container.repositories.blogPosts, container.logger),
+    blogPosts: new BlogPostService(container.repositories.blogPosts, container.redis, container.logger),
     shows: new ShowService(container.repositories.shows, container.logger),
     songs: new SongService(container.repositories.songs, container.logger),
     setlists: new SetlistService(container.repositories.setlists),

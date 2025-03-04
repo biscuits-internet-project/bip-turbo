@@ -17,20 +17,6 @@ interface LoaderData {
 
 const years = Array.from({ length: 30 }, (_, i) => 2025 - i).reverse();
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-const fullMonths = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 // Minimum characters required to trigger search
 const MIN_SEARCH_CHARS = 5;

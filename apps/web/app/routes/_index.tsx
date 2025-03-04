@@ -7,7 +7,6 @@ import { Card } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
-import { getServerClient } from "~/server/supabase";
 
 interface LoaderData {
   tourDates: TourDate[];
@@ -16,12 +15,6 @@ interface LoaderData {
 }
 
 export const loader = publicLoader<LoaderData>(async ({ request }) => {
-  const sbServerClient = getServerClient(request);
-  const userResponse = await sbServerClient.auth.getUser();
-
-  console.log("userResponse");
-  console.log(JSON.stringify(userResponse.data.user, null, 2));
-
   // Get upcoming tour dates
   const tourDates = Array.isArray(await services.tourDatesService.getTourDates())
     ? await services.tourDatesService.getTourDates()

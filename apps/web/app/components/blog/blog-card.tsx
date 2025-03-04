@@ -40,7 +40,6 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
           <div className="flex items-center text-md text-gray-400">
             <span>{formatDate(blogPost.publishedAt)}</span>
           </div>
-          <span className="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-300">{blogPost.postType}</span>
         </div>
         <CardTitle className={`${compact ? "text-lg" : "text-xl"} mt-2 text-white`}>{blogPost.title}</CardTitle>
         {blogPost.imageUrls && blogPost.imageUrls.length > 0 && (

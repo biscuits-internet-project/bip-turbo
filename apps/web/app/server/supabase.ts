@@ -16,5 +16,5 @@ export const getServerClient = (request: Request) => {
     },
   });
 
-  return supabase;
+  return { supabase, headers };
 };

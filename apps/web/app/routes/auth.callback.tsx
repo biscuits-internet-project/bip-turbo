@@ -1,21 +1,27 @@
 import { type LoaderFunctionArgs, redirect } from "react-router";
+import { logger } from "~/server/logger";
 import { getServerClient } from "~/server/supabase";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next") || "/";
-  const headers = new Headers();
+
+  console.log("code", code);
+  console.log("next", next);
 
   if (code) {
-    const supabase = getServerClient(request);
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { supabase, headers } = getServerClient(request);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
-      return redirect(next, { headers });
+    if (error) {
+      logger.error({ error });
+      return redirect("/auth/login", { headers });
     }
+
+    return redirect(next, { headers });
   }
 
-  // return the user to an error page with instructions
-  return redirect("/auth/auth-code-error", { headers });
+  logger.error("missing code from supabase auth callback");
+  return redirect("/auth/login");
 }
