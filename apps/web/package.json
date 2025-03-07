@@ -6,7 +6,8 @@
     "build": "react-router build",
     "dev": "doppler run -- react-router dev",
     "start": "react-router-serve ./build/server/index.js --port 8080",
-    "typecheck": "react-router typegen && tsc",
+    "gen-root": "bun scripts/gen-root.ts",
+    "typecheck": "react-router typegen && bun run gen-root && tsc",
     "lint": "biome lint",
     "format": "biome format . --write"
   },

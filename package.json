@@ -2,11 +2,12 @@
   "name": "bip-turbo",
   "private": true,
   "scripts": {
-    "dev": "bun --cwd apps/web run dev & bun --cwd apps/workers run dev",
-    "build": "cd apps/web && bun run build && cd ../workers && bun run build",
-    "lint": "bun --cwd apps/web run lint && bun --cwd apps/workers run lint",
-    "format": "bun --cwd apps/web run format && bun --cwd apps/workers run format",
-    "typecheck": "bun --cwd apps/web run typecheck && bun --cwd apps/workers run typecheck"
+    "dev": "bun --cwd apps/web run dev",
+    "build": "cd apps/web && bun run build",
+    "lint": "biome lint .",
+    "format": "biome format . --write",
+    "typecheck": "cd apps/web && bun react-router typegen && cd ../.. && bun tsc --noEmit",
+    "typecheck:all": "bun run -F '*' typecheck"
   },
   "workspaces": [
     "apps/*",

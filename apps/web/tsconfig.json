@@ -28,7 +28,10 @@
     },
 
     // Output
-    "noEmit": true
+    "noEmit": true,
+
+    // Types
+    "typeRoots": ["./types", "./node_modules/@types"]
   },
-  "include": ["**/*"]
+  "include": ["**/*", "types/**/*"]
 }

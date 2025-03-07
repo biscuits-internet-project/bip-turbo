@@ -9,7 +9,6 @@ This monorepo is structured using pnpm workspaces and Turborepo for efficient bu
 ### Apps
 
 - **web**: A React application built with React Router v7, using modern UI components with Radix UI and Tailwind CSS. It serves as the main frontend interface for the application.
-- **workers**: A TypeScript application that handles background processing using Temporal.io for workflow orchestration.
 
 ### Packages
 
@@ -105,7 +104,6 @@ pnpm format
 bip-turbo/
 ├── apps/
 │   ├── web/           # React frontend application
-│   └── workers/       # Background processing workers
 ├── packages/
 │   ├── core/          # Core functionality and database access
 │   └── domain/        # Domain models and business logic

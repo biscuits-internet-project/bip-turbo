@@ -46,7 +46,7 @@ jobs:
           cd ../core && bun run build
 
       - name: Type Check
-        run: bun run typecheck
+        run: bun run typecheck:all
 
       - name: Lint
-        run: bun run lint 
+        run: bun run lint

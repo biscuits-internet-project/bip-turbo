@@ -11,7 +11,7 @@ build:
 	bun run build
 
 tc:
-	bun run typecheck
+	bun run typecheck:all
 
 lint:
 	bun run lint
@@ -22,16 +22,11 @@ format:
 clean:
 	rm -rf node_modules
 	rm -rf apps/web/node_modules
-	rm -rf apps/workers/node_modules
 	rm -rf packages/*/node_modules
 	rm -rf apps/web/build
-	rm -rf apps/workers/dist
 
 web:
 	cd apps/web && bun run dev
-
-workers:
-	cd apps/workers && bun run dev
 
 dev:
 	bun run dev

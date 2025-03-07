@@ -76,8 +76,8 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
 
 export function meta({ data }: { data: ShowLoaderData }) {
   const showDate = formatDateLong(data.setlist.show.date);
-  const venueName = data.setlist.show.venue.name;
-  const cityState = `${data.setlist.show.venue.city}, ${data.setlist.show.venue.state}`;
+  const venueName = data.setlist.show.venue?.name ?? "Unknown Venue";
+  const cityState = `${data.setlist.show.venue?.city}, ${data.setlist.show.venue?.state}`;
 
   return [
     { title: `${showDate} - ${venueName} - ${cityState} | Biscuits Internet Project` },

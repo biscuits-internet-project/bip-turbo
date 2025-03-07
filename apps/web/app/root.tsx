@@ -16,8 +16,8 @@ import { RootLayout } from "~/components/layout/root-layout";
 import { SidebarProvider } from "~/components/ui/sidebar";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { env } from "~/server/env";
-import type { Route } from "./+types/root";
 import stylesheet from "./styles.css?url";
+import type { Route } from ".react-router/types/app/+types/root";
 
 export type RootData = {
   env: ClientSideEnv;

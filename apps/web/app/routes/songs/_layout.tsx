@@ -37,7 +37,7 @@ export default function SongsLayout() {
 
   // Try to get the title from meta data or use the path segment
   const songTitle = songData?.title
-    ? songData.title.replace(" | Biscuits Internet Project", "").trim()
+    ? (songData.title as string).replace(" | Biscuits Internet Project", "").trim()
     : pathSegments[1];
 
   // Format the song name for display (convert slug to title case)
