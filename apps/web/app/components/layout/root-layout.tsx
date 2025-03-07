@@ -63,16 +63,6 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
           "border-r border-border/10",
         )}
       >
-        {/* Header */}
-        <div className="border-b border-border/10 p-4">
-          <Link to="/">
-            <div className="flex flex-col items-start gap-1">
-              <div className="text-lg font-bold text-primary">biscuits</div>
-              <div className="text-sm text-muted-foreground">internet project</div>
-            </div>
-          </Link>
-        </div>
-
         {/* Navigation */}
         <nav className="p-4 space-y-1">
           {navigation.map((item) => (

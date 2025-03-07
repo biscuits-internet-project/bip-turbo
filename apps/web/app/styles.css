@@ -1,9 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Monoton&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    --font-heading: 'Monoton', cursive;
+    --font-body: 'Space Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --sidebar-width: 16rem;
@@ -93,6 +101,7 @@
   }
   body {
     @apply bg-background text-foreground relative overflow-x-hidden;
+    font-family: var(--font-body);
   }
 
   html {
@@ -107,17 +116,17 @@
     right: 0;
     bottom: 0;
     background: 
-      linear-gradient(115deg, transparent 0%, transparent 49.8%, hsla(var(--laser-1) / 0.08) 50%, hsla(var(--laser-1) / 0.08) 50.2%, transparent 50.4%),
-      linear-gradient(155deg, transparent 0%, transparent 49.8%, hsla(var(--laser-3) / 0.08) 50%, hsla(var(--laser-3) / 0.08) 50.2%, transparent 50.4%),
-      linear-gradient(45deg, transparent 0%, transparent 49.8%, hsla(var(--laser-2) / 0.08) 50%, hsla(var(--laser-2) / 0.08) 50.2%, transparent 50.4%),
-      linear-gradient(-60deg, transparent 0%, transparent 49.8%, hsla(var(--laser-4) / 0.08) 50%, hsla(var(--laser-4) / 0.08) 50.2%, transparent 50.4%),
-      linear-gradient(90deg, transparent 0%, transparent 49.8%, hsla(var(--laser-5) / 0.08) 50%, hsla(var(--laser-5) / 0.08) 50.2%, transparent 50.4%),
-      linear-gradient(-30deg, transparent 0%, transparent 49.8%, hsla(var(--laser-6) / 0.08) 50%, hsla(var(--laser-6) / 0.08) 50.2%, transparent 50.4%);
+      linear-gradient(115deg, transparent 0%, transparent 49.8%, hsla(var(--laser-1) / 0.15) 50%, hsla(var(--laser-1) / 0.15) 50.2%, transparent 50.4%),
+      linear-gradient(155deg, transparent 0%, transparent 49.8%, hsla(var(--laser-3) / 0.15) 50%, hsla(var(--laser-3) / 0.15) 50.2%, transparent 50.4%),
+      linear-gradient(45deg, transparent 0%, transparent 49.8%, hsla(var(--laser-2) / 0.15) 50%, hsla(var(--laser-2) / 0.15) 50.2%, transparent 50.4%),
+      linear-gradient(-60deg, transparent 0%, transparent 49.8%, hsla(var(--laser-4) / 0.15) 50%, hsla(var(--laser-4) / 0.15) 50.2%, transparent 50.4%),
+      linear-gradient(90deg, transparent 0%, transparent 49.8%, hsla(var(--laser-5) / 0.15) 50%, hsla(var(--laser-5) / 0.15) 50.2%, transparent 50.4%),
+      linear-gradient(-30deg, transparent 0%, transparent 49.8%, hsla(var(--laser-6) / 0.15) 50%, hsla(var(--laser-6) / 0.15) 50.2%, transparent 50.4%);
     background-size: 600px 800px, 800px 600px, 700px 500px, 500px 700px, 900px 400px, 400px 900px;
-    filter: blur(4px) brightness(1.5);
+    filter: blur(4px) brightness(2.5);
     pointer-events: none;
     z-index: 0;
-    opacity: 0.8;
+    opacity: 1;
     animation: laser-drift-1 120s linear infinite;
   }
 
@@ -151,6 +160,42 @@
   html > * {
     position: relative;
     z-index: 1;
+  }
+
+  /* Apply default fonts */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 400;  /* Monoton only comes in regular weight */
+    letter-spacing: 0.05em;  /* Reduced letter spacing as Monoton has built-in spacing */
+    text-transform: uppercase;
+    line-height: 1.4;  /* Increased line height for better readability */
+  }
+
+  code, pre {
+    font-family: var(--font-mono);
+  }
+
+  /* Style the sidebar title */
+  [data-sidebar="sidebar"] .text-lg {
+    font-family: var(--font-heading);
+    font-weight: 400;  /* Monoton only comes in regular weight */
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  /* Style navigation items with a bit of sci-fi feel */
+  [data-sidebar="sidebar"] nav a span {
+    font-family: var(--font-heading);
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+  }
+
+  /* Add a subtle tech feel to form elements */
+  input, select, textarea {
+    font-family: var(--font-mono);
+    font-weight: 400;
   }
 }
 
