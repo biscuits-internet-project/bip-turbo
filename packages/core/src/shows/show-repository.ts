@@ -1,4 +1,5 @@
 import type { Show } from "@bip/domain";
+import { Prisma } from "@prisma/client";
 import { BaseRepository } from "../_shared/database/base-repository";
 import type { DbShow } from "../_shared/database/models";
 import type { QueryOptions } from "../_shared/database/types";
@@ -71,38 +72,52 @@ export class ShowRepository extends BaseRepository<Show, DbShow> {
       return this.findMany(options);
     }
 
-    // Find show IDs from pg_search_documents that match the query
-    const searchResults = await this.db.$queryRaw<Array<{ searchable_id: string }>>`
-      SELECT searchable_id 
+    console.log("🔍 Searching for:", query);
+
+    // First, let's see what the tokenization looks like
+    const tokenDebug = await this.db.$queryRaw<Array<{ tokens: string }>>`
+      SELECT to_tsvector('english', ${query}) as tokens;
+    `;
+    console.log("🔤 Query tokens:", tokenDebug[0]?.tokens);
+
+    // Let's also check what's in the pg_search_documents table
+    const sampleContent = await this.db.$queryRaw<Array<{ content: string }>>`
+      SELECT content 
       FROM pg_search_documents 
-      WHERE searchable_type = 'Show' 
-      AND content ILIKE ${`%${query}%`}
+      WHERE content ILIKE ${`%${query}%`}
+      LIMIT 1;
+    `;
+    console.log("📄 Matching content sample:", sampleContent[0]?.content);
+
+    const searchResults = await this.db.$queryRaw<Array<{ searchable_id: string; rank: number }>>`
+      SELECT 
+        searchable_id,
+        ts_rank_cd(to_tsvector('english', content), websearch_to_tsquery('english', ${query})) as rank
+      FROM pg_search_documents 
+      WHERE 
+        searchable_type = 'Show'
+        AND to_tsvector('english', content) @@ websearch_to_tsquery('english', ${query})
+      ORDER BY rank DESC
     `;
 
-    if (!searchResults.length) {
-      return [];
-    }
+    console.log("✨ Search results count:", searchResults.length);
 
     // Get the show IDs from the search results
     const showIds = searchResults.map((result) => result.searchable_id);
 
-    // Fetch the actual shows using the IDs
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ date: "desc" }];
-    const skip =
-      options?.pagination?.page && options?.pagination?.limit
-        ? (options.pagination.page - 1) * options.pagination.limit
-        : undefined;
-    const take = options?.pagination?.limit;
-
+    // Fetch shows using Prisma's findMany
     const shows = await this.db.show.findMany({
       where: {
         id: {
           in: showIds,
         },
       },
-      orderBy,
-      skip,
-      take,
+      orderBy: options?.sort ? this.buildOrderByClause(options.sort) : [{ date: "desc" }],
+      skip:
+        options?.pagination?.page && options?.pagination?.limit
+          ? (options.pagination.page - 1) * options.pagination.limit
+          : undefined,
+      take: options?.pagination?.limit,
     });
 
     return shows.map((show) => this.mapToDomainEntity(show));

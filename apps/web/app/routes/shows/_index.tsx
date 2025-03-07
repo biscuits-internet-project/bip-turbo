@@ -19,7 +19,7 @@ const years = Array.from({ length: 30 }, (_, i) => 2025 - i).reverse();
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 // Minimum characters required to trigger search
-const MIN_SEARCH_CHARS = 5;
+const MIN_SEARCH_CHARS = 4;
 
 export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
   console.log("⚡️ shows loader start:", request.method, new URL(request.url).pathname);
@@ -76,12 +76,11 @@ export function meta() {
 export default function Shows() {
   const { setlists, year, searchQuery } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submit = useSubmit();
+  const pendingSearchRef = useRef<AbortController | null>(null);
 
   // Group setlists by month
   const setlistsByMonth = useMemo(() => {
@@ -107,40 +106,19 @@ export default function Shows() {
   // Handle scroll event to show/hide back to top button
   useEffect(() => {
     const handleScroll = () => {
-      // Show button when user scrolls down 2 viewport heights
       const scrollThreshold = window.innerHeight * 2;
       setShowBackToTop(window.scrollY > scrollThreshold);
     };
 
+    // Check initial scroll position
+    handleScroll();
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Initialize search input from URL on mount and when URL changes
-  useEffect(() => {
-    if (searchQuery && searchInputRef.current) {
-      searchInputRef.current.value = searchQuery;
-    }
-  }, [searchQuery]);
-
-  // Reset loading state when data is loaded
-  useEffect(() => {
-    // When new data is loaded, reset the loading state
-    setIsSearching(false);
-
-    // Clear any safety timeout
-    if (safetyTimeoutRef.current) {
-      clearTimeout(safetyTimeoutRef.current);
-      safetyTimeoutRef.current = null;
-    }
-  }, []);
-
   // Scroll to top function
   const scrollToTop = useCallback(() => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   // Clear search and return to year view
@@ -149,87 +127,80 @@ export default function Shows() {
       searchInputRef.current.value = "";
     }
 
-    // Set a safety timeout to reset loading state if navigation takes too long
-    if (safetyTimeoutRef.current) {
-      clearTimeout(safetyTimeoutRef.current);
+    // Cancel any pending search
+    if (pendingSearchRef.current) {
+      pendingSearchRef.current.abort();
+      pendingSearchRef.current = null;
     }
 
-    safetyTimeoutRef.current = setTimeout(() => {
-      setIsSearching(false);
-    }, 5000);
+    setIsSearching(false);
 
-    setIsSearching(true);
-
-    // Navigate directly to the year page instead of modifying search params
-    const yearParam = year ? `?year=${year}` : "";
-    window.location.href = `/shows${yearParam}`;
-
-    // As a fallback, also update search params (this might not execute if redirect happens quickly)
-    const params = new URLSearchParams(searchParams);
-    params.delete("q");
+    const params = new URLSearchParams();
     if (year) {
       params.set("year", year.toString());
     }
-    setSearchParams(params, { replace: true });
-  }, [searchParams, setSearchParams, year]);
+    submit(params, { method: "get", replace: true });
+  }, [year, submit]);
 
   // Perform search with the current input value
   const performSearch = useCallback(() => {
     const value = searchInputRef.current?.value || "";
 
+    // Cancel any pending search
+    if (pendingSearchRef.current) {
+      pendingSearchRef.current.abort();
+      pendingSearchRef.current = null;
+    }
+
     if (value.length >= MIN_SEARCH_CHARS) {
       setIsSearching(true);
-
-      // Set a safety timeout to reset loading state if search takes too long
-      if (safetyTimeoutRef.current) {
-        clearTimeout(safetyTimeoutRef.current);
-      }
-
-      safetyTimeoutRef.current = setTimeout(() => {
-        setIsSearching(false);
-      }, 5000);
 
       const formData = new FormData();
       formData.append("q", value);
       submit(formData, { method: "get", replace: true });
     } else if (value.length === 0 && searchQuery) {
-      // If search is cleared, return to year view
       clearSearch();
     }
   }, [submit, searchQuery, clearSearch]);
 
   // Handle search input change with debounce
   const handleSearchInputChange = useCallback(() => {
-    // Clear any existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
     const value = searchInputRef.current?.value || "";
 
-    // If input is empty and we were previously searching, clear the search
     if (value.length === 0 && searchQuery) {
       clearSearch();
       return;
     }
 
-    // Set a new timeout for debounce (800ms)
     searchTimeoutRef.current = setTimeout(() => {
       performSearch();
-    }, 800);
+    }, 1000);
   }, [performSearch, searchQuery, clearSearch]);
 
-  // Clean up timeouts on unmount
+  // Reset loading state and initialize search input when query changes
   useEffect(() => {
+    setIsSearching(false);
+
+    // Initialize search input from URL
+    if (searchInputRef.current) {
+      searchInputRef.current.value = searchQuery || "";
+    }
+
     return () => {
+      // Clean up any pending searches and timeouts
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
-      if (safetyTimeoutRef.current) {
-        clearTimeout(safetyTimeoutRef.current);
+      if (pendingSearchRef.current) {
+        pendingSearchRef.current.abort();
+        pendingSearchRef.current = null;
       }
     };
-  }, []);
+  }, [searchQuery]);
 
   return (
     <div className="">
@@ -253,43 +224,28 @@ export default function Shows() {
         {/* Search */}
         <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
             <input
               ref={searchInputRef}
               type="search"
-              defaultValue={searchQuery || ""}
-              placeholder={`Search by venue, city, state, song (min ${MIN_SEARCH_CHARS} characters)...`}
-              className="w-full rounded-md border border-border/40 bg-black/20 pl-10 pr-10 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500"
-              disabled={isSearching}
-              autoComplete="off"
+              placeholder="Search by venue, city, state, song (min 4 characters)..."
+              className="w-full pl-9 bg-transparent border border-gray-800 focus:border-purple-500 rounded-md text-white placeholder:text-gray-500 text-sm h-9 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               onChange={handleSearchInputChange}
             />
-            {searchInputRef.current?.value && !isSearching && (
+            {searchInputRef.current?.value && (
               <button
                 type="button"
                 onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                aria-label="Clear search input"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-400 transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
-            {isSearching && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-4 h-4">
-                <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
+            {isSearching && searchInputRef.current?.value && (
+              <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
               </div>
             )}
-          </div>
-          {/* Warning message for minimum characters */}
-          <div className="min-h-[20px]">
-            {!isSearching &&
-              searchInputRef.current?.value &&
-              searchInputRef.current.value.length > 0 &&
-              searchInputRef.current.value.length < MIN_SEARCH_CHARS && (
-                <div className="text-amber-500 text-xs mt-1 ml-1">
-                  Please enter at least {MIN_SEARCH_CHARS} characters to search
-                </div>
-              )}
           </div>
         </div>
 
@@ -338,56 +294,78 @@ export default function Shows() {
           </div>
         )}
 
-        {/* Search results count */}
-        {searchQuery && (
-          <div className="text-gray-400">
-            Found {setlists.length} {setlists.length === 1 ? "show" : "shows"}
-          </div>
-        )}
-
-        {/* Loading state */}
-        {isSearching && (
-          <div className="flex justify-center py-8">
-            <div className="flex items-center gap-2 text-purple-500">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Searching...</span>
+        {/* Results Section */}
+        <div className="relative min-h-[200px]">
+          {/* Search Results Count - Fade in/out */}
+          <div
+            className={cn(
+              "absolute w-full transition-opacity duration-200",
+              searchQuery && !isSearching ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <div className="text-gray-400 mb-4">
+              Found {setlists.length} {setlists.length === 1 ? "show" : "shows"}
             </div>
           </div>
-        )}
 
-        {/* Setlist cards */}
-        {!isSearching && (
-          <div className="space-y-8">
-            {setlists.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-400 text-lg">
-                  {searchQuery ? "No shows found matching your search." : "No shows found for this year."}
-                </p>
-              </div>
-            ) : searchQuery ? (
-              // When searching, display all setlists without month grouping
-              <div className="space-y-4">
-                {setlists.map((setlist) => (
-                  <SetlistCard key={setlist.show.id} setlist={setlist} />
-                ))}
-              </div>
-            ) : (
-              // When not searching, group by month
-              monthsWithShows
-                .sort((a, b) => a - b)
-                .map((month) => (
-                  <div key={month} className="space-y-4">
-                    {setlistsByMonth[month].map((setlist, index) => (
-                      <div key={setlist.show.id}>
-                        {index === 0 && <div id={`month-${month}`} className="scroll-mt-20" />}
-                        <SetlistCard setlist={setlist} />
-                      </div>
-                    ))}
-                  </div>
-                ))
-            )}
+          {/* Results Content */}
+          <div className={cn("transition-all duration-300", isSearching ? "opacity-50" : "opacity-100")}>
+            {/* Setlist cards */}
+            <div className="space-y-8">
+              {setlists.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-lg">
+                    {searchQuery ? "No shows found matching your search." : "No shows found for this year."}
+                  </p>
+                </div>
+              ) : searchQuery ? (
+                // When searching, display all setlists without month grouping
+                <div className="space-y-4">
+                  {setlists.map((setlist) => (
+                    <SetlistCard
+                      key={setlist.show.id}
+                      setlist={setlist}
+                      className={cn(
+                        "transition-all duration-300 transform",
+                        isSearching ? "opacity-50 scale-[0.98] translate-y-2" : "opacity-100 scale-100 translate-y-0",
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : (
+                // When not searching, group by month
+                monthsWithShows
+                  .sort((a, b) => a - b)
+                  .map((month) => (
+                    <div key={month} className="space-y-4">
+                      {setlistsByMonth[month].map((setlist, index) => (
+                        <div key={setlist.show.id}>
+                          {index === 0 && <div id={`month-${month}`} className="scroll-mt-20" />}
+                          <SetlistCard
+                            setlist={setlist}
+                            className="transition-all duration-300 transform hover:scale-[1.01]"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ))
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Loading Overlay */}
+          <div
+            className={cn(
+              "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
+              isSearching ? "opacity-100" : "opacity-0 pointer-events-none",
+            )}
+          >
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-gray-900/50 backdrop-blur-sm border border-gray-800">
+              <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
+              <span className="text-gray-200">Searching...</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Back to Top Button */}

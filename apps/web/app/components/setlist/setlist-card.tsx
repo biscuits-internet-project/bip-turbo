@@ -5,7 +5,12 @@ import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 import { cn, formatDateShort } from "~/lib/utils";
 
-export function SetlistCard({ setlist }: { setlist: Setlist }) {
+interface SetlistCardProps {
+  setlist: Setlist;
+  className?: string;
+}
+
+export function SetlistCard({ setlist, className }: SetlistCardProps) {
   // Use the utility function to format the date
   const formattedDate = formatDateShort(setlist.show.date);
 
@@ -57,7 +62,12 @@ export function SetlistCard({ setlist }: { setlist: Setlist }) {
   const orderedAnnotations = Array.from(uniqueAnnotations.values()).sort((a, b) => a.index - b.index);
 
   return (
-    <Card className="relative overflow-hidden border-gray-800 transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
+    <Card
+      className={cn(
+        "relative overflow-hidden border-gray-800 transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20",
+        className,
+      )}
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
 
       <CardHeader className="relative z-10 border-b border-gray-800/50 px-6 py-5">

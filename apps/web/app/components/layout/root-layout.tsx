@@ -146,7 +146,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <main className="w-full p-10">{children}</main>
+        <main className="w-full px-10">{children}</main>
       </div>
     </div>
   );

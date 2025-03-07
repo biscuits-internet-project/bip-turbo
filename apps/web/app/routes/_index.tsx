@@ -53,9 +53,9 @@ export default function Index() {
   const { tourDates = [], recentShows = [], recentBlogPosts = [] } = useSerializedLoaderData<LoaderData>();
 
   return (
-    <div className="min-h-screen p-6 md:p-8 lg:p-10">
+    <div className="w-full p-0">
       {/* Hero section */}
-      <div className="py-12 text-center">
+      <div className="py-2 text-center">
         <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent">
           Welcome to BIP 3.0
         </h1>

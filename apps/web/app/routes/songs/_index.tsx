@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
@@ -151,31 +152,11 @@ export default function Songs() {
 
   const [filteredSongs, setFilteredSongs] = useState(songs);
   const [searchQuery, setSearchQuery] = useState("");
-  const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const loadMoreRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (!node) return;
-
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const first = entries[0];
-          if (first.isIntersecting && !isLoading && displayCount < filteredSongs.length) {
-            setIsLoading(true);
-            setTimeout(() => {
-              setDisplayCount((prev) => Math.min(prev + ITEMS_PER_PAGE, filteredSongs.length));
-              setIsLoading(false);
-            }, 100);
-          }
-        },
-        { rootMargin: "800px" },
-      );
-
-      observer.observe(node);
-    },
-    [displayCount, filteredSongs.length, isLoading],
-  );
+  const { loadMoreRef, isLoading, currentCount, reset } = useInfiniteScroll({
+    totalItems: filteredSongs.length,
+    itemsPerPage: ITEMS_PER_PAGE,
+  });
 
   const handleSearch = useCallback(
     (query: string) => {
@@ -187,14 +168,14 @@ export default function Songs() {
         const filtered = songs.filter((song: Song) => song.title.toLowerCase().includes(lowerQuery));
         setFilteredSongs(filtered);
       }
-      setDisplayCount(ITEMS_PER_PAGE);
+      reset();
     },
-    [songs],
+    [songs, reset],
   );
 
-  const visibleSongs = useMemo(() => filteredSongs.slice(0, displayCount), [filteredSongs, displayCount]);
+  const visibleSongs = useMemo(() => filteredSongs.slice(0, currentCount), [filteredSongs, currentCount]);
 
-  const hasMore = displayCount < filteredSongs.length;
+  const hasMore = currentCount < filteredSongs.length;
 
   return (
     <div className="">
@@ -233,7 +214,7 @@ export default function Songs() {
 
             {hasMore && (
               <div ref={loadMoreRef} className="py-8 text-center text-gray-400">
-                {isLoading ? "Loading more songs..." : `${filteredSongs.length - displayCount} more songs`}
+                {isLoading ? "Loading more songs..." : `${filteredSongs.length - currentCount} more songs`}
               </div>
             )}
           </>
