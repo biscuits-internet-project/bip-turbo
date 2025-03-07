@@ -23,4 +23,12 @@ export default defineConfig({
   ssr: {
     noExternal: ["use-elapsed-time"],
   },
+  resolve:
+    process.env.NODE_ENV === "development"
+      ? {}
+      : {
+          alias: {
+            "react-dom/server": "react-dom/server.node",
+          },
+        },
 });

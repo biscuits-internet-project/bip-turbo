@@ -184,7 +184,6 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
                           : "w-full text-left"
                       }
                       onClick={(e) => {
-                        console.log("Sort button clicked:", header.id);
                         header.column.toggleSorting();
                       }}
                     >
@@ -276,7 +275,6 @@ export default function SongPage() {
           <TabsList className="w-full flex justify-start border-b border-gray-800 rounded-none bg-transparent p-0">
             <TabsTrigger
               value="all-timers"
-              onClick={() => console.log("TabsTrigger clicked: all-timers")}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
                 "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",

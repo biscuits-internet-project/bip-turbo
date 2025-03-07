@@ -37,21 +37,14 @@ export default function Login() {
       console.error("Google auth error:", error);
       setError("An unexpected error occurred");
     }
-
-    if (data) {
-      console.log("Google auth data:", data);
-    }
   };
 
   const doEmailLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log("Login form submitted");
 
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-
-    console.log("Attempting login with:", { email });
 
     try {
       const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);

@@ -7,9 +7,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next") || "/";
 
-  console.log("code", code);
-  console.log("next", next);
-
   if (code) {
     const { supabase, headers } = getServerClient(request);
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);

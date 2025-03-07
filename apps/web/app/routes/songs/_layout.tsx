@@ -33,8 +33,6 @@ export default function SongsLayout() {
     ? (matches.find((match) => match.pathname.includes(`/songs/${pathSegments[1]}`))?.data as { json: SongData }).json
     : null;
 
-  console.log("songData", songData);
-
   // Try to get the title from meta data or use the path segment
   const songTitle = songData?.title
     ? (songData.title as string).replace(" | Biscuits Internet Project", "").trim()

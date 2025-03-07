@@ -41,8 +41,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
 
   const username = user?.user_metadata?.username ?? user?.email?.split("@")[0];
 
-  const { open, setOpen, toggleSidebar } = useSidebar();
-  console.log("user", user);
+  const { open, setOpen, openMobile, setOpenMobile } = useSidebar();
 
   // Ensure sidebar is closed on mobile by default
   useEffect(() => {
@@ -60,7 +59,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           "fixed top-0 left-0 z-30 h-screen bg-background/95 backdrop-blur-sm transition-all duration-300 w-64",
-          isMobile ? (open ? "translate-x-0" : "-translate-x-full") : "translate-x-0",
+          isMobile ? (openMobile ? "translate-x-0" : "-translate-x-full") : "translate-x-0",
           "border-r border-border/10",
         )}
       >
@@ -122,12 +121,12 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Overlay for mobile */}
-      {isMobile && open && (
+      {isMobile && openMobile && (
         <div
           className="fixed inset-0 z-20 bg-background/80 backdrop-blur-sm"
-          onClick={() => setOpen(false)}
+          onClick={() => setOpenMobile(false)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") setOpen(false);
+            if (e.key === "Escape") setOpenMobile(false);
           }}
           tabIndex={0}
           role="button"
@@ -142,15 +141,17 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
           <Button
             variant="ghost"
             size="icon"
-            className="fixed top-6 right-6 z-50 h-14 w-14 bg-background/95 backdrop-blur-sm text-muted-foreground hover:text-accent-foreground hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] shadow-lg rounded-full border border-border/10"
-            onClick={() => setOpen(!open)}
+            className="fixed top-4 right-4 z-50 h-14 w-14 bg-background/95 backdrop-blur-sm text-muted-foreground hover:text-accent-foreground hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] shadow-lg rounded-full border border-border/10"
+            onClick={() => {
+              setOpenMobile(!openMobile);
+            }}
           >
-            {open ? (
+            {openMobile ? (
               <X className="h-7 w-7 transition-all duration-200" />
             ) : (
               <Menu className="h-7 w-7 transition-all duration-200" />
             )}
-            <span className="sr-only">{open ? "Close" : "Open"} Sidebar</span>
+            <span className="sr-only">{openMobile ? "Close" : "Open"} Sidebar</span>
           </Button>
         )}
         <main className="w-full h-full px-10 py-8">{children}</main>

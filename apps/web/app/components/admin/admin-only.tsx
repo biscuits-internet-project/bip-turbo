@@ -10,8 +10,6 @@ export function AdminOnly({ children, fallback = null }: AdminOnlyProps) {
   const { supabaseUrl, supabaseAnonKey, isLoaded } = useSupabaseContext();
   const { user } = useSession(supabaseUrl, supabaseAnonKey);
 
-  console.log("user", user);
-
   // If Supabase context is not loaded yet, render nothing
   if (!isLoaded) {
     return null;
