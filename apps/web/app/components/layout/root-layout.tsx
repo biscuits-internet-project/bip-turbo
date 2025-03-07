@@ -66,25 +66,12 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       >
         {/* Header */}
         <div className="border-b border-border/10 p-4">
-          <div className="flex items-center justify-between">
-            <Link to="/">
-              <div className="flex flex-col items-start gap-1">
-                <div className="text-lg font-bold text-primary">biscuits</div>
-                <div className="text-sm text-muted-foreground">internet project</div>
-              </div>
-            </Link>
-            {isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-accent-foreground"
-                onClick={toggleSidebar}
-              >
-                {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                <span className="sr-only">Toggle Sidebar</span>
-              </Button>
-            )}
-          </div>
+          <Link to="/">
+            <div className="flex flex-col items-start gap-1">
+              <div className="text-lg font-bold text-primary">biscuits</div>
+              <div className="text-sm text-muted-foreground">internet project</div>
+            </div>
+          </Link>
         </div>
 
         {/* Navigation */}
@@ -150,6 +137,18 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <div className={cn("flex-1 transition-all duration-300", isMobile ? "pl-0" : "pl-64")}>
+        {/* Mobile Menu Button */}
+        {isMobile && !open && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="fixed top-4 right-4 z-50 h-12 w-12 bg-background/95 backdrop-blur-sm text-muted-foreground hover:text-accent-foreground hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] shadow-lg rounded-full border border-border/10"
+            onClick={() => setOpen(true)}
+          >
+            <Menu className="h-6 w-6" />
+            <span className="sr-only">Open Sidebar</span>
+          </Button>
+        )}
         <main className="w-full h-full px-10 py-8">{children}</main>
       </div>
     </div>
