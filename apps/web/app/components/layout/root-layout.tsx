@@ -59,19 +59,32 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar - fixed on desktop, slide-in on mobile */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-screen bg-[#0a0a0a] transition-all duration-300 w-64",
+          "fixed top-0 left-0 z-40 h-screen bg-background/95 backdrop-blur-sm transition-all duration-300 w-64",
           isMobile ? (open ? "translate-x-0" : "-translate-x-full") : "translate-x-0",
-          "border-r border-border/40",
+          "border-r border-border/10",
         )}
       >
         {/* Header */}
-        <div className="border-b border-border/40 p-4">
-          <Link to="/">
-            <div className="flex flex-col items-start gap-1">
-              <div className="text-lg font-bold text-primary">biscuits</div>
-              <div className="text-sm text-muted-foreground">internet project</div>
-            </div>
-          </Link>
+        <div className="border-b border-border/10 p-4">
+          <div className="flex items-center justify-between">
+            <Link to="/">
+              <div className="flex flex-col items-start gap-1">
+                <div className="text-lg font-bold text-primary">biscuits</div>
+                <div className="text-sm text-muted-foreground">internet project</div>
+              </div>
+            </Link>
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-accent-foreground"
+                onClick={toggleSidebar}
+              >
+                {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                <span className="sr-only">Toggle Sidebar</span>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Navigation */}
@@ -80,20 +93,44 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               to={item.href}
-              className="flex items-center rounded-md px-3 py-2 text-lg font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="flex items-center rounded-md px-4 py-3 text-base font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground group"
             >
-              <item.icon className="h-4 w-4 transition-all" />
-              <span className="ml-3">{item.name}</span>
+              <item.icon className="h-5 w-5 transition-all duration-200 group-hover:text-accent-foreground group-hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.5)]" />
+              <span className="ml-3 transition-all duration-200 group-hover:text-accent-foreground group-hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)]">
+                {item.name}
+              </span>
             </Link>
           ))}
         </nav>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border/40 p-4 bg-[#0a0a0a]">
-          <p className="mb-2 text-xs text-muted-foreground">Help keep the BIP ad-free</p>
-          <Button variant="secondary" className="w-full">
-            Donate
-          </Button>
+        <div className="absolute bottom-0 left-0 right-0 border-t border-border/10 p-4 bg-background/95 backdrop-blur-sm">
+          {!loading &&
+            (user ? (
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarImage src={user.user_metadata?.avatar_url} />
+                  <AvatarFallback className="bg-accent text-accent-foreground text-xs">
+                    {username?.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-foreground">{username}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="h-7 justify-start px-0 text-muted-foreground hover:text-accent-foreground"
+                  >
+                    <Link to="/auth/logout">Sign out</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-accent-foreground">
+                <Link to="/auth/login">Sign in</Link>
+              </Button>
+            ))}
         </div>
       </aside>
 
@@ -113,40 +150,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <div className={cn("flex-1 transition-all duration-300", isMobile ? "pl-0" : "pl-64")}>
-        <header className="sticky top-0 z-20 border-b border-border/40 bg-[#0a0a0a]">
-          <div className="flex h-14 items-center gap-4 px-6">
-            {isMobile && (
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleSidebar}>
-                {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                <span className="sr-only">Toggle Sidebar</span>
-              </Button>
-            )}
-
-            {/* User session indicator */}
-            <div className="ml-auto flex items-center gap-4">
-              {!loading &&
-                (user ? (
-                  <div className="flex items-center gap-2">
-                    <Avatar>
-                      <AvatarImage src={user.user_metadata?.avatar_url} />
-                      <AvatarFallback className="bg-purple-900/50 text-xs">
-                        {username?.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm text-muted-foreground">{username}</span>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to="/auth/logout">Logout</Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to="/auth/login">Login</Link>
-                  </Button>
-                ))}
-            </div>
-          </div>
-        </header>
-        <main className="w-full px-10">{children}</main>
+        <main className="w-full h-full px-10 py-8">{children}</main>
       </div>
     </div>
   );
