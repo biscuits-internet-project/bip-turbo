@@ -20,11 +20,42 @@ export class VenueService extends BaseService<Venue, DbVenue> {
     return this.repository.findBySlug(slug);
   }
 
+  // Alias for findBySlug to match the naming in the routes
+  async getBySlug(slug: string) {
+    return this.findBySlug(slug);
+  }
+
   async findMany(filter: QueryOptions<Venue>) {
     return this.repository.findMany(filter);
   }
 
   async delete(id: string) {
     return this.repository.delete(id);
+  }
+
+  async create(data: Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">) {
+    const slug = this.generateSlug(data.name);
+    return this.repository.create({
+      ...data,
+      slug,
+      timesPlayed: 0,
+    });
+  }
+
+  async update(slug: string, data: Partial<Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">>) {
+    const venue = await this.findBySlug(slug);
+    if (!venue) {
+      throw new Error(`Venue with slug "${slug}" not found`);
+    }
+
+    return this.repository.update(venue.id, data);
+  }
+
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
   }
 }

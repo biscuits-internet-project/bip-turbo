@@ -1,6 +1,8 @@
 import type { LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
+import { redirect } from "react-router-dom";
 import superjson from "superjson";
 import { logger } from "~/lib/logger";
+import { getServerClient } from "~/server/supabase";
 
 interface LoaderContext {
   auth?: {
@@ -14,6 +16,7 @@ export function createLoader<T>(
   fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>,
   options?: {
     auth?: boolean;
+    admin?: boolean;
     metrics?: boolean;
     rateLimit?: boolean;
   },
@@ -24,13 +27,19 @@ export function createLoader<T>(
 
     try {
       // Auth middleware
-      //   if (options?.auth) {
-      //     const authToken = await getAuthToken(args.request);
-      //     if (!authToken) {
-      //       throw redirect('/login');
-      //     }
-      //     context.auth = await validateToken(authToken);
-      //   }
+      if (options?.auth) {
+        const { supabase } = getServerClient(args.request);
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) {
+          throw redirect("/auth/login");
+        }
+        context.auth = {
+          userId: session.user.id,
+          role: session.user.user_metadata.role,
+        };
+      }
 
       //   // Request tracking
       //   if (options?.metrics) {
@@ -65,6 +74,9 @@ export function createLoader<T>(
 
 // You could even create preset configurations:
 export const protectedLoader = <T>(fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>) =>
+  createLoader(fn, { auth: true, metrics: true });
+
+export const adminLoader = <T>(fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>) =>
   createLoader(fn, { auth: true, metrics: true });
 
 export const publicLoader = <T>(fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>) =>

@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, isRouteErrorResponse, useRouteError } from "react-router-dom";
+import {
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  isRouteErrorResponse,
+  useLoaderData,
+  useRouteError,
+} from "react-router-dom";
 import { Toaster } from "sonner";
 import { NotFound, ServerError } from "~/components/layout/errors";
 import { RootLayout } from "~/components/layout/root-layout";
 import { SidebarProvider } from "~/components/ui/sidebar";
+import { SupabaseProvider } from "~/context/supabase-provider";
 import { env } from "~/server/env";
 import type { Route } from "./+types/root";
 import stylesheet from "./styles.css?url";
@@ -22,13 +32,24 @@ export type ClientSideEnv = {
 export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
 export async function loader({ request }: LoaderFunctionArgs<RootData>) {
-  return {
-    env: {
-      SUPABASE_URL: env.SUPABASE_URL,
-      SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY,
-      BASE_URL: env.BASE_URL,
-    },
+  const clientEnv = {
+    SUPABASE_URL: env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY,
+    BASE_URL: env.BASE_URL,
   };
+
+  return {
+    env: clientEnv,
+  };
+}
+
+// Inject environment variables into the window object
+function InjectEnv({ env }: { env: ClientSideEnv }) {
+  useEffect(() => {
+    window.__ENV__ = env;
+  }, [env]);
+
+  return null;
 }
 
 // Client-only component to handle window-dependent logic
@@ -71,13 +92,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <ClientOnly>
-          {(isDesktop) => (
-            <SidebarProvider defaultOpen={isDesktop}>
-              <RootLayout>{children}</RootLayout>
-            </SidebarProvider>
-          )}
-        </ClientOnly>
+        <SupabaseProvider>
+          <ClientOnly>
+            {(isDesktop) => (
+              <SidebarProvider defaultOpen={isDesktop}>
+                <RootLayout>{children}</RootLayout>
+              </SidebarProvider>
+            )}
+          </ClientOnly>
+        </SupabaseProvider>
         <Toaster position="top-right" theme="dark" />
         <ScrollRestoration />
         <Scripts />
@@ -87,7 +110,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const { env } = useLoaderData() as RootData;
+  return (
+    <>
+      <InjectEnv env={env} />
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary() {

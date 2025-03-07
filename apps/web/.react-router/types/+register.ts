@@ -8,40 +8,45 @@ declare module "react-router" {
 
 type Params = {
   "/": {};
-  "/resources/chemical-warfare-brigade": {};
-  "/resources/hot-air-balloon": {};
-  "/resources/side-projects": {};
-  "/resources/band-history": {};
-  "/resources/movie-scores": {};
-  "/resources/tractorbeam": {};
-  "/auth/forgot-password": {};
-  "/resources/think-tank": {};
-  "/resources/touchdowns": {};
-  "/resources/perfume": {};
-  "/resources": {};
-  "/resources/media": {};
-  "/resources/mixes": {};
-  "/resources/music": {};
-  "/auth/callback": {};
-  "/auth/register": {};
   "/venues": {};
-  "/shows": {};
-  "/songs": {};
   "/venues/:slug": {
     "slug": string;
   };
-  "/auth/logout": {};
-  "/blog": {};
-  "/healthcheck": {};
-  "/shows/:slug": {
+  "/venues/new": {};
+  "/venues/:slug/edit": {
     "slug": string;
   };
-  "/songs/:slug": {
-    "slug": string;
-  };
+  "/resources": {};
+  "/resources/band-history": {};
+  "/resources/chemical-warfare-brigade": {};
+  "/resources/hot-air-balloon": {};
+  "/resources/media": {};
+  "/resources/mixes": {};
+  "/resources/movie-scores": {};
+  "/resources/music": {};
+  "/resources/perfume": {};
+  "/resources/side-projects": {};
+  "/resources/think-tank": {};
+  "/resources/tractorbeam": {};
+  "/resources/touchdowns": {};
   "/auth/login": {};
+  "/auth/register": {};
+  "/auth/callback": {};
+  "/auth/logout": {};
+  "/auth/forgot-password": {};
+  "/blog": {};
   "/blog/:slug": {
     "slug": string;
   };
-  "/tour-dates": {};
+  "/shows": {};
+  "/shows/:slug": {
+    "slug": string;
+  };
+  "/shows/top-rated": {};
+  "/shows/tour-dates": {};
+  "/songs": {};
+  "/songs/:slug": {
+    "slug": string;
+  };
+  "/healthcheck": {};
 };

@@ -39,6 +39,16 @@ export const loader = publicLoader<LoaderData>(async ({ request }) => {
   return { tourDates, recentShows, recentBlogPosts };
 });
 
+export function meta() {
+  return [
+    { title: "Biscuits Internet Project" },
+    {
+      name: "description",
+      content: "The ultimate resource for Disco Biscuits fans - shows, setlists, songs, venues, and more.",
+    },
+  ];
+}
+
 export default function Index() {
   const { tourDates = [], recentShows = [], recentBlogPosts = [] } = useSerializedLoaderData<LoaderData>();
 
