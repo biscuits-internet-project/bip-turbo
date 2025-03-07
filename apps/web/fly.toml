@@ -10,7 +10,7 @@ kill_timeout = "5s"
   dockerfile = "Dockerfile"
 
 [deploy]
-  release_command = "pnpm prisma migrate deploy --schema ../../packages/core/src/_shared/prisma/schema.prisma"
+  release_command = "cd packages/core && DATABASE_URL=${DATABASE_URL} bun prisma migrate deploy --schema src/_shared/prisma/schema.prisma"
 
 [env]
   PORT = "8080"
