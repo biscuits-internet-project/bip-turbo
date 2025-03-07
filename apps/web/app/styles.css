@@ -41,6 +41,12 @@
   .dark {
     --background: 224 71% 4%;
     --foreground: 213 31% 91%;
+    --laser-1: 267 100% 50%;  /* Purple */
+    --laser-2: 140 100% 50%;  /* Bright Neon Green */
+    --laser-3: 135 100% 45%;  /* Slightly Darker Green */
+    --laser-4: 145 100% 55%;  /* Lighter Green */
+    --laser-5: 130 100% 45%;  /* Deep Green */
+    --laser-6: 150 100% 50%;  /* Mint Green */
  
     --card: 224 71% 4%;
     --card-foreground: 213 31% 91%;
@@ -68,11 +74,83 @@
     --ring: 267 75% 25%;
   }
 
+  /* Override the Tailwind background utility */
+  .bg-sidebar {
+    background-color: transparent !important;
+  }
+
+  /* Remove all backgrounds from sidebar and its children */
+  [data-sidebar] {
+    background: none !important;
+  }
+
+  [data-sidebar] * {
+    background: none !important;
+  }
+
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground relative overflow-x-hidden;
+  }
+
+  html {
+    position: relative;
+  }
+
+  html::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      linear-gradient(115deg, transparent 0%, transparent 49.8%, hsla(var(--laser-1) / 0.08) 50%, hsla(var(--laser-1) / 0.08) 50.2%, transparent 50.4%),
+      linear-gradient(155deg, transparent 0%, transparent 49.8%, hsla(var(--laser-3) / 0.08) 50%, hsla(var(--laser-3) / 0.08) 50.2%, transparent 50.4%),
+      linear-gradient(45deg, transparent 0%, transparent 49.8%, hsla(var(--laser-2) / 0.08) 50%, hsla(var(--laser-2) / 0.08) 50.2%, transparent 50.4%),
+      linear-gradient(-60deg, transparent 0%, transparent 49.8%, hsla(var(--laser-4) / 0.08) 50%, hsla(var(--laser-4) / 0.08) 50.2%, transparent 50.4%),
+      linear-gradient(90deg, transparent 0%, transparent 49.8%, hsla(var(--laser-5) / 0.08) 50%, hsla(var(--laser-5) / 0.08) 50.2%, transparent 50.4%),
+      linear-gradient(-30deg, transparent 0%, transparent 49.8%, hsla(var(--laser-6) / 0.08) 50%, hsla(var(--laser-6) / 0.08) 50.2%, transparent 50.4%);
+    background-size: 600px 800px, 800px 600px, 700px 500px, 500px 700px, 900px 400px, 400px 900px;
+    filter: blur(4px) brightness(1.5);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.8;
+    animation: laser-drift-1 120s linear infinite;
+  }
+
+  @keyframes laser-drift-1 {
+    0% { background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%; }
+    100% { background-position: 600px 800px, -800px -600px, 700px -500px, -500px 700px, 900px 400px, -400px 900px; }
+  }
+
+  /* Remove sidebar background completely */
+  html [data-sidebar="sidebar"],
+  html .bg-sidebar,
+  html div[data-sidebar="sidebar"],
+  html [data-variant="sidebar"],
+  html [data-variant="floating"],
+  html [data-variant="inset"],
+  html [class*="bg-sidebar"],
+  html [class*="group-data-[variant=floating]:bg-sidebar"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    backdrop-filter: blur(12px);
+  }
+
+  /* Remove background from any nested elements */
+  html [data-sidebar="sidebar"] *,
+  html .bg-sidebar * {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Ensure content stays above the laser effect */
+  html > * {
+    position: relative;
+    z-index: 1;
   }
 }
 

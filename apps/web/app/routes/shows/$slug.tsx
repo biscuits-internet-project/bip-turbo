@@ -74,10 +74,10 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
   return { setlist, reviews, selectedRecordingId };
 });
 
-export function meta({ data }: { data: ShowLoaderData }) {
-  const showDate = formatDateLong(data.setlist.show.date);
-  const venueName = data.setlist.show.venue?.name ?? "Unknown Venue";
-  const cityState = `${data.setlist.show.venue?.city}, ${data.setlist.show.venue?.state}`;
+export function meta({ data }: { data: { json: ShowLoaderData } }) {
+  const showDate = formatDateLong(data.json.setlist.show.date);
+  const venueName = data.json.setlist.show.venue?.name ?? "Unknown Venue";
+  const cityState = `${data.json.setlist.show.venue?.city}, ${data.json.setlist.show.venue?.state}`;
 
   return [
     { title: `${showDate} - ${venueName} - ${cityState} | Biscuits Internet Project` },
@@ -92,12 +92,12 @@ export default function Show() {
   const { setlist, reviews, selectedRecordingId } = useSerializedLoaderData<ShowLoaderData>();
 
   return (
-    <div className="w-full px-4 md:px-6">
+    <div className="w-full">
       {/* Header with show date and venue */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 mt-4">
         <div>
           <h1 className="text-4xl font-bold text-white">{formatDateLong(setlist.show.date)}</h1>
-          <p className="text-xl text-gray-300 mt-1">
+          <p className="text-xl text-gray-300 mt-2">
             {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
           </p>
         </div>

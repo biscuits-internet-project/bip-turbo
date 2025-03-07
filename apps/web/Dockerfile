@@ -37,19 +37,20 @@ COPY --from=builder /app/packages/domain/package.json ./packages/domain/
 COPY --from=builder /app/packages/core/dist ./packages/core/dist
 COPY --from=builder /app/packages/domain/dist ./packages/domain/dist
 
-# Copy Prisma files
+# Copy Prisma schema and migrations
 COPY --from=builder /app/packages/core/src/_shared/prisma ./packages/core/src/_shared/prisma
 
 # Copy web app
 COPY --from=builder /app/apps/web/build ./apps/web/build
 COPY --from=builder /app/apps/web/package.json ./apps/web/
 
-WORKDIR /app/apps/web
+# Install dependencies and generate Prisma client
+WORKDIR /app/packages/core
+RUN bun add prisma@6.4.1 && \
+    bun prisma generate --schema=src/_shared/prisma/schema.prisma
 
-# Install production dependencies and generate Prisma client
-RUN bun install --production && \
-    cd ../packages/core && \
-    DATABASE_URL=postgresql://dummy bun prisma generate --schema=src/_shared/prisma/schema.prisma
+WORKDIR /app/apps/web
+RUN bun install --production
 
 ENV NODE_ENV=production
 ENV PORT=8080
