@@ -59,7 +59,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       {/* Sidebar - fixed on desktop, slide-in on mobile */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-screen bg-background/95 backdrop-blur-sm transition-all duration-300 w-64",
+          "fixed top-0 left-0 z-30 h-screen bg-background/95 backdrop-blur-sm transition-all duration-300 w-64",
           isMobile ? (open ? "translate-x-0" : "-translate-x-full") : "translate-x-0",
           "border-r border-border/10",
         )}
@@ -124,10 +124,10 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       {/* Overlay for mobile */}
       {isMobile && open && (
         <div
-          className="fixed inset-0 z-30 bg-background/80 backdrop-blur-sm"
-          onClick={toggleSidebar}
+          className="fixed inset-0 z-20 bg-background/80 backdrop-blur-sm"
+          onClick={() => setOpen(false)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") toggleSidebar();
+            if (e.key === "Escape") setOpen(false);
           }}
           tabIndex={0}
           role="button"
@@ -138,15 +138,19 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className={cn("flex-1 transition-all duration-300", isMobile ? "pl-0" : "pl-64")}>
         {/* Mobile Menu Button */}
-        {isMobile && !open && (
+        {isMobile && (
           <Button
             variant="ghost"
             size="icon"
-            className="fixed top-4 right-4 z-50 h-12 w-12 bg-background/95 backdrop-blur-sm text-muted-foreground hover:text-accent-foreground hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] shadow-lg rounded-full border border-border/10"
-            onClick={() => setOpen(true)}
+            className="fixed top-6 right-6 z-50 h-14 w-14 bg-background/95 backdrop-blur-sm text-muted-foreground hover:text-accent-foreground hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)] shadow-lg rounded-full border border-border/10"
+            onClick={() => setOpen(!open)}
           >
-            <Menu className="h-6 w-6" />
-            <span className="sr-only">Open Sidebar</span>
+            {open ? (
+              <X className="h-7 w-7 transition-all duration-200" />
+            ) : (
+              <Menu className="h-7 w-7 transition-all duration-200" />
+            )}
+            <span className="sr-only">{open ? "Close" : "Open"} Sidebar</span>
           </Button>
         )}
         <main className="w-full h-full px-10 py-8">{children}</main>

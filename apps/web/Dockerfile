@@ -37,6 +37,9 @@ COPY --from=builder /app/packages/domain/package.json ./packages/domain/
 COPY --from=builder /app/packages/core/dist ./packages/core/dist
 COPY --from=builder /app/packages/domain/dist ./packages/domain/dist
 
+# Copy Prisma files
+COPY --from=builder /app/packages/core/src/_shared/prisma ./packages/core/src/_shared/prisma
+
 # Copy web app
 COPY --from=builder /app/apps/web/build ./apps/web/build
 COPY --from=builder /app/apps/web/package.json ./apps/web/
