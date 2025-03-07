@@ -5,7 +5,7 @@ FROM base AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/core/package.json ./packages/core/
 COPY packages/domain/package.json ./packages/domain/
@@ -38,4 +38,5 @@ RUN bun install --production
 USER bun
 
 EXPOSE 8080
+
 CMD ["bun", "run", "start"]
