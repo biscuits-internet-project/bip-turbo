@@ -1,42 +1,41 @@
-FROM node:22-alpine AS base
-RUN npm install -g pnpm
-RUN npm install -g turbo
-
-# Prune the workspace to only what's needed for web
-FROM base as pruner
-WORKDIR /app
-COPY . .
-RUN turbo prune @bip/web --docker
+FROM oven/bun:1.2.4-alpine AS base
 
 # Build the app
 FROM base AS builder
 WORKDIR /app
-# Copy the pruned workspace
-COPY --from=pruner /app/out/json/ .
-COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile
-# Copy source code after installing dependencies
-COPY --from=pruner /app/out/full/ .
+
+# Copy package files
+COPY package.json bun.lockb ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/core/package.json ./packages/core/
+COPY packages/domain/package.json ./packages/domain/
+
+# Install dependencies
+RUN bun install
+
+# Copy source code
+COPY . .
 
 # Generate Prisma client before building
-RUN pnpm --filter @bip/core prisma:generate:prod
+RUN cd packages/core && bun prisma:generate:prod
 
-RUN pnpm run build --filter=@bip/web...
+# Build the app
+RUN cd apps/web && bun run build
 
 # Production image
 FROM base AS runner
 WORKDIR /app
 
-# Copy all files from builder
-COPY --from=builder /app .
+# Copy built files
+COPY --from=builder /app/apps/web/build ./apps/web/build
+COPY --from=builder /app/apps/web/package.json ./apps/web/
 
 # Install production dependencies
-RUN pnpm install --frozen-lockfile --prod
+WORKDIR /app/apps/web
+RUN bun install --production
 
 # Set up permissions properly
-RUN chown -R node:node /app
-USER node
+USER bun
 
-WORKDIR /app/apps/web
 EXPOSE 8080
-CMD ["pnpm", "start"]
+CMD ["bun", "run", "start"]

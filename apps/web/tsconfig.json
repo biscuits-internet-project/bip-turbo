@@ -13,10 +13,6 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
 
-    // React Router specific
-    "types": ["node", "vite/client"],
-    "rootDirs": [".", "./.react-router/types"],
-
     // Path aliases
     "baseUrl": ".",
     "paths": {
@@ -32,7 +28,7 @@
     },
 
     // Output
-    "noEmit": true // Since React Router handles the build
+    "noEmit": true
   },
-  "include": ["**/*", "**/.server/**/*", "**/.client/**/*", ".react-router/types/**/*", ".react-router/dev/**/*"]
+  "include": ["**/*"]
 }

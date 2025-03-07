@@ -1,16 +1,17 @@
-name: Deploy Web App
+name: CI
 on:
-  push:
+  pull_request:
     branches: [main]
     paths:
-      - 'apps/web/**'
+      - 'apps/**'
       - 'packages/**'
       - 'bun.lockb'
       - '.github/**'
       - '!README.md'
+
 jobs:
-  deploy:
-    name: Deploy Web App
+  lint-typecheck:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +38,15 @@ jobs:
 
       - name: Generate Prisma Client
         run: cd packages/core && bun prisma:generate:prod
-      
-      - name: Build
-        run: bun run build
-      
-      - name: Install Fly
-        uses: superfly/flyctl-actions/setup-flyctl@master
-      
-      - name: Deploy to Fly
-        run: flyctl deploy --strategy bluegreen --remote-only --config apps/web/fly.toml --dockerfile apps/web/Dockerfile
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }} 
+
+      - name: Build packages
+        run: |
+          # Build packages in order
+          cd packages/domain && bun run build
+          cd ../core && bun run build
+
+      - name: Type Check
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint 

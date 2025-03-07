@@ -102,30 +102,6 @@ export class ShowRepository extends BaseRepository<Show, DbShow> {
 
     console.log("✨ Search results count:", searchResults.length);
 
-    if (!searchResults.length) {
-      // Let's try a simpler ILIKE search as fallback
-      console.log("⚠️ No results with full-text search, trying ILIKE...");
-      const likeResults = await this.db.$queryRaw<Array<{ searchable_id: string }>>`
-        SELECT searchable_id
-        FROM pg_search_documents 
-        WHERE 
-          searchable_type = 'Show'
-          AND content ILIKE ${`%${query}%`}
-      `;
-
-      if (likeResults.length) {
-        console.log("✅ Found results with ILIKE:", likeResults.length);
-        const showIds = likeResults.map((result) => result.searchable_id);
-        const shows = await this.db.show.findMany({
-          where: { id: { in: showIds } },
-          orderBy: [{ date: "desc" }],
-        });
-        return shows.map((show) => this.mapToDomainEntity(show));
-      }
-
-      return [];
-    }
-
     // Get the show IDs from the search results
     const showIds = searchResults.map((result) => result.searchable_id);
 

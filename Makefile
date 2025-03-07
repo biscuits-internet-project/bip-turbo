@@ -5,40 +5,51 @@ DB_PASSWORD ?= password
 PROD_DATA_PATH ?= ../data/bip.tar
 
 install:
-	pnpm install
+	bun install
 
 build:
-	turbo run build
+	bun run build
 
 tc:
-	turbo run typecheck
+	bun run typecheck
 
 lint:
-	turbo run lint
+	bun run lint
+
+format:
+	bun run format
 
 clean:
-	turbo run clean
+	rm -rf node_modules
+	rm -rf apps/web/node_modules
+	rm -rf apps/workers/node_modules
+	rm -rf packages/*/node_modules
+	rm -rf apps/web/build
+	rm -rf apps/workers/dist
 
 web:
-	turbo run dev --filter=@bip/web
+	cd apps/web && bun run dev
 
 workers:
-	turbo run dev --filter=@bip/workers
+	cd apps/workers && bun run dev
+
+dev:
+	bun run dev
 
 doppler:
 	doppler setup
 
 migrate:
-	cd packages/core && pnpm prisma:migrate:dev
+	cd packages/core && bun prisma:migrate:dev
 
 migrate-create:
-	cd packages/core && pnpm prisma:migrate:create
+	cd packages/core && bun prisma:migrate:create
 
 migrate-baseline:
-	cd packages/core && pnpm prisma:migrate:baseline
+	cd packages/core && bun prisma:migrate:baseline
 
 db-reset:
-	cd packages/core && pnpm prisma:reset
+	cd packages/core && bun prisma:reset
 	@echo "Restoring production data from $(PROD_DATA_PATH)..."
 	@if [ ! -f $(PROD_DATA_PATH) ]; then \
 		echo "Error: Production data file not found at $(PROD_DATA_PATH)"; \
@@ -48,10 +59,10 @@ db-reset:
 	@echo "Production data restored successfully."
 
 db-generate:
-	cd packages/core && pnpm prisma:generate
+	cd packages/core && bun prisma:generate
 
 db-introspect:
-	cd packages/core && pnpm prisma:introspect
+	cd packages/core && bun prisma:introspect
 
 db-studio:
-	cd packages/core && pnpm prisma:studio
+	cd packages/core && bun prisma:studio
