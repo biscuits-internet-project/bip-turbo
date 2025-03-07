@@ -46,7 +46,10 @@ COPY --from=builder /app/apps/web/package.json ./apps/web/
 
 WORKDIR /app/apps/web
 
-RUN bun install --production
+# Install production dependencies and generate Prisma client
+RUN bun install --production && \
+    cd ../packages/core && \
+    DATABASE_URL=postgresql://dummy bun prisma generate --schema=src/_shared/prisma/schema.prisma
 
 ENV NODE_ENV=production
 ENV PORT=8080
