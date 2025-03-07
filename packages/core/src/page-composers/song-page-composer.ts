@@ -54,7 +54,7 @@ export class SongPageComposer {
       ORDER BY shows.date DESC, tracks.set, tracks.position
     `;
 
-    const performances = result.map((row) => this.transformToSongPagePerformanceView(row));
+    const performances = result.map((row: PerformanceDto) => this.transformToSongPagePerformanceView(row));
 
     return {
       song,
