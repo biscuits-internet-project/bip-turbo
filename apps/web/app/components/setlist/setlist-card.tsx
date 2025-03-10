@@ -1,20 +1,42 @@
-import type { Setlist } from "@bip/domain";
+import type { Attendance, Rating, Setlist } from "@bip/domain";
 import { Flame } from "lucide-react";
+import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { StarRating } from "~/components/ui/star-rating";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
+import { useSession } from "~/hooks/use-session";
 import { cn, formatDateShort } from "~/lib/utils";
+import { AttendanceToggle } from "./attendance";
 
 interface SetlistCardProps {
   setlist: Setlist;
   className?: string;
+  userAttendance: Attendance | null;
+  userRating: Rating | null;
+  showRating: number | null;
 }
 
-export function SetlistCard({ setlist, className }: SetlistCardProps) {
-  // Use the utility function to format the date
+function SetlistCardComponent({ setlist, className, userAttendance, userRating, showRating }: SetlistCardProps) {
+  const { user } = useSession();
   const formattedDate = formatDateShort(setlist.show.date);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
 
-  const rating = setlist.show.averageRating;
+  // Trigger animation only when rating updates
+  useEffect(() => {
+    const newRating = showRating ?? setlist.show.averageRating ?? 0;
+    if (newRating !== displayedRating) {
+      setIsAnimating(true);
+      // Wait for animation to reach peak before updating displayed value
+      const updateTimer = setTimeout(() => setDisplayedRating(newRating), 800);
+      const animationTimer = setTimeout(() => setIsAnimating(false), 2000);
+      return () => {
+        clearTimeout(updateTimer);
+        clearTimeout(animationTimer);
+      };
+    }
+  }, [showRating, setlist.show.averageRating, displayedRating]);
 
   // Create a map to store unique annotations by description
   const uniqueAnnotations = new Map<string, { index: number; desc: string }>();
@@ -80,13 +102,13 @@ export function SetlistCard({ setlist, className }: SetlistCardProps) {
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
             </div>
           </div>
-          {rating !== null && rating > 0 && (
+          {displayedRating !== null && displayedRating > 0 && (
             <div className="flex items-center gap-1 bg-purple-900/30 px-2 py-1 rounded-md">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                className="w-4 h-4 text-yellow-400"
+                className={cn("w-4 h-4 text-yellow-400", isAnimating && "animate-avg-rating-update")}
                 role="img"
                 aria-hidden="true"
               >
@@ -97,7 +119,9 @@ export function SetlistCard({ setlist, className }: SetlistCardProps) {
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="text-sm font-medium text-yellow-100">{rating.toFixed(1)}</span>
+              <span className={cn("text-sm font-medium text-yellow-100", isAnimating && "animate-avg-rating-update")}>
+                {displayedRating.toFixed(1)}
+              </span>
             </div>
           )}
         </div>
@@ -172,16 +196,33 @@ export function SetlistCard({ setlist, className }: SetlistCardProps) {
           ))}
         </div>
 
-        {orderedAnnotations.length > 0 && (
-          <div className="mt-6 space-y-2 pt-4 border-t border-gray-800/50">
-            {orderedAnnotations.map((annotation) => (
-              <div key={`annotation-${annotation.index}`} className="text-sm text-gray-400">
-                <sup className="text-purple-400">{annotation.index}</sup> {annotation.desc}
-              </div>
-            ))}
+        <div className="flex justify-between items-end mt-6 pt-4 border-t border-gray-800/50">
+          {orderedAnnotations.length > 0 ? (
+            <div className="space-y-2">
+              {orderedAnnotations.map((annotation) => (
+                <div key={`annotation-${annotation.index}`} className="text-sm text-gray-400">
+                  <sup className="text-purple-400">{annotation.index}</sup> {annotation.desc}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div />
+          )}
+        </div>
+        {user && (
+          <div className="flex items-center justify-end gap-4">
+            <StarRating
+              rateableId={setlist.show.id}
+              rateableType="Show"
+              className="hover:scale-105 transition-transform"
+              initialRating={userRating?.value}
+            />
+            <AttendanceToggle showId={setlist.show.id} initialAttendance={userAttendance} />
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
+
+export const SetlistCard = memo(SetlistCardComponent);

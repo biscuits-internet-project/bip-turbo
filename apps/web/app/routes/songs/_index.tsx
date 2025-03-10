@@ -1,7 +1,9 @@
 import type { Song, TrendingSong } from "@bip/domain";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { AdminOnly } from "~/components/admin/admin-only";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
@@ -182,6 +184,14 @@ export default function Songs() {
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl md:text-4xl font-bold text-white">Songs</h1>
+          <AdminOnly>
+            <Button asChild className="bg-purple-800 hover:bg-purple-700 text-white">
+              <Link to="/songs/new" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                New Song
+              </Link>
+            </Button>
+          </AdminOnly>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

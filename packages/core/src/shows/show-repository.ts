@@ -1,7 +1,6 @@
 import type { Show } from "@bip/domain";
-import { Prisma } from "@prisma/client";
-import { BaseRepository } from "../_shared/database/base-repository";
-import type { DbShow } from "../_shared/database/models";
+import type { DbClient, DbShow } from "../_shared/database/models";
+import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 
 export function mapShowToDomainEntity(show: DbShow): Show {
@@ -21,30 +20,24 @@ export function mapShowToDbModel(show: Partial<Show>): Partial<DbShow> {
   return show as Partial<DbShow>;
 }
 
-export class ShowRepository extends BaseRepository<Show, DbShow> {
-  protected modelName = "show" as const;
-
-  protected mapToDomainEntity(show: DbShow): Show {
-    return mapShowToDomainEntity(show);
-  }
-
-  protected mapToDbModel(show: Partial<Show>): Partial<DbShow> {
-    return mapShowToDbModel(show);
-  }
+export class ShowRepository {
+  constructor(protected db: DbClient) {}
 
   async findById(id: string): Promise<Show | null> {
     const result = await this.db.show.findUnique({ where: { id } });
-    return result ? this.mapToDomainEntity(result) : null;
+    return result ? mapShowToDomainEntity(result) : null;
   }
 
   async findBySlug(slug: string): Promise<Show | null> {
     const result = await this.db.show.findUnique({ where: { slug } });
-    return result ? this.mapToDomainEntity(result) : null;
+    return result ? mapShowToDomainEntity(result) : null;
   }
 
   async findMany(options?: QueryOptions<Show>): Promise<Show[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ date: "desc" }];
+    console.log("🔍 Options:", options);
+    const include = options?.includes ? buildIncludeClause(options.includes) : {};
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ date: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -56,9 +49,10 @@ export class ShowRepository extends BaseRepository<Show, DbShow> {
       orderBy,
       skip,
       take,
+      include,
     });
 
-    return results.map((result: DbShow) => this.mapToDomainEntity(result));
+    return results.map((result: DbShow) => mapShowToDomainEntity(result));
   }
 
   /**
@@ -112,7 +106,7 @@ export class ShowRepository extends BaseRepository<Show, DbShow> {
           in: showIds,
         },
       },
-      orderBy: options?.sort ? this.buildOrderByClause(options.sort) : [{ date: "desc" }],
+      orderBy: options?.sort ? buildOrderByClause(options.sort) : [{ date: "desc" }],
       skip:
         options?.pagination?.page && options?.pagination?.limit
           ? (options.pagination.page - 1) * options.pagination.limit
@@ -120,7 +114,7 @@ export class ShowRepository extends BaseRepository<Show, DbShow> {
       take: options?.pagination?.limit,
     });
 
-    return shows.map((show) => this.mapToDomainEntity(show));
+    return shows.map((show) => mapShowToDomainEntity(show));
   }
 
   async delete(id: string): Promise<boolean> {

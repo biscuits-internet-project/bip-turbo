@@ -10,11 +10,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase } = getServerClient(request);
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Redirect to home if user is already logged in
-  if (session) {
+  if (user) {
     throw new Response(null, { status: 302, headers: { Location: "/" } });
   }
 

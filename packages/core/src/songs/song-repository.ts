@@ -1,7 +1,9 @@
 import type { Song, TrendingSong } from "@bip/domain";
-import { BaseRepository } from "../_shared/database/base-repository";
-import type { DbSong } from "../_shared/database/models";
+import type { DbClient, DbSong } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
+import { slugify } from "../_shared/utils/slugify";
+import type { CreateSongInput, UpdateSongInput } from "./song-service";
 
 export function mapSongToDomainEntity(dbSong: DbSong): Song {
   const { createdAt, updatedAt, dateLastPlayed, yearlyPlayData, longestGapsData, cover, ...rest } = dbSong;
@@ -21,8 +23,8 @@ export function mapSongToDbModel(entity: Partial<Song>): Partial<DbSong> {
   return entity as Partial<DbSong>;
 }
 
-export class SongRepository extends BaseRepository<Song, DbSong> {
-  protected modelName = "song" as const;
+export class SongRepository {
+  constructor(private readonly db: DbClient) {}
 
   protected mapToDomainEntity(dbSong: DbSong): Song {
     return mapSongToDomainEntity(dbSong);
@@ -60,8 +62,8 @@ export class SongRepository extends BaseRepository<Song, DbSong> {
   }
 
   async findMany(options?: QueryOptions<Song>): Promise<Song[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -76,6 +78,38 @@ export class SongRepository extends BaseRepository<Song, DbSong> {
     });
 
     return results.map((result: DbSong) => this.mapToDomainEntity(result));
+  }
+
+  async create(input: CreateSongInput): Promise<Song> {
+    const slug = slugify(input.title);
+    const now = new Date();
+    const result = await this.db.song.create({
+      data: {
+        ...input,
+        slug,
+        createdAt: now,
+        updatedAt: now,
+        yearlyPlayData: {},
+        longestGapsData: {},
+        timesPlayed: 0,
+      },
+    });
+
+    return this.mapToDomainEntity(result);
+  }
+
+  async update(slug: string, input: UpdateSongInput): Promise<Song> {
+    const now = new Date();
+    const result = await this.db.song.update({
+      where: { slug },
+      data: {
+        ...input,
+        updatedAt: now,
+        ...(input.title ? { slug: slugify(input.title) } : {}),
+      },
+    });
+
+    return this.mapToDomainEntity(result);
   }
 
   async findTrendingLastXShows(lastXShows: number, limit: number): Promise<TrendingSong[]> {

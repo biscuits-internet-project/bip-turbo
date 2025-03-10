@@ -7,7 +7,9 @@
     "lint": "biome lint .",
     "format": "biome format . --write",
     "typecheck": "cd apps/web && bun react-router typegen && cd ../.. && bun tsc --noEmit",
-    "typecheck:all": "bun run -F '*' typecheck"
+    "typecheck:all": "bun run -F '*' typecheck",
+    "migrate:users": "cd packages/core && bun run migrate:users",
+    "truncate:auth:users": "cd packages/core && bun run truncate:auth:users"
   },
   "workspaces": [
     "apps/*",

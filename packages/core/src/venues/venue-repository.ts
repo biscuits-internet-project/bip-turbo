@@ -1,6 +1,6 @@
 import type { Venue } from "@bip/domain";
-import { BaseRepository } from "../_shared/database/base-repository";
-import type { DbVenue } from "../_shared/database/models";
+import type { DbClient, DbVenue } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause, generateSlug } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 
 export function mapVenueToDomainEntity(dbVenue: DbVenue): Venue {
@@ -19,8 +19,8 @@ export function mapVenueToDbModel(entity: Partial<Venue>): Partial<DbVenue> {
   return entity as Partial<DbVenue>;
 }
 
-export class VenueRepository extends BaseRepository<Venue, DbVenue> {
-  protected modelName = "venue" as const;
+export class VenueRepository {
+  constructor(private readonly db: DbClient) {}
 
   protected mapToDomainEntity(dbVenue: DbVenue): Venue {
     return mapVenueToDomainEntity(dbVenue);
@@ -45,8 +45,8 @@ export class VenueRepository extends BaseRepository<Venue, DbVenue> {
   }
 
   async findMany(options?: QueryOptions<Venue>): Promise<Venue[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -61,6 +61,30 @@ export class VenueRepository extends BaseRepository<Venue, DbVenue> {
     });
 
     return results.map((result: DbVenue) => this.mapToDomainEntity(result));
+  }
+
+  async create(data: Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">): Promise<Venue> {
+    const slug = generateSlug(data.name);
+    const result = await this.db.venue.create({
+      data: {
+        ...data,
+        slug,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    return this.mapToDomainEntity(result);
+  }
+
+  async update(id: string, data: Partial<Venue>): Promise<Venue> {
+    const result = await this.db.venue.update({
+      where: { id },
+      data: {
+        ...this.mapToDbModel(data),
+        updatedAt: new Date(),
+      },
+    });
+    return this.mapToDomainEntity(result);
   }
 
   async delete(id: string): Promise<boolean> {

@@ -1,8 +1,10 @@
 import type { Setlist, Venue } from "@bip/domain";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
@@ -22,6 +24,13 @@ interface LoaderData {
     lastShow: Date | null;
     yearsPlayed: number[];
   };
+}
+
+interface VenueStats {
+  totalShows: number;
+  firstShow: Date | null;
+  lastShow: Date | null;
+  yearsPlayed: number[];
 }
 
 export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promise<LoaderData> => {
@@ -74,9 +83,10 @@ function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
 }
 
 // Custom setlist card that displays the exact date without timezone adjustments
-function VenueSetlistCard({ setlist }: { setlist: Setlist }) {
-  const rating = setlist.show.averageRating;
-
+function VenueSetlistCard({
+  setlist,
+  onRate,
+}: { setlist: Setlist; onRate?: (showId: string, rating: number) => Promise<void> }) {
   // Create a flat array of all tracks in order for annotations
   const allTracks = [];
   for (const set of setlist.sets) {
@@ -145,26 +155,6 @@ function VenueSetlistCard({ setlist }: { setlist: Setlist }) {
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
             </div>
           </div>
-          {rating !== null && rating > 0 && (
-            <div className="flex items-center gap-1 bg-purple-900/30 px-2 py-1 rounded-md">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-4 h-4 text-yellow-400"
-                role="img"
-                aria-hidden="true"
-              >
-                <title>Rating star</title>
-                <path
-                  fillRule="evenodd"
-                  d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="text-sm font-medium text-yellow-100">{rating.toFixed(1)}</span>
-            </div>
-          )}
         </div>
       </CardHeader>
 
@@ -226,6 +216,20 @@ function VenueSetlistCard({ setlist }: { setlist: Setlist }) {
             ))}
           </div>
         )}
+
+        <div className="flex justify-between items-end mt-6 pt-4 border-t border-gray-800/50">
+          {orderedAnnotations.length > 0 ? (
+            <div className="space-y-2">
+              {orderedAnnotations.map((annotation) => (
+                <div key={`annotation-${annotation.index}`} className="text-sm text-gray-400">
+                  <sup className="text-purple-400">{annotation.index}</sup> {annotation.desc}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div />
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -247,6 +251,65 @@ export function meta({ data }: { data: LoaderData }) {
 
 export default function VenuePage() {
   const { venue, setlists, stats } = useSerializedLoaderData<LoaderData>();
+  const queryClient = useQueryClient();
+
+  // Mutation for rating
+  const rateMutation = useMutation({
+    mutationFn: async ({ showId, rating }: { showId: string; rating: number }) => {
+      const response = await fetch("/api/ratings", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rateableId: showId,
+          rateableType: "Show",
+          value: rating,
+        }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/auth/login";
+        throw new Error("Unauthorized");
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to rate show");
+      }
+
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      toast.success("Rating submitted successfully");
+      // Update the setlist in the cache with the new rating
+      queryClient.setQueryData(
+        ["venue", venue.id],
+        (old: { venue: Venue; setlists: Setlist[]; stats: VenueStats } | undefined) => {
+          if (!old?.setlists) return old;
+          return {
+            ...old,
+            setlists: old.setlists.map((setlist: Setlist) => {
+              if (setlist.show.id === variables.showId) {
+                return {
+                  ...setlist,
+                  show: {
+                    ...setlist.show,
+                    userRating: variables.rating,
+                    averageRating: data.averageRating,
+                  },
+                };
+              }
+              return setlist;
+            }),
+          };
+        },
+      );
+    },
+    onError: (error) => {
+      console.error("Error rating show:", error);
+      toast.error("Failed to submit rating. Please try again.");
+    },
+  });
 
   return (
     <div>
@@ -260,7 +323,7 @@ export default function VenuePage() {
         </div>
 
         <AdminOnly>
-          <Button asChild size="sm" variant="outline">
+          <Button asChild size="sm" className="bg-purple-800 hover:bg-purple-700 text-white">
             <Link to={`/venues/${venue.slug}/edit`} className="flex items-center gap-1">
               <Edit className="h-4 w-4" />
               <span>Edit Venue</span>

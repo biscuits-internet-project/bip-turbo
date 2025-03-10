@@ -1,6 +1,8 @@
 import type { Logger } from "@bip/domain";
 import type { RedisClientType } from "redis";
+import { AttendanceRepository } from "../attendances/attendance-repository";
 import { BlogPostRepository } from "../blog-posts/blog-post-repository";
+import { RatingRepository } from "../ratings/rating-repository";
 import { ReviewRepository } from "../reviews/review-repository";
 import { SetlistRepository } from "../setlists/setlist-repository";
 import { ShowRepository } from "../shows/show-repository";
@@ -25,6 +27,8 @@ export interface ServiceContainer {
     venues: VenueRepository;
     blogPosts: BlogPostRepository;
     reviews: ReviewRepository;
+    ratings: RatingRepository;
+    attendances: AttendanceRepository;
   };
 }
 
@@ -51,6 +55,8 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
     venues: new VenueRepository(db),
     blogPosts: new BlogPostRepository(db),
     reviews: new ReviewRepository(db),
+    ratings: new RatingRepository(db),
+    attendances: new AttendanceRepository(db),
   };
 
   const redis = new RedisService(env.REDIS_URL);

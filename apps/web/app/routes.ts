@@ -60,7 +60,18 @@ export default [
 
   // Songs routes with layout
   layout("routes/songs/_layout.tsx", [
-    ...prefix("songs", [index("routes/songs/_index.tsx"), route(":slug", "routes/songs/$slug.tsx")]),
+    ...prefix("songs", [
+      index("routes/songs/_index.tsx"),
+      route(":slug", "routes/songs/$slug.tsx"),
+      route("new", "routes/songs/new.tsx"),
+      route(":slug/edit", "routes/songs/$slug.edit.tsx"),
+    ]),
+  ]),
+
+  ...prefix("api", [
+    route("reviews", "routes/api/reviews.tsx"),
+    route("ratings", "routes/api/ratings.tsx"),
+    route("attendances", "routes/api/attendances.tsx"),
   ]),
 
   // Health check route

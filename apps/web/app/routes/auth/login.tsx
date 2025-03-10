@@ -25,7 +25,13 @@ export default function Login() {
   const { SUPABASE_URL, SUPABASE_ANON_KEY, BASE_URL } = rootData.env;
 
   const doGoogleAuth = async () => {
-    const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      cookieOptions: {
+        path: "/",
+        secure: true,
+        sameSite: "lax",
+      },
+    });
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

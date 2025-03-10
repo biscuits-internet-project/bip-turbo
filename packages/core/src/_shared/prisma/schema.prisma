@@ -239,10 +239,11 @@ model Rating {
   userId       String   @map("user_id") @db.Uuid
   createdAt    DateTime @map("created_at") @db.Timestamp(6)
   updatedAt    DateTime @map("updated_at") @db.Timestamp(6)
-  rateableType String?  @map("rateable_type") @db.VarChar
-  rateableId   String?  @map("rateable_id") @db.Uuid
+  rateableType String   @map("rateable_type") @db.VarChar
+  rateableId   String   @map("rateable_id") @db.Uuid
   user         User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_ratings_users_user_id")
 
+  @@unique([userId, rateableId, rateableType], map: "ratings_user_id_rateable_id_rateable_type_unique")
   @@index([rateableType, rateableId], map: "ratings_rateable_type_id_idx")
   @@index([userId])
   @@map("ratings")
@@ -259,6 +260,7 @@ model Review {
   showId     String?  @map("show_id") @db.Uuid
   user       User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_users_user_id")
 
+  @@unique([showId, userId])
   @@index([likesCount])
   @@index([showId])
   @@index([userId])
@@ -319,6 +321,7 @@ model Show {
   likesCount        Int           @default(0) @map("likes_count")
   relistenUrl       String?       @map("relisten_url") @db.VarChar
   averageRating     Float?        @default(0) @map("average_rating")
+  ratingsCount      Int           @default(0) @map("ratings_count")
   showPhotosCount   Int           @default(0) @map("show_photos_count")
   showYoutubesCount Int           @default(0) @map("show_youtubes_count")
   reviewsCount      Int           @default(0) @map("reviews_count")

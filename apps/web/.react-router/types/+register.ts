@@ -48,5 +48,12 @@ type Params = {
   "/songs/:slug": {
     "slug": string;
   };
+  "/songs/new": {};
+  "/songs/:slug/edit": {
+    "slug": string;
+  };
+  "/api/reviews": {};
+  "/api/ratings": {};
+  "/api/attendances": {};
   "/healthcheck": {};
 };

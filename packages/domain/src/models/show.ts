@@ -14,6 +14,8 @@ export const showSchema = z.object({
   likesCount: z.number().default(0),
   relistenUrl: z.string().nullable(),
   averageRating: z.number().default(0.0).nullable(),
+  ratingsCount: z.number().default(0),
+  userRating: z.number().nullable().optional(),
   showPhotosCount: z.number().default(0),
   showYoutubesCount: z.number().default(0),
   reviewsCount: z.number().default(0),

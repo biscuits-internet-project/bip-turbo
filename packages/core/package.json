@@ -23,11 +23,14 @@
     "prisma:migrate:baseline": "doppler run -- prisma migrate resolve --applied 20250301154946_init  --schema=./src/_shared/prisma/schema.prisma",
     "prisma:introspect": "doppler run -- prisma db pull --schema=./src/_shared/prisma/schema.prisma",
     "prisma:studio": "doppler run -- prisma studio --schema=./src/_shared/prisma/schema.prisma",
-    "prisma:reset": "doppler run -- prisma migrate reset --force --schema=./src/_shared/prisma/schema.prisma"
+    "prisma:reset": "doppler run -- prisma migrate reset --force --schema=./src/_shared/prisma/schema.prisma",
+    "migrate:users": "doppler run -- bun run scripts/migrate-users-to-supabase.ts"
   },
   "dependencies": {
     "@bip/domain": "workspace:*",
     "@prisma/client": "^6.4.1",
+    "@supabase/supabase-js": "^2.39.7",
+    "dotenv": "^16.4.5",
     "postgres": "^3.4.5",
     "redis": "^4.7.0",
     "zod": "^3.24.2"
@@ -38,6 +41,7 @@
     "prisma": "^6.4.1",
     "supabase": "^2.15.8",
     "ts-node": "^10.9.2",
+    "tsx": "^4.7.1",
     "tsup": "^8.3.6",
     "typescript": "^5.7.3"
   }

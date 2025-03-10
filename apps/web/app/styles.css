@@ -184,18 +184,53 @@
     line-height: 1.4;
   }
 
-  /* Style navigation items with a bit of sci-fi feel */
-  [data-sidebar="sidebar"] nav a span {
-    font-family: var(--font-heading);
+  /* Style navigation items with Monoton font */
+  html [data-sidebar="sidebar"] nav a span {
+    font-family: var(--font-body) !important;
     font-weight: 400;
-    letter-spacing: 0.05em;
-    text-transform: lowercase;
+    letter-spacing: normal;
+    text-transform: none;
+    opacity: 0.7;
+    font-size: 0.9em;
+    transition: opacity 0.2s ease;
+    line-height: normal;
   }
 
-  /* Add a subtle tech feel to form elements */
-  input, select, textarea {
-    font-family: var(--font-mono);
-    font-weight: 400;
+  /* Add hover effect */
+  html [data-sidebar="sidebar"] nav a:hover span {
+    opacity: 1;
+  }
+
+  /* Ensure proper spacing between nav items */
+  html [data-sidebar="sidebar"] nav a {
+    margin-bottom: 0.5em;
+  }
+
+  /* Navigation specific styles - outside of any nested rules */
+  nav[role="navigation"] a span,
+  [data-sidebar] nav a span,
+  .sidebar nav a span,
+  nav a span {
+    font-family: var(--font-body) !important;
+    font-weight: 400 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    opacity: 0.7;
+    font-size: 0.9em;
+    line-height: normal;
+  }
+
+  /* Add hover effect */
+  nav[role="navigation"] a:hover span,
+  [data-sidebar] nav a:hover span {
+    opacity: 1;
+  }
+
+  /* Add spacing between items */
+  nav[role="navigation"] a,
+  [data-sidebar] nav a {
+    margin-bottom: 0.5em;
+    display: block;
   }
 }
 

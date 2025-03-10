@@ -1,6 +1,6 @@
 import type { Annotation, Track } from "@bip/domain";
-import { BaseRepository } from "../_shared/database/base-repository";
-import type { DbAnnotation, DbTrack } from "../_shared/database/models";
+import type { DbAnnotation, DbClient, DbTrack } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 
 export function mapTrackToDomainEntity(dbTrack: DbTrack): Track {
@@ -28,8 +28,8 @@ export function mapTrackToDbModel(entity: Partial<Track>): Partial<DbTrack> {
   return entity as Partial<DbTrack>;
 }
 
-export class TrackRepository extends BaseRepository<Track, DbTrack> {
-  protected modelName = "track" as const;
+export class TrackRepository {
+  constructor(private readonly db: DbClient) {}
 
   protected mapToDomainEntity(dbTrack: DbTrack): Track {
     return mapTrackToDomainEntity(dbTrack);
@@ -54,8 +54,8 @@ export class TrackRepository extends BaseRepository<Track, DbTrack> {
   }
 
   async findMany(options?: QueryOptions<Track>): Promise<Track[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit

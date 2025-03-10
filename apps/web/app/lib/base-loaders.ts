@@ -1,88 +1,137 @@
-import type { LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
+import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { redirect } from "react-router-dom";
-import superjson from "superjson";
 import { logger } from "~/lib/logger";
 import { getServerClient } from "~/server/supabase";
 
-interface LoaderContext {
-  auth?: {
-    userId: string;
-    role: string;
-  };
+interface User {
+  id: string;
+  role: string;
+}
+
+export interface PublicContext {
+  currentUser?: User;
   requestId?: string;
 }
 
-export function createLoader<T>(
-  fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>,
+export interface ProtectedContext {
+  currentUser: User;
+  requestId?: string;
+}
+
+export type Context = PublicContext;
+
+export function createLoader<T, TContext extends PublicContext = PublicContext>(
+  fn: (args: LoaderFunctionArgs & { context: TContext }) => Promise<T>,
   options?: {
-    auth?: boolean;
-    admin?: boolean;
-    metrics?: boolean;
-    rateLimit?: boolean;
+    requireAuth?: boolean;
+    requireAdmin?: boolean;
   },
 ): LoaderFunction {
   return async (args) => {
-    const context: LoaderContext = {};
+    const context = {} as TContext;
     const startTime = performance.now();
 
     try {
-      // Auth middleware
-      if (options?.auth) {
-        const { supabase } = getServerClient(args.request);
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session) {
-          throw redirect("/auth/login");
-        }
-        context.auth = {
-          userId: session.user.id,
-          role: session.user.user_metadata.role,
-        };
+      const user = await getUser(args.request, { requireAuth: options?.requireAuth ?? false });
+
+      if (user) {
+        context.currentUser = user as TContext["currentUser"];
       }
 
-      //   // Request tracking
-      //   if (options?.metrics) {
-      //     context.requestId = crypto.randomUUID();
-      //     console.log(`🔄 Request ${context.requestId} started: ${args.request.url}`);
-      //   }
+      const result = await fn({ ...args, context });
 
-      //   // Rate limiting
-      //   if (options?.rateLimit) {
-      //     await checkRateLimit(args.request);
-      //   }
+      const duration = performance.now() - startTime;
+      logger.info(`✅ ${args.request.method} ${args.request.url} | completed in ${duration}ms`);
 
-      // Execute the loader with context
-      const result = await fn(args, context);
-
-      // Metrics logging
-      if (options?.metrics) {
-        const duration = performance.now() - startTime;
-        logger.info(`✅ Request completed in ${duration}ms`);
-      }
-
-      return superjson.serialize(result);
+      return result;
     } catch (error) {
-      // Error handling middleware
-      if (options?.metrics) {
-        logger.error("❌ Request failed:", error);
-      }
+      logger.error("❌ Request failed:", error);
       throw error;
     }
   };
 }
 
-// You could even create preset configurations:
-export const protectedLoader = <T>(fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>) =>
-  createLoader(fn, { auth: true, metrics: true });
+export function createAction<T, TContext extends PublicContext = PublicContext>(
+  fn: (args: ActionFunctionArgs & { context: TContext }) => Promise<T>,
+  options?: {
+    requireAuth?: boolean;
+    requireAdmin?: boolean;
+  },
+): LoaderFunction {
+  return async (args) => {
+    const context = {} as TContext;
+    const startTime = performance.now();
 
-export const adminLoader = <T>(fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>) =>
-  createLoader(fn, { auth: true, metrics: true });
+    try {
+      const user = await getUser(args.request, { requireAuth: options?.requireAuth ?? false });
 
-export const publicLoader = <T>(fn: (args: LoaderFunctionArgs, context: LoaderContext) => Promise<T>) =>
-  createLoader(fn, { metrics: true });
+      if (user) {
+        context.currentUser = user as TContext["currentUser"];
+      }
 
-// Then use like:
-export const sensitiveDataLoader = protectedLoader(async (args, context) => {
-  // Already has auth and metrics!
-});
+      const result = await fn({ ...args, context });
+
+      const duration = performance.now() - startTime;
+      logger.info(`✅ ${args.request.method} ${args.request.url} | completed in ${duration}ms`);
+
+      return result;
+    } catch (error) {
+      logger.error("❌ Request failed:", error);
+      throw error;
+    }
+  };
+}
+
+// Protected versions with stricter typing
+export const protectedLoader = <T>(fn: (args: LoaderFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
+  createLoader<T, ProtectedContext>(fn, { requireAuth: true });
+
+export const protectedAction = <T>(fn: (args: ActionFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
+  createAction<T, ProtectedContext>(fn, { requireAuth: true });
+
+export const adminLoader = <T>(fn: (args: LoaderFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
+  createLoader<T, ProtectedContext>(fn, { requireAuth: true, requireAdmin: false });
+
+export const adminAction = <T>(fn: (args: ActionFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
+  createAction<T, ProtectedContext>(fn, { requireAuth: true, requireAdmin: false });
+
+export const publicLoader = <T>(fn: (args: LoaderFunctionArgs & { context: PublicContext }) => Promise<T>) =>
+  createLoader<T, PublicContext>(fn, { requireAuth: false });
+
+async function getUser(request: Request, options: { requireAuth: boolean }): Promise<User | null> {
+  const { supabase } = getServerClient(request);
+
+  if (options?.requireAuth) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      const isJsonRequest = request.headers.get("Accept")?.includes("application/json");
+      if (isJsonRequest) {
+        throw new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw redirect("/auth/login");
+    }
+    return {
+      id: user.id,
+      role: user.user_metadata.role,
+    };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (session) {
+    return {
+      id: session.user.id,
+      role: session.user.user_metadata.role,
+    };
+  }
+
+  return null;
+}

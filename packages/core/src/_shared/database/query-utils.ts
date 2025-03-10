@@ -1,4 +1,4 @@
-import type { FilterCondition, SortOptions } from "./types";
+import type { FilterCondition, QueryOptions, SortOptions } from "./types";
 
 /**
  * Builds a Prisma-compatible where clause from our generic filter conditions
@@ -70,4 +70,28 @@ export function buildOrderByClause<T>(
   return sort.map((sortOption) => ({
     [String(sortOption.field)]: sortOption.direction,
   }));
+}
+
+/**
+ * Convert our generic includes to database-specific include object
+ */
+export function buildIncludeClause<Entity>(includes?: QueryOptions<Entity>["includes"]): Record<string, boolean> {
+  if (!includes || includes.length === 0) {
+    return {};
+  }
+
+  const includeObject: Record<string, boolean> = {};
+  for (const include of includes) {
+    includeObject[String(include)] = true;
+  }
+
+  return includeObject;
+}
+
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

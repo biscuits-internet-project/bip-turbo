@@ -1,7 +1,6 @@
 import type { Review, ReviewMinimal } from "@bip/domain";
-import invariant from "tiny-invariant";
-import { BaseRepository } from "../_shared/database/base-repository";
 import type { DbClient, DbReview, DbUser } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 import { mapToUserMinimal } from "../users/user-repository";
 
@@ -30,8 +29,8 @@ export function mapReviewToMinimal(entity: DbReview, user: DbUser): ReviewMinima
   };
 }
 
-export class ReviewRepository extends BaseRepository<Review, DbReview> {
-  protected modelName = "review" as const;
+export class ReviewRepository {
+  constructor(private readonly db: DbClient) {}
 
   protected mapToDomainEntity(dbReview: DbReview): Review {
     return mapReviewToDomainEntity(dbReview);
@@ -73,7 +72,7 @@ export class ReviewRepository extends BaseRepository<Review, DbReview> {
   }
 
   async findByUserId(userId: string, options?: QueryOptions<Review>): Promise<Review[]> {
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -91,8 +90,8 @@ export class ReviewRepository extends BaseRepository<Review, DbReview> {
   }
 
   async findMany(options?: QueryOptions<Review>): Promise<Review[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -107,6 +106,31 @@ export class ReviewRepository extends BaseRepository<Review, DbReview> {
     });
 
     return results.map((result: DbReview) => this.mapToDomainEntity(result));
+  }
+
+  async create(data: Omit<Review, "id" | "createdAt" | "updatedAt">): Promise<ReviewMinimal> {
+    const result = await this.db.review.create({
+      data: {
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      include: {
+        user: true,
+      },
+    });
+    return mapReviewToMinimal(result, result.user);
+  }
+
+  async update(id: string, data: Partial<Review>): Promise<ReviewMinimal> {
+    const result = await this.db.review.update({
+      where: { id },
+      data,
+      include: {
+        user: true,
+      },
+    });
+    return mapReviewToMinimal(result, result.user);
   }
 
   async delete(id: string): Promise<boolean> {

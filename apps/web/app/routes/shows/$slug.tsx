@@ -1,12 +1,13 @@
 import type { ReviewMinimal, Setlist } from "@bip/domain";
-import { Search } from "lucide-react";
-import React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import ArchiveMusicPlayer from "~/components/player";
 import { ReviewsList } from "~/components/review";
+import { ReviewForm } from "~/components/review/review-form";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
-import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { formatDateLong } from "~/lib/utils";
@@ -35,7 +36,7 @@ interface ArchiveSearchHit {
   };
 }
 
-export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> => {
+export const loader = publicLoader(async ({ params, context }): Promise<ShowLoaderData> => {
   console.log("⚡️ shows.$slug loader:", params.slug);
   const slug = params.slug;
   if (!slug) throw notFound();
@@ -46,7 +47,6 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
   const reviews = await services.reviews.findByShowId(setlist.show.id);
 
   // Find Archive.org recordings for this show date
-  let archiveRecordings: ArchiveItem[] = [];
   let selectedRecordingId: string | null = null;
 
   // Make a second request to get the actual items
@@ -62,22 +62,20 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
   const detailsData = await detailsResponse.json();
 
   if (detailsData?.response?.docs && detailsData.response.docs.length > 0) {
-    archiveRecordings = detailsData.response.docs as ArchiveItem[];
+    const archiveRecordings = detailsData.response.docs as ArchiveItem[];
 
     if (archiveRecordings.length > 0) {
       selectedRecordingId = archiveRecordings[0].identifier;
     }
-  } else {
-    console.log("No recording details found despite having hits in the count");
   }
 
   return { setlist, reviews, selectedRecordingId };
 });
 
-export function meta({ data }: { data: { json: ShowLoaderData } }) {
-  const showDate = formatDateLong(data.json.setlist.show.date);
-  const venueName = data.json.setlist.show.venue?.name ?? "Unknown Venue";
-  const cityState = `${data.json.setlist.show.venue?.city}, ${data.json.setlist.show.venue?.state}`;
+export function meta({ data }: { data: ShowLoaderData }) {
+  const showDate = formatDateLong(data.setlist.show.date);
+  const venueName = data.setlist.show.venue?.name ?? "Unknown Venue";
+  const cityState = `${data.setlist.show.venue?.city}, ${data.setlist.show.venue?.state}`;
 
   return [
     { title: `${showDate} - ${venueName} - ${cityState} | Biscuits Internet Project` },
@@ -89,7 +87,143 @@ export function meta({ data }: { data: { json: ShowLoaderData } }) {
 }
 
 export default function Show() {
-  const { setlist, reviews, selectedRecordingId } = useSerializedLoaderData<ShowLoaderData>();
+  const { setlist, reviews: initialReviews, selectedRecordingId } = useSerializedLoaderData<ShowLoaderData>();
+  const { user } = useSession();
+  const queryClient = useQueryClient();
+
+  // Query for reviews
+  const { data: reviews = [] } = useQuery({
+    queryKey: ["reviews", setlist.show.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/reviews?showId=${setlist.show.id}`);
+      if (!response.ok) throw new Error("Failed to fetch reviews");
+      const data = await response.json();
+      return data.reviews;
+    },
+    initialData: initialReviews,
+  });
+
+  // Mutation for creating reviews
+  const createReviewMutation = useMutation({
+    mutationFn: async (data: { content: string }) => {
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: data.content,
+          showId: setlist.show.id,
+        }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/auth/login";
+        throw new Error("Unauthorized");
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to create review");
+      }
+
+      const text = await response.text();
+      if (!text) {
+        throw new Error("Empty response from server");
+      }
+
+      let result: { json: { review?: ReviewMinimal } };
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse response:", e);
+        console.error("Response text was:", text);
+        throw new Error("Invalid JSON response from server");
+      }
+
+      if (!result.json.review) {
+        throw new Error("Invalid response format from server: missing review");
+      }
+
+      return result.json.review;
+    },
+    onSuccess: (review) => {
+      toast.success("Review submitted successfully");
+      queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) => [...old, review]);
+    },
+    onError: () => {
+      toast.error("Failed to submit review. Please try again.");
+    },
+  });
+
+  // Mutation for deleting reviews
+  const deleteReviewMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch("/api/reviews", {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id,
+        }),
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete review");
+      }
+    },
+    onSuccess: (_, id) => {
+      toast.success("Review deleted successfully");
+      queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) =>
+        old.filter((review) => review.id !== id),
+      );
+    },
+    onError: () => {
+      toast.error("Failed to delete review. Please try again.");
+    },
+  });
+
+  // Mutation for updating reviews
+  const updateReviewMutation = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const response = await fetch("/api/reviews", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, content }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update review");
+      }
+
+      const data = await response.json();
+      console.log("Review updated successfully:", data);
+      return data.review;
+    },
+    onSuccess: (review) => {
+      console.log("Review updated successfully:", review);
+      toast.success("Review updated successfully");
+      queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) =>
+        old.map((r) => (r.id === review.id ? review : r)),
+      );
+    },
+    onError: () => {
+      toast.error("Failed to update review. Please try again.");
+    },
+  });
+
+  const handleReviewSubmit = async (data: { content: string }) => {
+    await createReviewMutation.mutateAsync(data);
+  };
+
+  const handleReviewDelete = async (id: string) => {
+    await deleteReviewMutation.mutateAsync(id);
+  };
+
+  const handleReviewUpdate = async (id: string, content: string) => {
+    await updateReviewMutation.mutateAsync({ id, content });
+  };
 
   return (
     <div className="w-full">
@@ -101,44 +235,48 @@ export default function Show() {
             {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
           </p>
         </div>
-
-        {/* <Button variant="outline">EDIT SHOW</Button> */}
       </div>
 
       {/* Main content area with responsive grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Setlist */}
         <div className="lg:col-span-8">
-          <SetlistCard key={setlist.show.id} setlist={setlist} />
+          <SetlistCard
+            key={setlist.show.id}
+            setlist={setlist}
+            userAttendance={null}
+            userRating={null}
+            showRating={setlist.show.averageRating}
+          />
 
-          {/* Reviews section moved up to fill whitespace */}
           <div className="mt-6">
-            <ReviewsList reviews={reviews} />
+            {reviews && reviews.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-400">No reviews yet. Be the first to share your thoughts!</p>
+              </div>
+            )}
+            {user && !reviews.some((review: ReviewMinimal) => review.userId === user.id) && (
+              <div className="mb-8">
+                <ReviewForm onSubmit={handleReviewSubmit} />
+              </div>
+            )}
+            {reviews && reviews.length > 0 && (
+              <ReviewsList
+                reviews={reviews}
+                currentUserId={user?.id}
+                onDelete={handleReviewDelete}
+                onUpdate={handleReviewUpdate}
+              />
+            )}
           </div>
         </div>
 
         {/* Right column: Highlights and additional content */}
         <div className="lg:col-span-4">
           <div className="lg:sticky lg:top-4 space-y-6">
-            {/* Music Player */}
-            {selectedRecordingId ? (
+            {selectedRecordingId && (
               <div>
                 <ArchiveMusicPlayer identifier={selectedRecordingId} />
-              </div>
-            ) : (
-              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-                <h3 className="text-lg font-medium text-white mb-2">No Recording Available</h3>
-                <p className="text-gray-400 text-sm">
-                  No Archive.org recording was found for this show date. Check back later or try a different show.
-                </p>
-                <a
-                  href="https://archive.org/details/DiscoBiscuits"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-purple-400 hover:text-purple-300 text-sm mt-4 inline-block"
-                >
-                  Browse all Disco Biscuits recordings
-                </a>
               </div>
             )}
 

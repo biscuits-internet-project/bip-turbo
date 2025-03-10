@@ -1,16 +1,12 @@
 import type { Logger, Venue } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
-import type { DbVenue } from "../_shared/database/models";
 import type { QueryOptions } from "../_shared/database/types";
 import type { VenueRepository } from "./venue-repository";
 
-export class VenueService extends BaseService<Venue, DbVenue> {
+export class VenueService {
   constructor(
     protected readonly repository: VenueRepository,
-    logger: Logger,
-  ) {
-    super(repository, logger);
-  }
+    protected readonly logger: Logger,
+  ) {}
 
   async findById(id: string) {
     return this.repository.findById(id);
@@ -29,17 +25,8 @@ export class VenueService extends BaseService<Venue, DbVenue> {
     return this.repository.findMany(filter);
   }
 
-  async delete(id: string) {
-    return this.repository.delete(id);
-  }
-
   async create(data: Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">) {
-    const slug = this.generateSlug(data.name);
-    return this.repository.create({
-      ...data,
-      slug,
-      timesPlayed: 0,
-    });
+    return this.repository.create(data);
   }
 
   async update(slug: string, data: Partial<Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">>) {
@@ -51,11 +38,7 @@ export class VenueService extends BaseService<Venue, DbVenue> {
     return this.repository.update(venue.id, data);
   }
 
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/[\s_-]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+  async delete(id: string) {
+    return this.repository.delete(id);
   }
 }

@@ -115,7 +115,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
         />
 
         <div className="flex gap-4 pt-2">
-          <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+          <Button type="submit" className="bg-purple-800 hover:bg-purple-700 text-white">
             {submitLabel}
           </Button>
           <Button

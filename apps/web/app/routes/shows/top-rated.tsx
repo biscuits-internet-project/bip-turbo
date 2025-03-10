@@ -1,10 +1,10 @@
 import type { Show } from "@bip/domain";
-import { format } from "date-fns";
 import { Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { formatDateShort } from "~/lib/utils";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -22,7 +22,13 @@ export const loader = publicLoader<LoaderData>(async () => {
         operator: "gt",
         value: 0,
       },
+      {
+        field: "ratingsCount",
+        operator: "gt",
+        value: 10,
+      },
     ],
+    includes: ["venue"],
   });
 
   return { shows };
@@ -55,6 +61,7 @@ export default function TopRated() {
                 <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
                   <th className="p-4">Rank</th>
                   <th className="p-4">Rating</th>
+                  <th className="p-4">Number of Ratings</th>
                   <th className="p-4">Date</th>
                   <th className="p-4">Venue</th>
                   <th className="p-4">Location</th>
@@ -70,13 +77,14 @@ export default function TopRated() {
                         <span className="text-white font-medium">{show.averageRating?.toFixed(1) || "—"}</span>
                       </div>
                     </td>
+                    <td className="p-4 text-white">{show.ratingsCount}</td>
                     <td className="p-4 text-white">
                       <Link to={`/shows/${show.slug}`} className="hover:underline">
-                        {format(new Date(show.date), "MMM d, yyyy")}
+                        {formatDateShort(show.date)}
                       </Link>
                     </td>
-                    <td className="p-4 text-white font-medium">{show.venue?.name || "Unknown Venue"}</td>
-                    <td className="p-4 text-gray-400">
+                    <td className="p-4 text-white">{show.venue?.name || "Unknown Venue"}</td>
+                    <td className="p-4 text-white font-medium">
                       {show.venue
                         ? [show.venue.city, show.venue.state, show.venue.country].filter(Boolean).join(", ")
                         : ""}

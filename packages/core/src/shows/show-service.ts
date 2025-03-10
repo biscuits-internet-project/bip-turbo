@@ -1,6 +1,4 @@
 import type { Logger, Show } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
-import type { DbShow } from "../_shared/database/models";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import type { ShowRepository } from "./show-repository";
 
@@ -9,13 +7,11 @@ export interface ShowFilter {
   songId?: string;
 }
 
-export class ShowService extends BaseService<Show, DbShow> {
+export class ShowService {
   constructor(
-    protected override repository: ShowRepository,
-    logger: Logger,
-  ) {
-    super(repository, logger);
-  }
+    protected repository: ShowRepository,
+    protected logger: Logger,
+  ) {}
 
   async findById(id: string): Promise<Show | null> {
     return this.repository.findById(id);

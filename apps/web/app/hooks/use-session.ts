@@ -1,18 +1,26 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { useMemo, useState } from "react";
+import { useRouteLoaderData } from "react-router";
+import type { RootData } from "~/root";
 
-export function useSession(supabaseUrl: string, supabaseAnonKey: string) {
+export function useSession() {
+  const rootData = useRouteLoaderData("root") as RootData;
+  const { SUPABASE_URL, SUPABASE_ANON_KEY } = rootData.env;
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Create the Supabase client only once
   const supabase = useMemo(() => {
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       setLoading(false);
       return null;
     }
-    const client = createBrowserClient(supabaseUrl, supabaseAnonKey);
+    const client = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      cookieOptions: {
+        path: "/",
+      },
+    });
 
     // Set up initial session synchronously
     client.auth.getSession().then(({ data: { session } }) => {
@@ -27,7 +35,7 @@ export function useSession(supabaseUrl: string, supabaseAnonKey: string) {
     });
 
     return client;
-  }, [supabaseUrl, supabaseAnonKey]);
+  }, [SUPABASE_URL, SUPABASE_ANON_KEY]);
 
   return { user, supabase, loading };
 }

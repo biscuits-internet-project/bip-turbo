@@ -1,4 +1,4 @@
-import type { BlogPost, Setlist, TourDate } from "@bip/domain";
+import type { Attendance, BlogPost, Rating, Setlist, TourDate } from "@bip/domain";
 import { ArrowRight, Calendar, FileText, MapPin, Music, Search } from "lucide-react";
 import { Link, redirect } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
@@ -12,10 +12,13 @@ interface LoaderData {
   tourDates: TourDate[];
   recentShows: Setlist[];
   recentBlogPosts: BlogPost[];
+  attendancesByShowId: Record<string, Attendance>;
+  ratingsByShowId: Record<string, Rating>;
 }
 
-export const loader = publicLoader<LoaderData>(async ({ request }) => {
-  // Get upcoming tour dates
+export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
+  const { currentUser } = context;
+
   const tourDates = Array.isArray(await services.tourDatesService.getTourDates())
     ? await services.tourDatesService.getTourDates()
     : [];
@@ -36,7 +39,35 @@ export const loader = publicLoader<LoaderData>(async ({ request }) => {
     ],
   });
 
-  return { tourDates, recentShows, recentBlogPosts };
+  const attendances = currentUser
+    ? await services.attendances.findManyByUserIdAndShowIds(
+        currentUser.id,
+        recentShows.map((s) => s.show.id),
+      )
+    : [];
+  const ratings = currentUser
+    ? await services.ratings.findManyByUserIdAndRateableIds(
+        currentUser.id,
+        recentShows.map((s) => s.show.id),
+        "Show",
+      )
+    : [];
+  const attendancesByShowId = attendances.reduce(
+    (acc, attendance) => {
+      acc[attendance.showId] = attendance;
+      return acc;
+    },
+    {} as Record<string, Attendance>,
+  );
+  const ratingsByShowId = ratings.reduce(
+    (acc, rating) => {
+      acc[rating.rateableId] = rating;
+      return acc;
+    },
+    {} as Record<string, Rating>,
+  );
+
+  return { tourDates, recentShows, recentBlogPosts, attendancesByShowId, ratingsByShowId };
 });
 
 export function meta() {
@@ -50,7 +81,13 @@ export function meta() {
 }
 
 export default function Index() {
-  const { tourDates = [], recentShows = [], recentBlogPosts = [] } = useSerializedLoaderData<LoaderData>();
+  const {
+    tourDates = [],
+    recentShows = [],
+    recentBlogPosts = [],
+    attendancesByShowId = {} as Record<string, Attendance>,
+    ratingsByShowId = {} as Record<string, Rating>,
+  } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div className="w-full p-0">
@@ -86,7 +123,13 @@ export default function Index() {
           {recentShows.length > 0 ? (
             <div className="grid gap-6">
               {recentShows.map((setlist) => (
-                <SetlistCard key={setlist.show.id} setlist={setlist} />
+                <SetlistCard
+                  key={setlist.show.id}
+                  setlist={setlist}
+                  userAttendance={attendancesByShowId[setlist.show.id] || null}
+                  userRating={ratingsByShowId[setlist.show.id] || null}
+                  showRating={setlist.show.averageRating}
+                />
               ))}
             </div>
           ) : (

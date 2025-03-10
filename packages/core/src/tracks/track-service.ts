@@ -1,16 +1,13 @@
 import type { Logger, Track } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
 import type { DbTrack } from "../_shared/database/models";
 import type { QueryOptions } from "../_shared/database/types";
 import type { TrackRepository } from "./track-repository";
 
-export class TrackService extends BaseService<Track, DbTrack> {
+export class TrackService {
   constructor(
     protected readonly repository: TrackRepository,
-    logger: Logger,
-  ) {
-    super(repository, logger);
-  }
+    protected readonly logger: Logger,
+  ) {}
 
   async findById(id: string): Promise<Track | null> {
     return this.repository.findById(id);

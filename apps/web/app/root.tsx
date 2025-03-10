@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import {
@@ -82,6 +84,16 @@ function ClientOnly({ children }: { children: (isDesktop: boolean) => React.Reac
   return children(isDesktop);
 }
 
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="font-quicksand dark">
@@ -92,18 +104,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <SupabaseProvider>
-          <ClientOnly>
-            {(isDesktop) => (
-              <SidebarProvider defaultOpen={isDesktop}>
-                <RootLayout>{children}</RootLayout>
-              </SidebarProvider>
-            )}
-          </ClientOnly>
-        </SupabaseProvider>
-        <Toaster position="top-right" theme="dark" />
-        <ScrollRestoration />
-        <Scripts />
+        <QueryClientProvider client={queryClient}>
+          <SupabaseProvider>
+            <ClientOnly>
+              {(isDesktop) => (
+                <SidebarProvider defaultOpen={isDesktop}>
+                  <RootLayout>{children}</RootLayout>
+                </SidebarProvider>
+              )}
+            </ClientOnly>
+          </SupabaseProvider>
+          <ReactQueryDevtools initialIsOpen={false} />
+          <Toaster position="top-right" theme="dark" />
+          <ScrollRestoration />
+          <Scripts />
+        </QueryClientProvider>
       </body>
     </html>
   );

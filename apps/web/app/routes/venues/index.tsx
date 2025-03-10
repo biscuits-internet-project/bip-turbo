@@ -391,7 +391,7 @@ export default function VenuesPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-white">Venues</h1>
         <AdminOnly>
-          <Button asChild size="sm">
+          <Button asChild size="sm" className="bg-purple-800 hover:bg-purple-700 text-white">
             <Link to="/venues/new" className="flex items-center gap-1">
               <Plus className="h-4 w-4" />
               <span>Create Venue</span>

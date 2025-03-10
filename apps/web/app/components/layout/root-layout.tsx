@@ -1,4 +1,3 @@
-import type { User } from "@supabase/supabase-js";
 import {
   BookOpen,
   Building2,
@@ -34,10 +33,8 @@ const navigation = [
 
 export function RootLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
-  const rootData = useRouteLoaderData("root") as RootData;
 
-  const { SUPABASE_URL, SUPABASE_ANON_KEY } = rootData.env;
-  const { user, loading } = useSession(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const { user, loading } = useSession();
 
   const username = user?.user_metadata?.username ?? user?.email?.split("@")[0];
 
@@ -54,33 +51,35 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
   }, [isMobile, setOpen]);
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="h-screen w-full overflow-hidden">
       {/* Sidebar - fixed on desktop, slide-in on mobile */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-30 h-screen bg-background/95 backdrop-blur-sm transition-all duration-300 w-64",
+          "fixed top-0 left-0 z-30 h-screen bg-background/95 backdrop-blur-sm transition-all duration-300 w-64 flex flex-col",
           isMobile ? (openMobile ? "translate-x-0" : "-translate-x-full") : "translate-x-0",
           "border-r border-border/10",
         )}
       >
-        {/* Navigation */}
-        <nav className="p-4 space-y-1">
-          {navigation.map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className="flex items-center rounded-md px-4 py-3 text-base font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground group"
-            >
-              <item.icon className="h-5 w-5 transition-all duration-200 group-hover:text-accent-foreground group-hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.5)]" />
-              <span className="ml-3 transition-all duration-200 group-hover:text-accent-foreground group-hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)]">
-                {item.name}
-              </span>
-            </Link>
-          ))}
-        </nav>
+        {/* Navigation - scrollable area */}
+        <div className="flex-1 overflow-y-auto">
+          <nav className="p-4 space-y-1">
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                to={item.href}
+                className="flex items-center rounded-md px-4 py-3 text-lg font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground group"
+              >
+                <item.icon className="h-5 w-5 transition-all duration-200 group-hover:text-accent-foreground group-hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.5)]" />
+                <span className="ml-3 transition-all text-lg duration-200 group-hover:text-accent-foreground group-hover:drop-shadow-[0_0_8px_rgba(167,139,250,0.5)]">
+                  {item.name}
+                </span>
+              </Link>
+            ))}
+          </nav>
+        </div>
 
-        {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border/10 p-4 bg-background/95 backdrop-blur-sm">
+        {/* Footer - fixed at bottom */}
+        <div className="border-t border-border/10 p-4 bg-background/95 backdrop-blur-sm">
           {!loading &&
             (user ? (
               <div className="flex items-center gap-3">
@@ -125,7 +124,7 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main Content */}
-      <div className={cn("flex-1 transition-all duration-300", isMobile ? "pl-0" : "pl-64")}>
+      <main className={cn("h-screen overflow-y-auto", isMobile ? "" : "ml-64")}>
         {/* Mobile Menu Button */}
         {isMobile && (
           <Button
@@ -144,8 +143,8 @@ export function RootLayout({ children }: { children: React.ReactNode }) {
             <span className="sr-only">{openMobile ? "Close" : "Open"} Sidebar</span>
           </Button>
         )}
-        <main className="w-full h-full px-10 py-8">{children}</main>
-      </div>
+        <div className="px-4 py-6 sm:px-10 sm:py-8">{children}</div>
+      </main>
     </div>
   );
 }

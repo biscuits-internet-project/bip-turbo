@@ -1,16 +1,12 @@
 import type { Logger, Review, ReviewMinimal } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
-import type { DbReview } from "../_shared/database/models";
 import type { QueryOptions } from "../_shared/database/types";
 import type { ReviewRepository } from "./review-repository";
 
-export class ReviewService extends BaseService<Review, DbReview> {
+export class ReviewService {
   constructor(
     protected readonly repository: ReviewRepository,
-    logger: Logger,
-  ) {
-    super(repository, logger);
-  }
+    protected readonly logger: Logger,
+  ) {}
 
   async findById(id: string) {
     return this.repository.findById(id);
@@ -26,6 +22,14 @@ export class ReviewService extends BaseService<Review, DbReview> {
 
   async findMany(options?: QueryOptions<Review>) {
     return this.repository.findMany(options);
+  }
+
+  async create(data: Omit<Review, "id" | "createdAt" | "updatedAt">): Promise<ReviewMinimal> {
+    return this.repository.create(data);
+  }
+
+  async update(id: string, data: Partial<Omit<Review, "id" | "createdAt" | "updatedAt">>): Promise<ReviewMinimal> {
+    return this.repository.update(id, data);
   }
 
   async delete(id: string) {

@@ -1,20 +1,16 @@
 import type { BlogPost, Logger } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
-import type { DbBlogPost } from "../_shared/database/models";
 import type { QueryOptions } from "../_shared/database/types";
 import type { RedisService } from "../_shared/redis";
 import type { BlogPostRepository } from "./blog-post-repository";
 
 const BLOG_POSTS_CACHE_KEY = "blog-posts";
 
-export class BlogPostService extends BaseService<BlogPost, DbBlogPost> {
+export class BlogPostService {
   constructor(
     protected readonly repository: BlogPostRepository,
     protected readonly redis: RedisService,
     protected readonly logger: Logger,
-  ) {
-    super(repository, logger);
-  }
+  ) {}
 
   async findById(id: string) {
     return this.repository.findById(id);

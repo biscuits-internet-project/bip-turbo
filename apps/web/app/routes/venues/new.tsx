@@ -1,16 +1,17 @@
 import type { Venue } from "@bip/domain";
 import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, redirect, useSubmit } from "react-router-dom";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
 import { VenueForm, type VenueFormValues } from "~/components/venue/venue-form";
-import { adminLoader } from "~/lib/base-loaders";
+import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
 export const loader = adminLoader(async () => {
   return { ok: true };
 });
 
-export const action = adminLoader(async ({ request }) => {
+export const action = adminAction(async ({ request }) => {
   const formData = await request.formData();
   const name = formData.get("name") as string;
   const city = (formData.get("city") as string) || null;
@@ -25,11 +26,11 @@ export const action = adminLoader(async ({ request }) => {
     country,
   });
 
-  return { venue };
+  return redirect(`/venues/${venue.slug}`);
 });
 
 export default function NewVenue() {
-  const navigate = useNavigate();
+  const submit = useSubmit();
 
   const handleSubmit = async (data: VenueFormValues) => {
     const formData = new FormData();
@@ -38,15 +39,7 @@ export default function NewVenue() {
     if (data.state) formData.append("state", data.state);
     if (data.country) formData.append("country", data.country);
 
-    const response = await fetch("/venues/new", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      navigate(`/venues/${result.venue.slug}`);
-    }
+    submit(formData, { method: "post" });
   };
 
   return (
@@ -61,9 +54,12 @@ export default function NewVenue() {
         </Button>
       </div>
 
-      <div className="bg-gray-900 rounded-lg shadow-md p-6">
-        <VenueForm onSubmit={handleSubmit} submitLabel="Create Venue" cancelHref="/venues" />
-      </div>
+      <Card className="relative overflow-hidden border-gray-800 transition-all duration-300">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
+        <CardContent className="relative z-10 p-6">
+          <VenueForm onSubmit={handleSubmit} submitLabel="Create Venue" cancelHref="/venues" />
+        </CardContent>
+      </Card>
     </div>
   );
 }

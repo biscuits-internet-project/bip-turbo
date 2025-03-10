@@ -1,6 +1,8 @@
 import type { BlogPost, BlogPostState, BlogPostType } from "@bip/domain";
-import { BaseRepository } from "../_shared/database/base-repository";
 import type { DbBlogPost } from "../_shared/database/models";
+import type { DbClient } from "../_shared/database/models";
+import { buildOrderByClause } from "../_shared/database/query-utils";
+import { buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 
 export function mapBlogPostToDomainEntity(dbBlogPost: DbBlogPost): BlogPost {
@@ -20,34 +22,26 @@ export function mapBlogPostToDbModel(entity: Partial<BlogPost>): Partial<DbBlogP
   return entity as Partial<DbBlogPost>;
 }
 
-export class BlogPostRepository extends BaseRepository<BlogPost, DbBlogPost> {
-  protected modelName = "blogPost" as const;
-
-  protected mapToDomainEntity(dbBlogPost: DbBlogPost): BlogPost {
-    return mapBlogPostToDomainEntity(dbBlogPost);
-  }
-
-  protected mapToDbModel(entity: Partial<BlogPost>): Partial<DbBlogPost> {
-    return mapBlogPostToDbModel(entity);
-  }
+export class BlogPostRepository {
+  constructor(protected db: DbClient) {}
 
   async findById(id: string): Promise<BlogPost | null> {
     const result = await this.db.blogPost.findUnique({
       where: { id },
     });
-    return result ? this.mapToDomainEntity(result) : null;
+    return result ? mapBlogPostToDomainEntity(result) : null;
   }
 
   async findBySlug(slug: string): Promise<BlogPost | null> {
     const result = await this.db.blogPost.findFirst({
       where: { slug },
     });
-    return result ? this.mapToDomainEntity(result) : null;
+    return result ? mapBlogPostToDomainEntity(result) : null;
   }
 
   async findMany(options?: QueryOptions<BlogPost>): Promise<BlogPost[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ publishedAt: "desc" }];
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ publishedAt: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -71,7 +65,7 @@ export class BlogPostRepository extends BaseRepository<BlogPost, DbBlogPost> {
       },
     });
 
-    const domainBlogPosts = blogPosts.map((blogPost: DbBlogPost) => this.mapToDomainEntity(blogPost));
+    const domainBlogPosts = blogPosts.map((blogPost: DbBlogPost) => mapBlogPostToDomainEntity(blogPost));
 
     for (const blogPost of domainBlogPosts) {
       const imgUrls = images
@@ -85,13 +79,9 @@ export class BlogPostRepository extends BaseRepository<BlogPost, DbBlogPost> {
   }
 
   async delete(id: string): Promise<boolean> {
-    try {
-      await this.db.blogPost.delete({
-        where: { id },
-      });
-      return true;
-    } catch (error) {
-      return false;
-    }
+    await this.db.blogPost.delete({
+      where: { id },
+    });
+    return true;
   }
 }

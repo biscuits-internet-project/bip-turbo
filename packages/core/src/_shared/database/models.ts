@@ -9,8 +9,10 @@ import type { PrismaClient } from "@prisma/client";
 // Import the actual types from the generated Prisma client
 import type {
   Annotation as PrismaAnnotation,
+  Attendance as PrismaAttendance,
   Author as PrismaAuthor,
   BlogPost as PrismaBlogPost,
+  Rating as PrismaRating,
   Review as PrismaReview,
   Show as PrismaShow,
   Song as PrismaSong,
@@ -30,12 +32,25 @@ export type DbShow = PrismaShow;
 export type DbTrack = PrismaTrack;
 export type DbVenue = PrismaVenue;
 export type DbUser = PrismaUser;
+export type DbRating = PrismaRating;
+export type DbAttendance = PrismaAttendance;
 
 // Define a type for any model name in the database client
 export type ModelName = keyof DbClient;
 
 // Define a generic database model type
-export type DbModel = DbSong | DbAuthor | DbShow | DbTrack | DbVenue | DbUser | DbAnnotation | DbBlogPost | DbReview;
+export type DbModel =
+  | DbSong
+  | DbAuthor
+  | DbShow
+  | DbTrack
+  | DbVenue
+  | DbUser
+  | DbAnnotation
+  | DbBlogPost
+  | DbReview
+  | DbRating
+  | DbAttendance;
 
 // Re-export the Prisma client instance with the generic type
 import { prisma as prismaInstance } from "../prisma";

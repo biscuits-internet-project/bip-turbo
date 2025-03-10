@@ -1,6 +1,6 @@
 import type { User, UserMinimal } from "@bip/domain";
-import { BaseRepository } from "../_shared/database/base-repository";
-import type { DbUser } from "../_shared/database/models";
+import type { DbClient, DbUser } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 
 export function mapUserToDomainEntity(dbUser: DbUser): User {
@@ -25,34 +25,26 @@ export function mapToUserMinimal(dbUser: DbUser): UserMinimal {
   };
 }
 
-export class UserRepository extends BaseRepository<User, DbUser> {
-  protected modelName = "user" as const;
-
-  protected mapToDomainEntity(dbUser: DbUser): User {
-    return mapUserToDomainEntity(dbUser);
-  }
-
-  protected mapToDbModel(entity: Partial<User>): Partial<DbUser> {
-    return mapUserToDbModel(entity);
-  }
+export class UserRepository {
+  constructor(private readonly db: DbClient) {}
 
   async findById(id: string): Promise<User | null> {
     const result = await this.db.user.findUnique({
       where: { id },
     });
-    return result ? this.mapToDomainEntity(result) : null;
+    return result ? mapUserToDomainEntity(result) : null;
   }
 
   async findBySlug(username: string): Promise<User | null> {
     const result = await this.db.user.findUnique({
       where: { username },
     });
-    return result ? this.mapToDomainEntity(result) : null;
+    return result ? mapUserToDomainEntity(result) : null;
   }
 
   async findMany(options?: QueryOptions<User>): Promise<User[]> {
-    const where = options?.filters ? this.buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? this.buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -66,7 +58,7 @@ export class UserRepository extends BaseRepository<User, DbUser> {
       take,
     });
 
-    return results.map((result: DbUser) => this.mapToDomainEntity(result));
+    return results.map((result: DbUser) => mapUserToDomainEntity(result));
   }
 
   async delete(id: string): Promise<boolean> {

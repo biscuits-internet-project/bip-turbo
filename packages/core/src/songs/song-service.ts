@@ -1,6 +1,4 @@
 import type { Logger, Song, TrendingSong } from "@bip/domain";
-import { BaseService } from "../_shared/base-service";
-import type { DbSong } from "../_shared/database/models";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import type { SongRepository } from "./song-repository";
 
@@ -9,13 +7,25 @@ export interface SongFilter {
   legacyId?: number;
 }
 
-export class SongService extends BaseService<Song, DbSong> {
+export interface CreateSongInput {
+  title: string;
+  lyrics?: string | null;
+  tabs?: string | null;
+  notes?: string | null;
+  cover?: boolean | null;
+  history?: string | null;
+  featuredLyric?: string | null;
+  guitarTabsUrl?: string | null;
+  authorId?: string | null;
+}
+
+export type UpdateSongInput = Partial<CreateSongInput>;
+
+export class SongService {
   constructor(
     protected repository: SongRepository,
-    logger: Logger,
-  ) {
-    super(repository, logger);
-  }
+    protected logger: Logger,
+  ) {}
 
   async findById(id: string): Promise<Song | null> {
     return this.repository.findById(id);
@@ -43,6 +53,14 @@ export class SongService extends BaseService<Song, DbSong> {
 
   async findTrendingLastYear(): Promise<TrendingSong[]> {
     return this.repository.findTrendingLastYear();
+  }
+
+  async create(input: CreateSongInput): Promise<Song> {
+    return this.repository.create(input);
+  }
+
+  async update(slug: string, input: UpdateSongInput): Promise<Song> {
+    return this.repository.update(slug, input);
   }
 
   async delete(id: string): Promise<void> {

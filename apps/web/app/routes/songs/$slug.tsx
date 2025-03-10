@@ -15,13 +15,16 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpIcon, BarChart2Icon, FileTextIcon, GuitarIcon, StarIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, BarChart2Icon, FileTextIcon, GuitarIcon, Pencil, StarIcon } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import Markdown from "react-markdown";
 import Masonry from "react-masonry-css";
 import type { LoaderFunctionArgs } from "react-router";
+import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { AdminOnly } from "~/components/admin/admin-only";
+import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -105,7 +108,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
       }),
       {
         id: "before",
-        header: "Before",
+        header: "Song before",
         size: 192,
         enableSorting: false,
         cell: (info) => {
@@ -126,7 +129,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
       }),
       {
         id: "after",
-        header: "After",
+        header: "Song after",
         size: 192,
         enableSorting: false,
         cell: (info) => {
@@ -222,15 +225,12 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
   );
 }
 
-export function meta({ data }: { data: { json: SongPageView } }) {
-  const songTitle = data.json.song.title;
-  const timesPlayed = data.json.song.timesPlayed;
-
+export function meta({ data }: { data: SongPageView }) {
   return [
-    { title: `${songTitle} | Biscuits Internet Project` },
+    { title: `${data.song.title} - Biscuits Internet Project` },
     {
       name: "description",
-      content: `View lyrics, history, and performances of ${songTitle} by the Disco Biscuits. Played ${timesPlayed} times.`,
+      content: `View details, lyrics, tabs, and performance history for ${data.song.title} by The Disco Biscuits.`,
     },
   ];
 }
@@ -240,10 +240,9 @@ export default function SongPage() {
   const allTimers = performances.filter((p) => p.allTimer);
 
   return (
-    <div className="w-full">
-      <div className="space-y-6 md:space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col space-y-4">
+    <div className="space-y-6">
+      <div className="flex flex-col space-y-4">
+        <div className="flex items-center justify-between">
           <div className="flex flex-wrap items-baseline gap-4">
             <h1 className="text-3xl md:text-4xl font-bold text-white">{song.title}</h1>
             {song.authorName && (
@@ -252,184 +251,204 @@ export default function SongPage() {
               </span>
             )}
           </div>
+          <AdminOnly>
+            <Button
+              asChild
+              variant="outline"
+              className="border-purple-800 hover:bg-purple-800/10 text-purple-400 hover:text-purple-300"
+            >
+              <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
+          </AdminOnly>
         </div>
+      </div>
 
-        {/* Stats Grid */}
-        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatBox label="Times Played" value={song.timesPlayed} sublabel="total plays" />
-          <StatBox
-            label="Last Played"
-            value={
-              song.dateLastPlayed
-                ? new Date(song.dateLastPlayed).toLocaleDateString("en-US", {
-                    timeZone: "UTC",
-                  })
-                : "Never"
-            }
-          />
-          <StatBox label="Most Common Year" value={song.mostCommonYear || "—"} />
-          <StatBox label="Least Common Year" value={song.leastCommonYear || "—"} />
-        </dl>
+      {/* Stats Grid */}
+      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatBox label="Times Played" value={song.timesPlayed} sublabel="total plays" />
+        <StatBox
+          label="Last Played"
+          value={
+            song.dateLastPlayed
+              ? new Date(song.dateLastPlayed).toLocaleDateString("en-US", {
+                  timeZone: "UTC",
+                })
+              : "Never"
+          }
+        />
+        <StatBox label="Most Common Year" value={song.mostCommonYear || "—"} />
+        <StatBox label="Least Common Year" value={song.leastCommonYear || "—"} />
+      </dl>
 
-        <Tabs defaultValue="all-timers" className="w-full">
-          <TabsList className="w-full flex justify-start border-b border-gray-800 rounded-none bg-transparent p-0">
-            <TabsTrigger
-              value="all-timers"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
-              )}
-            >
-              <StarIcon className="h-4 w-4" />
-              All-Timers
-            </TabsTrigger>
-            <TabsTrigger
-              value="lyrics"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
-              )}
-            >
-              <FileTextIcon className="h-4 w-4" />
-              Lyrics
-            </TabsTrigger>
-            <TabsTrigger
-              value="yearly-plays"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
-              )}
-            >
-              <BarChart2Icon className="h-4 w-4" />
-              Yearly Plays
-            </TabsTrigger>
-            <TabsTrigger
-              value="guitar-tabs"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
-              )}
-            >
-              <GuitarIcon className="h-4 w-4" />
-              Guitar Tabs
-            </TabsTrigger>
-          </TabsList>
+      {song.notes && (
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+          <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
+            <Markdown>{song.notes}</Markdown>
+          </div>
+        </div>
+      )}
 
-          <TabsContent value="all-timers" className="mt-4">
-            {allTimers.length > 0 && (
-              <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {allTimers.map((p) => (
-                    <a
-                      href={`/shows/${p.show.slug}`}
-                      key={p.trackId}
-                      className="block rounded-lg border border-border/40 bg-black/20 hover:bg-accent/10 transition-all duration-200"
-                    >
-                      <div className="p-4">
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <div className="text-lg font-medium text-white">{p.show.date}</div>
-                          {p.rating && p.rating > 0 && (
-                            <div className="text-sm text-gray-400">{`★ ${p.rating.toFixed(1)}`}</div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <div className="text-purple-400/90 font-medium text-base">{p.venue?.name}</div>
-                          {p.venue?.city && (
-                            <div className="text-sm text-gray-400">
-                              {p.venue.city}, {p.venue.state}
-                            </div>
-                          )}
-                          {p.notes && (
-                            <div className="mt-3 pt-3 border-t border-border/40">
-                              <div className="text-sm text-gray-400">{p.notes}</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
+      <Tabs defaultValue="all-timers" className="w-full">
+        <TabsList className="w-full flex justify-start border-b border-gray-800 rounded-none bg-transparent p-0">
+          <TabsTrigger
+            value="all-timers"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
             )}
-          </TabsContent>
-
-          <TabsContent value="lyrics" className="mt-4">
-            {song.lyrics && (
-              <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-                <div className="overflow-x-auto">
-                  <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
-                    <Markdown>{song.lyrics.replace(/<br\/?>/g, "\n")}</Markdown>
-                  </div>
-                </div>
-              </div>
+          >
+            <StarIcon className="h-4 w-4" />
+            All-Timers
+          </TabsTrigger>
+          <TabsTrigger
+            value="lyrics"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
             )}
-          </TabsContent>
+          >
+            <FileTextIcon className="h-4 w-4" />
+            Lyrics
+          </TabsTrigger>
+          <TabsTrigger
+            value="yearly-plays"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+            )}
+          >
+            <BarChart2Icon className="h-4 w-4" />
+            Yearly Plays
+          </TabsTrigger>
+          <TabsTrigger
+            value="guitar-tabs"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+            )}
+          >
+            <GuitarIcon className="h-4 w-4" />
+            Guitar Tabs
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="yearly-plays" className="mt-4">
+        <TabsContent value="all-timers" className="mt-4">
+          {allTimers.length > 0 && (
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-              <ChartContainer config={{}} className="min-h-[300px] w-full">
-                <BarChart
-                  accessibilityLayer
-                  data={Object.entries(song.yearlyPlayData || {}).map(([year, count]) => ({
-                    year: Number.parseInt(year),
-                    plays: count,
-                  }))}
-                  margin={{ top: 20, right: 20, bottom: 20, left: 40 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                  <XAxis
-                    dataKey="year"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                    tick={{ fill: "rgba(255,255,255,0.7)" }}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                    tick={{ fill: "rgba(255,255,255,0.7)" }}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
-                  <Bar dataKey="plays" fill="rgb(168, 85, 247)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ChartContainer>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {allTimers.map((p) => (
+                  <a
+                    href={`/shows/${p.show.slug}`}
+                    key={p.trackId}
+                    className="block rounded-lg border border-border/40 bg-black/20 hover:bg-accent/10 transition-all duration-200"
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="text-lg font-medium text-white">{p.show.date}</div>
+                        {p.rating && p.rating > 0 && (
+                          <div className="text-sm text-gray-400">{`★ ${p.rating.toFixed(1)}`}</div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-purple-400/90 font-medium text-base">{p.venue?.name}</div>
+                        {p.venue?.city && (
+                          <div className="text-sm text-gray-400">
+                            {p.venue.city}, {p.venue.state}
+                          </div>
+                        )}
+                        {p.notes && (
+                          <div className="mt-3 pt-3 border-t border-border/40">
+                            <div className="text-sm text-gray-400">{p.notes}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
-          </TabsContent>
+          )}
+        </TabsContent>
 
-          <TabsContent value="guitar-tabs" className="mt-4">
+        <TabsContent value="lyrics" className="mt-4">
+          {song.lyrics && (
             <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
               <div className="overflow-x-auto">
                 <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
-                  {song.tabs ? (
-                    <Markdown>{song.tabs}</Markdown>
-                  ) : song.guitarTabsUrl ? (
-                    <a
-                      href={song.guitarTabsUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-purple-400 hover:underline"
-                    >
-                      View Guitar Tabs
-                    </a>
-                  ) : (
-                    <p>No guitar tabs available for this song.</p>
-                  )}
+                  <Markdown>{song.lyrics.replace(/<br\/?>/g, "\n")}</Markdown>
                 </div>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
+        </TabsContent>
 
-        {/* Performance History */}
-        <div className="w-full">
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 md:p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Performance History</h2>
-            <PerformanceTable performances={performances} />
+        <TabsContent value="yearly-plays" className="mt-4">
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+            <ChartContainer config={{}} className="min-h-[300px] w-full">
+              <BarChart
+                accessibilityLayer
+                data={Object.entries(song.yearlyPlayData || {}).map(([year, count]) => ({
+                  year: Number.parseInt(year),
+                  plays: count,
+                }))}
+                margin={{ top: 20, right: 20, bottom: 20, left: 40 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <XAxis
+                  dataKey="year"
+                  tickLine={false}
+                  tickMargin={10}
+                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                  tick={{ fill: "rgba(255,255,255,0.7)" }}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                  tick={{ fill: "rgba(255,255,255,0.7)" }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
+                <Bar dataKey="plays" fill="rgb(168, 85, 247)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
           </div>
+        </TabsContent>
+
+        <TabsContent value="guitar-tabs" className="mt-4">
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+            <div className="overflow-x-auto">
+              <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
+                {song.tabs ? (
+                  <Markdown>{song.tabs}</Markdown>
+                ) : song.guitarTabsUrl ? (
+                  <a
+                    href={song.guitarTabsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-purple-400 hover:underline"
+                  >
+                    View Guitar Tabs
+                  </a>
+                ) : (
+                  <p>No guitar tabs available for this song.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Performance History */}
+      <div className="w-full">
+        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 md:p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Performance History</h2>
+          <PerformanceTable performances={performances} />
         </div>
       </div>
     </div>
