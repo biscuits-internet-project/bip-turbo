@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type { ControllerRenderProps } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSubmit } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -25,13 +25,13 @@ export type SongFormValues = z.infer<typeof songFormSchema>;
 
 interface SongFormProps {
   defaultValues?: SongFormValues;
-  onSubmit?: (data: SongFormValues) => Promise<void>;
   submitLabel: string;
   cancelHref: string;
 }
 
-export function SongForm({ defaultValues, onSubmit, submitLabel, cancelHref }: SongFormProps) {
+export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormProps) {
   const navigate = useNavigate();
+  const submit = useSubmit();
 
   const form = useForm<SongFormValues>({
     resolver: zodResolver(songFormSchema),
@@ -47,11 +47,23 @@ export function SongForm({ defaultValues, onSubmit, submitLabel, cancelHref }: S
     },
   });
 
-  const handleSubmit = onSubmit || (() => Promise.resolve());
+  const onSubmit = (data: SongFormValues) => {
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== null) {
+        if (key === "cover") {
+          formData.append(key, value ? "on" : "off");
+        } else {
+          formData.append(key, value.toString());
+        }
+      }
+    }
+    submit(formData, { method: "post" });
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 max-w-2xl">
+      <div className="space-y-6 max-w-2xl" onSubmit={form.handleSubmit(onSubmit)}>
         <FormField
           control={form.control}
           name="title"
@@ -205,7 +217,11 @@ export function SongForm({ defaultValues, onSubmit, submitLabel, cancelHref }: S
         />
 
         <div className="flex gap-4 pt-2">
-          <Button type="submit" className="bg-purple-800 hover:bg-purple-700 text-white">
+          <Button
+            type="button"
+            onClick={form.handleSubmit(onSubmit)}
+            className="bg-purple-800 hover:bg-purple-700 text-white"
+          >
             {submitLabel}
           </Button>
           <Button
@@ -217,7 +233,7 @@ export function SongForm({ defaultValues, onSubmit, submitLabel, cancelHref }: S
             Cancel
           </Button>
         </div>
-      </form>
+      </div>
     </Form>
   );
 }

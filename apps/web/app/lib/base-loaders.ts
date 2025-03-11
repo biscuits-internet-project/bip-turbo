@@ -18,7 +18,13 @@ export interface ProtectedContext {
   requestId?: string;
 }
 
-export type Context = PublicContext;
+export interface AdminContext {
+  currentUser: User;
+  requestId?: string;
+  isAdmin: boolean;
+}
+
+export type Context = PublicContext | AdminContext;
 
 export function createLoader<T, TContext extends PublicContext = PublicContext>(
   fn: (args: LoaderFunctionArgs & { context: TContext }) => Promise<T>,
@@ -89,11 +95,11 @@ export const protectedLoader = <T>(fn: (args: LoaderFunctionArgs & { context: Pr
 export const protectedAction = <T>(fn: (args: ActionFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
   createAction<T, ProtectedContext>(fn, { requireAuth: true });
 
-export const adminLoader = <T>(fn: (args: LoaderFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
-  createLoader<T, ProtectedContext>(fn, { requireAuth: true, requireAdmin: false });
+export const adminLoader = <T>(fn: (args: LoaderFunctionArgs & { context: AdminContext }) => Promise<T>) =>
+  createLoader<T, AdminContext>(fn, { requireAuth: true, requireAdmin: true });
 
-export const adminAction = <T>(fn: (args: ActionFunctionArgs & { context: ProtectedContext }) => Promise<T>) =>
-  createAction<T, ProtectedContext>(fn, { requireAuth: true, requireAdmin: false });
+export const adminAction = <T>(fn: (args: ActionFunctionArgs & { context: AdminContext }) => Promise<T>) =>
+  createAction<T, AdminContext>(fn, { requireAuth: true, requireAdmin: true });
 
 export const publicLoader = <T>(fn: (args: LoaderFunctionArgs & { context: PublicContext }) => Promise<T>) =>
   createLoader<T, PublicContext>(fn, { requireAuth: false });

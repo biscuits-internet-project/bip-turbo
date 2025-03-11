@@ -93,7 +93,7 @@ export default function Index() {
     <div className="w-full p-0">
       {/* Hero section */}
       <div className="py-2 text-center">
-        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent">
+        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent font-header">
           Biscuits Internet Project 3.0
         </h1>
         <p className="text-xl text-muted-foreground mb-8">

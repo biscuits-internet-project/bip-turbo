@@ -87,11 +87,3 @@ export function buildIncludeClause<Entity>(includes?: QueryOptions<Entity>["incl
 
   return includeObject;
 }
-
-export function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}

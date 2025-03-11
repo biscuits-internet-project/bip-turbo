@@ -1,11 +1,19 @@
 import type { BlogPost } from "@bip/domain";
+import { Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AdminOnly } from "~/components/admin/admin-only";
 import { BlogCard } from "~/components/blog/blog-card";
+import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
 interface LoaderData {
-  blogPosts: BlogPost[];
+  blogPosts: Array<
+    BlogPost & {
+      coverImage?: string;
+    }
+  >;
 }
 
 export const loader = publicLoader<LoaderData>(async () => {
@@ -22,15 +30,22 @@ export const loader = publicLoader<LoaderData>(async () => {
         operator: "eq",
         value: "published",
       },
-      {
-        field: "publishedAt",
-        operator: "lte",
-        value: new Date(),
-      },
     ],
   });
 
-  return { blogPosts };
+  // Fetch cover images for all blog posts
+  const blogPostsWithCoverImages = await Promise.all(
+    blogPosts.map(async (blogPost) => {
+      const files = await services.files.findByBlogPostId(blogPost.id);
+      const coverImage = files.find((file) => file.isCover)?.url;
+      return {
+        ...blogPost,
+        coverImage,
+      };
+    }),
+  );
+
+  return { blogPosts: blogPostsWithCoverImages };
 });
 
 export function meta() {
@@ -51,6 +66,14 @@ export default function BlogPosts() {
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl md:text-4xl font-bold text-white">Blog Posts</h1>
+          <AdminOnly>
+            <Button asChild className="bg-purple-800 hover:bg-purple-700 text-white">
+              <Link to="/blog/new" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                New Post
+              </Link>
+            </Button>
+          </AdminOnly>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

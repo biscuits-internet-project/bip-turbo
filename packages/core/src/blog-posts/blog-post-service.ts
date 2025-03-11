@@ -21,16 +21,30 @@ export class BlogPostService {
   }
 
   async findMany(filter: QueryOptions<BlogPost>) {
-    const cachedBlogPosts = await this.redis.get<BlogPost[]>(BLOG_POSTS_CACHE_KEY);
-    if (cachedBlogPosts) {
-      return cachedBlogPosts;
-    }
+    // const cachedBlogPosts = await this.redis.get<BlogPost[]>(BLOG_POSTS_CACHE_KEY);
+    // if (cachedBlogPosts) {
+    //   return cachedBlogPosts;
+    // }
     const blogPosts = await this.repository.findMany(filter);
     await this.redis.set<BlogPost[]>(BLOG_POSTS_CACHE_KEY, blogPosts, { EX: 60 * 60 * 24 });
     return blogPosts;
   }
 
+  async create(data: Omit<BlogPost, "id" | "createdAt" | "updatedAt">) {
+    const blogPost = await this.repository.create(data);
+    await this.redis.del(BLOG_POSTS_CACHE_KEY);
+    return blogPost;
+  }
+
+  async update(slug: string, data: Partial<BlogPost>) {
+    const blogPost = await this.repository.update(slug, data);
+    await this.redis.del(BLOG_POSTS_CACHE_KEY);
+    return blogPost;
+  }
+
   async delete(id: string) {
-    return this.repository.delete(id);
+    const result = await this.repository.delete(id);
+    await this.redis.del(BLOG_POSTS_CACHE_KEY);
+    return result;
   }
 }

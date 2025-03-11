@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ClientSideEnv } from "~/root";
 
@@ -12,31 +13,48 @@ declare global {
 type SupabaseContextType = {
   supabaseUrl: string;
   supabaseAnonKey: string;
+  supabaseStorageUrl: string;
   isLoaded: boolean;
+  client: SupabaseClient | null;
 };
 
 const SupabaseContext = createContext<SupabaseContextType | null>(null);
 
-export function SupabaseProvider({ children }: { children: React.ReactNode }) {
+interface SupabaseProviderProps {
+  children: React.ReactNode;
+  env: ClientSideEnv;
+}
+
+export function SupabaseProvider({ children, env }: SupabaseProviderProps) {
   const [state, setState] = useState<SupabaseContextType>({
     supabaseUrl: "",
     supabaseAnonKey: "",
+    supabaseStorageUrl: "",
     isLoaded: false,
+    client: null,
   });
 
   useEffect(() => {
-    // Get the environment variables from the window object
-    // These are injected by the root loader
-    const env = window.__ENV__;
+    const client = createBrowserClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey: "sb-storage",
+        storage: window.localStorage,
+      },
+      global: {
+        headers: {
+          "x-storage-url": env.SUPABASE_STORAGE_URL,
+        },
+      },
+    });
 
-    if (env) {
-      setState({
-        supabaseUrl: env.SUPABASE_URL,
-        supabaseAnonKey: env.SUPABASE_ANON_KEY,
-        isLoaded: true,
-      });
-    }
-  }, []);
+    setState({
+      supabaseUrl: env.SUPABASE_URL,
+      supabaseAnonKey: env.SUPABASE_ANON_KEY,
+      supabaseStorageUrl: env.SUPABASE_STORAGE_URL,
+      isLoaded: true,
+      client,
+    });
+  }, [env]);
 
   return <SupabaseContext.Provider value={state}>{children}</SupabaseContext.Provider>;
 }

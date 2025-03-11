@@ -12,3 +12,4 @@ export * from "./models/user";
 export * from "./models/venue";
 export * from "./models/attendance";
 export * from "./views/song-page";
+export * from "./models/file";

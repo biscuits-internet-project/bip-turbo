@@ -45,7 +45,12 @@ export default [
 
   // Blog routes with layout
   layout("routes/blog/_layout.tsx", [
-    ...prefix("blog", [index("routes/blog/_index.tsx"), route(":slug", "routes/blog/$slug.tsx")]),
+    ...prefix("blog", [
+      index("routes/blog/_index.tsx"),
+      route("new", "routes/blog/new.tsx"),
+      route(":slug", "routes/blog/$slug.tsx"),
+      route(":slug/edit", "routes/blog/$slug.edit.tsx"),
+    ]),
   ]),
 
   // Shows routes with layout

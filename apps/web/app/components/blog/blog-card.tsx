@@ -5,7 +5,9 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 
 interface BlogCardProps {
-  blogPost: BlogPost;
+  blogPost: BlogPost & {
+    coverImage?: string;
+  };
   compact?: boolean;
 }
 
@@ -41,11 +43,11 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
             <span>{formatDate(blogPost.publishedAt)}</span>
           </div>
         </div>
-        <CardTitle className={`${compact ? "text-lg" : "text-xl"} mt-2 text-white`}>{blogPost.title}</CardTitle>
-        {blogPost.imageUrls && blogPost.imageUrls.length > 0 && (
+        <CardTitle className={`${compact ? "text-lg" : "text-xl"} mt-4 text-white`}>{blogPost.title}</CardTitle>
+        {blogPost.coverImage && (
           <div className="w-full my-3">
             <img
-              src={blogPost.imageUrls[0]}
+              src={blogPost.coverImage}
               alt={blogPost.title}
               className={`w-full ${compact ? "h-32" : "h-40"} object-cover rounded-md`}
             />
@@ -54,19 +56,12 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
       </CardHeader>
 
       {/* Card Content */}
-      <CardContent className={`flex-grow ${compact ? "p-4 pt-0" : ""}`}>
-        {blogPost.blurb && (
-          <div className="text-gray-400 text-sm mb-4">
-            <div className={`${compact ? "line-clamp-4" : ""} overflow-hidden`}>
+      <CardContent className="flex-grow flex flex-col h-full">
+        <div className="flex-grow">
+          <div className="text-gray-400 text-sm">
+            <div className="line-clamp-5 prose prose-invert prose-sm">
               <Markdown>{blogPost.blurb}</Markdown>
             </div>
-          </div>
-        )}
-
-        <div className="flex items-center justify-end w-full text-xs text-gray-400 mt-4">
-          <div className="flex items-center">
-            <span className="mr-1">⏱️</span>
-            <span>{getReadTime(blogPost.content)}</span>
           </div>
         </div>
 

@@ -35,7 +35,11 @@ type Params = {
   "/auth/logout": {};
   "/auth/forgot-password": {};
   "/blog": {};
+  "/blog/new": {};
   "/blog/:slug": {
+    "slug": string;
+  };
+  "/blog/:slug/edit": {
     "slug": string;
   };
   "/shows": {};

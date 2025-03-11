@@ -1,7 +1,8 @@
 import type { Venue } from "@bip/domain";
 import type { DbClient, DbVenue } from "../_shared/database/models";
-import { buildOrderByClause, buildWhereClause, generateSlug } from "../_shared/database/query-utils";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
+import { slugify } from "../_shared/utils/slugify";
 
 export function mapVenueToDomainEntity(dbVenue: DbVenue): Venue {
   const { slug, createdAt, updatedAt, name, ...rest } = dbVenue;
@@ -64,7 +65,7 @@ export class VenueRepository {
   }
 
   async create(data: Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">): Promise<Venue> {
-    const slug = generateSlug(data.name);
+    const slug = slugify(data.name);
     const result = await this.db.venue.create({
       data: {
         ...data,

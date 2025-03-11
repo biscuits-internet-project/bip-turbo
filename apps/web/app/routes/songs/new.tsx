@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import type { ActionFunctionArgs } from "react-router";
 import { Form, Link, redirect } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { SongForm, type SongFormValues } from "~/components/song/song-form";
+import { SongForm } from "~/components/song/song-form";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
@@ -18,7 +18,7 @@ export const action = adminAction(async ({ request }: ActionFunctionArgs) => {
   const lyrics = formData.get("lyrics") as string;
   const tabs = formData.get("tabs") as string;
   const notes = formData.get("notes") as string;
-  const cover = formData.get("cover") === "true";
+  const cover = formData.get("cover") === "on";
   const history = formData.get("history") as string;
   const featuredLyric = formData.get("featuredLyric") as string;
   const guitarTabsUrl = formData.get("guitarTabsUrl") as string;
@@ -38,11 +38,6 @@ export const action = adminAction(async ({ request }: ActionFunctionArgs) => {
 });
 
 export default function NewSong() {
-  const handleSubmit = async (data: SongFormValues) => {
-    // The form submission will be handled by React Router's Form component
-    // which will automatically call our action function
-  };
-
   return (
     <div className="">
       <div className="flex justify-between items-center mb-6">
@@ -59,9 +54,7 @@ export default function NewSong() {
         <Card className="relative overflow-hidden border-gray-800 transition-all duration-300">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
           <CardContent className="relative z-10 p-6">
-            <Form method="post">
-              <SongForm onSubmit={handleSubmit} submitLabel="Create Song" cancelHref="/songs" />
-            </Form>
+            <SongForm submitLabel="Create Song" cancelHref="/songs" />
           </CardContent>
         </Card>
       </AdminOnly>

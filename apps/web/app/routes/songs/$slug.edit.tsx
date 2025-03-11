@@ -2,7 +2,7 @@ import type { Song } from "@bip/domain";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs } from "react-router";
-import { Form, Link, redirect } from "react-router-dom";
+import { Link, redirect } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SongForm, type SongFormValues } from "~/components/song/song-form";
 import { Button } from "~/components/ui/button";
@@ -34,7 +34,7 @@ export const action = adminAction(async ({ request, params }: ActionFunctionArgs
   const lyrics = formData.get("lyrics") as string;
   const tabs = formData.get("tabs") as string;
   const notes = formData.get("notes") as string;
-  const cover = formData.get("cover") === "true";
+  const cover = formData.get("cover") === "on";
   const history = formData.get("history") as string;
   const featuredLyric = formData.get("featuredLyric") as string;
   const guitarTabsUrl = formData.get("guitarTabsUrl") as string;
@@ -95,9 +95,7 @@ export default function EditSong() {
         <Card className="relative overflow-hidden border-gray-800 transition-all duration-300">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
           <CardContent className="relative z-10 p-6">
-            <Form method="post">
-              <SongForm defaultValues={defaultValues} submitLabel="Save Changes" cancelHref={`/songs/${song.slug}`} />
-            </Form>
+            <SongForm defaultValues={defaultValues} submitLabel="Save Changes" cancelHref={`/songs/${song.slug}`} />
           </CardContent>
         </Card>
       </AdminOnly>
