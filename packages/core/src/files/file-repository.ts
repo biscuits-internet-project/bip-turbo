@@ -126,6 +126,6 @@ export class FileRepository {
   }
 
   private getPublicUrl(path: string): string {
-    return `${process.env.SUPABASE_STORAGE_URL}/object/public/uploads/${path}`;
+    return `${process.env.SUPABASE_STORAGE_URL}/object/public/${path}`;
   }
 }

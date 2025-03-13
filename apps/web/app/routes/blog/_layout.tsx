@@ -11,9 +11,8 @@ import {
 
 // Define a type for the blog post data
 interface BlogPostData {
-  meta?: {
-    title?: string;
-    [key: string]: unknown;
+  blogPost?: {
+    title: string;
   };
   [key: string]: unknown;
 }
@@ -33,10 +32,8 @@ export default function BlogLayout() {
     ? (matches.find((match) => match.pathname.includes(`/blog/${pathSegments[1]}`))?.data as BlogPostData)
     : null;
 
-  // Try to get the title from meta data or use the path segment
-  const postTitle = blogPostData?.meta?.title
-    ? blogPostData.meta.title.replace(" | Biscuits Internet Project", "").trim()
-    : pathSegments[1];
+  // Get the title directly from the blog post data
+  const displayTitle = blogPostData?.blogPost?.title || "";
 
   // Format the post name for display (convert slug to title case)
   const formatPostName = (name: string) => {
@@ -46,10 +43,10 @@ export default function BlogLayout() {
       .join(" ");
   };
 
-  const displayTitle = postTitle || formatPostName(pathSegments[1] || "");
+  const formattedDisplayTitle = displayTitle || formatPostName(pathSegments[1] || "");
 
   return (
-    <div className="py-8">
+    <div className="">
       <div className="mb-6">
         <Breadcrumb>
           <BreadcrumbList>
@@ -75,7 +72,7 @@ export default function BlogLayout() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+                  <BreadcrumbPage>{formattedDisplayTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </>
             ) : (

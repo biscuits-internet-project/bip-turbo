@@ -6,7 +6,7 @@ export const envSchema = z.object({
   REDIS_URL: z.string().url(),
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string(),
-  SUPABASE_STORAGE_URL: z.string().url().default("http://127.0.0.1:54321/storage/v1"),
+  SUPABASE_STORAGE_URL: z.string().url(),
 });
 
 export const env = envSchema.parse(process.env);

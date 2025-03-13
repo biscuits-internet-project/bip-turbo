@@ -1,7 +1,7 @@
 import type React from "react";
 import Markdown from "react-markdown";
 import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent } from "~/components/ui/card";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 // Define types for our data
@@ -484,167 +484,98 @@ const ChemicalWarfareBrigade: React.FC = () => {
   );
 
   return (
-    <div className="">
-      <div className="space-y-6 md:space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white">The Chemical Warfare Brigade</h1>
-        </div>
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">The Chemical Warfare Brigade</h1>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="md:col-span-1 space-y-6">
-            <OperaMenuCard title="Characters" items={chars.map(({ name, anchor }) => ({ name, anchor }))} />
-            <OperaMenuCard title="Acts" items={acts.map(({ name, anchor }) => ({ name, anchor }))} />
-            <OperaMenuCard title="Songs" items={songs.map(({ name, anchor }) => ({ name, anchor }))} />
-            <Card className="mb-6 bg-gray-900 border-gray-800">
-              <CardContent className="p-4">
-                <h3 className="text-lg font-semibold mb-3 text-white">Listen</h3>
-                <ul className="space-y-2">
-                  <li>
-                    <Link
-                      to="/shows/2000-12-30-vanderbilt-plainview-ny"
-                      className="text-purple-400 hover:text-purple-300 hover:underline"
-                    >
-                      12/30/2000 - Vanderbilt, Plainview, NY
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/shows/2001-12-30-roseland-ballroom-new-york-ny"
-                      className="text-purple-400 hover:text-purple-300 hover:underline"
-                    >
-                      12/30/2001 - Roseland Ballroom, New York, NY
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/shows/2002-12-30-roseland-ballroom-new-york-ny"
-                      className="text-purple-400 hover:text-purple-300 hover:underline"
-                    >
-                      12/30/2002 - Roseland Ballroom, New York, NY
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/shows/2003-12-30-roseland-ballroom-new-york-ny"
-                      className="text-purple-400 hover:text-purple-300 hover:underline"
-                    >
-                      12/30/2003 - Roseland Ballroom, New York, NY
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/shows/2007-12-30-electric-factory-philadelphia-pa"
-                      className="text-purple-400 hover:text-purple-300 hover:underline"
-                    >
-                      12/30/2007 - Electric Factory, Philadelphia, PA
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/shows/2009-12-30-nokia-theatre-times-square-new-york-ny"
-                      className="text-purple-400 hover:text-purple-300 hover:underline"
-                    >
-                      12/30/2009 - Nokia Theatre, New York, NY
-                    </Link>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
+      <div className="space-y-6">
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <CardHeader>
+            <h3 className="text-2xl font-semibold">Introduction</h3>
+          </CardHeader>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+            <p>
+              The Chemical Warfare Brigade is the Disco Biscuits' second full-length rock opera, written by Marc
+              Brownstein, and debuted on{" "}
+              <Link to="/shows/2000-12-30-vanderbilt-plainview-ny" className="text-purple-400 hover:text-purple-300">
+                12/30/00
+              </Link>{" "}
+              at the Vanderbilt on Long Island.
+            </p>
+            <p>
+              The story follows a complex plot involving a chemist, a construction worker, and an FBI agent, centered
+              around a dangerous chemical weapon and organized crime. Through themes of deception, greed, and
+              redemption, the opera weaves together multiple perspectives into a tragic tale.
+            </p>
+          </CardContent>
+        </Card>
 
-          <div className="md:col-span-3 space-y-6">
-            <Card title="Introduction">
-              <CardContent>
-                Chemical Warfare Brigade, Marc Brownstein's rock opera, was first debuted by his side project Electron
-                on 08/18/00 and then by The Disco Biscuits on 12/30/00. While a number of the songs were written during
-                Marc's departure from the band in 2000, Plan B (10/16/98), Three Wishes (12/03/98), Little Lai
-                (04/21/99), and Chemical Warfare Brigade (08/21/99) were all written and debuted prior to that.
-              </CardContent>
-
-              <CardContent>
-                Performed in full six times by TDB, the most recent occurrence was on 12/31/13 at the Theater at Madison
-                Square Garden in New York. After the opening tracks of Plan B and Little Lai, the opera was played out
-                of order with songs like Hot Air Balloon, House Dog Party Favor and Helicopters interwoven into the
-                setlist.
-              </CardContent>
-
-              <CardContent>Electron also played CWB in full on 5/11/08, 05/11/13, 04/21/17, and 03/26/17.</CardContent>
-
-              <ul className="list-disc pl-5 mb-4 text-gray-300">
-                <li>
-                  <Link
-                    to="/shows/2000-12-30-the-vanderbilt-plainview-ny"
-                    className="text-purple-400 hover:text-purple-300 hover:underline"
-                  >
-                    12/30/00 - The Vanderbilt, Plainview, NY
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/shows/2001-04-26-the-roxy-atlanta-ga"
-                    className="text-purple-400 hover:text-purple-300 hover:underline"
-                  >
-                    04/26/01 - The Roxy - Atlanta, GA
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/shows/2002-11-06-the-odeon-cleveland-oh"
-                    className="text-purple-400 hover:text-purple-300 hover:underline"
-                  >
-                    11/06/02 - The Odeon - Cleveland, OH
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/shows/2003-11-28-webster-theater-hartford-ct"
-                    className="text-purple-400 hover:text-purple-300 hover:underline"
-                  >
-                    11/28/03 - The Webster Theater - Hartford, CT
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/shows/2009-06-03-lupo-s-heartbreak-hotel-providence-ri"
-                    className="text-purple-400 hover:text-purple-300 hover:underline"
-                  >
-                    06/03/09 - Lupo's Heartbreak Hotel - Providence, RI
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/shows/2013-12-31-the-theater-at-madison-square-garden-new-york-ny"
-                    className="text-purple-400 hover:text-purple-300 hover:underline"
-                  >
-                    12/31/13 - The Theater at Madison Square Garden, New York, NY (played out of order)
-                  </Link>
-                </li>
-              </ul>
-            </Card>
-
-            <h2 className="text-2xl font-bold mt-12 mb-6 text-white">The Cast</h2>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <CardHeader>
+            <h3 className="text-2xl font-semibold">Characters</h3>
+          </CardHeader>
+          <CardContent className="space-y-6 text-gray-200 leading-relaxed">
             {chars.map((char) => (
-              <Card key={char.anchor} title={char.name} id={char.anchor}>
+              <div key={char.anchor} id={char.anchor}>
+                <h4 className="text-xl font-semibold mb-2">{char.name}</h4>
                 <p>{char.copy}</p>
-              </Card>
+              </div>
             ))}
+          </CardContent>
+        </Card>
 
-            <h2 className="text-2xl font-bold mt-12 mb-6 text-white">Overview</h2>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <CardHeader>
+            <h3 className="text-2xl font-semibold">Story Overview</h3>
+          </CardHeader>
+          <CardContent className="space-y-6 text-gray-200 leading-relaxed">
             {acts.map((act) => (
-              <Card key={act.anchor} title={act.name} id={act.anchor}>
+              <div key={act.anchor} id={act.anchor}>
+                <h4 className="text-xl font-semibold mb-2">{act.name}</h4>
                 <p>{act.setting}</p>
-              </Card>
+              </div>
             ))}
+          </CardContent>
+        </Card>
 
-            <h2 className="text-2xl font-bold mt-12 mb-6 text-white">Songs</h2>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <CardHeader>
+            <h3 className="text-2xl font-semibold">Songs</h3>
+          </CardHeader>
+          <CardContent className="space-y-6 text-gray-200 leading-relaxed">
             {songs.map((song) => (
-              <Card key={song.anchor} title={song.name} id={song.anchor}>
+              <div key={song.anchor} id={song.anchor}>
+                <h4 className="text-xl font-semibold mb-2">{song.name}</h4>
                 {song.setting && <p>{song.setting}</p>}
-                {song.lyrics && <Markdown>{song.lyrics}</Markdown>}
-              </Card>
+                {song.lyrics && (
+                  <blockquote className="border-l-4 border-gray-700 pl-4 italic my-4 text-gray-400 whitespace-pre-line">
+                    {song.lyrics}
+                  </blockquote>
+                )}
+              </div>
             ))}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <CardHeader>
+            <h3 className="text-2xl font-semibold">Related Links</h3>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link to="/resources/hot-air-balloon" className="text-purple-400 hover:text-purple-300 block">
+              The Hot Air Balloon
+            </Link>
+            <a
+              href="https://archive.org/details/db2000-12-30.shnf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-400 hover:text-purple-300 block"
+            >
+              Listen to the Debut Performance
+            </a>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

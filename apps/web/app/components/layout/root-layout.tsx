@@ -5,22 +5,23 @@ import {
   Disc,
   FileText,
   Headphones,
+  Home,
   Menu,
   TrendingUp,
   UsersRound,
   X,
 } from "lucide-react";
 import { useEffect } from "react";
-import { Link, useRouteLoaderData } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
-import type { RootData } from "~/root";
 
 const navigation = [
+  { name: "home", href: "/", icon: Home },
   { name: "shows", href: "/shows", icon: Headphones },
   { name: "top rated", href: "/shows/top-rated", icon: TrendingUp },
   { name: "songs", href: "/songs", icon: Disc },

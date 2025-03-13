@@ -11,9 +11,8 @@ import {
 
 // Define a type for the resource data
 interface ResourceData {
-  meta?: {
-    title?: string;
-    [key: string]: unknown;
+  resource?: {
+    title: string;
   };
   [key: string]: unknown;
 }
@@ -33,10 +32,8 @@ export default function ResourcesLayout() {
     ? (matches.find((match) => match.pathname.includes(`/resources/${pathSegments[1]}`))?.data as ResourceData)
     : null;
 
-  // Try to get the title from meta data or use the path segment
-  const resourceTitle = resourceData?.meta?.title
-    ? resourceData.meta.title.replace(" | Biscuits Internet Project", "").trim()
-    : pathSegments[1];
+  // Get the title directly from the resource data
+  const displayTitle = resourceData?.resource?.title || "";
 
   // Format the resource name for display (convert slug to title case)
   const formatResourceName = (name: string) => {
@@ -46,7 +43,7 @@ export default function ResourcesLayout() {
       .join(" ");
   };
 
-  const displayTitle = resourceTitle || formatResourceName(pathSegments[1] || "");
+  const formattedDisplayTitle = displayTitle || formatResourceName(pathSegments[1] || "");
 
   return (
     <div className="">
@@ -72,7 +69,7 @@ export default function ResourcesLayout() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+                  <BreadcrumbPage>{formattedDisplayTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </>
             ) : (

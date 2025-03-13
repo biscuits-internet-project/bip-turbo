@@ -18,7 +18,6 @@ export function meta() {
 export default function Tractorbeam() {
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8 text-center text-white">Tractorbeam</h1>
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-white">Tractor Beam</h1>

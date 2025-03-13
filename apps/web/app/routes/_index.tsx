@@ -11,7 +11,7 @@ import { services } from "~/server/services";
 interface LoaderData {
   tourDates: TourDate[];
   recentShows: Setlist[];
-  recentBlogPosts: BlogPost[];
+  recentBlogPosts: Array<BlogPost & { coverImage?: string }>;
   attendancesByShowId: Record<string, Attendance>;
   ratingsByShowId: Record<string, Rating>;
 }
@@ -38,6 +38,18 @@ export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
       { field: "publishedAt", operator: "lte", value: new Date() },
     ],
   });
+
+  // Fetch cover images for all blog posts
+  const recentBlogPostsWithCoverImages = await Promise.all(
+    recentBlogPosts.map(async (blogPost) => {
+      const files = await services.files.findByBlogPostId(blogPost.id);
+      const coverImage = files.find((file) => file.isCover)?.url;
+      return {
+        ...blogPost,
+        coverImage,
+      };
+    }),
+  );
 
   const attendances = currentUser
     ? await services.attendances.findManyByUserIdAndShowIds(
@@ -67,7 +79,13 @@ export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
     {} as Record<string, Rating>,
   );
 
-  return { tourDates, recentShows, recentBlogPosts, attendancesByShowId, ratingsByShowId };
+  return {
+    tourDates,
+    recentShows,
+    recentBlogPosts: recentBlogPostsWithCoverImages,
+    attendancesByShowId,
+    ratingsByShowId,
+  };
 });
 
 export function meta() {
@@ -99,14 +117,14 @@ export default function Index() {
         <p className="text-xl text-muted-foreground mb-8">
           Your ultimate resource for the Disco Biscuits - shows, setlists, stats, and more.
         </p>
-        <div className="relative max-w-2xl mx-auto mb-12">
+        {/* <div className="relative max-w-2xl mx-auto mb-12">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
             placeholder="Search shows, songs, venues..."
             className="w-full rounded-lg border border-input bg-background pl-10 pr-4 py-3 text-lg"
           />
-        </div>
+        </div> */}
       </div>
 
       {/* Main content grid - Setlists and Tour Dates */}

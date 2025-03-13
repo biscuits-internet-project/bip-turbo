@@ -11,9 +11,8 @@ import {
 
 // Define a type for the show data
 interface ShowData {
-  meta?: {
-    title?: string;
-    [key: string]: unknown;
+  show?: {
+    title: string;
   };
   [key: string]: unknown;
 }
@@ -33,10 +32,8 @@ export default function ShowsLayout() {
     ? (matches.find((match) => match.pathname.includes(`/shows/${pathSegments[1]}`))?.data as ShowData)
     : null;
 
-  // Try to get the title from meta data or use the path segment
-  const showTitle = showData?.meta?.title
-    ? showData.meta.title.replace(" | Biscuits Internet Project", "").trim()
-    : pathSegments[1];
+  // Get the title directly from the show data
+  const displayTitle = showData?.show?.title || "";
 
   // Format the show name for display (convert slug to title case)
   const formatShowName = (name: string) => {
@@ -46,7 +43,7 @@ export default function ShowsLayout() {
       .join(" ");
   };
 
-  const displayTitle = showTitle || formatShowName(pathSegments[1] || "");
+  const formattedDisplayTitle = displayTitle || formatShowName(pathSegments[1] || "");
 
   return (
     <div className="py-8">
@@ -75,7 +72,7 @@ export default function ShowsLayout() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+                  <BreadcrumbPage>{formattedDisplayTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </>
             ) : (

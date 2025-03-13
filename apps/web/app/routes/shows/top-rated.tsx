@@ -69,25 +69,35 @@ export default function TopRated() {
               </thead>
               <tbody>
                 {shows.map((show, index) => (
-                  <tr key={show.id} className="border-b border-border/40 hover:bg-accent/5">
-                    <td className="p-4 text-white font-medium">{index + 1}</td>
-                    <td className="p-4">
-                      <div className="flex items-center">
-                        <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                        <span className="text-white font-medium">{show.averageRating?.toFixed(1) || "—"}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-white">{show.ratingsCount}</td>
-                    <td className="p-4 text-white">
-                      <Link to={`/shows/${show.slug}`} className="hover:underline">
-                        {formatDateShort(show.date)}
+                  <tr key={show.id} className="border-b border-border/40 group">
+                    <td className="p-0" colSpan={6}>
+                      <Link to={`/shows/${show.slug}`} className="flex w-full hover:bg-accent/5 transition-colors">
+                        <div className="p-4 w-[100px]">
+                          <span className="text-white font-medium">{index + 1}</span>
+                        </div>
+                        <div className="p-4 w-[140px]">
+                          <div className="flex items-center">
+                            <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                            <span className="text-white font-medium">{show.averageRating?.toFixed(1) || "—"}</span>
+                          </div>
+                        </div>
+                        <div className="p-4 w-[180px]">
+                          <span className="text-white">{show.ratingsCount}</span>
+                        </div>
+                        <div className="p-4 w-[140px]">
+                          <span className="text-white group-hover:underline">{formatDateShort(show.date)}</span>
+                        </div>
+                        <div className="p-4 flex-1">
+                          <span className="text-white">{show.venue?.name || "Unknown Venue"}</span>
+                        </div>
+                        <div className="p-4 flex-1">
+                          <span className="text-white font-medium">
+                            {show.venue
+                              ? [show.venue.city, show.venue.state, show.venue.country].filter(Boolean).join(", ")
+                              : ""}
+                          </span>
+                        </div>
                       </Link>
-                    </td>
-                    <td className="p-4 text-white">{show.venue?.name || "Unknown Venue"}</td>
-                    <td className="p-4 text-white font-medium">
-                      {show.venue
-                        ? [show.venue.city, show.venue.state, show.venue.country].filter(Boolean).join(", ")
-                        : ""}
                     </td>
                   </tr>
                 ))}

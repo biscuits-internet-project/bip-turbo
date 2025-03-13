@@ -1,5 +1,6 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 // Add a loader function
@@ -22,32 +23,32 @@ export function meta() {
 
 const MovieScores: React.FC = () => {
   const MovieCard = ({ title, children }: { title: React.ReactNode; children: React.ReactNode }) => (
-    <div className="bg-gray-900 rounded-lg shadow-md overflow-hidden mb-8">
-      <div className="p-6">
-        <h2 className="text-2xl font-bold mb-4 text-white">{title}</h2>
-        {children}
-      </div>
-    </div>
-  );
-
-  const p = ({ children }: { children: React.ReactNode }) => (
-    <p className="mb-4 text-gray-300 leading-relaxed">{children}</p>
+    <Card className="bg-gray-900 border-gray-800 mb-6">
+      <CardHeader>
+        <h2 className="text-2xl font-semibold text-white">{title}</h2>
+      </CardHeader>
+      <CardContent className="space-y-4 text-gray-200 leading-relaxed">{children}</CardContent>
+    </Card>
   );
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8 text-center text-white">Live Movie Scores</h1>
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-white">Live Movie Scores</h1>
+      </div>
 
       <MovieCard
         title={
-          <div className="flex flex-col sm:flex-row sm:items-center">
-            <span className="mr-2">Akira</span>
-            <Link
-              to="/shows/1999-12-31-theater-of-the-living-arts-philadelphia-pa"
-              className="text-purple-400 hover:text-purple-300 hover:underline text-lg sm:text-2xl"
-            >
-              December 31, 1999 at Theater Of The Living Arts - Philadelphia, PA
-            </Link>
+          <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+            <span className="text-2xl font-bold text-white">Akira</span>
+            <span className="text-lg text-gray-400">
+              <Link
+                to="/shows/1999-12-31-theater-of-the-living-arts-philadelphia-pa"
+                className="text-purple-400 hover:text-purple-300 hover:underline"
+              >
+                December 31, 1999 at Theater Of The Living Arts - Philadelphia, PA
+              </Link>
+            </span>
           </div>
         }
       >
@@ -62,29 +63,31 @@ const MovieScores: React.FC = () => {
           There are many theories as to where you should start the tape with the movie, so it might take you some
           experimenting to find the best sync. Here's a tip from one fan:
         </p>
-        <p>
+        <blockquote className="border-l-4 border-gray-700 pl-4 my-4 text-gray-300 italic">
           "When the 1988 dateline appears, the first note of the DJ spinning should start up. When they first take off
           in the motorcycles, the beat should get noticeably more intense. When the kid is headbutted by the big Clown
           leader, the drum machines should stop completely, leaving just the vocal sample. When the first child subject
           screams after seeing his guardian shot, a phone should ring right at the time the store sign blows up (right
           before the windows all smash). Hope that will help line it up."
-        </p>
+        </blockquote>
       </MovieCard>
 
       <MovieCard
         title={
-          <div className="flex flex-col sm:flex-row sm:items-center">
-            <span className="mr-2">Tron</span>
-            <Link
-              to="/shows/2015-12-31-playstation-theater-new-york-ny"
-              className="text-purple-400 hover:text-purple-300 hover:underline text-lg sm:text-2xl"
-            >
-              December 31, 2015 at Playstation Theater - New York, NY
-            </Link>
+          <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+            <span className="text-2xl font-bold text-white">Tron</span>
+            <span className="text-lg text-gray-400">
+              <Link
+                to="/shows/2015-12-31-playstation-theater-new-york-ny"
+                className="text-purple-400 hover:text-purple-300 hover:underline"
+              >
+                December 31, 2015 at Playstation Theater - New York, NY
+              </Link>
+            </span>
           </div>
         }
       >
-        <p className="mb-4 text-gray-300 leading-relaxed">
+        <p>
           For the 3rd set of their New Year's Eve 2015 show, the Disco Biscuits again played an improvised score to a
           movie, this time the original Tron. However, instead of projecting the movie behind behind them, they
           projected it onto a scrim that hung in front of them, covering the entire stage area, top to bottom, left to
@@ -94,7 +97,7 @@ const MovieScores: React.FC = () => {
       </MovieCard>
 
       <MovieCard title="Fall 2001 Movie Jams">
-        <p className="mb-4 text-gray-300 leading-relaxed">
+        <p>
           In the spirit of Halloween, and on the heels of the much-ballyhooed Akira Jam, the band played a series of
           improvised scores during a special mini-run in the Pacific Northwest. Though the full Alice in Wonderland jam
           was marred by DVD playback issues (and as such, no sync is possible), each score offers its own unique session
@@ -102,7 +105,7 @@ const MovieScores: React.FC = () => {
           throughout a unique opening jam that started out of DJ Mauricio's set. And the Linus and Lucy/"Great Pumpkin
           Jam" featured a sped-up version of the Peanuts classic.
         </p>
-        <ul className="list-disc pl-8 space-y-2 mb-4 text-gray-300">
+        <ul className="list-disc pl-8 space-y-2">
           <li>
             Disney's Alice in Wonderland -{" "}
             <Link

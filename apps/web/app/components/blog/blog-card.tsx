@@ -31,6 +31,8 @@ export const getReadTime = (content: string | undefined | null) => {
 };
 
 export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
+  const coverImage = blogPost.coverImage || blogPost.imageUrls?.[0];
+
   return (
     <Card
       key={blogPost.id}
@@ -44,10 +46,10 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
           </div>
         </div>
         <CardTitle className={`${compact ? "text-lg" : "text-xl"} mt-4 text-white`}>{blogPost.title}</CardTitle>
-        {blogPost.coverImage && (
+        {coverImage && (
           <div className="w-full my-3">
             <img
-              src={blogPost.coverImage}
+              src={coverImage}
               alt={blogPost.title}
               className={`w-full ${compact ? "h-32" : "h-40"} object-cover rounded-md`}
             />

@@ -12,9 +12,8 @@ import { cn } from "~/lib/utils";
 
 // Define a type for the venue data
 interface VenueData {
-  meta?: {
-    title?: string;
-    [key: string]: unknown;
+  venue?: {
+    title: string;
   };
   [key: string]: unknown;
 }
@@ -34,10 +33,8 @@ export default function VenuesLayout() {
     ? (matches.find((match) => match.pathname.includes(`/venues/${pathSegments[1]}`))?.data as VenueData)
     : null;
 
-  // Try to get the title from meta data or use the path segment
-  const venueTitle = venueData?.meta?.title
-    ? venueData.meta.title.replace(" | Biscuits Internet Project", "").trim()
-    : pathSegments[1];
+  // Get the title directly from the venue data
+  const displayTitle = venueData?.venue?.title || "";
 
   // Format the venue name for display (convert slug to title case)
   const formatVenueName = (name: string) => {
@@ -47,7 +44,7 @@ export default function VenuesLayout() {
       .join(" ");
   };
 
-  const displayTitle = venueTitle || formatVenueName(pathSegments[1] || "");
+  const formattedDisplayTitle = displayTitle || formatVenueName(pathSegments[1] || "");
 
   return (
     <div className="py-8">
@@ -76,7 +73,7 @@ export default function VenuesLayout() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+                  <BreadcrumbPage>{formattedDisplayTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </>
             ) : (

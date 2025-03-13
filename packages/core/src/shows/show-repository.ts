@@ -70,7 +70,7 @@ export class ShowRepository {
 
     // First, let's see what the tokenization looks like
     const tokenDebug = await this.db.$queryRaw<Array<{ tokens: string }>>`
-      SELECT to_tsvector('english', ${query}) as tokens;
+      SELECT to_tsvector('english', ${query})::text as tokens;
     `;
     console.log("🔤 Query tokens:", tokenDebug[0]?.tokens);
 
@@ -86,11 +86,11 @@ export class ShowRepository {
     const searchResults = await this.db.$queryRaw<Array<{ searchable_id: string; rank: number }>>`
       SELECT 
         searchable_id,
-        ts_rank_cd(to_tsvector('english', content), websearch_to_tsquery('english', ${query})) as rank
+        ts_rank_cd(to_tsvector('english', content)::tsvector, websearch_to_tsquery('english', ${query})) as rank
       FROM pg_search_documents 
       WHERE 
         searchable_type = 'Show'
-        AND to_tsvector('english', content) @@ websearch_to_tsquery('english', ${query})
+        AND to_tsvector('english', content)::tsvector @@ websearch_to_tsquery('english', ${query})
       ORDER BY rank DESC
     `;
 

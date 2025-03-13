@@ -39,6 +39,16 @@ export const loader = publicLoader(async ({ params }) => {
   };
 });
 
+export function meta({ data }: { data: LoaderData }) {
+  return [
+    { title: `${data.blogPost.title} | Biscuits Internet Project` },
+    {
+      name: "description",
+      content: data.blogPost.blurb || `Read ${data.blogPost.title} on Biscuits Internet Project`,
+    },
+  ];
+}
+
 export default function BlogPostPage() {
   const { blogPost } = useSerializedLoaderData<LoaderData>();
 
@@ -90,18 +100,15 @@ export default function BlogPostPage() {
           </div>
         </div>
 
-        {blogPost.coverImage && (
-          <div className="max-w-3xl mx-auto overflow-hidden rounded-lg">
-            <div className="aspect-[2/1]">
-              <img src={blogPost.coverImage} alt={blogPost.title} className="w-full h-full object-cover" />
-            </div>
-          </div>
-        )}
-
         <Card className="relative overflow-hidden border-gray-800">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
           <CardContent className="relative z-10 p-6">
             <div className="prose prose-invert max-w-none">
+              {blogPost.coverImage && (
+                <div className="float-right ml-12 mb-8 max-w-[300px] w-full">
+                  <img src={blogPost.coverImage} alt={blogPost.title} className="rounded-lg w-full" />
+                </div>
+              )}
               <Markdown rehypePlugins={[rehypeRaw]} remarkPlugins={[remarkGfm]}>
                 {blogPost.content}
               </Markdown>

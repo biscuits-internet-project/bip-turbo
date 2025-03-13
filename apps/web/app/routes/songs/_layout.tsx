@@ -11,9 +11,8 @@ import {
 
 // Define a type for the song data
 interface SongData {
-  meta?: {
-    title?: string;
-    [key: string]: unknown;
+  song?: {
+    title: string;
   };
   [key: string]: unknown;
 }
@@ -30,13 +29,11 @@ export default function SongsLayout() {
 
   // Get song title from matches if available
   const songData = isDetailPage
-    ? (matches.find((match) => match.pathname.includes(`/songs/${pathSegments[1]}`))?.data as { json: SongData }).json
+    ? (matches.find((match) => match.pathname.includes(`/songs/${pathSegments[1]}`))?.data as SongData)
     : null;
 
-  // Try to get the title from meta data or use the path segment
-  const songTitle = songData?.title
-    ? (songData.title as string).replace(" | Biscuits Internet Project", "").trim()
-    : pathSegments[1];
+  // Get the title directly from the song data
+  const displayTitle = songData?.song?.title || "";
 
   // Format the song name for display (convert slug to title case)
   const formatSongName = (name: string) => {
@@ -46,7 +43,7 @@ export default function SongsLayout() {
       .join(" ");
   };
 
-  const displayTitle = songTitle || formatSongName(pathSegments[1] || "");
+  const formattedDisplayTitle = displayTitle || formatSongName(pathSegments[1] || "");
 
   return (
     <div className="py-8">
@@ -75,7 +72,7 @@ export default function SongsLayout() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{displayTitle}</BreadcrumbPage>
+                  <BreadcrumbPage>{formattedDisplayTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </>
             ) : (

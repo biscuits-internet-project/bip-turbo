@@ -1,8 +1,13 @@
+import { Twitter } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
+
+const Link = (props: React.ComponentProps<typeof RouterLink>) => (
+  <RouterLink {...props} className={`text-purple-400 hover:text-purple-300 ${props.className || ""}`} />
+);
 
 // Define types for our data
 interface BandMember {
@@ -33,18 +38,12 @@ export function meta() {
 const BandHistory: React.FC = () => {
   const [data, setData] = useState<BandHistoryData>({
     currentMembers: [
-      { name: "Jon Gutwillig", instrument: "Guitar", twitter: "https://twitter.com/BarberShreds" },
-      { name: "Marc Brownstein", instrument: "Bass", twitter: "https://twitter.com/Marc_Brownstein" },
-      { name: "Aron Magner", instrument: "Keys", twitter: "https://twitter.com/aronmagner" },
-      { name: "Allen Aucoin", instrument: "Drums", twitter: "https://twitter.com/DrFameus" },
+      { name: "Jon Gutwillig", instrument: "Guitar", twitter: "BarberShreds" },
+      { name: "Marc Brownstein", instrument: "Bass", twitter: "Marc_Brownstein" },
+      { name: "Aron Magner", instrument: "Keys", twitter: "aronmagner" },
+      { name: "Allen Aucoin", instrument: "Drums", twitter: "DrFameus" },
     ],
   });
-
-  const TwitterIcon = ({ url }: { url: string }) => (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block ml-2 pt-1">
-      <img src="/twitter.png" alt="twitter" className="inline-block" />
-    </a>
-  );
 
   return (
     <div className="">
@@ -56,25 +55,31 @@ const BandHistory: React.FC = () => {
         <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-white">Current Members</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {data.currentMembers.map((member) => (
-                <div key={member.name} className="flex items-center space-x-2">
-                  <div>
-                    <h3 className="font-medium text-white">{member.name}</h3>
-                    <p className="text-sm text-gray-400">{member.instrument}</p>
-                  </div>
-                  <TwitterIcon url={member.twitter} />
+                <div key={member.name} className="flex flex-col space-y-1">
+                  <h3 className="text-lg font-medium text-white">{member.name}</h3>
+                  <p className="text-sm text-gray-400">{member.instrument}</p>
+                  <a
+                    href={`https://twitter.com/${member.twitter}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    @{member.twitter}
+                    <Twitter className="h-4 w-4" />
+                  </a>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>Early Years</CardTitle>
+            <h3 className="text-2xl font-semibold">Early Years</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               The four original members, Jon Gutwillig (guitar), Marc Brownstein (bass), Ben Hayflick (keys), and Sam
               Altman (drums) met in the early 90's as students at the University of Pennsylvania in Philadelphia.
@@ -84,11 +89,15 @@ const BandHistory: React.FC = () => {
               Day &gt; Help On the Way &gt; Slipknot &gt; Basis For a Day" or "Antelope &gt; Morning Dew &gt; Antelope"
             </p>
             <p>
-              In 1995, Aron Magner replaced Hayflick on keys and the band changed their name to The Disco Biscuits. In
-              an interview with Spin, Marc says:
+              In{" "}
+              <Link to="/shows/year/1995" className="text-purple-400 hover:text-purple-300">
+                1995
+              </Link>
+              , Aron Magner replaced Hayflick on keys and the band changed their name to The Disco Biscuits. In an
+              interview with Spin, Marc says:
             </p>
             <p>
-              <blockquote>
+              <blockquote className="italic px-10">
                 "...we were headed out to the Jersey Shore one weekend for this huge party. We were sitting in our car
                 and one of our friends... totally out of the blue... says, 'Hey, you guys wanna go find some Disco
                 Biscuits?' We were like 'Boom! That's the name.' At the time I didn't know what Disco Biscuits even
@@ -99,18 +108,24 @@ const BandHistory: React.FC = () => {
               </blockquote>
             </p>
             <p>
-              <Link to="/shows/year/1995">1995</Link> into <Link to="/shows/year/1996">1996</Link> saw them move away
-              from house parties and into the Philadelphia bar/club scene with shows at Sam Adam's Brewhouse, The Middle
-              East, J.C. Dobb's, and the Blarney Stone, among others.
+              <Link to="/shows/year/1995" className="text-purple-400 hover:text-purple-300">
+                1995
+              </Link>{" "}
+              into{" "}
+              <Link to="/shows/year/1996" className="text-purple-400 hover:text-purple-300">
+                1996
+              </Link>{" "}
+              saw them move away from house parties and into the Philadelphia bar/club scene with shows at Sam Adam's
+              Brewhouse, The Middle East, J.C. Dobb's, and the Blarney Stone, among others.
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>1997 - 1999</CardTitle>
+            <h3 className="text-2xl font-semibold">1997 - 1999</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               The first heavily circulated show of the Disco Biscuits career was played on{" "}
               <Link to="/shows/1997-01-30-wetlands-preserve-new-york-ny">1/30/97</Link> at the Wetlands Preserve, in New
@@ -148,11 +163,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2000 - The Disco Triscuits and The Maui Project</CardTitle>
+            <h3 className="text-2xl font-semibold">2000 - The Disco Triscuits and The Maui Project</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               In January 2000 Marc announced via an Internet message board post that he had been asked to leave the
               band. Luckily, this hiatus was short-lived, and he rejoined the band in July of that same year.
@@ -180,11 +195,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2000 - 2004</CardTitle>
+            <h3 className="text-2xl font-semibold">2000 - 2004</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               Coming soon!. Follow us at on{" "}
               <Link to="https://twitter.com/tdbdotnet" target="blank">
@@ -199,11 +214,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2005 - The Doctor is Out. Enter Batman.</CardTitle>
+            <h3 className="text-2xl font-semibold">2005 - The Doctor is Out. Enter Batman.</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               In <Link to="/shows/years/2005">2005</Link>, after more than 10 years, Sam Altman left the band to pursue
               his dream of becoming a doctor. His last official shows were{" "}
@@ -227,23 +242,23 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2006</CardTitle>
+            <h3 className="text-2xl font-semibold">2006</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               <Link to="/shows/year/2006">2006</Link> marked a new chapter for the Disco Biscuits, as they took their
               new drummer Allen on the road. While performances may have been a little uneven at first, it was clear
               that Allen had the chops and chemistry within the band improved with each show. A change in the band's
               sound was immediately evident. The jams produced during these early Allen days could be described as
-              hard-driving and more electronic sounding than ever before. While the sound wasn’t fully actualized yet,
+              hard-driving and more electronic sounding than ever before. While the sound wasn't fully actualized yet,
               they were playing with a raw energy that gave fans reason to be optimistic.
             </p>
             <p>
               Winter Tour started in February and included stops in Chicago, Denver, Baltimore and three nights in
               Sayreville. These first few shows featured a lot of standalones in the setlists as Allen was still getting
-              comfortable with the band’s catalog. A mixture of old classics, Conspirator tracks Commercial Amen and
+              comfortable with the band's catalog. A mixture of old classics, Conspirator tracks Commercial Amen and
               Liquid Handcuffs, and new originals The Great Abyss and Cyclone (originally debuted by JM2) were common
               songs to see in early 2006.
             </p>
@@ -264,7 +279,7 @@ const BandHistory: React.FC = () => {
               <Link to="/shows/2006-05-28-electric-factory-philadelphia-pa">05/28</Link> Astronaut and 42).
             </p>
             <p>
-              Early June included two nights Wakarusa in Lawrence, KS, a co-bill with Umphrey’s McGee in Indianapolis,
+              Early June included two nights Wakarusa in Lawrence, KS, a co-bill with Umphrey's McGee in Indianapolis,
               IN and late-night and sonic stage sets at Bonnaroo. Two shows at the Stone Pony in Asbury Park, NJ again
               indicated that the band was building momentum and refining their sound. (Recommended listening:
               <Link to="/shows/2006-06-23-stone-pony-asbury-park-nj">06/23</Link> I-Man) Shows in Norfolk, VA and at
@@ -279,7 +294,7 @@ const BandHistory: React.FC = () => {
               the second and third were
               <Link to="/shows/2006-08-25-hunter-mountain-ski-lodge-hunter-ny">8/25</Link> and
               <Link to="/shows/2006-08-26-hunter-mountain-ski-lodge-hunter-ny">8/26</Link> Camp Bisco V at Hunter
-              Mountain in Hunter, NY. This was Allen’s first Camp and proved to be an important weekend. At the time,
+              Mountain in Hunter, NY. This was Allen's first Camp and proved to be an important weekend. At the time,
               these shows, 8/25 in particular, contained some of the most cohesive playing to date.
             </p>
             <p>
@@ -316,11 +331,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2007</CardTitle>
+            <h3 className="text-2xl font-semibold">2007</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               While it could be said that much of 2006 felt like a period of adjustment,{" "}
               <Link to="/shows/year/2007">2007</Link> found the Biscuits extremely comfortable with their new drummer
@@ -335,7 +350,7 @@ const BandHistory: React.FC = () => {
               (Strobelights appearing in <Link to="/shows/2001-09-01-wetlands-preserve-new-york-ny">09/01/01</Link>{" "}
               Dribble and Gangster as the intro jam &gt; I-Man on{" "}
               <Link to="/shows/2002-12-29-electric-factory-philadelphia-pa">12/29/02</Link>
-              ), now being presented as full-fledged songs. Both songs would go on to become staples in the band’s live
+              ), now being presented as full-fledged songs. Both songs would go on to become staples in the band's live
               repertoire and are used as jam vehicles to this day. These Starland shows would be a harbinger of good
               things to come in 2007 as the Disco Biscuits were ready to remind everyone that they can be the best band
               on the planet on any given night.
@@ -350,9 +365,9 @@ const BandHistory: React.FC = () => {
               for the band as they headlined Starscape in Baltimore, MD, played a legendary{" "}
               <Link to="/resources/tractorbeam">Tractorbeam</Link> show on{" "}
               <Link to="/shows/2007-06-26-chameleon-club-lancaster-pa">06/26</Link>, and played a six show run
-              co-headlining shows with Umphrey’s McGee (dubbed D.U.M.B. tour). Their hot streak continued into July as
+              co-headlining shows with Umphrey's McGee (dubbed D.U.M.B. tour). Their hot streak continued into July as
               they zigzagged across the country playing High Sierra Music Festival, two shows in Southern California,
-              co-headlined festival Trancegression (with Umphrey’s) in Copper Mountain, Colorado, played Missouri,
+              co-headlined festival Trancegression (with Umphrey's) in Copper Mountain, Colorado, played Missouri,
               Wisconsin, and 10,000 Lakes Festival in Detroit Lakes, MN, and then finally back out to San Francisco and
               Berkeley, CA. You really cannot go wrong with any of these shows, but{" "}
               <Link to="/shows/2007-07-19-10-000-lakes-festival-detriot-lakes-mn">07/19/07</Link> epitomizes the
@@ -376,20 +391,20 @@ const BandHistory: React.FC = () => {
             </p>
             <p>
               In mid-December the band and fans headed off to Runaway Bay, Jamaica for Caribbean Holidaze, a jamband
-              destination vacation. Co-headlined by Umphrey’s McGee, this event gave fans an opportunity to watch the
-              band from the beach and even take excursions with band members. 2007 wrapped with a New Year’s run split
-              between New York and Philadelphia, culminating with New Year’s Eve at the Tweeter Center (now the
+              destination vacation. Co-headlined by Umphrey's McGee, this event gave fans an opportunity to watch the
+              band from the beach and even take excursions with band members. 2007 wrapped with a New Year's run split
+              between New York and Philadelphia, culminating with New Year's Eve at the Tweeter Center (now the
               Susquehanna Bank Center). Fans still look back on this time period as a golden age of The Disco Biscuits
               and with good reason, the band was at the top of their game and the future looked bright.
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2008</CardTitle>
+            <h3 className="text-2xl font-semibold">2008</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               Fresh off an incredibly successful 2007, four nights in Colorado started{" "}
               <Link to="/shows/year/2008">2008</Link> off on the right foot. Extended sections of improv were prevalent
@@ -400,7 +415,7 @@ const BandHistory: React.FC = () => {
               after the festival. Two major highlights of this European Tour occurred on{" "}
               <Link to="/shows/2008-03-21-magnet-club-berlin-germany">3/21</Link> and{" "}
               <Link to="/shows/2008-03-22-pumpehuset-copenhagen-denmark">3/22</Link>. Channeling the spirit of Berlin
-              and the techno music that’s revered there, 03/21 featured relentless, hard hitting jams that reflected
+              and the techno music that's revered there, 03/21 featured relentless, hard hitting jams that reflected
               this German city splendidly. The following night in Copenhagen, Denmark delivered a performance that could
               not have been more different, instead showing off gorgeous soundscapes and gooey transitions (both
               Crickets &gt; Voices and Voices &gt; Rainbow song are master level segues).
@@ -453,16 +468,16 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2009</CardTitle>
+            <h3 className="text-2xl font-semibold">2009</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               When the band hit the road in early January, excitement was palpable. While they had played at a high
               level in the first half of 2008, there was no tour in the second half, and fans were ready to go out and
               jam when things kicked off with two nights in Northampton. The shows served as notice that the Biscuits
-              would be taking no prisoners in ‘09. The improv was dark and aggressive and often synthesized into
+              would be taking no prisoners in '09. The improv was dark and aggressive and often synthesized into
               melodic, thematic peaks. Triumph &gt; Basis from{" "}
               <Link to="/shows/2009-01-16-the-calvin-northampton-ma">1/16</Link> exemplifies how locked in they were
               right out of the gate and things would only grow from there.
@@ -518,7 +533,7 @@ const BandHistory: React.FC = () => {
               and the tour closer in Asheville, NC. Fans were again delighted as top notch jams were dropped at nearly
               every stop. <Link to="/shows/2009-04-20-9-30-club-washington-dc">4/20</Link> Crickets would become one of
               the most talked about and revered jams of the year. Finding themselves in dark and haunting, yet beautiful
-              territory, the band’s communication on stage, some thought, could only be explained by telepathy.{" "}
+              territory, the band's communication on stage, some thought, could only be explained by telepathy.{" "}
               <Link to="/shows/2009-04-23-headliners-music-hall-louisville-ky">4/23</Link> Run Like Hell &gt; Humu
               (inverted) was monstrous and exhibited a stark juxtaposition in jamming styles (when compared to 4/20
               Crickets), with the jamming and transition being silky smooth and bubbly.
@@ -542,7 +557,7 @@ const BandHistory: React.FC = () => {
               most complete shows of this banner year start to finish, but it would be criminal to not at least mention
               the Vassillios &gt; HAB and the Basis from this storied evening.{" "}
               <Link to="/shows/2009-06-06-ft-armistead-park-baltimore-md">6/06</Link> at Starscape provided one of the
-              crazier backdrops for a show (and in our scene that’s really saying something). Anyone who was there
+              crazier backdrops for a show (and in our scene that's really saying something). Anyone who was there
               probably remembers the marathon second set, the cop twirling glowsticks and the Robots encore with the sun
               fully up.
             </p>
@@ -554,7 +569,7 @@ const BandHistory: React.FC = () => {
               Biscuits. Some fans passionately argue that the creative energy that they brought to these shows is
               unparalleled. This type of sentiment is backed up by blistering segments like Hope &gt; Digital Buddha
               &gt; I-Man on 6/25, Strobelights &gt; Minions on{" "}
-              <Link to="/shows/2009-06-26-house-of-blues-atlantic-city-nj">6/26</Link>, Story &gt; Pilin’ and Astronaut
+              <Link to="/shows/2009-06-26-house-of-blues-atlantic-city-nj">6/26</Link>, Story &gt; Pilin' and Astronaut
               &gt; Helicopters from <Link to="/shows/2009-06-27-the-state-theater-state-college-pa">6/27</Link>.{" "}
               <Link to="/shows/2009-06-28-church-of-universal-love-and-music-acme-pa">06/28</Link> was a psychedelic
               experience at the Universal Church of Love and Music in Acme, PA where a number of fans camped on site.
@@ -588,13 +603,13 @@ const BandHistory: React.FC = () => {
               was another highly regarded show with standout segments Sound One &gt; Tempest &gt; Sound One and Shem-Rah
               &gt; HAB, the latter producing one of the most beautiful, blissful jams of the year.{" "}
               <Link to="/shows/2009-09-19-stubb-s-bar-b-q-austin-tx">9/19</Link> at Stubbs in Dallas, TX electrified the
-              band and fans alike prompting Jon to say “It was like we were throwing touchdown passes the whole show."
+              band and fans alike prompting Jon to say "It was like we were throwing touchdown passes the whole show."
               (Recommended listening: Mirrors &gt; Basis)
             </p>
             <p>
               Tour marched on through Tuscaloosa, AL, Oxford, MS and then Nashville,TN.{" "}
               <Link to="/shows/2009-09-24-cannery-ballroom-nashville-tn">9/24</Link> in Nashville is famous for the
-              Shimmy &gt; Boom Shanker &gt; Shimmy, but don’t sleep on the second set. Atlanta, GA, Knoxville, TN,
+              Shimmy &gt; Boom Shanker &gt; Shimmy, but don't sleep on the second set. Atlanta, GA, Knoxville, TN,
               Charlotte/Boone, NC, and Richmond, VA concluded the Southern run of fall tour. After two nights at the
               9:30 Club in D.C. (Recommended listening:{" "}
               <Link to="/shows/2009-10-03-9-30-club-washington-dc">10/03</Link> Floodlights) they continued north to
@@ -630,26 +645,26 @@ const BandHistory: React.FC = () => {
               <Link to="/shows/2009-12-30-nokia-theater-new-york-ny">12/30</Link> is another fan favorite with a massive
               Crickets in the first set and fully segued, masterful second set. Gangster &gt; Waves &gt; Shem Rah Boo
               from <Link to="/shows/2009-12-31-nokia-theater-new-york-ny">12/31</Link> gave fans a reason to celebrate,
-              playing Shem Rah Boo’s ending for the first time in over a year. The Second set is highlighted by the new
+              playing Shem Rah Boo's ending for the first time in over a year. The Second set is highlighted by the new
               years countdown medley (Consisting of Orch Theme &gt; Morph Dusseldorf &gt; Run Like Hell &gt; Aceetobee
               &gt; Vassillios &gt; Mr. Don &gt; Above The Waves &gt; Munchkin Invasion &gt; Crickets) which kept fans
               guessing right down to the Basis countdown. The third set does not let up as Down To the Bottom &gt; Naeba
               &gt; Humu delivers the goods.
             </p>
             <p>
-              The year was over and everyone’s hearts were full. The Disco Biscuits had conquered the world in 2009 and
+              The year was over and everyone's hearts were full. The Disco Biscuits had conquered the world in 2009 and
               with a new album on the horizon, fans were optimistic that there was nothing that could stand in the
-              band’s way. While sometimes it feels like there’s always something lurking around the corner in Biscuits
+              band's way. While sometimes it feels like there's always something lurking around the corner in Biscuits
               land, no one could have predicted what the following months would have in store.
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2011 - 2019 - Setbreak</CardTitle>
+            <h3 className="text-2xl font-semibold">2011 - 2019 - Setbreak</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               During the 8 years from 2011 - 2019, the band did not tour - instead just performing periodic series of
               limited engagement runs (4 nights in Colorado, NYE Run, Camp Bisco, etc).
@@ -657,11 +672,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-900 rounded-lg border border-gray-800">
           <CardHeader>
-            <CardTitle>2019 - Present - Setbreak is Over</CardTitle>
+            <h3 className="text-2xl font-semibold">2019 - Present - Setbreak is Over</h3>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
             <p>
               In September of 2019 in a series of social media posts, the Disco Biscuits announced "Setbreak is over.
               Gas tank's refilled. We are back." Shortly thereafter, they announced their 2019-2020 Winter Tour, playing
