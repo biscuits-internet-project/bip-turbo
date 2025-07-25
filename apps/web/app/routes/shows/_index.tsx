@@ -1,9 +1,10 @@
 import type { Setlist } from "@bip/domain";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Loader2, Search, X } from "lucide-react";
+import { ArrowUp, Loader2, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams, useSubmit } from "react-router-dom";
 import { toast } from "sonner";
+import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -271,7 +272,19 @@ export default function Shows() {
   }, [searchQuery]);
 
   return (
-    <div className="">
+    <div className="relative">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-white">Shows</h1>
+        <AdminOnly>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/shows/new" className="flex items-center gap-1">
+              <Plus className="h-4 w-4" />
+              <span>New Show</span>
+            </Link>
+          </Button>
+        </AdminOnly>
+      </div>
+
       <div className="space-y-6 md:space-y-8">
         {/* Header Section */}
         <div className="flex flex-col space-y-4">

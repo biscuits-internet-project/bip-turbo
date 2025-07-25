@@ -48,6 +48,10 @@ type Params = {
   };
   "/shows/top-rated": {};
   "/shows/tour-dates": {};
+  "/shows/new": {};
+  "/shows/:slug/edit": {
+    "slug": string;
+  };
   "/songs": {};
   "/songs/:slug": {
     "slug": string;

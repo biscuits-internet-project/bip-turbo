@@ -1,7 +1,10 @@
 import type { Show } from "@bip/domain";
+import type { Prisma } from "@prisma/client";
 import type { DbClient, DbShow } from "../_shared/database/models";
 import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
+
+export type ShowCreateInput = Prisma.ShowCreateInput;
 
 export function mapShowToDomainEntity(show: DbShow): Show {
   const { venueId, bandId, ...rest } = show;
@@ -126,5 +129,31 @@ export class ShowRepository {
     } catch (error) {
       return false;
     }
+  }
+
+  async create(data: ShowCreateInput): Promise<Show> {
+    const result = await this.db.show.create({
+      data: {
+        date: data.date,
+        venue: data.venue,
+        band: data.band,
+        notes: data.notes,
+        relistenUrl: data.relistenUrl,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    return mapShowToDomainEntity(result);
+  }
+
+  async update(slug: string, data: Partial<ShowCreateInput>): Promise<Show> {
+    const result = await this.db.show.update({
+      where: { slug },
+      data: {
+        ...data,
+        updatedAt: new Date(),
+      },
+    });
+    return mapShowToDomainEntity(result);
   }
 }

@@ -1,11 +1,15 @@
 import type { ReviewMinimal, Setlist } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Edit } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { AdminOnly } from "~/components/admin/admin-only";
 import ArchiveMusicPlayer from "~/components/player";
 import { ReviewsList } from "~/components/review";
 import { ReviewForm } from "~/components/review/review-form";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
+import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
@@ -88,7 +92,7 @@ export function meta({ data }: { data: ShowLoaderData }) {
 
 export default function Show() {
   const { setlist, reviews: initialReviews, selectedRecordingId } = useSerializedLoaderData<ShowLoaderData>();
-  const { user } = useSession();
+  const { user, session } = useSession();
   const queryClient = useQueryClient();
 
   // Query for reviews
@@ -226,15 +230,17 @@ export default function Show() {
   };
 
   return (
-    <div className="w-full">
-      {/* Header with show date and venue */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 mt-4">
-        <div>
-          <h1 className="text-4xl font-bold text-white">{formatDateLong(setlist.show.date)}</h1>
-          <p className="text-xl text-gray-300 mt-2">
-            {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
-          </p>
-        </div>
+    <div className="space-y-6 md:space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-white">{formatDateLong(setlist.show.date)}</h1>
+        <AdminOnly>
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/shows/${setlist.show.slug}/edit`} className="flex items-center gap-1">
+              <Edit className="h-4 w-4" />
+              <span>Edit Show</span>
+            </Link>
+          </Button>
+        </AdminOnly>
       </div>
 
       {/* Main content area with responsive grid */}
