@@ -547,3 +547,18 @@ model BlogPostToFile {
   @@index([fileId])
   @@map("blog_post_files")
 }
+
+model SearchIndex {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType  String   @map("entity_type") @db.VarChar
+  entityId    String   @map("entity_id") @db.Uuid
+  displayText String   @map("display_text")
+  content     String
+  embedding   Unsupported("vector(3072)")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([entityType])
+  @@map("search_indexes")
+}
+
