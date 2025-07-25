@@ -21,6 +21,18 @@ export class TrackService {
     return this.repository.findMany(filter);
   }
 
+  async create(data: Partial<Track>): Promise<Track> {
+    return this.repository.create(data);
+  }
+
+  async update(id: string, data: Partial<Track>): Promise<Track> {
+    return this.repository.update(id, data);
+  }
+
+  async findByShowId(showId: string): Promise<Track[]> {
+    return this.repository.findByShowId(showId);
+  }
+
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }

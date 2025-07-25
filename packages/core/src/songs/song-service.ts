@@ -47,6 +47,30 @@ export class SongService {
     return this.repository.findMany(queryOptions);
   }
 
+  async search(query: string, limit = 20): Promise<Song[]> {
+    const queryOptions: QueryOptions<Song> = {
+      filters: [
+        {
+          field: 'title',
+          operator: 'contains',
+          value: query
+        }
+      ] as FilterCondition<Song>[],
+      pagination: {
+        limit,
+        page: 1
+      },
+      sort: [
+        {
+          field: 'title',
+          direction: 'asc'
+        }
+      ]
+    };
+
+    return this.repository.findMany(queryOptions);
+  }
+
   async findTrendingLastXShows(lastXShows: number, limit: number): Promise<TrendingSong[]> {
     return this.repository.findTrendingLastXShows(lastXShows, limit);
   }

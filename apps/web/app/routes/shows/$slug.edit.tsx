@@ -1,7 +1,8 @@
-import type { Show } from "@bip/domain";
+import type { Show, Band, Venue } from "@bip/domain";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { ShowForm, type ShowFormValues } from "~/components/show/show-form";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -12,34 +13,47 @@ import { services } from "~/server/services";
 
 interface LoaderData {
   show: Show;
+  bands: Band[];
+  venues: Venue[];
 }
 
 export const loader = adminLoader(async ({ params }) => {
   const { slug } = params;
   const show = await services.shows.findBySlug(slug as string);
+  
+  // TODO: Add band service when implemented
+  const bands: Band[] = [];
 
   if (!show) {
     throw notFound(`Show with slug "${slug}" not found`);
   }
 
-  return { show };
+  return { show, bands };
 });
 
 export const action = adminLoader(async ({ request, params }) => {
   const { slug } = params;
   const formData = await request.formData();
-  const date = formData.get("date") as string;
+  
+  const venueId = formData.get("venueId") as string;
+  const bandId = formData.get("bandId") as string;
+  
+  const data = {
+    date: formData.get("date") as string,
+    venueId: venueId === "none" ? undefined : venueId,
+    bandId: bandId === "none" ? undefined : bandId,
+    notes: formData.get("notes") as string || null,
+    relistenUrl: formData.get("relistenUrl") as string || null,
+  };
 
   // Update the show
-  const show = await services.shows.update(slug as string, {
-    date,
-  });
+  const show = await services.shows.update(slug as string, data);
 
   return { show };
 });
 
 export default function EditShow() {
-  const { show } = useSerializedLoaderData<LoaderData>();
+  const { show, bands } = useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<ShowFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,22 +63,40 @@ export default function EditShow() {
     if (show) {
       setDefaultValues({
         date: show.date,
+        venueId: show.venueId || "none",
+        bandId: show.bandId || "none",
+        notes: show.notes || "",
+        relistenUrl: show.relistenUrl || "",
       });
       setIsLoading(false);
     }
   }, [show]);
 
   const handleSubmit = async (data: ShowFormValues) => {
-    const formData = new FormData();
-    formData.append("date", data.date);
+    const loadingToast = toast.loading("Updating show...");
+    
+    try {
+      const formData = new FormData();
+      formData.append("date", data.date);
+      formData.append("venueId", data.venueId);
+      formData.append("bandId", data.bandId);
+      formData.append("notes", data.notes);
+      formData.append("relistenUrl", data.relistenUrl);
 
-    const response = await fetch(`/shows/${show.slug}/edit`, {
-      method: "POST",
-      body: formData,
-    });
+      const response = await fetch(`/shows/${show.slug}/edit`, {
+        method: "POST",
+        body: formData,
+      });
 
-    if (response.ok) {
-      navigate(`/shows/${show.slug}`);
+      if (response.ok) {
+        toast.success("Show updated successfully!", { id: loadingToast });
+        navigate(`/shows/${show.slug}`);
+      } else {
+        toast.error("Failed to update show. Please try again.", { id: loadingToast });
+      }
+    } catch (error) {
+      toast.error("An error occurred while updating the show.", { id: loadingToast });
+      console.error("Show update error:", error);
     }
   };
 
@@ -92,6 +124,7 @@ export default function EditShow() {
             onSubmit={handleSubmit}
             submitLabel="Update Show"
             cancelHref={`/shows/${show.slug}`}
+            bands={bands}
           />
         </CardContent>
       </Card>

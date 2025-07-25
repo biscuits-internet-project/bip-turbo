@@ -72,6 +72,52 @@ export class TrackRepository {
     return results.map((result: DbTrack) => this.mapToDomainEntity(result));
   }
 
+  async create(data: Partial<Track>): Promise<Track> {
+    const dbData = this.mapToDbModel(data);
+    const result = await this.db.track.create({
+      data: dbData as any,
+    });
+    return this.mapToDomainEntity(result);
+  }
+
+  async update(id: string, data: Partial<Track>): Promise<Track> {
+    const dbData = this.mapToDbModel(data);
+    const result = await this.db.track.update({
+      where: { id },
+      data: dbData as any,
+    });
+    return this.mapToDomainEntity(result);
+  }
+
+  async findByShowId(showId: string): Promise<Track[]> {
+    const results = await this.db.track.findMany({
+      where: { showId },
+      orderBy: [{ position: "asc" }],
+      include: {
+        song: true,
+      },
+    });
+    
+    // Sort by set properly (S1, S2, S3, E1, E2, E3) then by position
+    const sortedResults = results.sort((a, b) => {
+      if (a.set !== b.set) {
+        const setOrder = { S: 0, E: 1 };
+        const aType = a.set.charAt(0) as 'S' | 'E';
+        const bType = b.set.charAt(0) as 'S' | 'E';
+        const aNum = parseInt(a.set.slice(1));
+        const bNum = parseInt(b.set.slice(1));
+        
+        if (aType !== bType) {
+          return setOrder[aType] - setOrder[bType];
+        }
+        return aNum - bNum;
+      }
+      return a.position - b.position;
+    });
+    
+    return sortedResults.map((result: any) => this.mapToDomainEntity(result));
+  }
+
   async delete(id: string): Promise<boolean> {
     await this.db.track.delete({
       where: { id },

@@ -9,6 +9,7 @@ import { SetlistService } from "../setlists/setlist-service";
 import { ShowService } from "../shows/show-service";
 import { TourDatesService } from "../shows/tour-dates-service";
 import { SongService } from "../songs/song-service";
+import { TrackService } from "../tracks/track-service";
 import { VenueService } from "../venues/venue-service";
 import type { ServiceContainer } from "./container";
 import type { RedisService } from "./redis";
@@ -17,6 +18,7 @@ export interface Services {
   blogPosts: BlogPostService;
   shows: ShowService;
   songs: SongService;
+  tracks: TrackService;
   setlists: SetlistService;
   venues: VenueService;
   reviews: ReviewService;
@@ -34,6 +36,7 @@ export function createServices(container: ServiceContainer): Services {
     blogPosts: new BlogPostService(container.repositories.blogPosts, container.redis, container.logger),
     shows: new ShowService(container.repositories.shows, container.logger),
     songs: new SongService(container.repositories.songs, container.logger),
+    tracks: new TrackService(container.repositories.tracks, container.logger),
     setlists: new SetlistService(container.repositories.setlists),
     venues: new VenueService(container.repositories.venues, container.logger),
     reviews: new ReviewService(container.repositories.reviews, container.logger),

@@ -14,10 +14,18 @@ export const loader = adminLoader(async () => {
 export const action = adminAction(async ({ request }) => {
   const formData = await request.formData();
   const date = formData.get("date") as string;
+  const venueId = formData.get("venueId") as string;
+  const bandId = formData.get("bandId") as string;
+  const notes = formData.get("notes") as string;
+  const relistenUrl = formData.get("relistenUrl") as string;
 
   // Create the show
   const show = await services.shows.create({
     date,
+    venueId: venueId === "none" ? undefined : venueId,
+    bandId: bandId === "none" ? undefined : bandId,
+    notes: notes || undefined,
+    relistenUrl: relistenUrl || undefined,
   });
 
   return redirect(`/shows/${show.slug}`);
@@ -29,6 +37,10 @@ export default function NewShow() {
   const handleSubmit = async (data: ShowFormValues) => {
     const formData = new FormData();
     formData.append("date", data.date);
+    formData.append("venueId", data.venueId);
+    formData.append("bandId", data.bandId);
+    formData.append("notes", data.notes);
+    formData.append("relistenUrl", data.relistenUrl);
 
     submit(formData, { method: "post" });
   };

@@ -79,6 +79,10 @@ export default [
     route("reviews", "routes/api/reviews.tsx"),
     route("ratings", "routes/api/ratings.tsx"),
     route("attendances", "routes/api/attendances.tsx"),
+    route("venues", "routes/api/venues.tsx"),
+    route("songs", "routes/api/songs.tsx"),
+    route("tracks", "routes/api/tracks.tsx"),
+    route("tracks/:id", "routes/api/tracks/$id.tsx"),
   ]),
 
   // Health check route
