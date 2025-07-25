@@ -15,6 +15,7 @@ import {
 import { Toaster } from "sonner";
 import { NotFound, ServerError } from "~/components/layout/errors";
 import { RootLayout } from "~/components/layout/root-layout";
+import { SearchProvider } from "~/components/search/search-provider";
 import { SidebarProvider } from "~/components/ui/sidebar";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { env } from "~/server/env";
@@ -71,13 +72,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body className="min-h-screen bg-background font-sans antialiased">
         <QueryClientProvider client={queryClient}>
           <SupabaseProvider env={env}>
-            <ClientOnly>
-              {(isDesktop) => (
-                <SidebarProvider defaultOpen={isDesktop}>
-                  <RootLayout>{children}</RootLayout>
-                </SidebarProvider>
-              )}
-            </ClientOnly>
+            <SearchProvider>
+              <ClientOnly>
+                {(isDesktop) => (
+                  <SidebarProvider defaultOpen={isDesktop}>
+                    <RootLayout>{children}</RootLayout>
+                  </SidebarProvider>
+                )}
+              </ClientOnly>
+            </SearchProvider>
           </SupabaseProvider>
           <ReactQueryDevtools initialIsOpen={false} />
           <Toaster position="top-right" theme="dark" />
@@ -110,9 +113,11 @@ function ClientOnly({ children }: { children: (isDesktop: boolean) => React.Reac
   if (!isMounted) {
     // Return a placeholder with the same structure during SSR
     return (
-      <SidebarProvider defaultOpen={true}>
-        <RootLayout>{null}</RootLayout>
-      </SidebarProvider>
+      <SearchProvider>
+        <SidebarProvider defaultOpen={true}>
+          <RootLayout>{null}</RootLayout>
+        </SidebarProvider>
+      </SearchProvider>
     );
   }
 

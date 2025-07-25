@@ -84,6 +84,7 @@ export default [
     route("tracks", "routes/api/tracks.tsx"),
     route("tracks/reorder", "routes/api/tracks/reorder.tsx"),
     route("tracks/:id", "routes/api/tracks/$id.tsx"),
+    route("search", "routes/api/search.tsx"),
   ]),
 
   // Health check route
