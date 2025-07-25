@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Save, Trash, X, Edit2, Check } from "lucide-react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Track } from "@bip/domain";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SongSearch } from "~/components/song/song-search";
+import { SortableTrackItem } from "./sortable-track-item";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 
@@ -52,6 +56,12 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   });
 
   const queryClient = useQueryClient();
+
+  // Set up drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor)
+  );
 
   // Load tracks when component mounts
   useEffect(() => {
@@ -145,6 +155,32 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     onError: () => toast.error("Failed to delete track"),
   });
 
+  // Reorder tracks mutation
+  const reorderTracksMutation = useMutation({
+    mutationFn: async (updates: { id: string; position: number; set: string }[]) => {
+      const response = await fetch("/api/tracks/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      });
+      if (!response.ok) throw new Error("Failed to reorder tracks");
+      return response.json();
+    },
+    onSuccess: (updatedTracks) => {
+      // Update local state with new positions, preserving song data
+      setTracks(prev => prev.map(track => {
+        const updated = updatedTracks.find((t: Track) => t.id === track.id);
+        if (updated) {
+          // Merge updated track data with original track's song data
+          return { ...track, ...updated };
+        }
+        return track;
+      }));
+      toast.success("Track order updated");
+    },
+    onError: () => toast.error("Failed to reorder tracks"),
+  });
+
   // Helper function to sort sets properly (S1, S2, S3, E1, E2, E3)
   const sortSets = (a: string, b: string) => {
     const setOrder = { S: 0, E: 1 };
@@ -188,22 +224,75 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     resetForm();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (position?: number) => {
     if (formData.songId === "none") {
       toast.error("Please select a song");
       return;
     }
 
+    const submitData = {
+      ...formData,
+      position: position || formData.position,
+    };
+
     if (editingId) {
-      updateTrackMutation.mutate({ ...formData, id: editingId });
+      updateTrackMutation.mutate({ ...submitData, id: editingId });
     } else {
-      createTrackMutation.mutate(formData);
+      createTrackMutation.mutate(submitData);
     }
   };
 
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this track?")) {
       deleteTrackMutation.mutate(id);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const activeTrack = tracks.find(track => track.id === active.id);
+    const overTrack = tracks.find(track => track.id === over.id);
+
+    if (!activeTrack || !overTrack) {
+      return;
+    }
+
+    // Only allow reordering within the same set for now
+    if (activeTrack.set !== overTrack.set) {
+      toast.error("Cannot move tracks between different sets yet");
+      return;
+    }
+
+    const currentSetTracks = tracks.filter(track => track.set === activeTrack.set);
+    const oldIndex = currentSetTracks.findIndex(track => track.id === active.id);
+    const newIndex = currentSetTracks.findIndex(track => track.id === over.id);
+
+    if (oldIndex !== newIndex) {
+      // Reorder tracks within the set
+      const reorderedSetTracks = arrayMove(currentSetTracks, oldIndex, newIndex);
+      
+      // Update positions
+      const updates = reorderedSetTracks.map((track, index) => ({
+        id: track.id,
+        position: index + 1,
+        set: track.set,
+      }));
+
+      // Optimistically update local state
+      const updatedTracks = tracks.map(track => {
+        const update = updates.find(u => u.id === track.id);
+        return update ? { ...track, position: update.position } : track;
+      });
+
+      setTracks(updatedTracks);
+      
+      // Send updates to server
+      reorderTracksMutation.mutate(updates);
     }
   };
 
@@ -214,87 +303,83 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     return acc;
   }, {} as Record<string, Track[]>);
 
-  const renderTrackForm = () => (
-    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-      <div className="md:col-span-2">
-        <label className="block text-sm font-medium text-gray-300 mb-1">Song</label>
-        <SongSearch
-          value={formData.songId}
-          onValueChange={(value) => setFormData(prev => ({ ...prev, songId: value }))}
-          placeholder="Select a song..."
-          className="w-full"
-          initialSong={formData.song}
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Set</label>
-        <Select 
-          value={formData.set} 
-          onValueChange={(value) => setFormData(prev => ({ ...prev, set: value }))}
-        >
-          <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-gray-800 border-gray-700">
-            {SET_OPTIONS.map(option => (
-              <SelectItem key={option.value} value={option.value} className="text-white">
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+  const renderTrackForm = () => {
+    // Auto-calculate position for new tracks
+    const nextPosition = editingId 
+      ? formData.position 
+      : Math.max(0, ...tracks.filter(t => t.set === formData.set).map(t => t.position)) + 1;
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Position</label>
-        <Input
-          type="number"
-          min="1"
-          value={formData.position}
-          onChange={(e) => setFormData(prev => ({ ...prev, position: parseInt(e.target.value) || 1 }))}
-          className="bg-gray-800 border-gray-700 text-white"
-        />
-      </div>
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-300 mb-1">Song</label>
+          <SongSearch
+            value={formData.songId}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, songId: value }))}
+            placeholder="Select a song..."
+            className="w-full"
+            initialSong={formData.song}
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Set</label>
+          <Select 
+            value={formData.set} 
+            onValueChange={(value) => setFormData(prev => ({ ...prev, set: value }))}
+          >
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              {SET_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value} className="text-white">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">Segue</label>
-        <Select 
-          value={formData.segue} 
-          onValueChange={(value) => setFormData(prev => ({ ...prev, segue: value }))}
-        >
-          <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-gray-800 border-gray-700">
-            {SEGUE_OPTIONS.map(option => (
-              <SelectItem key={option.value} value={option.value} className="text-white">
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Segue</label>
+          <Select 
+            value={formData.segue} 
+            onValueChange={(value) => setFormData(prev => ({ ...prev, segue: value }))}
+          >
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700">
+              {SEGUE_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value} className="text-white">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="flex items-end gap-2">
-        <Button
-          onClick={handleSubmit}
-          disabled={createTrackMutation.isPending || updateTrackMutation.isPending}
-          className="bg-purple-600 hover:bg-purple-700"
-        >
-          <Check className="h-4 w-4 mr-1" />
-          {editingId ? "Update" : "Add"}
-        </Button>
-        <Button
-          onClick={cancelEditing}
-          variant="outline"
-          className="border-gray-600 text-gray-300"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-end gap-2">
+          <Button
+            onClick={() => handleSubmit(nextPosition)}
+            disabled={createTrackMutation.isPending || updateTrackMutation.isPending}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
+            <Check className="h-4 w-4 mr-1" />
+            {editingId ? "Update" : "Add"}
+          </Button>
+          <Button
+            onClick={cancelEditing}
+            variant="outline"
+            className="border-gray-600 text-gray-300"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Card className="border-gray-800 bg-gray-900/50">
@@ -320,66 +405,46 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
             No tracks added yet. Click "Add Track" to get started.
           </div>
         ) : (
-          Object.entries(tracksBySet)
-            .sort(([a], [b]) => sortSets(a, b))
-            .map(([setName, setTracks]) => (
-              <div key={setName} className="space-y-2">
-                <h3 className="text-lg font-medium text-purple-300 border-b border-gray-700 pb-1">
-                  {SET_OPTIONS.find(opt => opt.value === setName)?.label || setName}
-                </h3>
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToVerticalAxis]}
+          >
+            {Object.entries(tracksBySet)
+              .sort(([a], [b]) => sortSets(a, b))
+              .map(([setName, setTracks]) => {
+                const sortedTracks = setTracks.sort((a, b) => a.position - b.position);
+                const trackIds = sortedTracks.map(track => track.id);
                 
-                {setTracks
-                  .sort((a, b) => a.position - b.position)
-                  .map((track) => (
-                    <div key={track.id}>
-                      {editingId === track.id ? (
-                        renderTrackForm()
-                      ) : (
-                        <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-                          <div className="flex items-center space-x-4">
-                            <span className="text-gray-400 font-mono text-sm w-8">
-                              {track.position}
-                            </span>
-                            <span className="text-white font-medium">
-                              {track.song?.title || "Unknown Song"}
-                            </span>
-                            {track.segue && (
-                              <span className="text-gray-400 text-sm">
-                                {track.segue}
-                              </span>
-                            )}
-                            {track.note && (
-                              <span className="text-gray-400 text-sm italic">
-                                ({track.note})
-                              </span>
+                return (
+                  <div key={setName} className="space-y-2">
+                    <h3 className="text-lg font-medium text-purple-300 border-b border-gray-700 pb-1">
+                      {SET_OPTIONS.find(opt => opt.value === setName)?.label || setName}
+                    </h3>
+                    
+                    <SortableContext items={trackIds} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {sortedTracks.map((track) => (
+                          <div key={track.id}>
+                            {editingId === track.id ? (
+                              renderTrackForm()
+                            ) : (
+                              <SortableTrackItem
+                                track={track}
+                                onEdit={startEditing}
+                                onDelete={handleDelete}
+                                isDeleting={deleteTrackMutation.isPending}
+                              />
                             )}
                           </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => startEditing(track)}
-                              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDelete(track.id)}
-                              disabled={deleteTrackMutation.isPending}
-                              className="border-red-600 text-red-400 hover:bg-red-900/20"
-                            >
-                              <Trash className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            ))
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </div>
+                );
+              })}
+          </DndContext>
         )}
       </CardContent>
     </Card>

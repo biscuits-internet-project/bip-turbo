@@ -405,6 +405,9 @@ export default function Shows() {
                     <SetlistCard
                       key={setlist.show.id}
                       setlist={setlist}
+                      userAttendance={null}
+                      userRating={null}
+                      showRating={setlist.show.averageRating}
                       className={cn(
                         "transition-all duration-300 transform",
                         isSearching ? "opacity-50 scale-[0.98] translate-y-2" : "opacity-100 scale-100 translate-y-0",
@@ -423,6 +426,9 @@ export default function Shows() {
                             {index === 0 && <div id={`month-${month}`} className="scroll-mt-20" />}
                             <SetlistCard
                               setlist={setlist}
+                              userAttendance={null}
+                              userRating={null}
+                              showRating={setlist.show.averageRating}
                               className="transition-all duration-300 transform hover:scale-[1.01]"
                             />
                           </div>

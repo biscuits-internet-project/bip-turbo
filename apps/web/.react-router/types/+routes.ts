@@ -155,6 +155,9 @@ type Pages = {
   "/api/tracks": {
     params: {};
   };
+  "/api/tracks/reorder": {
+    params: {};
+  };
   "/api/tracks/:id": {
     params: {
       "id": string;
@@ -168,7 +171,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/venues" | "/venues/:slug" | "/venues/new" | "/venues/:slug/edit" | "/resources" | "/resources/band-history" | "/resources/chemical-warfare-brigade" | "/resources/hot-air-balloon" | "/resources/media" | "/resources/mixes" | "/resources/movie-scores" | "/resources/music" | "/resources/perfume" | "/resources/side-projects" | "/resources/think-tank" | "/resources/tractorbeam" | "/resources/touchdowns" | "/auth/login" | "/auth/register" | "/auth/callback" | "/auth/logout" | "/auth/forgot-password" | "/blog" | "/blog/new" | "/blog/:slug" | "/blog/:slug/edit" | "/shows" | "/shows/:slug" | "/shows/top-rated" | "/shows/tour-dates" | "/shows/new" | "/shows/:slug/edit" | "/songs" | "/songs/:slug" | "/songs/new" | "/songs/:slug/edit" | "/api/reviews" | "/api/ratings" | "/api/attendances" | "/api/venues" | "/api/songs" | "/api/tracks" | "/api/tracks/:id" | "/healthcheck";
+    page: "/" | "/venues" | "/venues/:slug" | "/venues/new" | "/venues/:slug/edit" | "/resources" | "/resources/band-history" | "/resources/chemical-warfare-brigade" | "/resources/hot-air-balloon" | "/resources/media" | "/resources/mixes" | "/resources/movie-scores" | "/resources/music" | "/resources/perfume" | "/resources/side-projects" | "/resources/think-tank" | "/resources/tractorbeam" | "/resources/touchdowns" | "/auth/login" | "/auth/register" | "/auth/callback" | "/auth/logout" | "/auth/forgot-password" | "/blog" | "/blog/new" | "/blog/:slug" | "/blog/:slug/edit" | "/shows" | "/shows/:slug" | "/shows/top-rated" | "/shows/tour-dates" | "/shows/new" | "/shows/:slug/edit" | "/songs" | "/songs/:slug" | "/songs/new" | "/songs/:slug/edit" | "/api/reviews" | "/api/ratings" | "/api/attendances" | "/api/venues" | "/api/songs" | "/api/tracks" | "/api/tracks/reorder" | "/api/tracks/:id" | "/healthcheck";
   };
   "routes/_index.tsx": {
     id: "routes/_index";
@@ -361,6 +364,10 @@ type RouteFiles = {
   "routes/api/tracks.tsx": {
     id: "routes/api/tracks";
     page: "/api/tracks";
+  };
+  "routes/api/tracks/reorder.tsx": {
+    id: "routes/api/tracks/reorder";
+    page: "/api/tracks/reorder";
   };
   "routes/api/tracks/$id.tsx": {
     id: "routes/api/tracks/$id";

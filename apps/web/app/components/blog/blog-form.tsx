@@ -34,15 +34,13 @@ export const blogPostFormSchema = z.object({
   content: z.string().nullable(),
   state: z.enum([BlogPostState.DRAFT, BlogPostState.PUBLISHED]),
   publishedAt: z.string().nullable(),
-  files: z
-    .array(
-      z.object({
-        path: z.string(),
-        url: z.string(),
-        isCover: z.boolean().optional(),
-      }),
-    )
-    .default([]),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      url: z.string(),
+      isCover: z.boolean().optional(),
+    }),
+  ),
 });
 
 export type BlogPostFormValues = z.infer<typeof blogPostFormSchema>;

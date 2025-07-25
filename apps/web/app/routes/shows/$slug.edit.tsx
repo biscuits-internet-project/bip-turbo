@@ -1,9 +1,10 @@
-import type { Show, Band, Venue } from "@bip/domain";
+import type { Show, Band, Venue, Track } from "@bip/domain";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ShowForm, type ShowFormValues } from "~/components/show/show-form";
+import { TrackManager } from "~/components/track/track-manager";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -15,6 +16,7 @@ interface LoaderData {
   show: Show;
   bands: Band[];
   venues: Venue[];
+  tracks: Track[];
 }
 
 export const loader = adminLoader(async ({ params }) => {
@@ -28,7 +30,10 @@ export const loader = adminLoader(async ({ params }) => {
     throw notFound(`Show with slug "${slug}" not found`);
   }
 
-  return { show, bands };
+  // Get tracks for this show
+  const tracks = await services.tracks.findByShowId(show.id);
+
+  return { show, bands, tracks };
 });
 
 export const action = adminLoader(async ({ request, params }) => {
@@ -53,7 +58,7 @@ export const action = adminLoader(async ({ request, params }) => {
 });
 
 export default function EditShow() {
-  const { show, bands } = useSerializedLoaderData<LoaderData>();
+  const { show, bands, tracks } = useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<ShowFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -116,18 +121,24 @@ export default function EditShow() {
         </Button>
       </div>
 
-      <Card className="relative overflow-hidden border-gray-800 transition-all duration-300">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
-        <CardContent className="relative z-10 p-6">
-          <ShowForm
-            defaultValues={defaultValues}
-            onSubmit={handleSubmit}
-            submitLabel="Update Show"
-            cancelHref={`/shows/${show.slug}`}
-            bands={bands}
-          />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card className="relative overflow-hidden border-gray-800 transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
+          <CardContent className="relative z-10 p-6">
+            <ShowForm
+              defaultValues={defaultValues}
+              onSubmit={handleSubmit}
+              submitLabel="Update Show"
+              cancelHref={`/shows/${show.slug}`}
+              bands={bands}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="mt-6">
+          <TrackManager showId={show.id} initialTracks={tracks} />
+        </div>
+      </div>
     </div>
   );
 }

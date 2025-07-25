@@ -9,7 +9,6 @@ import { ReviewsList } from "~/components/review";
 import { ReviewForm } from "~/components/review/review-form";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
-import { TrackManager } from "~/components/track/track-manager";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
@@ -93,7 +92,7 @@ export function meta({ data }: { data: ShowLoaderData }) {
 
 export default function Show() {
   const { setlist, reviews: initialReviews, selectedRecordingId } = useSerializedLoaderData<ShowLoaderData>();
-  const { user, session } = useSession();
+  const { user, supabase } = useSession();
   const queryClient = useQueryClient();
 
   // Query for reviews
@@ -256,11 +255,6 @@ export default function Show() {
             showRating={setlist.show.averageRating}
           />
 
-          <AdminOnly>
-            <div className="mt-6">
-              <TrackManager showId={setlist.show.id} />
-            </div>
-          </AdminOnly>
 
           <div className="mt-6">
             {reviews && reviews.length === 0 && (

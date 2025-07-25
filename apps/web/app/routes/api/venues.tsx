@@ -35,7 +35,8 @@ export const loader = publicLoader(async ({ request }) => {
     });
   } catch (error) {
     console.error("Venue search error:", error);
-    return new Response(JSON.stringify({ error: error.message, query }), {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return new Response(JSON.stringify({ error: errorMessage, query }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

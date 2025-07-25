@@ -23,7 +23,7 @@ make dev                             # Same as bun run dev
 bun run build                        # Build all apps and packages
 bun run typecheck                    # Type check apps/web only
 bun run typecheck:all                # Type check all packages
-make tc                              # Shorthand for typecheck:all
+make tc                              # Shorthand for typecheck:all (ALWAYS run from root)
 ```
 
 **Code Quality:**
