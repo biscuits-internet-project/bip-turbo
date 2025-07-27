@@ -69,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body className="min-h-screen font-sans antialiased">
         <QueryClientProvider client={queryClient}>
           <SupabaseProvider env={env}>
             <GlobalSearchProvider>

@@ -19,9 +19,12 @@ interface LoaderData {
 export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
   const { currentUser } = context;
 
-  const tourDates = Array.isArray(await services.tourDatesService.getTourDates())
+  const allTourDates = Array.isArray(await services.tourDatesService.getTourDates())
     ? await services.tourDatesService.getTourDates()
     : [];
+  
+  // Limit to next 8 upcoming dates for home page
+  const tourDates = allTourDates.slice(0, 8);
 
   // Get recent shows (last 5)
   const recentShows = await services.setlists.findMany({
@@ -163,6 +166,9 @@ export default function Index() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
+              <Link to="/shows/tour-dates" className="text-purple-500 hover:text-purple-400 flex items-center">
+                View more <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
             </div>
 
             {tourDates.length > 0 ? (
