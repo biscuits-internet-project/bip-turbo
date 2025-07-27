@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import {
   Links,
@@ -14,9 +13,9 @@ import {
 } from "react-router-dom";
 import { Toaster } from "sonner";
 import { NotFound, ServerError } from "~/components/layout/errors";
-import { RootLayout } from "~/components/layout/root-layout";
+import { HeaderLayout } from "~/components/layout/header-layout";
 import { SearchProvider } from "~/components/search/search-provider";
-import { SidebarProvider } from "~/components/ui/sidebar";
+import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
@@ -59,7 +58,8 @@ const queryClient = new QueryClient({
 });
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { env } = useLoaderData() as RootData;
+  const data = useLoaderData() as RootData | undefined;
+  const env = data?.env;
 
   return (
     <html lang="en" className="font-quicksand dark">
@@ -72,15 +72,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body className="min-h-screen bg-background font-sans antialiased">
         <QueryClientProvider client={queryClient}>
           <SupabaseProvider env={env}>
-            <SearchProvider>
-              <ClientOnly>
-                {(isDesktop) => (
-                  <SidebarProvider defaultOpen={isDesktop}>
-                    <RootLayout>{children}</RootLayout>
-                  </SidebarProvider>
-                )}
-              </ClientOnly>
-            </SearchProvider>
+            <GlobalSearchProvider>
+              <SearchProvider>
+                <HeaderLayout>{children}</HeaderLayout>
+              </SearchProvider>
+            </GlobalSearchProvider>
           </SupabaseProvider>
           <ReactQueryDevtools initialIsOpen={false} />
           <Toaster position="top-right" theme="dark" />
@@ -92,40 +88,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Client-only component to handle window-dependent logic
-function ClientOnly({ children }: { children: (isDesktop: boolean) => React.ReactNode }) {
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-    const checkDesktop = () => window.innerWidth >= 768;
-    setIsDesktop(checkDesktop());
-
-    const handleResize = () => {
-      setIsDesktop(checkDesktop());
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  if (!isMounted) {
-    // Return a placeholder with the same structure during SSR
-    return (
-      <SearchProvider>
-        <SidebarProvider defaultOpen={true}>
-          <RootLayout>{null}</RootLayout>
-        </SidebarProvider>
-      </SearchProvider>
-    );
-  }
-
-  return children(isDesktop);
-}
 
 export default function App() {
-  const { env } = useLoaderData() as RootData;
   return <Outlet />;
 }
 

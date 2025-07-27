@@ -1,8 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.5.3/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
   "linter": {
     "enabled": true,
     "rules": {
@@ -22,14 +19,14 @@
     }
   },
   "files": {
-    "include": ["apps/**/*", "packages/**/*"],
-    "ignore": [
+    "includes": ["apps/**/*", "packages/**/*"],
+    "experimentalScannerIgnores": [
       "**/build/**",
       "**/dist/**",
       "**/.turbo/**",
       "**/node_modules/**",
       "**/tailwind.config.js",
-      "**/.react-router/types/+register.ts"
+      "**/.react-router/**"
     ]
   }
 }

@@ -19,7 +19,20 @@ export default defineConfig({
       plugins: [tailwindcss() as any, autoprefixer() as any],
     },
   },
-  plugins: [reactRouter(), tsconfigPaths()],
+  plugins: [
+    reactRouter(),
+    tsconfigPaths(),
+    {
+      name: 'handle-well-known',
+      configureServer(server) {
+        server.middlewares.use('/.well-known', (req, res, next) => {
+          // Silently return 404 for .well-known requests
+          res.statusCode = 404;
+          res.end();
+        });
+      },
+    },
+  ],
   ssr: {
     noExternal: ["use-elapsed-time"],
   },
