@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Monoton&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -56,28 +55,28 @@
     --laser-4: 145 100% 55%;  /* Lighter Green */
     --laser-5: 130 100% 45%;  /* Deep Green */
     --laser-6: 150 100% 50%;  /* Mint Green */
- 
+
     --card: 224 71% 4%;
     --card-foreground: 213 31% 91%;
- 
+
     --popover: 224 71% 4%;
     --popover-foreground: 213 31% 91%;
- 
+
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
- 
+
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
- 
+
     --muted: 223 47% 11%;
     --muted-foreground: 215.4 16.3% 56.9%;
- 
+
     --accent: 267 75% 25%;
     --accent-foreground: 267 100% 85%;
- 
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
- 
+
     --border: 216 34% 17%;
     --input: 216 34% 17%;
     --ring: 267 75% 25%;
@@ -287,4 +286,4 @@
   body {
     @apply bg-background text-foreground;
   }
-} 
+}
