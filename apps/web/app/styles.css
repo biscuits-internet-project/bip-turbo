@@ -1,82 +1,62 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Monoton&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @layer base {
+  /* Legacy CSS Custom Properties for backward compatibility */
   :root {
-    --font-header: 'Monoton', cursive;
-    --font-heading: 'Roboto', sans-serif;
-    --font-body: 'Roboto', sans-serif;
-    --font-mono: 'Roboto', monospace;
-
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-    --sidebar-width: 16rem;
-    --sidebar-width-icon: 3rem;
-    --sidebar-width-mobile: 18rem;
-
+    --laser-1: 267 100% 50%;
+    --laser-2: 140 100% 50%;
+    --laser-3: 135 100% 45%;
+    --laser-4: 145 100% 55%;
+    --laser-5: 130 100% 45%;
+    --laser-6: 150 100% 50%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
- 
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
- 
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
- 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
- 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
- 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
- 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
- 
     --radius: 0.5rem;
   }
  
   .dark {
     --background: 224 71% 4%;
     --foreground: 213 31% 91%;
-    --laser-1: 267 100% 50%;  /* Purple */
-    --laser-2: 140 100% 50%;  /* Bright Neon Green */
-    --laser-3: 135 100% 45%;  /* Slightly Darker Green */
-    --laser-4: 145 100% 55%;  /* Lighter Green */
-    --laser-5: 130 100% 45%;  /* Deep Green */
-    --laser-6: 150 100% 50%;  /* Mint Green */
-
+    --laser-1: 267 100% 50%;
+    --laser-2: 140 100% 50%;
+    --laser-3: 135 100% 45%;
+    --laser-4: 145 100% 55%;
+    --laser-5: 130 100% 45%;
+    --laser-6: 150 100% 50%;
     --card: 224 71% 4%;
     --card-foreground: 213 31% 91%;
-
     --popover: 224 71% 4%;
     --popover-foreground: 213 31% 91%;
-
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
-
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 223 47% 11%;
     --muted-foreground: 215.4 16.3% 56.9%;
-
     --accent: 267 75% 25%;
     --accent-foreground: 267 100% 85%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 216 34% 17%;
     --input: 216 34% 17%;
     --ring: 267 75% 25%;
@@ -97,10 +77,14 @@
   }
 
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+  
   body {
-    @apply bg-background text-foreground relative overflow-x-hidden;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    position: relative;
+    overflow-x: hidden;
     font-family: var(--font-body);
   }
 
@@ -232,6 +216,68 @@
     margin-bottom: 0.5em;
     display: block;
   }
+
+  /* Custom keyframes for animations */
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  
+  @keyframes star-pulse {
+    0% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+    50% {
+      transform: scale(1.2);
+      filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.6));
+    }
+    100% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+  }
+  
+  @keyframes star-glow {
+    0% { filter: brightness(100%); }
+    50% { filter: brightness(150%); }
+    100% { filter: brightness(100%); }
+  }
+  
+  @keyframes rating-update {
+    0% {
+      transform: scale(1);
+      filter: brightness(100%) drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+    50% {
+      transform: scale(1.4);
+      filter: brightness(150%) drop-shadow(0 0 8px rgba(250, 204, 21, 0.8));
+    }
+    100% {
+      transform: scale(1);
+      filter: brightness(100%) drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+  }
+  
+  @keyframes avg-rating-update {
+    0% {
+      transform: scale(1);
+      filter: brightness(100%);
+    }
+    40% {
+      transform: scale(1.5);
+      filter: brightness(150%) drop-shadow(0 0 12px rgba(250, 204, 21, 0.9));
+    }
+    100% {
+      transform: scale(1);
+      filter: brightness(100%);
+    }
+  }
 }
 
 @layer components {
@@ -281,9 +327,11 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: hsl(var(--border));
+    outline-color: hsl(var(--ring) / 0.5);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
