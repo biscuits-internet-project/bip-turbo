@@ -12,6 +12,13 @@ export default defineConfig({
     },
     sourcemap: process.env.NODE_ENV === "development",
   },
+  css: {
+    postcss: {
+      plugins: [
+        require('@tailwindcss/postcss'),
+      ],
+    },
+  },
   plugins: [
     reactRouter(),
     tsconfigPaths(),
