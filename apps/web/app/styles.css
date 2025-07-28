@@ -54,6 +54,12 @@
     --laser-4: 145 100% 55%;                 /* Electric green laser */
     --laser-5: 265 90% 40%;                  /* Deep violet laser */
     --laser-6: 150 95% 50%;                  /* Bright green laser */
+    --laser-white-1: 0 0% 95%;               /* Bright white laser */
+    --laser-white-2: 240 20% 90%;            /* Cool white laser */
+    --laser-cyan: 180 100% 60%;              /* Cyan laser */
+    --laser-magenta: 300 100% 60%;           /* Magenta laser */
+    --laser-blue: 220 100% 55%;              /* Electric blue laser */
+    --laser-red: 0 100% 60%;                 /* Red laser */
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 224 71% 4%;
@@ -216,32 +222,6 @@
     position: relative;
   }
 
-  html::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-      linear-gradient(115deg, transparent 0%, transparent 49.8%, hsla(var(--laser-1) / 0.15) 50%, hsla(var(--laser-1) / 0.15) 50.2%, transparent 50.4%),
-      linear-gradient(155deg, transparent 0%, transparent 49.8%, hsla(var(--laser-3) / 0.15) 50%, hsla(var(--laser-3) / 0.15) 50.2%, transparent 50.4%),
-      linear-gradient(45deg, transparent 0%, transparent 49.8%, hsla(var(--laser-2) / 0.15) 50%, hsla(var(--laser-2) / 0.15) 50.2%, transparent 50.4%),
-      linear-gradient(-60deg, transparent 0%, transparent 49.8%, hsla(var(--laser-4) / 0.15) 50%, hsla(var(--laser-4) / 0.15) 50.2%, transparent 50.4%),
-      linear-gradient(90deg, transparent 0%, transparent 49.8%, hsla(var(--laser-5) / 0.15) 50%, hsla(var(--laser-5) / 0.15) 50.2%, transparent 50.4%),
-      linear-gradient(-30deg, transparent 0%, transparent 49.8%, hsla(var(--laser-6) / 0.15) 50%, hsla(var(--laser-6) / 0.15) 50.2%, transparent 50.4%);
-    background-size: 600px 800px, 800px 600px, 700px 500px, 500px 700px, 900px 400px, 400px 900px;
-    filter: blur(4px) brightness(2.5);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 1;
-    animation: laser-drift-1 120s linear infinite;
-  }
-
-  @keyframes laser-drift-1 {
-    0% { background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%; }
-    100% { background-position: 600px 800px, -800px -600px, 700px -500px, -500px 700px, 900px 400px, -400px 900px; }
-  }
 
   /* Remove sidebar background completely */
   html [data-sidebar="sidebar"],

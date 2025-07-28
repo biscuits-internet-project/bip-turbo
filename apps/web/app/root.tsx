@@ -17,6 +17,7 @@ import { HeaderLayout } from "~/components/layout/header-layout";
 import { SearchProvider } from "~/components/search/search-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { SupabaseProvider } from "~/context/supabase-provider";
+import { ConcertLights } from "~/components/concert-lights";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
 import type { Route } from ".react-router/types/app/+types/root";
@@ -70,6 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="min-h-screen font-sans antialiased">
+        <ConcertLights />
         <QueryClientProvider client={queryClient}>
           <SupabaseProvider env={env}>
             <GlobalSearchProvider>

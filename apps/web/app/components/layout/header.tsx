@@ -16,6 +16,7 @@ import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { SearchButton } from "~/components/search/search-button";
+import { UserDropdown } from "~/components/layout/user-dropdown";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { useSession } from "~/hooks/use-session";
 import { useGlobalSearch } from "~/hooks/use-global-search";
@@ -47,10 +48,10 @@ export function Header() {
         <div className="flex items-center">
           <Link 
             to="/" 
-            className="flex items-center justify-center h-10 w-10 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors"
+            className="flex items-center justify-center h-10 w-10 rounded-lg bg-brand-primary/20 hover:bg-brand-primary/30 transition-colors"
             title="Home"
           >
-            <Home className="h-5 w-5 text-foreground" />
+            <Home className="h-5 w-5 text-brand-primary" />
           </Link>
         </div>
 
@@ -61,7 +62,7 @@ export function Header() {
               <Link
                 key={item.href}
                 to={item.href}
-                className="flex items-center rounded-md px-4 py-2 text-base font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground hover:bg-accent/10"
+                className="flex items-center rounded-md px-4 py-2 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
               >
                 <item.icon className="h-4 w-4 mr-2" />
                 <span>{item.name}</span>
@@ -86,20 +87,9 @@ export function Header() {
           {!loading && (
             <div className="hidden sm:flex items-center space-x-2">
               {user ? (
-                <div className="flex items-center space-x-2">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={user.user_metadata?.avatar_url} />
-                    <AvatarFallback className="bg-accent text-accent-foreground text-xs">
-                      {username?.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden lg:block text-sm font-medium text-foreground">{username}</span>
-                  <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-accent-foreground">
-                    <Link to="/auth/logout">Sign out</Link>
-                  </Button>
-                </div>
+                <UserDropdown user={user} />
               ) : (
-                <Button variant="ghost" size="sm" asChild>
+                <Button variant="ghost" size="sm" asChild className="glass-secondary hover:glass-content transition-all duration-200">
                   <Link to="/auth/login">Sign in</Link>
                 </Button>
               )}
@@ -112,7 +102,7 @@ export function Header() {
               variant="ghost"
               size="icon"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-muted-foreground hover:text-accent-foreground"
+              className="text-content-text-secondary hover:text-brand-primary"
             >
               {mobileMenuOpen ? (
                 <X className="h-5 w-5" />
@@ -142,7 +132,7 @@ export function Header() {
                   key={item.href}
                   to={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center rounded-md px-4 py-3 text-base font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground hover:bg-accent/10"
+                  className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
                 >
                   <item.icon className="h-5 w-5 mr-3" />
                   <span>{item.name}</span>
@@ -166,7 +156,7 @@ export function Header() {
                       <Link
                         to="/auth/logout"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center rounded-md px-4 py-3 text-base font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground hover:bg-accent/10"
+                        className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
                       >
                         Sign out
                       </Link>
@@ -175,7 +165,7 @@ export function Header() {
                     <Link
                       to="/auth/login"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center rounded-md px-4 py-3 text-base font-medium text-muted-foreground transition-all duration-200 hover:text-accent-foreground hover:bg-accent/10"
+                      className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
                     >
                       Sign in
                     </Link>

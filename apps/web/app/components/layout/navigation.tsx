@@ -56,11 +56,11 @@ export function Navigation() {
           className={({ isActive }) =>
             cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-md font-medium",
-              "hover:bg-accent hover:text-accent-foreground",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "text-content-text-secondary hover:bg-hover-glass hover:text-brand-primary",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary",
               "transition-colors duration-200",
               "group/nav-item",
-              isActive && "bg-accent text-accent-foreground",
+              isActive && "bg-brand-primary text-content-text-primary shadow-lg",
             )
           }
         >
