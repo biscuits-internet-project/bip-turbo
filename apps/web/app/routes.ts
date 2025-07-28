@@ -46,6 +46,16 @@ export default [
     route("forgot-password", "routes/auth/forgot-password.tsx"),
   ]),
 
+  // Profile routes
+  ...prefix("profile", [
+    route("edit", "routes/profile/edit.tsx"),
+  ]),
+
+  // User profile routes
+  ...prefix("users", [
+    route(":username", "routes/users/$username.tsx"),
+  ]),
+
   // Blog routes with layout
   layout("routes/blog/_layout.tsx", [
     ...prefix("blog", [
@@ -88,6 +98,7 @@ export default [
     route("tracks/reorder", "routes/api/tracks/reorder.tsx"),
     route("tracks/:id", "routes/api/tracks/$id.tsx"),
     route("search", "routes/api/search.tsx"),
+    route("users", "routes/api/users.tsx"),
   ]),
 
   // Health check route

@@ -6,6 +6,7 @@ export const userSchema = z.object({
   updatedAt: z.date(),
   email: z.string().email(),
   username: z.string(),
+  avatarUrl: z.string().url().nullable(),
 });
 
 export const userMinimalSchema = userSchema

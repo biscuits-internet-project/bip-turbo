@@ -14,4 +14,12 @@ export class UserService {
   async findMany(): Promise<User[]> {
     return this.repository.findMany();
   }
+
+  async findByUsername(username: string): Promise<User | null> {
+    return this.repository.findBySlug(username);
+  }
+
+  async update(id: string, data: Partial<User>): Promise<User | null> {
+    return this.repository.update(id, data);
+  }
 }

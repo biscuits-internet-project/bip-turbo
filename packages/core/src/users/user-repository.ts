@@ -8,6 +8,7 @@ export function mapUserToDomainEntity(dbUser: DbUser): User {
     id: dbUser.id,
     username: dbUser.username ?? "",
     email: dbUser.email ?? "",
+    avatarUrl: null, // TODO: Implement avatar storage
     createdAt: dbUser.createdAt,
     updatedAt: dbUser.updatedAt,
   };
@@ -21,7 +22,7 @@ export function mapToUserMinimal(dbUser: DbUser): UserMinimal {
   return {
     id: dbUser.id,
     username: dbUser.username ?? "",
-    avatarUrl: "",
+    avatarUrl: null, // TODO: Implement avatar storage
   };
 }
 
@@ -59,6 +60,19 @@ export class UserRepository {
     });
 
     return results.map((result: DbUser) => mapUserToDomainEntity(result));
+  }
+
+  async update(id: string, data: Partial<User>): Promise<User | null> {
+    try {
+      const dbData = mapUserToDbModel(data);
+      const result = await this.db.user.update({
+        where: { id },
+        data: dbData,
+      });
+      return mapUserToDomainEntity(result);
+    } catch (error) {
+      return null;
+    }
   }
 
   async delete(id: string): Promise<boolean> {

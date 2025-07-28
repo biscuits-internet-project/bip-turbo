@@ -1,4 +1,4 @@
-import { LogOut, User } from "lucide-react";
+import { Edit, Eye, LogOut, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
@@ -99,13 +99,33 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
             "group"
           )}
         >
-          <Link to="/profile" className="flex items-center space-x-3">
+          <Link to={`/users/${username}`} className="flex items-center space-x-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-primary/10 group-hover:bg-brand-primary/20 transition-colors">
-              <User className="h-4 w-4 text-brand-primary" />
+              <Eye className="h-4 w-4 text-brand-primary" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-medium">My Profile</span>
-              <span className="text-xs text-content-text-secondary">Manage your account</span>
+              <span className="text-sm font-medium">View Profile</span>
+              <span className="text-xs text-content-text-secondary">See your public profile</span>
+            </div>
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem 
+          asChild
+          className={cn(
+            "cursor-pointer rounded-lg p-3 transition-all duration-200",
+            "hover:bg-brand-secondary/10 hover:text-brand-secondary",
+            "focus:bg-brand-secondary/10 focus:text-brand-secondary",
+            "group"
+          )}
+        >
+          <Link to="/profile/edit" className="flex items-center space-x-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-secondary/10 group-hover:bg-brand-secondary/20 transition-colors">
+              <Edit className="h-4 w-4 text-brand-secondary" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Edit Profile</span>
+              <span className="text-xs text-content-text-secondary">Update your settings</span>
             </div>
           </Link>
         </DropdownMenuItem>
