@@ -51,14 +51,14 @@ export default function TopRated() {
     <div className="">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Top Rated Shows</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">Top Rated Shows</h1>
         </div>
 
-        <Card className="bg-content-bg border-content-bg-secondary">
+        <Card className="card-premium">
           <div className="relative overflow-x-auto">
             <table className="w-full text-md">
               <thead>
-                <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
+                <tr className="text-left text-sm text-content-text-secondary border-b border-glass-border/40">
                   <th className="p-4">Rank</th>
                   <th className="p-4">Rating</th>
                   <th className="p-4">Number of Ratings</th>
@@ -69,29 +69,29 @@ export default function TopRated() {
               </thead>
               <tbody>
                 {shows.map((show, index) => (
-                  <tr key={show.id} className="border-b border-border/40 group">
+                  <tr key={show.id} className="border-b border-glass-border/40 group">
                     <td className="p-0" colSpan={6}>
-                      <Link to={`/shows/${show.slug}`} className="flex w-full hover:bg-accent/5 transition-colors">
+                      <Link to={`/shows/${show.slug}`} className="flex w-full hover:bg-hover-glass transition-colors">
                         <div className="p-4 w-[100px]">
-                          <span className="text-white font-medium">{index + 1}</span>
+                          <span className="text-content-text-primary font-medium">{index + 1}</span>
                         </div>
                         <div className="p-4 w-[140px]">
                           <div className="flex items-center">
                             <Star className="h-4 w-4 text-rating-gold mr-1" />
-                            <span className="text-white font-medium">{show.averageRating?.toFixed(1) || "—"}</span>
+                            <span className="text-content-text-primary font-medium">{show.averageRating?.toFixed(1) || "—"}</span>
                           </div>
                         </div>
                         <div className="p-4 w-[180px]">
-                          <span className="text-white">{show.ratingsCount}</span>
+                          <span className="text-content-text-primary">{show.ratingsCount}</span>
                         </div>
                         <div className="p-4 w-[140px]">
-                          <span className="text-white group-hover:underline">{formatDateShort(show.date)}</span>
+                          <span className="text-brand-primary group-hover:underline group-hover:text-brand-secondary">{formatDateShort(show.date)}</span>
                         </div>
                         <div className="p-4 flex-1">
-                          <span className="text-white">{show.venue?.name || "Unknown Venue"}</span>
+                          <span className="text-content-text-primary">{show.venue?.name || "Unknown Venue"}</span>
                         </div>
                         <div className="p-4 flex-1">
-                          <span className="text-white font-medium">
+                          <span className="text-content-text-secondary font-medium">
                             {show.venue
                               ? [show.venue.city, show.venue.state, show.venue.country].filter(Boolean).join(", ")
                               : ""}

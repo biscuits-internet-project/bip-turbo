@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
 import { VenueForm, type VenueFormValues } from "~/components/venue/venue-form";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminLoader } from "~/lib/base-loaders";
@@ -86,7 +87,7 @@ export default function EditVenue() {
   return (
     <div className="">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-white">Edit Venue</h1>
+        <h1 className="text-3xl font-bold text-content-text-primary">Edit Venue</h1>
         <Button variant="outline" size="sm" asChild>
           <Link to={`/venues/${venue.slug}`} className="flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" />
@@ -95,14 +96,16 @@ export default function EditVenue() {
         </Button>
       </div>
 
-      <div className="bg-content-bg rounded-lg shadow-md p-6">
-        <VenueForm
-          defaultValues={defaultValues}
-          onSubmit={handleSubmit}
-          submitLabel="Update Venue"
-          cancelHref={`/venues/${venue.slug}`}
-        />
-      </div>
+      <Card className="card-premium">
+        <CardContent className="p-6">
+          <VenueForm
+            defaultValues={defaultValues}
+            onSubmit={handleSubmit}
+            submitLabel="Update Venue"
+            cancelHref={`/venues/${venue.slug}`}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

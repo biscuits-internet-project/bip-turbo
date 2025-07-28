@@ -67,19 +67,18 @@ export default function NewBlogPost() {
   return (
     <div className="">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-white">Create Blog Post</h1>
+        <h1 className="text-3xl font-bold text-content-text-primary">Create Blog Post</h1>
         <Button variant="outline" size="sm" asChild>
           <Link to="/blog" className="flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" />
-            Back to Blog
+            <span>Back to Blog</span>
           </Link>
         </Button>
       </div>
 
       <AdminOnly>
-        <Card className="relative overflow-hidden border-content-bg-secondary transition-all duration-300">
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
-          <CardContent className="relative z-10 p-6">
+        <Card className="card-premium">
+          <CardContent className="p-6">
             <BlogPostForm submitLabel="Create Post" cancelHref="/blog" />
           </CardContent>
         </Card>

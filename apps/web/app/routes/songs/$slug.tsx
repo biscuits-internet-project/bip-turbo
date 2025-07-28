@@ -15,7 +15,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpIcon, BarChart2Icon, FileTextIcon, GuitarIcon, Pencil, StarIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowLeft, ArrowUpIcon, BarChart2Icon, FileTextIcon, GuitarIcon, Pencil, StarIcon } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import Markdown from "react-markdown";
@@ -46,7 +46,7 @@ interface StatBoxProps {
 
 function StatBox({ label, value, sublabel }: StatBoxProps) {
   return (
-    <div className="p-6 bg-content-bg rounded-lg border border-content-bg-secondary">
+    <div className="glass-content p-6 rounded-lg">
       <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
       <dd className="mt-2">
         <span className="text-3xl font-bold text-content-text-primary">{value}</span>
@@ -72,7 +72,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
       enableSorting: true,
       sortingFn: "datetime",
       cell: (info) => (
-        <a href={`/shows/${info.row.original.show.slug}`} className="">
+        <a href={`/shows/${info.row.original.show.slug}`} className="text-brand-primary hover:text-brand-secondary">
           {info.getValue()}
         </a>
       ),
@@ -91,7 +91,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
         cell: (info) => {
           const venue = info.getValue();
           return venue.city ? (
-            <a href={`/shows/${venue.slug}`} className="">
+            <a href={`/shows/${venue.slug}`} className="text-brand-primary hover:text-brand-secondary">
               {venue.name}
               <br />
               {venue.city}, {venue.state}
@@ -114,7 +114,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
         cell: (info) => {
           const song = info.getValue();
           return song.slug ? (
-            <a href={`/songs/${song.slug}`} className="text-muted-foreground">
+            <a href={`/songs/${song.slug}`} className="text-content-text-secondary hover:text-brand-primary">
               {song.title} {song.segue ? ">" : ""}
             </a>
           ) : null;
@@ -135,7 +135,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
         cell: (info) => {
           const song = info.getValue();
           return song.slug ? (
-            <a href={`/songs/${song.slug}`} className="text-muted-foreground">
+            <a href={`/songs/${song.slug}`} className="text-content-text-secondary hover:text-brand-primary">
               {song.title} {song.segue ? ">" : ""}
             </a>
           ) : null;
@@ -175,7 +175,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
       <table className="w-full text-md">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="text-left text-sm text-muted-foreground">
+            <tr key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
               {headerGroup.headers.map((header) => (
                 <th key={header.id} className="p-3" style={{ width: header.getSize() }}>
                   {header.isPlaceholder ? null : (
@@ -194,7 +194,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </span>
                       {header.column.getIsSorted() && (
-                        <span className="text-brand ml-1">
+                        <span className="text-brand-primary ml-1">
                           {header.column.getIsSorted() === "asc" ? (
                             <ArrowUpIcon className="h-4 w-4 inline" />
                           ) : (
@@ -211,7 +211,7 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="border-t border-border/40 hover:bg-accent/5">
+            <tr key={row.id} className="border-t border-glass-border/30 hover:bg-hover-glass">
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id} className="p-3">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -247,7 +247,7 @@ export default function SongPage() {
             <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">{song.title}</h1>
             {song.authorName && (
               <span className="text-content-text-secondary text-lg">
-                by <span className="text-brand">{song.authorName}</span>
+                by <span className="text-brand-primary">{song.authorName}</span>
               </span>
             )}
           </div>
@@ -255,7 +255,7 @@ export default function SongPage() {
             <Button
               asChild
               variant="outline"
-              className="border-brand/50 hover:bg-brand/10 text-brand hover:text-hover-accent"
+              className="btn-secondary"
             >
               <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
                 <Pencil className="h-4 w-4" />
@@ -263,6 +263,17 @@ export default function SongPage() {
               </Link>
             </Button>
           </AdminOnly>
+        </div>
+        
+        {/* Subtle back link */}
+        <div className="flex justify-start">
+          <Link 
+            to="/songs" 
+            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back to songs</span>
+          </Link>
         </div>
       </div>
 
@@ -284,7 +295,7 @@ export default function SongPage() {
       </dl>
 
       {song.notes && (
-        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+        <div className="glass-content rounded-lg p-4">
           <div className="text-md text-content-text-tertiary whitespace-pre-wrap leading-relaxed">
             <Markdown>{song.notes}</Markdown>
           </div>
@@ -292,7 +303,7 @@ export default function SongPage() {
       )}
 
       <Tabs defaultValue="all-timers" className="w-full">
-        <TabsList className="w-full flex justify-start border-b border-content-bg-secondary rounded-none bg-transparent p-0">
+        <TabsList className="w-full flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
           <TabsTrigger
             value="all-timers"
             className={cn(
@@ -341,13 +352,13 @@ export default function SongPage() {
 
         <TabsContent value="all-timers" className="mt-4">
           {allTimers.length > 0 && (
-            <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+            <div className="glass-content rounded-lg p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {allTimers.map((p) => (
                   <a
                     href={`/shows/${p.show.slug}`}
                     key={p.trackId}
-                    className="block rounded-lg border border-border/40 bg-black/20 hover:bg-accent/10 transition-all duration-200"
+                    className="card-premium block rounded-lg hover:border-brand-primary/60 transition-all duration-200"
                   >
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-3 mb-2">
@@ -364,7 +375,7 @@ export default function SongPage() {
                           </div>
                         )}
                         {p.notes && (
-                          <div className="mt-3 pt-3 border-t border-border/40">
+                          <div className="mt-3 pt-3 border-t border-glass-border/30">
                             <div className="text-sm text-content-text-tertiary">{p.notes}</div>
                           </div>
                         )}
@@ -379,7 +390,7 @@ export default function SongPage() {
 
         <TabsContent value="lyrics" className="mt-4">
           {song.lyrics && (
-            <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+            <div className="glass-content rounded-lg p-4">
               <div className="overflow-x-auto">
                 <div className="text-md text-content-text-tertiary whitespace-pre-wrap leading-relaxed">
                   <Markdown>{song.lyrics.replace(/<br\/?>/g, "\n")}</Markdown>
@@ -390,7 +401,7 @@ export default function SongPage() {
         </TabsContent>
 
         <TabsContent value="yearly-plays" className="mt-4">
-          <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+          <div className="glass-content rounded-lg p-4">
             <ChartContainer config={{}} className="min-h-[300px] w-full">
               <BarChart
                 accessibilityLayer
@@ -421,7 +432,7 @@ export default function SongPage() {
         </TabsContent>
 
         <TabsContent value="guitar-tabs" className="mt-4">
-          <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+          <div className="glass-content rounded-lg p-4">
             <div className="overflow-x-auto">
               <div className="text-md text-content-text-tertiary whitespace-pre-wrap leading-relaxed">
                 {song.tabs ? (
@@ -431,7 +442,7 @@ export default function SongPage() {
                     href={song.guitarTabsUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-brand-secondary hover:underline"
+                    className="text-brand-primary hover:text-brand-secondary hover:underline"
                   >
                     View Guitar Tabs
                   </a>
@@ -446,7 +457,7 @@ export default function SongPage() {
 
       {/* Performance History */}
       <div className="w-full">
-        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4 md:p-6">
+        <div className="card-premium rounded-lg p-4 md:p-6">
           <h2 className="text-xl font-semibold text-content-text-primary mb-4">Performance History</h2>
           <PerformanceTable performances={performances} />
         </div>

@@ -36,14 +36,14 @@ export default function TourDates() {
     <div className="">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Tour Dates</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">Tour Dates</h1>
         </div>
 
-        <Card className="bg-content-bg border-content-bg-secondary">
+        <Card className="card-premium">
           <div className="relative overflow-x-auto">
             <table className="w-full text-md">
               <thead>
-                <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
+                <tr className="text-left text-sm text-content-text-secondary border-b border-glass-border/40">
                   <th className="p-4">Date</th>
                   <th className="p-4">Venue</th>
                   <th className="p-4">Address</th>
@@ -53,14 +53,14 @@ export default function TourDates() {
                 {dates.map((td: TourDate) => (
                   <tr
                     key={td.formattedStartDate + td.venueName}
-                    className="border-b border-border/40 hover:bg-accent/5"
+                    className="border-b border-glass-border/40 hover:bg-hover-glass"
                   >
-                    <td className="p-4 text-white">
+                    <td className="p-4 text-content-text-primary">
                       {td.formattedStartDate === td.formattedEndDate
                         ? td.formattedStartDate
                         : `${td.formattedStartDate} - ${td.formattedEndDate}`}
                     </td>
-                    <td className="p-4 text-white font-medium">{td.venueName}</td>
+                    <td className="p-4 text-brand-primary font-medium">{td.venueName}</td>
                     <td className="p-4 text-content-text-secondary">{td.address}</td>
                   </tr>
                 ))}

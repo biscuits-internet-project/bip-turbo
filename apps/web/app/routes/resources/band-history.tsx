@@ -49,22 +49,22 @@ const BandHistory: React.FC = () => {
     <div className="">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white">Band History</h1>
+          <h1 className="text-3xl font-bold text-content-text-primary">Band History</h1>
         </div>
 
-        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-6">
+        <div className="glass-content rounded-lg p-6">
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-white">Current Members</h2>
+            <h2 className="text-xl font-semibold text-content-text-primary">Current Members</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {data.currentMembers.map((member) => (
                 <div key={member.name} className="flex flex-col space-y-1">
-                  <h3 className="text-lg font-medium text-white">{member.name}</h3>
+                  <h3 className="text-lg font-medium text-content-text-primary">{member.name}</h3>
                   <p className="text-sm text-content-text-secondary">{member.instrument}</p>
                   <a
                     href={`https://twitter.com/${member.twitter}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-info hover:text-hover-accent transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-brand-primary hover:text-brand-secondary transition-colors"
                   >
                     @{member.twitter}
                     <Twitter className="h-4 w-4" />
@@ -75,7 +75,7 @@ const BandHistory: React.FC = () => {
           </div>
         </div>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Early Years</h3>
           </CardHeader>
@@ -121,7 +121,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">1997 - 1999</h3>
           </CardHeader>
@@ -163,7 +163,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2000 - The Disco Triscuits and The Maui Project</h3>
           </CardHeader>
@@ -195,7 +195,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2000 - 2004</h3>
           </CardHeader>
@@ -214,7 +214,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2005 - The Doctor is Out. Enter Batman.</h3>
           </CardHeader>
@@ -242,7 +242,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2006</h3>
           </CardHeader>
@@ -331,7 +331,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2007</h3>
           </CardHeader>
@@ -400,7 +400,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2008</h3>
           </CardHeader>
@@ -468,7 +468,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2009</h3>
           </CardHeader>
@@ -660,7 +660,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2011 - 2019 - Setbreak</h3>
           </CardHeader>
@@ -672,7 +672,7 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2019 - Present - Setbreak is Over</h3>
           </CardHeader>

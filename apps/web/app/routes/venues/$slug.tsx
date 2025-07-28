@@ -1,7 +1,7 @@
 import type { Setlist, Venue } from "@bip/domain";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
+import { ArrowLeft, CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -69,13 +69,13 @@ interface StatBoxProps {
 
 function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
   return (
-    <Card className="bg-content-bg border-content-bg-secondary">
+    <Card className="glass-content">
       <CardContent className="p-6">
         <div className="flex items-center space-x-2 text-content-text-secondary mb-2">
           {icon}
           <span className="text-sm font-medium">{label}</span>
         </div>
-        <div className="text-2xl font-bold text-white">{value || "—"}</div>
+        <div className="text-2xl font-bold text-content-text-primary">{value || "—"}</div>
         {sublabel && <div className="text-xs text-content-text-tertiary mt-1">{sublabel}</div>}
       </CardContent>
     </Card>
@@ -142,13 +142,13 @@ function VenueSetlistCard({
   }
 
   return (
-    <Card className="relative overflow-hidden border-content-bg-secondary transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
+    <Card className="card-premium relative overflow-hidden transition-all duration-300 hover:border-brand-primary/60">
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
 
-      <CardHeader className="relative z-10 border-b border-content-bg-secondary/50 px-6 py-5">
+      <CardHeader className="relative z-10 border-b border-glass-border/50 px-6 py-5">
         <div className="flex justify-between items-start">
           <div className="flex flex-col gap-1">
-            <div className="text-2xl font-medium text-brand hover:text-hover-accent transition-colors">
+            <div className="text-2xl font-medium text-brand-primary hover:text-brand-secondary transition-colors">
               <Link to={`/shows/${setlist.show.slug}`}>{formattedDate}</Link>
             </div>
             <div className="text-xl text-content-text-primary">
@@ -160,7 +160,7 @@ function VenueSetlistCard({
 
       <CardContent className="relative z-10 px-6 py-5">
         {setlist.show.notes && (
-          <div className="mb-4 text-sm text-content-text-secondary italic border-l border-content-bg-secondary pl-3 py-1">
+          <div className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1">
             {setlist.show.notes}
           </div>
         )}
@@ -186,14 +186,14 @@ function VenueSetlistCard({
                     <span className="inline-flex items-center gap-1">
                       <span
                         className={cn(
-                          "relative text-content-text-primary hover:text-hover-accent hover:underline transition-colors",
+                          "relative text-content-text-primary hover:text-brand-primary hover:underline transition-colors",
                           track.allTimer && "font-medium",
                         )}
                       >
                         {track.allTimer && <span className="text-chart-accent inline-block mr-1">🔥</span>}
                         <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
                         {trackAnnotationMap.has(track.id) && (
-                          <sup className="text-brand ml-0.5 font-medium">{trackAnnotationMap.get(track.id)}</sup>
+                          <sup className="text-brand-primary ml-0.5 font-medium">{trackAnnotationMap.get(track.id)}</sup>
                         )}
                       </span>
                     </span>
@@ -208,21 +208,21 @@ function VenueSetlistCard({
         </div>
 
         {orderedAnnotations.length > 0 && (
-          <div className="mt-6 space-y-2 pt-4 border-t border-content-bg-secondary/50">
+          <div className="mt-6 space-y-2 pt-4 border-t border-glass-border/50">
             {orderedAnnotations.map((annotation) => (
               <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-                <sup className="text-brand">{annotation.index}</sup> {annotation.desc}
+                <sup className="text-brand-primary">{annotation.index}</sup> {annotation.desc}
               </div>
             ))}
           </div>
         )}
 
-        <div className="flex justify-between items-end mt-6 pt-4 border-t border-content-bg-secondary/50">
+        <div className="flex justify-between items-end mt-6 pt-4 border-t border-glass-border/50">
           {orderedAnnotations.length > 0 ? (
             <div className="space-y-2">
               {orderedAnnotations.map((annotation) => (
                 <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-                  <sup className="text-brand">{annotation.index}</sup> {annotation.desc}
+                  <sup className="text-brand-primary">{annotation.index}</sup> {annotation.desc}
                 </div>
               ))}
             </div>
@@ -313,23 +313,36 @@ export default function VenuePage() {
 
   return (
     <div>
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-white">{venue.name}</h1>
-          <div className="flex items-center text-muted-foreground mt-1">
-            <MapPin className="h-4 w-4 mr-1" />
-            <span>{[venue.city, venue.state, venue.country].filter(Boolean).join(", ")}</span>
+      <div className="space-y-4 mb-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-content-text-primary">{venue.name}</h1>
+            <div className="flex items-center text-content-text-secondary mt-1">
+              <MapPin className="h-4 w-4 mr-1" />
+              <span>{[venue.city, venue.state, venue.country].filter(Boolean).join(", ")}</span>
+            </div>
           </div>
-        </div>
 
-        <AdminOnly>
-          <Button asChild size="sm" className="bg-brand hover:bg-hover-accent text-content-text-primary">
-            <Link to={`/venues/${venue.slug}/edit`} className="flex items-center gap-1">
-              <Edit className="h-4 w-4" />
-              <span>Edit Venue</span>
-            </Link>
-          </Button>
-        </AdminOnly>
+          <AdminOnly>
+            <Button asChild size="sm" className="btn-secondary">
+              <Link to={`/venues/${venue.slug}/edit`} className="flex items-center gap-1">
+                <Edit className="h-4 w-4" />
+                <span>Edit Venue</span>
+              </Link>
+            </Button>
+          </AdminOnly>
+        </div>
+        
+        {/* Subtle back link */}
+        <div className="flex justify-start">
+          <Link 
+            to="/venues" 
+            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back to venues</span>
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -356,11 +369,11 @@ export default function VenuePage() {
 
         {/* Setlists */}
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-white mb-4">Shows at this Venue</h2>
+          <h2 className="text-xl font-semibold text-content-text-primary mb-4">Shows at this Venue</h2>
           {setlists.length > 0 ? (
             setlists.map((setlist) => <VenueSetlistCard key={setlist.show.id} setlist={setlist} />)
           ) : (
-            <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-6 text-center text-content-text-secondary">
+            <div className="glass-content rounded-lg p-6 text-center text-content-text-secondary">
               No shows found for this venue.
             </div>
           )}

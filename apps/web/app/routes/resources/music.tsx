@@ -28,7 +28,7 @@ export default function Music() {
           <h1 className="text-3xl font-bold text-content-text-primary">Music Terminology</h1>
         </div>
 
-        <div className="bg-content-bg rounded-lg shadow-md p-6 mb-8">
+        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Inverted</h2>
           <p className="text-content-text-secondary mb-4">
             Inverted songs are played with the sections in reverse order. For example, if a song normally has an A-B-C
@@ -56,7 +56,7 @@ export default function Music() {
             <li>
               <Link
                 to="/shows/2009-12-31-the-fillmore-philadelphia-pa"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 12/31/2009 - The Fillmore, Philadelphia, PA
               </Link>{" "}
@@ -65,7 +65,7 @@ export default function Music() {
             <li>
               <Link
                 to="/shows/2010-01-16-theater-of-the-living-arts-philadelphia-pa"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 01/16/2010 - Theater of the Living Arts, Philadelphia, PA
               </Link>{" "}
@@ -74,7 +74,7 @@ export default function Music() {
           </ul>
         </div>
 
-        <div className="bg-content-bg rounded-lg shadow-md p-6 mb-8">
+        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Dyslexic</h2>
           <p className="text-content-text-secondary mb-4">
             Dyslexic versions involve playing the song's sections in a scrambled order, rather than simply reversing
@@ -100,7 +100,7 @@ export default function Music() {
             <li>
               <Link
                 to="/shows/2009-07-24-camp-bisco-8-mariaville-ny"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 07/24/2009 - Camp Bisco 8, Mariaville, NY
               </Link>{" "}
@@ -109,7 +109,7 @@ export default function Music() {
           </ul>
         </div>
 
-        <div className="bg-content-bg rounded-lg shadow-md p-6 mb-8">
+        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Palindrome</h2>
           <p className="text-content-text-secondary mb-4">
             Palindrome versions are played with the sections in a mirror-like structure. For example, if a song normally
@@ -122,7 +122,7 @@ export default function Music() {
             <li>
               <Link
                 to="/shows/2009-12-30-the-fillmore-philadelphia-pa"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 12/30/2009 - The Fillmore, Philadelphia, PA
               </Link>{" "}
@@ -131,7 +131,7 @@ export default function Music() {
             <li>
               <Link
                 to="/shows/2010-01-16-theater-of-the-living-arts-philadelphia-pa"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 01/16/2010 - Theater of the Living Arts, Philadelphia, PA
               </Link>{" "}
@@ -140,7 +140,7 @@ export default function Music() {
           </ul>
         </div>
 
-        <div className="bg-content-bg rounded-lg shadow-md p-6 mb-8">
+        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Techno</h2>
           <p className="text-content-text-secondary mb-4">
             In 2003 and 2004, the band experimented with techno versions of their songs, particularly during shows where
@@ -148,11 +148,11 @@ export default function Music() {
             synthesizers taking a more prominent role.
           </p>
           <p className="text-content-text-secondary mb-4">
-            <Link to="/shows?year=2003" className="text-brand hover:text-hover-accent hover:underline">
+            <Link to="/shows?year=2003" className="text-brand-primary hover:text-brand-secondary hover:underline">
               2003
             </Link>{" "}
             and{" "}
-            <Link to="/shows?year=2004" className="text-brand hover:text-hover-accent hover:underline">
+            <Link to="/shows?year=2004" className="text-brand-primary hover:text-brand-secondary hover:underline">
               2004
             </Link>{" "}
             were particularly notable years for these techno experiments, with songs like "I-Man" and "7-11" receiving

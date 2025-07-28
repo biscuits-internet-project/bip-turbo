@@ -8,12 +8,24 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
+interface AcastEpisode {
+  id: string;
+  title: string;
+  description: string;
+  publishDate: string;
+  duration: number;
+  mediaUrl: string;
+  image: string;
+  url: string;
+}
+
 interface LoaderData {
   tourDates: TourDate[];
   recentShows: Setlist[];
   recentBlogPosts: Array<BlogPost & { coverImage?: string }>;
   attendancesByShowId: Record<string, Attendance>;
   ratingsByShowId: Record<string, Rating>;
+  latestEpisode: AcastEpisode | null;
 }
 
 export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
@@ -82,12 +94,23 @@ export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
     {} as Record<string, Rating>,
   );
 
+  // Fetch latest podcast episode
+  let latestEpisode: AcastEpisode | null = null;
+  try {
+    const response = await fetch("https://feeder.acast.com/api/v1/shows/d690923d-524e-5c8b-b29f-d66517615b5b?limit=1&from=0");
+    const data = await response.json();
+    latestEpisode = data.episodes?.[0] || null;
+  } catch (error) {
+    console.error("Error fetching latest episode:", error);
+  }
+
   return {
     tourDates,
     recentShows,
     recentBlogPosts: recentBlogPostsWithCoverImages,
     attendancesByShowId,
     ratingsByShowId,
+    latestEpisode,
   };
 });
 
@@ -108,6 +131,7 @@ export default function Index() {
     recentBlogPosts = [],
     attendancesByShowId = {} as Record<string, Attendance>,
     ratingsByShowId = {} as Record<string, Rating>,
+    latestEpisode,
   } = useSerializedLoaderData<LoaderData>();
 
   return (
@@ -160,8 +184,59 @@ export default function Index() {
           )}
         </div>
 
-        {/* Right Column - Tour Dates and Blog Posts */}
+        {/* Right Column - Latest Episode, Tour Dates and Blog Posts */}
         <div className="lg:col-span-3 order-1 lg:order-2 space-y-8">
+          {/* Latest Podcast Episode */}
+          {latestEpisode && (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold">Latest Episode</h2>
+                <Link to="/resources/touchdowns" className="flex items-center" style={{color: "hsl(var(--brand-tertiary))"}}>
+                  View all <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
+              
+              <div className="card-premium rounded-lg overflow-hidden">
+                {latestEpisode.image && (
+                  <div className="relative">
+                    <img src={latestEpisode.image} alt={latestEpisode.title} className="w-full h-48 object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-white text-lg font-semibold line-clamp-2">{latestEpisode.title}</h3>
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-6">
+                  <div 
+                    className="text-content-text-secondary mb-4 line-clamp-3"
+                    dangerouslySetInnerHTML={{ __html: latestEpisode.description }}
+                  />
+                  
+                  <div className="text-content-text-tertiary text-sm mb-6 space-y-1">
+                    <div>Duration: {Math.floor(latestEpisode.duration / 60)} minutes</div>
+                    <div>Published: {latestEpisode.publishDate ? new Date(latestEpisode.publishDate).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    }) : 'Date unavailable'}</div>
+                  </div>
+
+                  <div>
+                    <a
+                      href={latestEpisode.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-primary hover:text-brand-secondary text-sm font-medium hover:underline transition-colors"
+                    >
+                      Listen to episode →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Upcoming Tour Dates Section */}
           <div>
             <div className="flex items-center justify-between mb-6">

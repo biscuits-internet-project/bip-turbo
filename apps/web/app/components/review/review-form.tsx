@@ -37,7 +37,7 @@ export function ReviewForm({ onSubmit }: ReviewFormProps) {
                 <Textarea
                   placeholder="Share your thoughts about this show..."
                   {...field}
-                  className="bg-content-bg border-content-bg-secondary text-white min-h-[120px]"
+                  className="glass-content border-glass-border text-content-text-primary min-h-[120px]"
                 />
               </FormControl>
               <FormMessage />
@@ -45,7 +45,7 @@ export function ReviewForm({ onSubmit }: ReviewFormProps) {
           )}
         />
 
-        <Button type="submit" className="bg-brand hover:bg-hover-accent text-white">
+        <Button type="submit" className="btn-primary">
           Post Review
         </Button>
       </form>

@@ -5,6 +5,9 @@ export default [
   // Root index route
   index("routes/_index.tsx"),
 
+  // add test-styles route
+  route("test-styles", "routes/test-styles.tsx"),
+
   // Venues routes with layout
   layout("routes/venues/_layout.tsx", [
     ...prefix("venues", [

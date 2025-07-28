@@ -23,7 +23,7 @@ export function meta() {
 
 const MovieScores: React.FC = () => {
   const MovieCard = ({ title, children }: { title: React.ReactNode; children: React.ReactNode }) => (
-    <Card className="bg-content-bg border-content-bg-secondary mb-6">
+    <Card className="card-premium mb-6">
       <CardHeader>
         <h2 className="text-2xl font-semibold text-content-text-primary">{title}</h2>
       </CardHeader>
@@ -44,7 +44,7 @@ const MovieScores: React.FC = () => {
             <span className="text-lg text-content-text-tertiary">
               <Link
                 to="/shows/1999-12-31-theater-of-the-living-arts-philadelphia-pa"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 December 31, 1999 at Theater Of The Living Arts - Philadelphia, PA
               </Link>
@@ -79,7 +79,7 @@ const MovieScores: React.FC = () => {
             <span className="text-lg text-content-text-tertiary">
               <Link
                 to="/shows/2015-12-31-playstation-theater-new-york-ny"
-                className="text-brand-secondary hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 December 31, 2015 at Playstation Theater - New York, NY
               </Link>
@@ -110,7 +110,7 @@ const MovieScores: React.FC = () => {
             Disney's Alice in Wonderland -{" "}
             <Link
               to="/shows/2001-10-31-woodmen-of-the-world-hall-eugene-or"
-              className="text-brand hover:text-hover-accent hover:underline"
+              className="text-brand-primary hover:text-brand-secondary hover:underline"
             >
               10/31/01 Woodmen of the World Hall, Eugene, OR
             </Link>
@@ -119,7 +119,7 @@ const MovieScores: React.FC = () => {
             It's The Great Pumpkin, Charlie Brown -{" "}
             <Link
               to="/shows/2001-11-01-wett-bar-vancouver-bc"
-              className="text-brand hover:text-hover-accent hover:underline"
+              className="text-brand-primary hover:text-brand-secondary hover:underline"
             >
               11/01/01 The Wett Bar, Vancouver, BC
             </Link>
@@ -128,7 +128,7 @@ const MovieScores: React.FC = () => {
             Koyaanisqatsi -{" "}
             <Link
               to="/shows/2001-11-02-crystal-ballroom-portland-or"
-              className="text-brand hover:text-hover-accent hover:underline"
+              className="text-brand-primary hover:text-brand-secondary hover:underline"
             >
               11/02/01 Crystal Ballroom, Portland, OR
             </Link>
@@ -137,7 +137,7 @@ const MovieScores: React.FC = () => {
             Run Lola Run -{" "}
             <Link
               to="/shows/2001-11-03-king-cat-theatre-seattle-wa"
-              className="text-brand hover:text-hover-accent hover:underline"
+              className="text-brand-primary hover:text-brand-secondary hover:underline"
             >
               11/03/01 King Cat Theatre, Seattle, WA
             </Link>

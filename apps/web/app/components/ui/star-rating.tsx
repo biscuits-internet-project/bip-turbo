@@ -243,8 +243,11 @@ const StarIcon = ({
         style={{ animationDelay: delay ? `${delay}ms` : undefined }}
       >
         <svg
-          className={cn("w-4 h-4 ms-1 text-rating-gold", isAnimating && "animate-star-glow")}
-          style={{ animationDelay: delay ? `${delay}ms` : undefined }}
+          className={cn("w-4 h-4 ms-1", isAnimating && "animate-star-glow")}
+          style={{ 
+            animationDelay: delay ? `${delay}ms` : undefined,
+            color: "hsl(var(--rating-gold))"
+          }}
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           fill="currentColor"

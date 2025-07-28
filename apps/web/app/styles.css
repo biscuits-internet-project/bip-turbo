@@ -36,6 +36,9 @@
   --color-content-text-primary: hsl(0 0% 98%);
   --color-content-text-secondary: hsl(240 5% 75%);
   --color-content-text-tertiary: hsl(240 5% 55%);
+  
+  /* Rating Colors */
+  --color-rating-gold: hsl(38 95% 62%);
 }
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
@@ -119,7 +122,7 @@
     --content-bg-secondary: 240 6% 10%;      /* Secondary areas */
     --content-bg-tertiary: 240 6% 15%;       /* Tertiary areas */
     --content-glass: hsla(263, 20%, 15%, 0.6); /* Purple-tinted glass background with transparency */
-    --content-glass-border: hsla(263, 80%, 60%, 1); /* Glass border - very bright purple, fully opaque */
+    --content-glass-border: hsla(263, 40%, 65%, 0.2); /* Glass border - lighter and more subtle purple */
     --content-text-primary: 0 0% 98%;        /* High contrast primary text */
     --content-text-secondary: 240 5% 75%;    /* Secondary text */
     --content-text-tertiary: 240 5% 55%;     /* Tertiary/muted text */
@@ -143,7 +146,7 @@
     --error-bg: 0 50% 12%;                   /* Error background */
     --info: 205 100% 70%;                    /* Info blue */
     --info-bg: 205 50% 12%;                  /* Info background */
-    --rating-gold: 45 93% 57%;               /* Star ratings */
+    --rating-gold: 38 95% 62%;               /* Star ratings - yellowy orange */
     --rating-dim: 240 5% 35%;                /* Inactive ratings */
     
     /* Chart & Data Visualization - Purple Primary, Green Secondary */
@@ -158,7 +161,7 @@
     /* Component-Specific - Glass-morphism Enhanced */
     --card-overlay: 240 10% 3.9%;            /* Card background */
     --card-glass: hsla(263, 15%, 10%, 0.6);  /* Glass card background with transparency */
-    --card-glass-border: hsla(263, 30%, 20%, 0.8); /* Glass card border with transparency */
+    --card-glass-border: hsla(263, 35%, 60%, 0.18); /* Glass card border - lighter and more subtle */
     --nav-link-hover: 267 90% 70%;           /* Navigation hover */
     --nav-glass: hsla(263, 20%, 8%, 0.6);    /* Navigation glass background with transparency */
     --search-bg: 240 6% 10%;                 /* Search input background */
@@ -174,8 +177,8 @@
     /* Glass-morphism Effects */
     --glass-bg: hsla(263, 15%, 8%, 0.6);     /* Primary glass background with transparency */
     --glass-bg-secondary: hsla(240, 8%, 12%, 0.5); /* Secondary glass background with transparency */
-    --glass-border: hsla(263, 80%, 60%, 1); /* Glass borders - very bright purple, fully opaque */
-    --glass-border-accent: hsla(145, 80%, 60%, 1); /* Green accent glass borders - very bright green, fully opaque */
+    --glass-border: hsla(263, 40%, 65%, 0.2); /* Glass borders - lighter and more subtle purple */
+    --glass-border-accent: hsla(145, 50%, 60%, 0.25); /* Green accent glass borders - lighter and more subtle green */
     --glass-shadow: hsla(263, 50%, 5%, 0.3); /* Glass shadow color with transparency */
     --backdrop-blur: blur(12px);             /* Standard backdrop blur */
     --backdrop-blur-heavy: blur(20px);       /* Heavy backdrop blur */
@@ -213,8 +216,8 @@
     
     /* Slightly enhanced purple glow for dark mode */
     --brand-glow: 263 90% 70%;               /* Brighter purple glow in dark */
-    --glass-border: hsla(263, 80%, 60%, 1);  /* Very bright purple borders for dark mode */
-    --glass-border-accent: hsla(145, 80%, 60%, 1); /* Very bright green borders for dark mode */
+    --glass-border: hsla(263, 40%, 65%, 0.2);  /* Lighter and more subtle purple borders for dark mode */
+    --glass-border-accent: hsla(145, 50%, 60%, 0.25); /* Lighter and more subtle green borders for dark mode */
   }
 
   /* Override the Tailwind background utility */
@@ -360,15 +363,15 @@
   @keyframes star-pulse {
     0% {
       transform: scale(1);
-      filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+      filter: drop-shadow(0 0 0 rgba(255, 165, 0, 0));
     }
     50% {
       transform: scale(1.2);
-      filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.6));
+      filter: drop-shadow(0 0 4px rgba(255, 165, 0, 0.6));
     }
     100% {
       transform: scale(1);
-      filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+      filter: drop-shadow(0 0 0 rgba(255, 165, 0, 0));
     }
   }
   
@@ -381,15 +384,15 @@
   @keyframes rating-update {
     0% {
       transform: scale(1);
-      filter: brightness(100%) drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+      filter: brightness(100%) drop-shadow(0 0 0 rgba(255, 165, 0, 0));
     }
     50% {
       transform: scale(1.4);
-      filter: brightness(150%) drop-shadow(0 0 8px rgba(250, 204, 21, 0.8));
+      filter: brightness(150%) drop-shadow(0 0 8px rgba(255, 165, 0, 0.8));
     }
     100% {
       transform: scale(1);
-      filter: brightness(100%) drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+      filter: brightness(100%) drop-shadow(0 0 0 rgba(255, 165, 0, 0));
     }
   }
   
@@ -400,7 +403,7 @@
     }
     40% {
       transform: scale(1.5);
-      filter: brightness(150%) drop-shadow(0 0 12px rgba(250, 204, 21, 0.9));
+      filter: brightness(150%) drop-shadow(0 0 12px rgba(255, 165, 0, 0.9));
     }
     100% {
       transform: scale(1);
@@ -452,7 +455,7 @@
       hsla(263, 25%, 8%, 0.95) 0%, 
       hsla(263, 30%, 12%, 0.85) 50%, 
       hsla(263, 15%, 3%, 0.98) 100%) !important;
-    border: 1px solid hsla(263, 30%, 20%, 0.4) !important;
+    border: 1px solid hsla(263, 35%, 60%, 0.15) !important;
     backdrop-filter: var(--backdrop-blur) !important;
     -webkit-backdrop-filter: var(--backdrop-blur) !important;
     border-radius: 0.75rem;

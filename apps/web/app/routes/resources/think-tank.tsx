@@ -27,7 +27,7 @@ const ExternalLink = ({ href, children }: { href: string; children: React.ReactN
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="text-brand-secondary hover:text-hover-accent hover:underline"
+    className="text-brand-primary hover:text-brand-secondary hover:underline"
   >
     {children}
   </a>
@@ -80,7 +80,7 @@ export default function ThinkTank() {
     <div>
       <h1 className="text-3xl font-bold text-content-text-primary mb-6">Think Tank Dubs</h1>
 
-      <div className="bg-content-bg rounded-lg shadow-md p-6 mb-8">
+      <div className="glass-content rounded-lg shadow-md p-6 mb-8">
         <h2 className="text-2xl font-semibold text-brand-secondary mb-4">The Basement Sessions</h2>
 
         <p className="text-content-text-secondary mb-6">
@@ -113,8 +113,8 @@ export default function ThinkTank() {
         </div>
 
         <div className="mt-6">
-          <h3 className="text-xl font-semibold text-brand mb-3">Think Tank Dubs Starter Pack:</h3>
-          <ul className="list-disc pl-6 space-y-3 text-gray-300">
+          <h3 className="text-xl font-semibold text-brand-primary mb-3">Think Tank Dubs Starter Pack:</h3>
+          <ul className="list-disc pl-6 space-y-3 text-content-text-secondary">
             {starterPack.map((link) => (
               <li key={link.id}>
                 <ExternalLink href={link.url}>{link.title}</ExternalLink>

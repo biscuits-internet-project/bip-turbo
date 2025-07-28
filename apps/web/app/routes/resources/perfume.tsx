@@ -27,7 +27,7 @@ const Perfume: React.FC = () => {
   );
 
   const ShowLink = ({ to, children }: { to: string; children: React.ReactNode }) => (
-    <Link to={to} className="text-brand-secondary hover:text-hover-accent hover:underline">
+    <Link to={to} className="text-brand-primary hover:text-brand-secondary hover:underline">
       {children}
     </Link>
   );
@@ -36,7 +36,7 @@ const Perfume: React.FC = () => {
     <div>
       <h1 className="text-3xl font-bold mb-8  text-content-text-primary">The Perfume</h1>
 
-      <div className="bg-content-bg rounded-lg shadow-md overflow-hidden mb-8 p-6">
+      <div className="glass-content rounded-lg shadow-md overflow-hidden mb-8 p-6">
         <p className="mb-6 text-content-text-secondary leading-relaxed">
           The Disco Biscuits first performed under the moniker "The Perfume" on{" "}
           <ShowLink to="/shows/2001-04-16-wetlands-preserve-new-york-ny">April 16, 2001</ShowLink> at the Wetlands in

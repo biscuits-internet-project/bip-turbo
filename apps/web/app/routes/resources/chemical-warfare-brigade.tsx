@@ -463,16 +463,16 @@ const ChemicalWarfareBrigade: React.FC = () => {
   };
 
   const OperaMenuCard = ({ title, items }: { title: string; items: { name: string; anchor: string }[] }) => (
-    <Card className="mb-6 bg-content-bg border-content-bg-secondary">
+    <Card className="mb-6 card-premium">
       <CardContent className="p-4">
-        <h3 className="text-lg font-semibold mb-3 text-white">{title}</h3>
+        <h3 className="text-lg font-semibold mb-3 text-content-text-primary">{title}</h3>
         <ul className="space-y-2">
           {items.map((item) => (
             <li key={item.anchor}>
               <button
                 type="button"
                 onClick={() => scrollToSection(item.anchor)}
-                className="text-brand hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 {item.name}
               </button>
@@ -486,11 +486,11 @@ const ChemicalWarfareBrigade: React.FC = () => {
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">The Chemical Warfare Brigade</h1>
+        <h1 className="text-3xl font-bold text-content-text-primary">The Chemical Warfare Brigade</h1>
       </div>
 
       <div className="space-y-6">
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Introduction</h3>
           </CardHeader>
@@ -498,7 +498,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
             <p>
               The Chemical Warfare Brigade is the Disco Biscuits' second full-length rock opera, written by Marc
               Brownstein, and debuted on{" "}
-              <Link to="/shows/2000-12-30-vanderbilt-plainview-ny" className="text-brand hover:text-hover-accent">
+              <Link to="/shows/2000-12-30-vanderbilt-plainview-ny" className="text-brand-primary hover:text-brand-secondary">
                 12/30/00
               </Link>{" "}
               at the Vanderbilt on Long Island.
@@ -511,7 +511,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Characters</h3>
           </CardHeader>
@@ -525,7 +525,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Story Overview</h3>
           </CardHeader>
@@ -539,7 +539,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Songs</h3>
           </CardHeader>
@@ -558,19 +558,19 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+        <Card className="card-premium rounded-lg">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Related Links</h3>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Link to="/resources/hot-air-balloon" className="text-brand hover:text-hover-accent block">
+            <Link to="/resources/hot-air-balloon" className="text-brand-primary hover:text-brand-secondary block">
               The Hot Air Balloon
             </Link>
             <a
               href="https://archive.org/details/db2000-12-30.shnf"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-brand hover:text-hover-accent block"
+              className="text-brand-primary hover:text-brand-secondary block"
             >
               Listen to the Debut Performance
             </a>

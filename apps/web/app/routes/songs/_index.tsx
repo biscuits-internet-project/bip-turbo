@@ -35,10 +35,10 @@ interface SongCardProps {
 
 function SongCard({ song }: SongCardProps) {
   return (
-    <Card className="bg-content-bg border-content-bg-secondary hover:bg-accent/10 transition-colors">
+    <Card className="card-premium hover:border-brand-primary/60 transition-all duration-300">
       <CardHeader>
         <CardTitle className="text-xl">
-          <Link to={`/songs/${song.slug}`} className="text-content-text-primary hover:text-hover-accent">
+          <Link to={`/songs/${song.slug}`} className="text-brand-primary hover:text-brand-secondary">
             {song.title}
           </Link>
         </CardTitle>
@@ -66,16 +66,16 @@ interface TrendingSongCardProps {
 
 function TrendingSongCard({ song }: TrendingSongCardProps) {
   return (
-    <Card className="bg-content-bg border-content-bg-secondary hover:bg-accent/10 transition-colors">
+    <Card className="card-premium hover:border-brand-tertiary/60 transition-all duration-300">
       <CardHeader>
         <CardTitle className="text-lg">
-          <Link to={`/songs/${song.slug}`} className="text-content-text-primary hover:text-hover-accent">
+          <Link to={`/songs/${song.slug}`} className="text-brand-primary hover:text-brand-secondary">
             {song.title}
           </Link>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-brand">{song.count} of the last 10 shows</p>
+        <p className="text-brand-tertiary">{song.count} of the last 10 shows</p>
         <p className="text-content-text-secondary text-sm">{song.timesPlayed} times total</p>
       </CardContent>
     </Card>
@@ -102,7 +102,7 @@ function SearchForm({ onSearch }: { onSearch: (query: string) => void }) {
         value={searchValue}
         onChange={handleChange}
         placeholder="Search songs..."
-        className="w-full pl-10 bg-content-bg border-content-bg-secondary text-content-text-primary placeholder:text-content-text-secondary"
+        className="search-input w-full pl-10"
       />
     </div>
   );
@@ -118,14 +118,14 @@ function YearlyTrendingSongs() {
   return (
     <div className="mb-6">
       <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Popular This Year</h2>
-      <Card className="bg-content-bg border-content-bg-secondary">
+      <Card className="card-premium">
         <CardContent className="p-4">
-          <div className="divide-y divide-divider">
+          <div className="divide-y divide-glass-border/30">
             {yearlyTrendingSongs.map((song: TrendingSong, index: number) => (
-              <div key={song.id} className="py-2 flex items-center justify-between">
+              <div key={song.id} className="py-2 flex items-center justify-between hover:bg-hover-glass transition-colors">
                 <div className="flex items-center gap-3">
                   <span className="text-content-text-secondary font-medium w-5">{index + 1}</span>
-                  <Link to={`/songs/${song.slug}`} className="text-content-text-primary hover:text-hover-accent">
+                  <Link to={`/songs/${song.slug}`} className="text-brand-primary hover:text-brand-secondary">
                     {song.title}
                   </Link>
                 </div>
@@ -185,7 +185,7 @@ export default function Songs() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">Songs</h1>
           <AdminOnly>
-            <Button asChild className="bg-brand hover:bg-hover-accent text-content-text-primary">
+            <Button asChild className="btn-primary">
               <Link to="/songs/new" className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 New Song

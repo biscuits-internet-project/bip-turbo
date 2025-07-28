@@ -1,5 +1,5 @@
 import type { BlogPost } from "@bip/domain";
-import { CalendarDays, Pencil, User } from "lucide-react";
+import { ArrowLeft, CalendarDays, Pencil, User } from "lucide-react";
 import Markdown from "react-markdown";
 import { Link } from "react-router-dom";
 import rehypeRaw from "rehype-raw";
@@ -71,7 +71,7 @@ export default function BlogPostPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">{blogPost.title}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">{blogPost.title}</h1>
           <AdminOnly>
             <Button
               asChild
@@ -84,6 +84,17 @@ export default function BlogPostPage() {
               </Link>
             </Button>
           </AdminOnly>
+        </div>
+        
+        {/* Subtle back link */}
+        <div className="flex justify-start">
+          <Link 
+            to="/blog" 
+            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back to blog</span>
+          </Link>
         </div>
 
         <div className="flex items-center gap-6">

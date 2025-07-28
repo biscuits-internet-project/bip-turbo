@@ -107,7 +107,8 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                className={cn("w-4 h-4 text-rating-gold", isAnimating && "animate-avg-rating-update")}
+                className={cn("w-4 h-4", isAnimating && "animate-avg-rating-update")}
+                style={{ color: "hsl(var(--rating-gold))" }}
                 role="img"
                 aria-hidden="true"
               >
@@ -118,7 +119,10 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                   clipRule="evenodd"
                 />
               </svg>
-              <span className={cn("text-sm font-medium text-rating-gold", isAnimating && "animate-avg-rating-update")}>
+              <span 
+                className={cn("text-sm font-medium", isAnimating && "animate-avg-rating-update")}
+                style={{ color: "hsl(var(--rating-gold))" }}
+              >
                 {displayedRating.toFixed(1)}
               </span>
             </div>
@@ -128,7 +132,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
 
       <CardContent className="relative z-10 px-6 py-5">
         {setlist.show.notes && (
-          <div className="mb-4 text-sm text-content-text-secondary italic border-l border-content-bg-secondary pl-3 py-1">
+          <div className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1">
             {setlist.show.notes}
           </div>
         )}

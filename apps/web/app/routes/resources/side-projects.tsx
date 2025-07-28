@@ -37,7 +37,7 @@ export default function SideProjects(): ReactElement {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sideProjects.map((project) => (
             <div key={project.id || project.name} className="h-full">
-              <div className="bg-content-bg border border-content-bg-secondary rounded-lg p-6 h-full">
+              <div className="card-premium rounded-lg p-6 h-full">
                 <h3 className="text-xl font-bold text-content-text-primary mb-2">{project.name}</h3>
                 <div className="text-content-text-tertiary mb-4">
                   {project.dates.split(",").map((item) => (

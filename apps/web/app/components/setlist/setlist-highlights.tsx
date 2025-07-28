@@ -30,8 +30,8 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
   }
 
   return (
-    <Card className="border-content-bg-secondary bg-content-bg h-full">
-      <CardHeader className="border-b border-content-bg-secondary/50 px-6 py-4">
+    <Card className="card-premium h-full">
+      <CardHeader className="border-b border-glass-border/50 px-6 py-4">
         <CardTitle className="text-xl text-content-text-primary">Show Highlights</CardTitle>
       </CardHeader>
       <CardContent className="px-6 py-4 space-y-6">
@@ -48,7 +48,7 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
                     <span className="text-xs text-content-text-tertiary font-medium w-6">{track.set}</span>
                     <Link
                       to={`/songs/${track.song?.slug}`}
-                      className="text-warning hover:text-hover-accent hover:underline transition-colors"
+                      className="text-brand-tertiary hover:text-brand-primary hover:underline transition-colors"
                     >
                       {track.song?.title}
                     </Link>
@@ -73,11 +73,11 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
                     <div className="flex-1">
                       <Link
                         to={`/songs/${track.song?.slug}`}
-                        className="text-info hover:text-hover-accent hover:underline transition-colors"
+                        className="text-brand-primary hover:text-brand-secondary hover:underline transition-colors"
                       >
                         {track.song?.title}
                       </Link>
-                      <p className="text-sm text-content-text-tertiary mt-1 pl-1 border-l-2 border-content-bg-secondary ml-1">{track.note}</p>
+                      <p className="text-sm text-content-text-tertiary mt-1 pl-1 border-l-2 border-glass-border ml-1">{track.note}</p>
                     </div>
                   </div>
                 </li>

@@ -48,7 +48,7 @@ export default function NewShow() {
   return (
     <div className="">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-white">Create Show</h1>
+        <h1 className="text-3xl font-bold text-content-text-primary">Create Show</h1>
         <Button variant="outline" size="sm" asChild>
           <Link to="/shows" className="flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" />
@@ -57,9 +57,8 @@ export default function NewShow() {
         </Button>
       </div>
 
-      <Card className="relative overflow-hidden border-content-bg-secondary transition-all duration-300">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
-        <CardContent className="relative z-10 p-6">
+      <Card className="card-premium">
+        <CardContent className="p-6">
           <ShowForm onSubmit={handleSubmit} submitLabel="Create Show" cancelHref="/shows" />
         </CardContent>
       </Card>

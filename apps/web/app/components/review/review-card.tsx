@@ -59,11 +59,11 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
 
   return (
     <>
-      <Card className="border-content-bg-secondary bg-gradient-to-br from-gray-900 to-gray-900/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
-        <CardHeader className="border-b border-content-bg-secondary/50 px-6 py-4">
+      <Card className="card-premium overflow-hidden transition-all duration-300 hover:border-brand-primary/60">
+        <CardHeader className="border-b border-glass-border/50 px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-purple-900/50 flex items-center justify-center text-purple-300 font-medium shadow-inner shadow-purple-950/50">
+              <div className="h-10 w-10 rounded-full glass-content flex items-center justify-center text-brand-primary font-medium">
                 {review.user.username.charAt(0).toUpperCase()}
               </div>
               <div>
@@ -78,7 +78,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
                   size="icon"
                   onClick={() => setIsEditing(!isEditing)}
                   disabled={isLoading}
-                  className="text-content-text-secondary hover:text-hover-accent hover:bg-purple-900/20 transition-colors"
+                  className="text-content-text-secondary hover:text-brand-primary hover:bg-hover-glass transition-colors"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -87,7 +87,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
                   size="icon"
                   onClick={() => setShowDeleteDialog(true)}
                   disabled={isLoading}
-                  className="text-content-text-secondary hover:text-hover-accent hover:bg-purple-900/20 transition-colors"
+                  className="text-content-text-secondary hover:text-brand-primary hover:bg-hover-glass transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -101,18 +101,18 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
               <Textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="min-h-[100px] bg-content-bg-secondary border-content-bg-secondary text-white"
+                className="min-h-[100px] glass-content border-glass-border text-content-text-primary"
               />
               <div className="flex justify-end gap-2">
                 <Button
                   variant="ghost"
                   onClick={handleCancelEdit}
                   disabled={isLoading}
-                  className="text-content-text-secondary hover:text-hover-accent"
+                  className="text-content-text-secondary hover:text-brand-primary"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleUpdate} disabled={isLoading} className="bg-brand hover:bg-hover-accent">
+                <Button onClick={handleUpdate} disabled={isLoading} className="btn-primary">
                   Save
                 </Button>
               </div>

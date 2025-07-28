@@ -107,9 +107,9 @@ const Mixes: React.FC = () => {
   ];
 
   const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="bg-content-bg rounded-lg shadow-md overflow-hidden mb-8">
+    <div className="glass-content rounded-lg shadow-md overflow-hidden mb-8">
       <div className="p-6">
-        <h2 className="text-2xl font-semibold text-brand mb-4">{title}</h2>
+        <h2 className="text-2xl font-semibold text-brand-primary mb-4">{title}</h2>
         {children}
       </div>
     </div>
@@ -123,7 +123,7 @@ const Mixes: React.FC = () => {
     <div className="">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-white">Running Mixes</h1>
+          <h1 className="text-3xl font-bold text-content-text-primary">Running Mixes</h1>
         </div>
 
         <Card title="About These Mixes">
@@ -148,7 +148,7 @@ const Mixes: React.FC = () => {
                 href="https://livemusicblog.com/features/podcast-59-hippie-workout-mix-vol-1/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 This specific mix from LiveMusicBlog.com
               </a>{" "}
@@ -167,7 +167,7 @@ const Mixes: React.FC = () => {
                 href="https://johnvantine.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-brand hover:text-hover-accent hover:underline"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
               >
                 John
               </a>
@@ -183,7 +183,7 @@ const Mixes: React.FC = () => {
                   href={mix.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-brand hover:text-hover-accent hover:underline flex items-center"
+                  className="text-brand-primary hover:text-brand-secondary hover:underline flex items-center"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

@@ -430,7 +430,7 @@ at his last chance to fly
   const acts = [...act1, ...act2];
 
   const OperaMenuCard = ({ title, items }: { title: string; items: { name: string; anchor: string }[] }) => (
-    <Card className="bg-content-bg rounded-lg border border-content-bg-secondary mb-6">
+    <Card className="card-premium rounded-lg mb-6">
       <CardHeader>
         <h3 className="text-2xl font-semibold">{title}</h3>
       </CardHeader>
@@ -440,7 +440,7 @@ at his last chance to fly
             key={item.anchor}
             type="button"
             onClick={() => scrollToSection(item.anchor)}
-            className="text-brand hover:text-hover-accent block w-full text-left py-2 transition-colors"
+            className="text-brand-primary hover:text-brand-secondary block w-full text-left py-2 transition-colors"
           >
             {item.name}
           </button>
@@ -456,12 +456,12 @@ at his last chance to fly
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">The Hot Air Balloon</h1>
+        <h1 className="text-3xl font-bold text-content-text-primary">The Hot Air Balloon</h1>
       </div>
 
       <div className="gap-6">
         <div className="space-y-6">
-          <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+          <Card className="card-premium rounded-lg">
             <CardHeader>
               <h3 className="text-2xl font-semibold">Introduction</h3>
             </CardHeader>
@@ -471,7 +471,7 @@ at his last chance to fly
                 debuted on{" "}
                 <Link
                   to="/shows/1998-12-31-silk-city-diner-philadelphia-pa"
-                  className="text-brand hover:text-hover-accent"
+                  className="text-brand-primary hover:text-brand-secondary"
                 >
                   12/31/98
                 </Link>{" "}
@@ -486,7 +486,7 @@ at his last chance to fly
             </CardContent>
           </Card>
 
-          <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+          <Card className="card-premium rounded-lg">
             <CardHeader>
               <h3 className="text-2xl font-semibold">Characters</h3>
             </CardHeader>
@@ -500,7 +500,7 @@ at his last chance to fly
             </CardContent>
           </Card>
 
-          <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
+          <Card className="card-premium rounded-lg">
             <CardHeader>
               <h3 className="text-2xl font-semibold">Story Overview</h3>
             </CardHeader>

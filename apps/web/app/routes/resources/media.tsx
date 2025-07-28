@@ -32,10 +32,10 @@ export default function MediaResources(): ReactElement {
     <div className="">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">News from Nowhere</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">News from Nowhere</h1>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-content-bg-secondary bg-content-bg">
+        <div className="overflow-x-auto rounded-lg border border-content-bg-secondary glass-content">
           <table className="min-w-full divide-y divide-divider">
             <thead className="bg-table-header">
               <tr>
@@ -69,7 +69,7 @@ export default function MediaResources(): ReactElement {
                         href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand hover:text-hover-accent"
+                        className="text-brand-primary hover:text-brand-secondary"
                       >
                         {m.description}
                       </a>
