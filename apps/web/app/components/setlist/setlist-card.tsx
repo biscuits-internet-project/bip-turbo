@@ -86,29 +86,29 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
   return (
     <Card
       className={cn(
-        "relative overflow-hidden border-gray-800 transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20",
+        "relative overflow-hidden border-content-bg-secondary transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20",
         className,
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-content-bg via-content-bg/95 to-brand/20 pointer-events-none" />
 
-      <CardHeader className="relative z-10 border-b border-gray-800/50 px-6 py-5">
+      <CardHeader className="relative z-10 border-b border-content-bg-secondary/50 px-6 py-5">
         <div className="flex justify-between items-start">
           <div className="flex flex-col gap-1">
-            <div className="text-2xl font-medium text-purple-300 hover:text-purple-200 transition-colors">
+            <div className="text-2xl font-medium text-brand hover:text-hover-accent transition-colors">
               <Link to={`/shows/${setlist.show.slug}`}>{formattedDate}</Link>
             </div>
-            <div className="text-xl text-gray-200">
+            <div className="text-xl text-content-text-primary">
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
             </div>
           </div>
           {displayedRating !== null && displayedRating > 0 && (
-            <div className="flex items-center gap-1 bg-purple-900/30 px-2 py-1 rounded-md">
+            <div className="flex items-center gap-1 bg-brand/30 px-2 py-1 rounded-md">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                className={cn("w-4 h-4 text-yellow-400", isAnimating && "animate-avg-rating-update")}
+                className={cn("w-4 h-4 text-rating-gold", isAnimating && "animate-avg-rating-update")}
                 role="img"
                 aria-hidden="true"
               >
@@ -119,7 +119,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                   clipRule="evenodd"
                 />
               </svg>
-              <span className={cn("text-sm font-medium text-yellow-100", isAnimating && "animate-avg-rating-update")}>
+              <span className={cn("text-sm font-medium text-rating-gold", isAnimating && "animate-avg-rating-update")}>
                 {displayedRating.toFixed(1)}
               </span>
             </div>
@@ -129,7 +129,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
 
       <CardContent className="relative z-10 px-6 py-5">
         {setlist.show.notes && (
-          <div className="mb-4 text-sm text-gray-400 italic border-l border-gray-700 pl-3 py-1">
+          <div className="mb-4 text-sm text-content-text-secondary italic border-l border-content-bg-secondary pl-3 py-1">
             {setlist.show.notes}
           </div>
         )}
@@ -140,11 +140,11 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
               <span
                 className={cn(
                   "w-9 h-9 flex items-center justify-center rounded-full text-white font-medium",
-                  set.label === "I" && "bg-purple-900/50",
-                  set.label === "II" && "bg-indigo-900/50",
-                  set.label === "III" && "bg-blue-900/50",
-                  set.label === "E" && "bg-pink-900/50",
-                  !["I", "II", "III", "E"].includes(set.label) && "bg-gray-800/50",
+                  set.label === "I" && "bg-brand/20",
+                  set.label === "II" && "bg-brand-secondary/20",
+                  set.label === "III" && "bg-info/20",
+                  set.label === "E" && "bg-chart-tertiary/20",
+                  !["I", "II", "III", "E"].includes(set.label) && "bg-content-bg-secondary/50",
                 )}
               >
                 {set.label}
@@ -158,16 +158,16 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                           <TooltipTrigger asChild>
                             <span
                               className={cn(
-                                "relative text-white hover:text-purple-300 hover:underline transition-colors",
+                                "relative text-content-text-primary hover:text-hover-accent hover:underline transition-colors",
                                 track.allTimer && "font-medium",
                               )}
                             >
                               {track.allTimer && (
-                                <Flame className="h-4 w-4 text-orange-500 inline-block mr-1 transform -translate-y-0.5" />
+                                <Flame className="h-4 w-4 text-chart-accent inline-block mr-1 transform -translate-y-0.5" />
                               )}
                               <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
                               {trackAnnotationMap.has(track.id) && (
-                                <sup className="text-purple-400 ml-0.5 font-medium">
+                                <sup className="text-brand ml-0.5 font-medium">
                                   {trackAnnotationMap.get(track.id)}
                                 </sup>
                               )}
@@ -176,7 +176,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                           {trackAnnotationMap.has(track.id) && (
                             <TooltipContent side="top" className="max-w-xs">
                               <p className="text-sm">
-                                <span className="font-medium text-purple-300">
+                                <span className="font-medium text-brand">
                                   Note {trackAnnotationMap.get(track.id)}:{" "}
                                 </span>
                                 {orderedAnnotations.find((a) => a.index === trackAnnotationMap.get(track.id))?.desc}
@@ -187,7 +187,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                       </TooltipProvider>
                     </span>
                     {i < set.tracks.length - 1 && (
-                      <span className="text-gray-400 mx-1 font-medium">{track.segue ? " > " : ", "}</span>
+                      <span className="text-content-text-secondary mx-1 font-medium">{track.segue ? " > " : ", "}</span>
                     )}
                   </span>
                 ))}
@@ -196,12 +196,12 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
           ))}
         </div>
 
-        <div className="flex justify-between items-end mt-6 pt-4 border-t border-gray-800/50">
+        <div className="flex justify-between items-end mt-6 pt-4 border-t border-content-bg-secondary/50">
           {orderedAnnotations.length > 0 ? (
             <div className="space-y-2">
               {orderedAnnotations.map((annotation) => (
-                <div key={`annotation-${annotation.index}`} className="text-sm text-gray-400">
-                  <sup className="text-purple-400">{annotation.index}</sup> {annotation.desc}
+                <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+                  <sup className="text-brand">{annotation.index}</sup> {annotation.desc}
                 </div>
               ))}
             </div>

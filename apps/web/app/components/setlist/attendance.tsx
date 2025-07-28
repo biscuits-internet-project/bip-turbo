@@ -134,15 +134,15 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
         disabled={createMutation.isPending || deleteMutation.isPending}
         className={cn(
           "h-5 w-9",
-          "data-[state=checked]:bg-purple-800",
-          "data-[state=unchecked]:bg-purple-300",
+          "data-[state=checked]:bg-brand",
+          "data-[state=unchecked]:bg-brand/50",
           "[&>span]:h-4 [&>span]:w-4",
           "[&>span]:data-[state=checked]:bg-white",
           "[&>span]:data-[state=unchecked]:bg-white",
           "[&>span]:data-[state=checked]:shadow-[0_0_12px_rgba(107,33,168,0.5)]",
         )}
       />
-      <label htmlFor={switchId} className="text-sm font-medium leading-none text-gray-400">
+      <label htmlFor={switchId} className="text-sm font-medium leading-none text-content-text-secondary">
         Saw it?
       </label>
     </div>

@@ -35,20 +35,20 @@ interface SongCardProps {
 
 function SongCard({ song }: SongCardProps) {
   return (
-    <Card className="bg-gray-900 border-gray-800 hover:bg-accent/10 transition-colors">
+    <Card className="bg-content-bg border-content-bg-secondary hover:bg-accent/10 transition-colors">
       <CardHeader>
         <CardTitle className="text-xl">
-          <Link to={`/songs/${song.slug}`} className="text-white hover:text-purple-400">
+          <Link to={`/songs/${song.slug}`} className="text-content-text-primary hover:text-hover-accent">
             {song.title}
           </Link>
         </CardTitle>
       </CardHeader>
       {song.timesPlayed > 0 && (
         <CardContent>
-          <p className="text-gray-400 text-sm">
+          <p className="text-content-text-secondary text-sm">
             Played {song.timesPlayed} times
             {song.dateLastPlayed && (
-              <span className="text-gray-500">
+              <span className="text-content-text-tertiary">
                 {" "}
                 (Last: {new Date(song.dateLastPlayed).toLocaleDateString("en-US", { timeZone: "UTC" })})
               </span>
@@ -66,17 +66,17 @@ interface TrendingSongCardProps {
 
 function TrendingSongCard({ song }: TrendingSongCardProps) {
   return (
-    <Card className="bg-gray-900 border-gray-800 hover:bg-accent/10 transition-colors">
+    <Card className="bg-content-bg border-content-bg-secondary hover:bg-accent/10 transition-colors">
       <CardHeader>
         <CardTitle className="text-lg">
-          <Link to={`/songs/${song.slug}`} className="text-white hover:text-purple-400">
+          <Link to={`/songs/${song.slug}`} className="text-content-text-primary hover:text-hover-accent">
             {song.title}
           </Link>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-purple-400">{song.count} of the last 10 shows</p>
-        <p className="text-gray-400 text-sm">{song.timesPlayed} times total</p>
+        <p className="text-brand">{song.count} of the last 10 shows</p>
+        <p className="text-content-text-secondary text-sm">{song.timesPlayed} times total</p>
       </CardContent>
     </Card>
   );
@@ -96,13 +96,13 @@ function SearchForm({ onSearch }: { onSearch: (query: string) => void }) {
 
   return (
     <div className="relative max-w-2xl mx-auto">
-      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-content-text-secondary" />
       <Input
         type="search"
         value={searchValue}
         onChange={handleChange}
         placeholder="Search songs..."
-        className="w-full pl-10 bg-gray-900 border-gray-800 text-white placeholder:text-gray-400"
+        className="w-full pl-10 bg-content-bg border-content-bg-secondary text-content-text-primary placeholder:text-content-text-secondary"
       />
     </div>
   );
@@ -117,19 +117,19 @@ function YearlyTrendingSongs() {
 
   return (
     <div className="mb-6">
-      <h2 className="text-xl font-semibold mb-4 text-white">Popular This Year</h2>
-      <Card className="bg-gray-900 border-gray-800">
+      <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Popular This Year</h2>
+      <Card className="bg-content-bg border-content-bg-secondary">
         <CardContent className="p-4">
-          <div className="divide-y divide-gray-800">
+          <div className="divide-y divide-divider">
             {yearlyTrendingSongs.map((song: TrendingSong, index: number) => (
               <div key={song.id} className="py-2 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-gray-400 font-medium w-5">{index + 1}</span>
-                  <Link to={`/songs/${song.slug}`} className="text-white hover:text-purple-400">
+                  <span className="text-content-text-secondary font-medium w-5">{index + 1}</span>
+                  <Link to={`/songs/${song.slug}`} className="text-content-text-primary hover:text-hover-accent">
                     {song.title}
                   </Link>
                 </div>
-                <span className="text-gray-400 text-sm">{song.count} shows</span>
+                <span className="text-content-text-secondary text-sm">{song.count} shows</span>
               </div>
             ))}
           </div>
@@ -183,9 +183,9 @@ export default function Songs() {
     <div className="">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Songs</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">Songs</h1>
           <AdminOnly>
-            <Button asChild className="bg-purple-800 hover:bg-purple-700 text-white">
+            <Button asChild className="bg-brand hover:bg-hover-accent text-content-text-primary">
               <Link to="/songs/new" className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 New Song
@@ -198,7 +198,7 @@ export default function Songs() {
           <div className="lg:col-span-3">
             {trendingSongs.length > 0 && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-4 text-white">Trending in Recent Shows</h2>
+                <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Trending in Recent Shows</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {trendingSongs.map((song: TrendingSong) => (
                     <TrendingSongCard key={song.id} song={song} />
@@ -213,7 +213,7 @@ export default function Songs() {
         <SearchForm onSearch={handleSearch} />
 
         {filteredSongs.length === 0 ? (
-          <p className="text-gray-400">{searchQuery ? `No songs found matching "${searchQuery}"` : "No songs found"}</p>
+          <p className="text-content-text-secondary">{searchQuery ? `No songs found matching "${searchQuery}"` : "No songs found"}</p>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -223,7 +223,7 @@ export default function Songs() {
             </div>
 
             {hasMore && (
-              <div ref={loadMoreRef} className="py-8 text-center text-gray-400">
+              <div ref={loadMoreRef} className="py-8 text-center text-content-text-secondary">
                 {isLoading ? "Loading more songs..." : `${filteredSongs.length - currentCount} more songs`}
               </div>
             )}

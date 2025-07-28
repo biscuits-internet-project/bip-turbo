@@ -31,29 +31,29 @@ export default function SideProjects(): ReactElement {
     <div className="p-4 md:p-6">
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Side Projects</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">Side Projects</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sideProjects.map((project) => (
             <div key={project.id || project.name} className="h-full">
-              <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 h-full">
-                <h3 className="text-xl font-bold text-white mb-2">{project.name}</h3>
-                <div className="text-gray-400 mb-4">
+              <div className="bg-content-bg border border-content-bg-secondary rounded-lg p-6 h-full">
+                <h3 className="text-xl font-bold text-content-text-primary mb-2">{project.name}</h3>
+                <div className="text-content-text-tertiary mb-4">
                   {project.dates.split(",").map((item) => (
                     <span key={item} className="mr-2">
                       {item.trim()}
                     </span>
                   ))}
                 </div>
-                <div className="text-gray-300">
+                <div className="text-content-text-secondary">
                   {project.members.map((member) => (
                     <div key={member} className="mb-1">
                       {member}
                     </div>
                   ))}
                 </div>
-                {project.notes && <div className="mt-4 text-gray-400 text-sm">{project.notes}</div>}
+                {project.notes && <div className="mt-4 text-content-text-secondary text-sm">{project.notes}</div>}
               </div>
             </div>
           ))}
@@ -61,7 +61,7 @@ export default function SideProjects(): ReactElement {
 
         {sideProjects.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-400">Loading side projects...</p>
+            <p className="text-content-text-secondary">Loading side projects...</p>
           </div>
         )}
       </div>

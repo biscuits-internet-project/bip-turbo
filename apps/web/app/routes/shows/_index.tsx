@@ -290,10 +290,10 @@ export default function Shows() {
         <div className="flex flex-col space-y-4">
           <div className="flex flex-wrap items-baseline gap-4">
             <h1 className="text-3xl md:text-4xl font-bold text-white">Shows</h1>
-            {!searchQuery && <span className="text-gray-400 text-lg">{year}</span>}
+            {!searchQuery && <span className="text-content-text-secondary text-lg">{year}</span>}
             {searchQuery && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-400 text-lg">Search results for "{searchQuery}"</span>
+                <span className="text-content-text-secondary text-lg">Search results for "{searchQuery}"</span>
                 <Button variant="outline" size="sm" onClick={clearSearch} disabled={isSearching}>
                   Clear
                 </Button>
@@ -303,28 +303,28 @@ export default function Shows() {
         </div>
 
         {/* Search */}
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-text-tertiary" />
             <input
               ref={searchInputRef}
               type="search"
               placeholder="Search by venue, city, state, song (min 4 characters)..."
-              className="w-full pl-9 bg-transparent border border-gray-800 focus:border-purple-500 rounded-md text-white placeholder:text-gray-500 text-sm h-9 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+              className="w-full pl-9 bg-transparent border border-content-bg-secondary focus:border-brand rounded-md text-white placeholder:text-content-text-tertiary text-sm h-9 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
               onChange={handleSearchInputChange}
             />
             {searchInputRef.current?.value && (
               <button
                 type="button"
                 onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-400 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-text-tertiary hover:text-content-text-secondary transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
             {isSearching && searchInputRef.current?.value && (
               <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                <Loader2 className="h-4 w-4 animate-spin text-content-text-tertiary" />
               </div>
             )}
           </div>
@@ -332,10 +332,10 @@ export default function Shows() {
 
         {/* Navigation - Only show when not searching */}
         {!searchQuery && (
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+          <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
             {/* Year navigation */}
             <div className="mb-6">
-              <h2 className="text-sm font-medium text-gray-400 mb-3">Filter by Year</h2>
+              <h2 className="text-sm font-medium text-content-text-secondary mb-3">Filter by Year</h2>
               <div className="flex flex-wrap gap-2">
                 {years.map((y) => (
                   <Link
@@ -343,7 +343,7 @@ export default function Shows() {
                     to={`/shows?year=${y}`}
                     className={cn(
                       "px-3 py-1 text-sm rounded-md transition-colors",
-                      y === year ? "bg-purple-500 text-white" : "text-gray-400 hover:bg-accent/10 hover:text-white",
+                      y === year ? "bg-brand text-white" : "text-content-text-secondary hover:bg-accent/10 hover:text-white",
                     )}
                   >
                     {y}
@@ -354,7 +354,7 @@ export default function Shows() {
 
             {/* Month navigation */}
             <div>
-              <h2 className="text-sm font-medium text-gray-400 mb-3">Jump to Month</h2>
+              <h2 className="text-sm font-medium text-content-text-secondary mb-3">Jump to Month</h2>
               <div className="flex flex-wrap gap-2">
                 {months.map((month, index) => (
                   <a
@@ -363,8 +363,8 @@ export default function Shows() {
                     className={cn(
                       "px-3 py-1 text-sm rounded-md transition-colors",
                       monthsWithShows.includes(index)
-                        ? "text-gray-300 hover:bg-accent/10 hover:text-white cursor-pointer"
-                        : "text-gray-600 cursor-not-allowed",
+                        ? "text-content-text-secondary hover:bg-accent/10 hover:text-white cursor-pointer"
+                        : "text-content-text-tertiary cursor-not-allowed",
                     )}
                   >
                     {month}
@@ -384,7 +384,7 @@ export default function Shows() {
               searchQuery && !isSearching ? "opacity-100" : "opacity-0",
             )}
           >
-            <div className="text-gray-400 mb-4">
+            <div className="text-content-text-secondary mb-4">
               Found {setlists.length} {setlists.length === 1 ? "show" : "shows"}
             </div>
           </div>
@@ -395,7 +395,7 @@ export default function Shows() {
             <div className="space-y-8">
               {setlists.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-400 text-lg">
+                  <p className="text-content-text-secondary text-lg">
                     {searchQuery ? "No shows found matching your search." : "No shows found for this year."}
                   </p>
                 </div>
@@ -447,9 +447,9 @@ export default function Shows() {
               isSearching ? "opacity-100" : "opacity-0 pointer-events-none",
             )}
           >
-            <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-gray-900/50 backdrop-blur-sm border border-gray-800">
-              <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
-              <span className="text-gray-200">Searching...</span>
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-content-bg/50 backdrop-blur-sm border border-content-bg-secondary">
+              <Loader2 className="h-5 w-5 animate-spin text-brand" />
+              <span className="text-content-text-primary">Searching...</span>
             </div>
           </div>
         </div>
@@ -465,7 +465,7 @@ export default function Shows() {
         <Button
           onClick={scrollToTop}
           size="icon"
-          className="h-12 w-12 rounded-full bg-purple-600 hover:bg-purple-700 shadow-lg"
+          className="h-12 w-12 rounded-full bg-brand hover:bg-hover-accent shadow-lg"
           aria-label="Back to top"
         >
           <ArrowUp className="h-5 w-5" />

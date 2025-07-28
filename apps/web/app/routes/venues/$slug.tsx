@@ -69,14 +69,14 @@ interface StatBoxProps {
 
 function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
   return (
-    <Card className="bg-gray-900 border-gray-800">
+    <Card className="bg-content-bg border-content-bg-secondary">
       <CardContent className="p-6">
-        <div className="flex items-center space-x-2 text-gray-400 mb-2">
+        <div className="flex items-center space-x-2 text-content-text-secondary mb-2">
           {icon}
           <span className="text-sm font-medium">{label}</span>
         </div>
         <div className="text-2xl font-bold text-white">{value || "—"}</div>
-        {sublabel && <div className="text-xs text-gray-500 mt-1">{sublabel}</div>}
+        {sublabel && <div className="text-xs text-content-text-tertiary mt-1">{sublabel}</div>}
       </CardContent>
     </Card>
   );
@@ -142,16 +142,16 @@ function VenueSetlistCard({
   }
 
   return (
-    <Card className="relative overflow-hidden border-gray-800 transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
+    <Card className="relative overflow-hidden border-content-bg-secondary transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
 
-      <CardHeader className="relative z-10 border-b border-gray-800/50 px-6 py-5">
+      <CardHeader className="relative z-10 border-b border-content-bg-secondary/50 px-6 py-5">
         <div className="flex justify-between items-start">
           <div className="flex flex-col gap-1">
-            <div className="text-2xl font-medium text-purple-300 hover:text-purple-200 transition-colors">
+            <div className="text-2xl font-medium text-brand hover:text-hover-accent transition-colors">
               <Link to={`/shows/${setlist.show.slug}`}>{formattedDate}</Link>
             </div>
-            <div className="text-xl text-gray-200">
+            <div className="text-xl text-content-text-primary">
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
             </div>
           </div>
@@ -160,7 +160,7 @@ function VenueSetlistCard({
 
       <CardContent className="relative z-10 px-6 py-5">
         {setlist.show.notes && (
-          <div className="mb-4 text-sm text-gray-400 italic border-l border-gray-700 pl-3 py-1">
+          <div className="mb-4 text-sm text-content-text-secondary italic border-l border-content-bg-secondary pl-3 py-1">
             {setlist.show.notes}
           </div>
         )}
@@ -171,11 +171,11 @@ function VenueSetlistCard({
               <span
                 className={cn(
                   "w-9 h-9 flex items-center justify-center rounded-full text-white font-medium",
-                  set.label === "I" && "bg-purple-900/50",
-                  set.label === "II" && "bg-indigo-900/50",
-                  set.label === "III" && "bg-blue-900/50",
-                  set.label === "E" && "bg-pink-900/50",
-                  !["I", "II", "III", "E"].includes(set.label) && "bg-gray-800/50",
+                  set.label === "I" && "bg-brand/20",
+                  set.label === "II" && "bg-brand-secondary/20",
+                  set.label === "III" && "bg-info/20",
+                  set.label === "E" && "bg-chart-tertiary/20",
+                  !["I", "II", "III", "E"].includes(set.label) && "bg-content-bg-secondary/50",
                 )}
               >
                 {set.label}
@@ -186,19 +186,19 @@ function VenueSetlistCard({
                     <span className="inline-flex items-center gap-1">
                       <span
                         className={cn(
-                          "relative text-white hover:text-purple-300 hover:underline transition-colors",
+                          "relative text-content-text-primary hover:text-hover-accent hover:underline transition-colors",
                           track.allTimer && "font-medium",
                         )}
                       >
-                        {track.allTimer && <span className="text-orange-500 inline-block mr-1">🔥</span>}
+                        {track.allTimer && <span className="text-chart-accent inline-block mr-1">🔥</span>}
                         <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
                         {trackAnnotationMap.has(track.id) && (
-                          <sup className="text-purple-400 ml-0.5 font-medium">{trackAnnotationMap.get(track.id)}</sup>
+                          <sup className="text-brand ml-0.5 font-medium">{trackAnnotationMap.get(track.id)}</sup>
                         )}
                       </span>
                     </span>
                     {i < set.tracks.length - 1 && (
-                      <span className="text-gray-400 mx-1 font-medium">{track.segue ? " > " : ", "}</span>
+                      <span className="text-content-text-secondary mx-1 font-medium">{track.segue ? " > " : ", "}</span>
                     )}
                   </span>
                 ))}
@@ -208,21 +208,21 @@ function VenueSetlistCard({
         </div>
 
         {orderedAnnotations.length > 0 && (
-          <div className="mt-6 space-y-2 pt-4 border-t border-gray-800/50">
+          <div className="mt-6 space-y-2 pt-4 border-t border-content-bg-secondary/50">
             {orderedAnnotations.map((annotation) => (
-              <div key={`annotation-${annotation.index}`} className="text-sm text-gray-400">
-                <sup className="text-purple-400">{annotation.index}</sup> {annotation.desc}
+              <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+                <sup className="text-brand">{annotation.index}</sup> {annotation.desc}
               </div>
             ))}
           </div>
         )}
 
-        <div className="flex justify-between items-end mt-6 pt-4 border-t border-gray-800/50">
+        <div className="flex justify-between items-end mt-6 pt-4 border-t border-content-bg-secondary/50">
           {orderedAnnotations.length > 0 ? (
             <div className="space-y-2">
               {orderedAnnotations.map((annotation) => (
-                <div key={`annotation-${annotation.index}`} className="text-sm text-gray-400">
-                  <sup className="text-purple-400">{annotation.index}</sup> {annotation.desc}
+                <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+                  <sup className="text-brand">{annotation.index}</sup> {annotation.desc}
                 </div>
               ))}
             </div>
@@ -323,7 +323,7 @@ export default function VenuePage() {
         </div>
 
         <AdminOnly>
-          <Button asChild size="sm" className="bg-purple-800 hover:bg-purple-700 text-white">
+          <Button asChild size="sm" className="bg-brand hover:bg-hover-accent text-content-text-primary">
             <Link to={`/venues/${venue.slug}/edit`} className="flex items-center gap-1">
               <Edit className="h-4 w-4" />
               <span>Edit Venue</span>
@@ -360,7 +360,7 @@ export default function VenuePage() {
           {setlists.length > 0 ? (
             setlists.map((setlist) => <VenueSetlistCard key={setlist.show.id} setlist={setlist} />)
           ) : (
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 text-center text-gray-400">
+            <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-6 text-center text-content-text-secondary">
               No shows found for this venue.
             </div>
           )}

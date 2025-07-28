@@ -35,52 +35,52 @@ export default function MediaResources(): ReactElement {
           <h1 className="text-3xl md:text-4xl font-bold text-white">News from Nowhere</h1>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-gray-800 bg-gray-900">
-          <table className="min-w-full divide-y divide-gray-800">
-            <thead className="bg-gray-800">
+        <div className="overflow-x-auto rounded-lg border border-content-bg-secondary bg-content-bg">
+          <table className="min-w-full divide-y divide-divider">
+            <thead className="bg-table-header">
               <tr>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-content-text-primary uppercase tracking-wider"
                 >
                   Year
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-content-text-primary uppercase tracking-wider"
                 >
                   Description
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium text-content-text-primary uppercase tracking-wider"
                 >
                   Type
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-divider">
               {media.length > 0 ? (
                 media.map((m) => (
-                  <tr key={m.id || `${m.year}-${m.description}`} className="hover:bg-gray-800">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{m.year}</td>
+                  <tr key={m.id || `${m.year}-${m.description}`} className="hover:bg-table-row-hover">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-content-text-primary">{m.year}</td>
                     <td className="px-6 py-4 text-sm">
                       <a
                         href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-purple-400 hover:text-purple-300"
+                        className="text-brand hover:text-hover-accent"
                       >
                         {m.description}
                       </a>
-                      <span className="text-gray-500 ml-1">- {m.url ? new URL(m.url).host : ""}</span>
+                      <span className="text-content-text-tertiary ml-1">- {m.url ? new URL(m.url).host : ""}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{m.media_type}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-content-text-primary">{m.media_type}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-400">
+                  <td colSpan={3} className="px-6 py-4 text-center text-sm text-content-text-secondary">
                     Loading media content...
                   </td>
                 </tr>

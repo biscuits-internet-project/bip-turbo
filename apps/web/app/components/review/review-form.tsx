@@ -32,12 +32,12 @@ export function ReviewForm({ onSubmit }: ReviewFormProps) {
           name="content"
           render={({ field }: { field: ControllerRenderProps<ReviewFormValues, "content"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200 text-lg">Write a Review</FormLabel>
+              <FormLabel className="text-content-text-primary text-lg">Write a Review</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Share your thoughts about this show..."
                   {...field}
-                  className="bg-gray-800 border-gray-700 text-white min-h-[120px]"
+                  className="bg-content-bg border-content-bg-secondary text-white min-h-[120px]"
                 />
               </FormControl>
               <FormMessage />
@@ -45,7 +45,7 @@ export function ReviewForm({ onSubmit }: ReviewFormProps) {
           )}
         />
 
-        <Button type="submit" className="bg-purple-500 hover:bg-purple-600 text-white">
+        <Button type="submit" className="bg-brand hover:bg-hover-accent text-white">
           Post Review
         </Button>
       </form>

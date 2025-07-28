@@ -32,14 +32,14 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700 transition-all",
+        "flex items-center justify-between p-3 bg-content-bg-secondary/50 rounded-lg border border-content-bg-secondary transition-all",
         isDragging && "opacity-50 shadow-lg z-50"
       )}
     >
       <div className="flex items-center space-x-4">
         {/* Drag Handle */}
         <button
-          className="text-gray-400 hover:text-gray-300 cursor-grab active:cursor-grabbing p-1"
+          className="text-content-text-secondary hover:text-gray-300 cursor-grab active:cursor-grabbing p-1"
           {...attributes}
           {...listeners}
         >
@@ -47,7 +47,7 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
         </button>
 
         {/* Position Number - now just for display */}
-        <span className="text-gray-400 font-mono text-sm w-8">
+        <span className="text-content-text-secondary font-mono text-sm w-8">
           {track.position}
         </span>
 
@@ -58,14 +58,14 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
 
         {/* Segue */}
         {track.segue && (
-          <span className="text-gray-400 text-sm">
+          <span className="text-content-text-secondary text-sm">
             {track.segue}
           </span>
         )}
 
         {/* Notes */}
         {track.note && (
-          <span className="text-gray-400 text-sm italic">
+          <span className="text-content-text-secondary text-sm italic">
             ({track.note})
           </span>
         )}

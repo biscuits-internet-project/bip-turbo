@@ -95,7 +95,7 @@ export default function EditVenue() {
         </Button>
       </div>
 
-      <div className="bg-gray-900 rounded-lg shadow-md p-6">
+      <div className="bg-content-bg rounded-lg shadow-md p-6">
         <VenueForm
           defaultValues={defaultValues}
           onSubmit={handleSubmit}

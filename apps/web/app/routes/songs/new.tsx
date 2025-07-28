@@ -51,7 +51,7 @@ export default function NewSong() {
       </div>
 
       <AdminOnly>
-        <Card className="relative overflow-hidden border-gray-800 transition-all duration-300">
+        <Card className="relative overflow-hidden border-content-bg-secondary transition-all duration-300">
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
           <CardContent className="relative z-10 p-6">
             <SongForm submitLabel="Create Song" cancelHref="/songs" />

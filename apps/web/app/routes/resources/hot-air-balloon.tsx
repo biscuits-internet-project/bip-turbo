@@ -430,7 +430,7 @@ at his last chance to fly
   const acts = [...act1, ...act2];
 
   const OperaMenuCard = ({ title, items }: { title: string; items: { name: string; anchor: string }[] }) => (
-    <Card className="bg-gray-900 rounded-lg border border-gray-800 mb-6">
+    <Card className="bg-content-bg rounded-lg border border-content-bg-secondary mb-6">
       <CardHeader>
         <h3 className="text-2xl font-semibold">{title}</h3>
       </CardHeader>
@@ -440,7 +440,7 @@ at his last chance to fly
             key={item.anchor}
             type="button"
             onClick={() => scrollToSection(item.anchor)}
-            className="text-purple-400 hover:text-purple-300 block w-full text-left py-2 transition-colors"
+            className="text-brand hover:text-hover-accent block w-full text-left py-2 transition-colors"
           >
             {item.name}
           </button>
@@ -450,7 +450,7 @@ at his last chance to fly
   );
 
   const LyricsBlock = ({ children }: { children: React.ReactNode }) => (
-    <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-700">{children}</blockquote>
+    <blockquote className="border-l-4 border-content-bg-secondary pl-4 italic my-4 text-content-text-secondary">{children}</blockquote>
   );
 
   return (
@@ -461,17 +461,17 @@ at his last chance to fly
 
       <div className="gap-6">
         <div className="space-y-6">
-          <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
             <CardHeader>
               <h3 className="text-2xl font-semibold">Introduction</h3>
             </CardHeader>
-            <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+            <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
               <p>
                 The Hot Air Balloon is the Disco Biscuits' first full-length rock opera, written by Jon Gutwillig, and
                 debuted on{" "}
                 <Link
                   to="/shows/1998-12-31-silk-city-diner-philadelphia-pa"
-                  className="text-purple-400 hover:text-purple-300"
+                  className="text-brand hover:text-hover-accent"
                 >
                   12/31/98
                 </Link>{" "}
@@ -486,11 +486,11 @@ at his last chance to fly
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
             <CardHeader>
               <h3 className="text-2xl font-semibold">Characters</h3>
             </CardHeader>
-            <CardContent className="space-y-6 text-gray-200 leading-relaxed">
+            <CardContent className="space-y-6 text-content-text-primary leading-relaxed">
               {chars.map((char) => (
                 <div key={char.anchor} id={char.anchor}>
                   <h4 className="text-xl font-semibold mb-2">{char.name}</h4>
@@ -500,11 +500,11 @@ at his last chance to fly
             </CardContent>
           </Card>
 
-          <Card className="bg-gray-900 rounded-lg border border-gray-800">
+          <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
             <CardHeader>
               <h3 className="text-2xl font-semibold">Story Overview</h3>
             </CardHeader>
-            <CardContent className="space-y-6 text-gray-200 leading-relaxed">
+            <CardContent className="space-y-6 text-content-text-primary leading-relaxed">
               {acts.map((act) => (
                 <div key={act.anchor} id={act.anchor}>
                   <h4 className="text-xl font-semibold mb-2">{act.name}</h4>

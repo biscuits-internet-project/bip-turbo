@@ -78,7 +78,7 @@ export function VenueSearch({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "justify-between bg-gray-800 border-gray-700 text-white hover:bg-gray-700",
+            "justify-between bg-content-bg border-content-bg-secondary text-white hover:bg-content-bg-secondary",
             className
           )}
         >
@@ -86,8 +86,8 @@ export function VenueSearch({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-gray-800 border-gray-700" align="start">
-        <Command className="bg-gray-800" shouldFilter={false}>
+      <PopoverContent className="p-0 bg-content-bg border-content-bg-secondary" align="start">
+        <Command className="bg-content-bg" shouldFilter={false}>
           <CommandInput
             placeholder="Search venues..."
             value={searchQuery}
@@ -106,7 +106,7 @@ export function VenueSearch({
                   onValueChange("none");
                   setOpen(false);
                 }}
-                className="text-white hover:bg-gray-700"
+                className="text-white hover:bg-content-bg-secondary"
               >
                 <Check
                   className={cn(
@@ -125,7 +125,7 @@ export function VenueSearch({
                     onValueChange(venue.id);
                     setOpen(false);
                   }}
-                  className="text-white hover:bg-gray-700"
+                  className="text-white hover:bg-content-bg-secondary"
                 >
                   <Check
                     className={cn(

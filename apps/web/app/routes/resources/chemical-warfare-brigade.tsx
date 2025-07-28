@@ -463,7 +463,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
   };
 
   const OperaMenuCard = ({ title, items }: { title: string; items: { name: string; anchor: string }[] }) => (
-    <Card className="mb-6 bg-gray-900 border-gray-800">
+    <Card className="mb-6 bg-content-bg border-content-bg-secondary">
       <CardContent className="p-4">
         <h3 className="text-lg font-semibold mb-3 text-white">{title}</h3>
         <ul className="space-y-2">
@@ -472,7 +472,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
               <button
                 type="button"
                 onClick={() => scrollToSection(item.anchor)}
-                className="text-purple-400 hover:text-purple-300 hover:underline"
+                className="text-brand hover:text-hover-accent hover:underline"
               >
                 {item.name}
               </button>
@@ -490,15 +490,15 @@ const ChemicalWarfareBrigade: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Introduction</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               The Chemical Warfare Brigade is the Disco Biscuits' second full-length rock opera, written by Marc
               Brownstein, and debuted on{" "}
-              <Link to="/shows/2000-12-30-vanderbilt-plainview-ny" className="text-purple-400 hover:text-purple-300">
+              <Link to="/shows/2000-12-30-vanderbilt-plainview-ny" className="text-brand hover:text-hover-accent">
                 12/30/00
               </Link>{" "}
               at the Vanderbilt on Long Island.
@@ -511,11 +511,11 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Characters</h3>
           </CardHeader>
-          <CardContent className="space-y-6 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-6 text-content-text-primary leading-relaxed">
             {chars.map((char) => (
               <div key={char.anchor} id={char.anchor}>
                 <h4 className="text-xl font-semibold mb-2">{char.name}</h4>
@@ -525,11 +525,11 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Story Overview</h3>
           </CardHeader>
-          <CardContent className="space-y-6 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-6 text-content-text-primary leading-relaxed">
             {acts.map((act) => (
               <div key={act.anchor} id={act.anchor}>
                 <h4 className="text-xl font-semibold mb-2">{act.name}</h4>
@@ -539,17 +539,17 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Songs</h3>
           </CardHeader>
-          <CardContent className="space-y-6 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-6 text-content-text-primary leading-relaxed">
             {songs.map((song) => (
               <div key={song.anchor} id={song.anchor}>
                 <h4 className="text-xl font-semibold mb-2">{song.name}</h4>
                 {song.setting && <p>{song.setting}</p>}
                 {song.lyrics && (
-                  <blockquote className="border-l-4 border-gray-700 pl-4 italic my-4 text-gray-400 whitespace-pre-line">
+                  <blockquote className="border-l-4 border-content-bg-secondary pl-4 italic my-4 text-content-text-secondary whitespace-pre-line">
                     {song.lyrics}
                   </blockquote>
                 )}
@@ -558,19 +558,19 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Related Links</h3>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Link to="/resources/hot-air-balloon" className="text-purple-400 hover:text-purple-300 block">
+            <Link to="/resources/hot-air-balloon" className="text-brand hover:text-hover-accent block">
               The Hot Air Balloon
             </Link>
             <a
               href="https://archive.org/details/db2000-12-30.shnf"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-purple-400 hover:text-purple-300 block"
+              className="text-brand hover:text-hover-accent block"
             >
               Listen to the Debut Performance
             </a>

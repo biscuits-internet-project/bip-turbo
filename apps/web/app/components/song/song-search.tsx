@@ -82,7 +82,7 @@ export function SongSearch({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "justify-between bg-gray-800 border-gray-700 text-white hover:bg-gray-700",
+            "justify-between bg-content-bg-secondary border-content-bg-secondary text-white hover:bg-gray-700",
             className
           )}
         >
@@ -90,8 +90,8 @@ export function SongSearch({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-gray-800 border-gray-700" align="start">
-        <Command className="bg-gray-800" shouldFilter={false}>
+      <PopoverContent className="p-0 bg-content-bg-secondary border-content-bg-secondary" align="start">
+        <Command className="bg-content-bg-secondary" shouldFilter={false}>
           <CommandInput
             placeholder="Search songs..."
             value={searchQuery}

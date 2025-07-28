@@ -1,86 +1,151 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Monoton&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @layer base {
+  /* Design Token System - Semantic Color Palette */
   :root {
-    --font-header: 'Monoton', cursive;
-    --font-heading: 'Roboto', sans-serif;
-    --font-body: 'Roboto', sans-serif;
-    --font-mono: 'Roboto', monospace;
-
+    /* Base system colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-    --sidebar-width: 16rem;
-    --sidebar-width-icon: 3rem;
-    --sidebar-width-mobile: 18rem;
-
+    --laser-1: 267 100% 50%;
+    --laser-2: 140 100% 50%;
+    --laser-3: 135 100% 45%;
+    --laser-4: 145 100% 55%;
+    --laser-5: 130 100% 45%;
+    --laser-6: 150 100% 50%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
- 
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
- 
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
- 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
- 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
- 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
- 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
- 
     --radius: 0.5rem;
+
+    /* Brand & Identity */
+    --brand-primary: 267 100% 50%;           /* Purple brand color */
+    --brand-secondary: 267 85% 65%;          /* Lighter purple */
+    --brand-gradient-start: 267 100% 80%;    /* Gradient start */
+    --brand-gradient-mid: 267 90% 65%;       /* Gradient middle */
+    --brand-gradient-end: 267 85% 50%;       /* Gradient end */
+    
+    /* Content Areas */
+    --content-bg: 0 0% 7%;                   /* Dark content backgrounds */
+    --content-bg-secondary: 217 33% 17%;     /* Secondary content areas */
+    --content-text-primary: 0 0% 100%;       /* Primary text on dark */
+    --content-text-secondary: 215 16% 47%;   /* Secondary text */
+    --content-text-tertiary: 215 16% 37%;    /* Tertiary/muted text */
+    
+    /* Interactive States */
+    --hover-accent: 267 75% 45%;             /* Purple hover state */
+    --hover-subtle: 210 40% 94%;             /* Subtle hover background */
+    --focus-ring: 267 75% 60%;               /* Focus ring color */
+    --active-state: 267 85% 55%;             /* Active/pressed state */
+    
+    /* Status & Feedback */
+    --success: 142 76% 36%;                  /* Success/positive */
+    --warning: 38 92% 50%;                   /* Warning/caution */
+    --info: 199 89% 48%;                     /* Information */
+    --rating-gold: 45 93% 47%;               /* Star ratings */
+    --rating-dim: 215 16% 25%;               /* Inactive ratings */
+    
+    /* Chart & Data Visualization */
+    --chart-primary: 267 100% 66%;           /* Primary chart color */
+    --chart-secondary: 267 75% 75%;          /* Secondary chart color */
+    --chart-tertiary: 267 50% 85%;           /* Tertiary chart color */
+    --chart-accent: 45 93% 47%;              /* Chart accent color */
+    
+    /* Component-Specific */
+    --card-overlay: 0 0% 7%;                 /* Card overlay backgrounds */
+    --nav-link-hover: 267 75% 45%;           /* Navigation hover */
+    --search-bg: 0 0% 7%;                    /* Search input backgrounds */
+    --filter-active: 267 100% 50%;           /* Active filter state */
+    --table-header: 217 33% 13%;             /* Table header background */
+    --table-row-hover: 217 33% 10%;          /* Table row hover */
+    --divider: 215 25% 20%;                  /* Dividers and separators */
   }
  
   .dark {
+    /* Base system colors */
     --background: 224 71% 4%;
     --foreground: 213 31% 91%;
-    --laser-1: 267 100% 50%;  /* Purple */
-    --laser-2: 140 100% 50%;  /* Bright Neon Green */
-    --laser-3: 135 100% 45%;  /* Slightly Darker Green */
-    --laser-4: 145 100% 55%;  /* Lighter Green */
-    --laser-5: 130 100% 45%;  /* Deep Green */
-    --laser-6: 150 100% 50%;  /* Mint Green */
- 
+    --laser-1: 267 100% 50%;
+    --laser-2: 140 100% 50%;
+    --laser-3: 135 100% 45%;
+    --laser-4: 145 100% 55%;
+    --laser-5: 130 100% 45%;
+    --laser-6: 150 100% 50%;
     --card: 224 71% 4%;
     --card-foreground: 213 31% 91%;
- 
     --popover: 224 71% 4%;
     --popover-foreground: 213 31% 91%;
- 
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
- 
     --secondary: 222.2 47.4% 11.2%;
     --secondary-foreground: 210 40% 98%;
- 
     --muted: 223 47% 11%;
     --muted-foreground: 215.4 16.3% 56.9%;
- 
     --accent: 267 75% 25%;
     --accent-foreground: 267 100% 85%;
- 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
- 
     --border: 216 34% 17%;
     --input: 216 34% 17%;
     --ring: 267 75% 25%;
+
+    /* Brand & Identity (same in dark mode) */
+    --brand-primary: 267 100% 60%;           /* Slightly brighter in dark */
+    --brand-secondary: 267 75% 70%;          /* Adjusted for dark contrast */
+    --brand-gradient-start: 267 90% 75%;     /* Gradient start */
+    --brand-gradient-mid: 267 80% 60%;       /* Gradient middle */
+    --brand-gradient-end: 267 75% 45%;       /* Gradient end */
+    
+    /* Content Areas (already dark-optimized) */
+    --content-bg: 224 71% 4%;                /* Match dark background */
+    --content-bg-secondary: 216 34% 17%;     /* Secondary areas */
+    --content-text-primary: 213 31% 91%;     /* Primary text */
+    --content-text-secondary: 215 16% 57%;   /* Secondary text */
+    --content-text-tertiary: 215 16% 47%;    /* Tertiary text */
+    
+    /* Interactive States */
+    --hover-accent: 267 85% 65%;             /* Brighter hover in dark */
+    --hover-subtle: 216 34% 12%;             /* Subtle dark hover */
+    --focus-ring: 267 85% 70%;               /* Bright focus ring */
+    --active-state: 267 75% 55%;             /* Active state */
+    
+    /* Status & Feedback */
+    --success: 142 69% 58%;                  /* Brighter success in dark */
+    --warning: 38 85% 65%;                   /* Adjusted warning */
+    --info: 199 89% 68%;                     /* Brighter info */
+    --rating-gold: 45 93% 57%;               /* Brighter gold */
+    --rating-dim: 215 16% 35%;               /* Dimmed ratings */
+    
+    /* Chart & Data Visualization */
+    --chart-primary: 267 100% 66%;           /* Same primary chart */
+    --chart-secondary: 267 75% 75%;          /* Same secondary */
+    --chart-tertiary: 267 50% 85%;           /* Same tertiary */
+    --chart-accent: 45 93% 57%;              /* Brighter accent */
+    
+    /* Component-Specific */
+    --card-overlay: 224 71% 4%;              /* Dark card overlay */
+    --nav-link-hover: 267 85% 65%;           /* Brighter nav hover */
+    --search-bg: 216 34% 17%;                /* Dark search bg */
+    --filter-active: 267 85% 65%;            /* Bright active filter */
+    --table-header: 216 34% 8%;              /* Darker table header */
+    --table-row-hover: 216 34% 12%;          /* Table row hover */
+    --divider: 216 34% 17%;                  /* Dark dividers */
   }
 
   /* Override the Tailwind background utility */
@@ -98,10 +163,14 @@
   }
 
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
+  
   body {
-    @apply bg-background text-foreground relative overflow-x-hidden;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    position: relative;
+    overflow-x: hidden;
     font-family: var(--font-body);
   }
 
@@ -233,6 +302,68 @@
     margin-bottom: 0.5em;
     display: block;
   }
+
+  /* Custom keyframes for animations */
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  
+  @keyframes star-pulse {
+    0% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+    50% {
+      transform: scale(1.2);
+      filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.6));
+    }
+    100% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+  }
+  
+  @keyframes star-glow {
+    0% { filter: brightness(100%); }
+    50% { filter: brightness(150%); }
+    100% { filter: brightness(100%); }
+  }
+  
+  @keyframes rating-update {
+    0% {
+      transform: scale(1);
+      filter: brightness(100%) drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+    50% {
+      transform: scale(1.4);
+      filter: brightness(150%) drop-shadow(0 0 8px rgba(250, 204, 21, 0.8));
+    }
+    100% {
+      transform: scale(1);
+      filter: brightness(100%) drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+    }
+  }
+  
+  @keyframes avg-rating-update {
+    0% {
+      transform: scale(1);
+      filter: brightness(100%);
+    }
+    40% {
+      transform: scale(1.5);
+      filter: brightness(150%) drop-shadow(0 0 12px rgba(250, 204, 21, 0.9));
+    }
+    100% {
+      transform: scale(1);
+      filter: brightness(100%);
+    }
+  }
 }
 
 @layer components {
@@ -282,9 +413,11 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: hsl(var(--border));
+    outline-color: hsl(var(--ring) / 0.5);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
-} 
+}

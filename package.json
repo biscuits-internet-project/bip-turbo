@@ -17,6 +17,7 @@
   ],
   "devDependencies": {
     "@biomejs/biome": "^2.1.2",
+    "@tailwindcss/cli": "^4.0.0",
     "shadcn": "2.9.3",
     "typescript": "^5.8.3"
   },

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 const Link = (props: React.ComponentProps<typeof RouterLink>) => (
-  <RouterLink {...props} className={`text-purple-400 hover:text-purple-300 ${props.className || ""}`} />
+  <RouterLink {...props} className={`text-brand hover:text-hover-accent ${props.className || ""}`} />
 );
 
 // Define types for our data
@@ -52,19 +52,19 @@ const BandHistory: React.FC = () => {
           <h1 className="text-3xl font-bold text-white">Band History</h1>
         </div>
 
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-6">
+        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-6">
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-white">Current Members</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {data.currentMembers.map((member) => (
                 <div key={member.name} className="flex flex-col space-y-1">
                   <h3 className="text-lg font-medium text-white">{member.name}</h3>
-                  <p className="text-sm text-gray-400">{member.instrument}</p>
+                  <p className="text-sm text-content-text-secondary">{member.instrument}</p>
                   <a
                     href={`https://twitter.com/${member.twitter}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-info hover:text-hover-accent transition-colors"
                   >
                     @{member.twitter}
                     <Twitter className="h-4 w-4" />
@@ -75,11 +75,11 @@ const BandHistory: React.FC = () => {
           </div>
         </div>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">Early Years</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               The four original members, Jon Gutwillig (guitar), Marc Brownstein (bass), Ben Hayflick (keys), and Sam
               Altman (drums) met in the early 90's as students at the University of Pennsylvania in Philadelphia.
@@ -90,7 +90,7 @@ const BandHistory: React.FC = () => {
             </p>
             <p>
               In{" "}
-              <Link to="/shows/year/1995" className="text-purple-400 hover:text-purple-300">
+              <Link to="/shows/year/1995" className="text-brand hover:text-hover-accent">
                 1995
               </Link>
               , Aron Magner replaced Hayflick on keys and the band changed their name to The Disco Biscuits. In an
@@ -108,11 +108,11 @@ const BandHistory: React.FC = () => {
               </blockquote>
             </p>
             <p>
-              <Link to="/shows/year/1995" className="text-purple-400 hover:text-purple-300">
+              <Link to="/shows/year/1995" className="text-brand hover:text-hover-accent">
                 1995
               </Link>{" "}
               into{" "}
-              <Link to="/shows/year/1996" className="text-purple-400 hover:text-purple-300">
+              <Link to="/shows/year/1996" className="text-brand hover:text-hover-accent">
                 1996
               </Link>{" "}
               saw them move away from house parties and into the Philadelphia bar/club scene with shows at Sam Adam's
@@ -121,11 +121,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">1997 - 1999</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               The first heavily circulated show of the Disco Biscuits career was played on{" "}
               <Link to="/shows/1997-01-30-wetlands-preserve-new-york-ny">1/30/97</Link> at the Wetlands Preserve, in New
@@ -163,11 +163,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2000 - The Disco Triscuits and The Maui Project</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               In January 2000 Marc announced via an Internet message board post that he had been asked to leave the
               band. Luckily, this hiatus was short-lived, and he rejoined the band in July of that same year.
@@ -195,11 +195,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2000 - 2004</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               Coming soon!. Follow us at on{" "}
               <Link to="https://twitter.com/tdbdotnet" target="blank">
@@ -214,11 +214,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2005 - The Doctor is Out. Enter Batman.</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               In <Link to="/shows/years/2005">2005</Link>, after more than 10 years, Sam Altman left the band to pursue
               his dream of becoming a doctor. His last official shows were{" "}
@@ -242,11 +242,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2006</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               <Link to="/shows/year/2006">2006</Link> marked a new chapter for the Disco Biscuits, as they took their
               new drummer Allen on the road. While performances may have been a little uneven at first, it was clear
@@ -331,11 +331,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2007</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               While it could be said that much of 2006 felt like a period of adjustment,{" "}
               <Link to="/shows/year/2007">2007</Link> found the Biscuits extremely comfortable with their new drummer
@@ -400,11 +400,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2008</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               Fresh off an incredibly successful 2007, four nights in Colorado started{" "}
               <Link to="/shows/year/2008">2008</Link> off on the right foot. Extended sections of improv were prevalent
@@ -468,11 +468,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2009</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               When the band hit the road in early January, excitement was palpable. While they had played at a high
               level in the first half of 2008, there was no tour in the second half, and fans were ready to go out and
@@ -660,11 +660,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2011 - 2019 - Setbreak</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               During the 8 years from 2011 - 2019, the band did not tour - instead just performing periodic series of
               limited engagement runs (4 nights in Colorado, NYE Run, Camp Bisco, etc).
@@ -672,11 +672,11 @@ const BandHistory: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-900 rounded-lg border border-gray-800">
+        <Card className="bg-content-bg rounded-lg border border-content-bg-secondary">
           <CardHeader>
             <h3 className="text-2xl font-semibold">2019 - Present - Setbreak is Over</h3>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-200 leading-relaxed">
+          <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               In September of 2019 in a series of social media posts, the Disco Biscuits announced "Setbreak is over.
               Gas tank's refilled. We are back." Shortly thereafter, they announced their 2019-2020 Winter Tour, playing
