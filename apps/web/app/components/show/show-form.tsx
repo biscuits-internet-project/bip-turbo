@@ -88,7 +88,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
                     <SelectValue placeholder="Select a band" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]">
+                <SelectContent className="bg-content-bg-secondary border-content-bg-secondary">
                   <SelectItem value="none">No band</SelectItem>
                   <SelectItem value="db7f2c5d-2727-41fd-bd6f-e91c74164f09" className="text-content-text-primary hover:bg-content-bg-secondary">
                     The Disco Biscuits

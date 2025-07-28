@@ -506,11 +506,11 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (isLoading) {
     return (
-      <div className="bg-[hsl(var(--content-bg))] border border-[hsl(var(--content-bg-secondary))] rounded-lg p-6 text-center">
+      <div className="bg-content-bg border border-content-bg-secondary rounded-lg p-6 text-center">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="h-4 bg-[hsl(var(--content-bg-secondary))] rounded w-3/4 mb-4" />
-          <div className="h-10 bg-[hsl(var(--content-bg-secondary))] rounded w-full mb-4" />
-          <div className="h-4 bg-[hsl(var(--content-bg-secondary))] rounded w-1/2" />
+          <div className="h-4 bg-content-bg-secondary rounded w-3/4 mb-4" />
+          <div className="h-10 bg-content-bg-secondary rounded w-full mb-4" />
+          <div className="h-4 bg-content-bg-secondary rounded w-1/2" />
         </div>
       </div>
     );
@@ -538,7 +538,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   return (
     <div className={cn("archive-player", className)}>
-      <div className="player-container bg-[hsl(var(--content-bg))] border border-[hsl(var(--content-bg-secondary))] rounded-lg p-6 shadow-lg">
+      <div className="player-container bg-content-bg border border-content-bg-secondary rounded-lg p-6 shadow-lg">
         {/* Hidden audio element */}
         <audio ref={audioRef} src={audioUrl} preload="metadata">
           <track kind="captions" src="" />
@@ -556,7 +556,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         </div>
 
         {/* Now playing */}
-        <div className="mb-4 bg-[hsl(var(--content-bg-secondary))]/50 rounded-md p-3 border border-[hsl(var(--content-bg-secondary))]">
+        <div className="mb-4 bg-content-bg-secondary/50 rounded-md p-3 border border-content-bg-secondary">
           <div className="text-sm font-medium text-content-text-tertiary mb-1">Now Playing:</div>
           <div className="text-base text-content-text-primary font-medium truncate">{getTrackName(currentFile)}</div>
           <div className="text-xs text-content-text-tertiary mt-1">
@@ -568,7 +568,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         <div className="mb-4">
           <div
             ref={progressRef}
-            className="h-2 bg-[hsl(var(--content-bg-secondary))] rounded-full cursor-pointer overflow-hidden"
+            className="h-2 bg-content-bg-secondary rounded-full cursor-pointer overflow-hidden"
             onClick={handleProgressClick}
             onKeyDown={handleProgressKeyDown}
             role="slider"
@@ -579,7 +579,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             tabIndex={0}
           >
             <div
-              className="h-full bg-gradient-to-r from-[hsl(var(--brand-primary))] to-[hsl(var(--chart-primary))] rounded-full"
+              className="h-full bg-gradient-to-r from-brand-primary to-chart-primary rounded-full"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
@@ -645,7 +645,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               step="0.01"
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-20 h-1 bg-[hsl(var(--content-bg-secondary))] rounded-lg appearance-none cursor-pointer"
+              className="w-20 h-1 bg-content-bg-secondary rounded-lg appearance-none cursor-pointer"
               aria-label="Volume"
             />
           </div>
@@ -655,13 +655,13 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         {audioFiles.length > 1 && (
           <div className="track-list">
             <h4 className="text-md font-medium text-content-text-secondary mb-2">Tracks</h4>
-            <div className="max-h-48 overflow-y-auto rounded-md border border-[hsl(var(--content-bg-secondary))] bg-[hsl(var(--content-bg-secondary))]/30 scrollbar-thin scrollbar-thumb-[hsl(var(--content-bg-secondary))] scrollbar-track-[hsl(var(--content-bg))]">
+            <div className="max-h-48 overflow-y-auto rounded-md border border-content-bg-secondary bg-content-bg-secondary/30 scrollbar-thin scrollbar-thumb-content-bg-secondary scrollbar-track-content-bg">
               {audioFiles.map((file, index) => (
                 <button
                   key={file.name}
                   type="button"
                   className={cn(
-                    "w-full p-2 cursor-pointer text-sm border-b border-[hsl(var(--content-bg-secondary))] last:border-0 hover:bg-[hsl(var(--content-bg-secondary))]/80 transition-colors text-left",
+                    "w-full p-2 cursor-pointer text-sm border-b border-content-bg-secondary last:border-0 hover:bg-content-bg-secondary/80 transition-colors text-left",
                     currentTrackIndex === index
                       ? "bg-gradient-to-r from-brand-primary/50 to-chart-primary/30 text-brand-secondary"
                       : "text-content-text-secondary",

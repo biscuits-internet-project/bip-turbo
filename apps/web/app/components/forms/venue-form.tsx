@@ -11,10 +11,10 @@ type VenueFormProps = {
 
 export function VenueForm({ venue, onSubmit }: VenueFormProps) {
   return (
-    <Card className="relative border-none bg-[hsl(var(--content-bg))]/90 backdrop-blur-2xl before:pointer-events-none before:absolute before:-inset-1 before:rounded-[inherit] before:border before:border-[hsl(var(--brand-primary))]/20 before:opacity-0 before:transition before:duration-300 hover:before:opacity-100">
-      <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-[hsl(var(--brand-primary))]/10 via-transparent to-transparent" />
-      <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-[hsl(var(--brand-primary))]/5" />
-      <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-[hsl(var(--brand-primary))]/5 to-[hsl(var(--brand-primary))]/0 opacity-50" />
+    <Card className="relative border-none bg-content-bg/90 backdrop-blur-2xl before:pointer-events-none before:absolute before:-inset-1 before:rounded-[inherit] before:border before:border-brand-primary/20 before:opacity-0 before:transition before:duration-300 hover:before:opacity-100">
+      <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand-primary/10 via-transparent to-transparent" />
+      <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand-primary/5" />
+      <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand-primary/5 to-brand-primary/0 opacity-50" />
       <CardHeader className="space-y-1">
         <CardTitle className="text-3xl font-bold tracking-tight text-content-text-primary">Venue Details</CardTitle>
       </CardHeader>

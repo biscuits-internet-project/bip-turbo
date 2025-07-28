@@ -207,7 +207,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                 <Checkbox
                   checked={field.value || false}
                   onCheckedChange={field.onChange}
-                  className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]"
+                  className="bg-content-bg-secondary border-content-bg-secondary"
                 />
               </FormControl>
               <FormLabel className="text-content-text-secondary">Cover Song</FormLabel>

@@ -414,7 +414,7 @@ export default function SongPage() {
                   tick={{ fill: "rgba(255,255,255,0.7)" }}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
-                <Bar dataKey="plays" fill="hsl(var(--chart-primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="plays" fill="theme(colors.chart.primary)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           </div>

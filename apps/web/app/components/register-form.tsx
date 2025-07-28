@@ -82,7 +82,7 @@ export function RegisterForm({ className, onSubmit, ...props }: RegisterFormProp
               </Button>
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-[hsl(var(--content-bg-secondary))]" />
+                  <span className="w-full border-t border-content-bg-secondary" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-background px-2 text-content-text-tertiary">Or continue with</span>

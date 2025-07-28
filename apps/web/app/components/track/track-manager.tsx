@@ -310,7 +310,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       : Math.max(0, ...tracks.filter(t => t.set === formData.set).map(t => t.position)) + 1;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-[hsl(var(--content-bg))]/50 rounded-lg border border-[hsl(var(--content-bg-secondary))]">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-content-bg/50 rounded-lg border border-content-bg-secondary">
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-content-text-secondary mb-1">Song</label>
           <SongSearch
@@ -331,7 +331,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
             <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]">
+            <SelectContent className="bg-content-bg-secondary border-content-bg-secondary">
               {SET_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value} className="text-content-text-primary">
                   {option.label}
@@ -350,7 +350,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
             <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]">
+            <SelectContent className="bg-content-bg-secondary border-content-bg-secondary">
               {SEGUE_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value} className="text-content-text-primary">
                   {option.label}
@@ -364,7 +364,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           <Button
             onClick={() => handleSubmit(nextPosition)}
             disabled={createTrackMutation.isPending || updateTrackMutation.isPending}
-            className="bg-[hsl(var(--brand-primary))] hover:bg-[hsl(var(--hover-accent))]"
+            className="bg-brand-primary hover:bg-hover-accent"
           >
             <Check className="h-4 w-4 mr-1" />
             {editingId ? "Update" : "Add"}
@@ -382,14 +382,14 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   };
 
   return (
-    <Card className="border-[hsl(var(--content-bg-secondary))] bg-[hsl(var(--content-bg))]/50">
+    <Card className="border-content-bg-secondary bg-content-bg/50">
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-content-text-primary">Track List</CardTitle>
           <Button
             onClick={() => setIsAddingNew(true)}
             disabled={isAddingNew || editingId !== null}
-            className="bg-[hsl(var(--brand-primary))] hover:bg-[hsl(var(--hover-accent))]"
+            className="bg-brand-primary hover:bg-hover-accent"
           >
             <Plus className="h-4 w-4 mr-1" />
             Add Track
