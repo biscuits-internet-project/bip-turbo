@@ -54,7 +54,7 @@ export default function TopRated() {
           <h1 className="text-3xl md:text-4xl font-bold text-white">Top Rated Shows</h1>
         </div>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <Card className="bg-content-bg border-content-bg-secondary">
           <div className="relative overflow-x-auto">
             <table className="w-full text-md">
               <thead>
@@ -77,7 +77,7 @@ export default function TopRated() {
                         </div>
                         <div className="p-4 w-[140px]">
                           <div className="flex items-center">
-                            <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                            <Star className="h-4 w-4 text-rating-gold mr-1" />
                             <span className="text-white font-medium">{show.averageRating?.toFixed(1) || "—"}</span>
                           </div>
                         </div>

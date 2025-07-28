@@ -65,7 +65,7 @@ export default function BlogPostPage() {
   return (
     <div>
       <div className="space-y-6 md:space-y-8">
-        <div className="flex items-center gap-2 text-gray-400">
+        <div className="flex items-center gap-2 text-content-text-secondary">
           <CalendarDays className="h-5 w-5" />
           <p className="text-lg">{formatDate(blogPost.publishedAt)}</p>
         </div>
@@ -76,7 +76,7 @@ export default function BlogPostPage() {
             <Button
               asChild
               variant="outline"
-              className="border-purple-800 hover:bg-purple-800/10 text-purple-400 hover:text-purple-300"
+              className="border-brand hover:bg-brand/10 text-brand hover:text-hover-accent"
             >
               <Link to={`/blog/${blogPost.slug}/edit`} className="flex items-center gap-2">
                 <Pencil className="h-4 w-4" />
@@ -95,13 +95,13 @@ export default function BlogPostPage() {
               </AvatarFallback>
             </Avatar>
             <div className="text-sm">
-              <p className="text-gray-200">Admin User</p>
+              <p className="text-content-text-primary">Admin User</p>
             </div>
           </div>
         </div>
 
-        <Card className="relative overflow-hidden border-gray-800">
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-900/95 to-purple-950/20 pointer-events-none" />
+        <Card className="relative overflow-hidden border-content-bg-secondary">
+          <div className="absolute inset-0 bg-gradient-to-br from-content-bg via-content-bg/95 to-brand/20 pointer-events-none" />
           <CardContent className="relative z-10 p-6">
             <div className="prose prose-invert max-w-none">
               {blogPost.coverImage && (

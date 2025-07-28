@@ -223,7 +223,7 @@ const StarIcon = ({
   <div className="relative">
     {/* Empty star (background) */}
     <svg
-      className={cn("w-4 h-4 ms-1", filled || half ? "text-gray-500" : "text-gray-500")}
+      className={cn("w-4 h-4 ms-1", filled || half ? "text-content-text-tertiary" : "text-content-text-tertiary")}
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
       fill="currentColor"
@@ -243,7 +243,7 @@ const StarIcon = ({
         style={{ animationDelay: delay ? `${delay}ms` : undefined }}
       >
         <svg
-          className={cn("w-4 h-4 ms-1 text-yellow-400", isAnimating && "animate-star-glow")}
+          className={cn("w-4 h-4 ms-1 text-rating-gold", isAnimating && "animate-star-glow")}
           style={{ animationDelay: delay ? `${delay}ms` : undefined }}
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"

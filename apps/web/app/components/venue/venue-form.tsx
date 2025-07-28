@@ -45,9 +45,9 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           name="name"
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "name"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Venue Name</FormLabel>
+              <FormLabel className="text-content-text-primary">Venue Name</FormLabel>
               <FormControl>
-                <Input placeholder="Enter venue name" {...field} className="bg-gray-800 border-gray-700 text-white" />
+                <Input placeholder="Enter venue name" {...field} className="bg-content-bg-secondary border-content-bg-secondary text-white" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -59,14 +59,14 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           name="city"
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "city"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">City</FormLabel>
+              <FormLabel className="text-content-text-primary">City</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Enter city"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-white"
                 />
               </FormControl>
               <FormMessage />
@@ -79,14 +79,14 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           name="state"
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "state"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">State</FormLabel>
+              <FormLabel className="text-content-text-primary">State</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Enter state"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-white"
                 />
               </FormControl>
               <FormMessage />
@@ -99,14 +99,14 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           name="country"
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "country"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Country</FormLabel>
+              <FormLabel className="text-content-text-primary">Country</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Enter country"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-white"
                 />
               </FormControl>
               <FormMessage />
@@ -122,7 +122,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
             type="button"
             variant="outline"
             onClick={() => navigate(cancelHref)}
-            className="border-gray-600 text-gray-200 hover:bg-gray-800 hover:text-white"
+            className="border-gray-600 text-content-text-primary hover:bg-content-bg-secondary hover:text-white"
           >
             Cancel
           </Button>

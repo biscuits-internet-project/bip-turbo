@@ -39,7 +39,7 @@ export default function TourDates() {
           <h1 className="text-3xl md:text-4xl font-bold text-white">Tour Dates</h1>
         </div>
 
-        <Card className="bg-gray-900 border-gray-800">
+        <Card className="bg-content-bg border-content-bg-secondary">
           <div className="relative overflow-x-auto">
             <table className="w-full text-md">
               <thead>
@@ -61,7 +61,7 @@ export default function TourDates() {
                         : `${td.formattedStartDate} - ${td.formattedEndDate}`}
                     </td>
                     <td className="p-4 text-white font-medium">{td.venueName}</td>
-                    <td className="p-4 text-gray-400">{td.address}</td>
+                    <td className="p-4 text-content-text-secondary">{td.address}</td>
                   </tr>
                 ))}
               </tbody>

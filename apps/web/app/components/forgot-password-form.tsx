@@ -14,13 +14,13 @@ type ForgotPasswordFormProps = {
 export function ForgotPasswordForm({ className, onSubmit, ...props }: ForgotPasswordFormProps) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="relative border-none bg-zinc-900/90 backdrop-blur-2xl before:pointer-events-none before:absolute before:-inset-1 before:rounded-[inherit] before:border before:border-purple-500/20 before:opacity-0 before:transition before:duration-300 hover:before:opacity-100">
-        <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-purple-500/10 via-transparent to-transparent" />
-        <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-purple-500/5" />
-        <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-purple-500/5 to-purple-500/0 opacity-50" />
+      <Card className="relative border-none bg-content-bg/90 backdrop-blur-2xl before:pointer-events-none before:absolute before:-inset-1 before:rounded-[inherit] before:border before:border-brand/20 before:opacity-0 before:transition before:duration-300 hover:before:opacity-100">
+        <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
+        <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
+        <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold tracking-tight text-white">Reset password</CardTitle>
-          <CardDescription className="text-base text-zinc-400">
+          <CardDescription className="text-base text-content-text-secondary">
             Enter your email address and we'll send you a link to reset your password
           </CardDescription>
         </CardHeader>
@@ -32,7 +32,7 @@ export function ForgotPasswordForm({ className, onSubmit, ...props }: ForgotPass
                   Email
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-text-secondary" />
                   <Input
                     id="email"
                     name="email"
@@ -46,14 +46,14 @@ export function ForgotPasswordForm({ className, onSubmit, ...props }: ForgotPass
             </div>
 
             <div className="space-y-4">
-              <Button type="submit" className="w-full bg-purple-500 text-white hover:bg-purple-600">
+              <Button type="submit" className="w-full bg-brand text-white hover:bg-hover-accent">
                 Send reset link
               </Button>
             </div>
 
-            <div className="text-center text-sm text-zinc-400">
+            <div className="text-center text-sm text-content-text-secondary">
               Remember your password?{" "}
-              <Link to="/auth/login" className="text-purple-400 hover:text-purple-300">
+              <Link to="/auth/login" className="text-brand hover:text-hover-accent">
                 Sign in
               </Link>
             </div>

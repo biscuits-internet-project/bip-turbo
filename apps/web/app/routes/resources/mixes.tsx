@@ -107,16 +107,16 @@ const Mixes: React.FC = () => {
   ];
 
   const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="bg-gray-900 rounded-lg shadow-md overflow-hidden mb-8">
+    <div className="bg-content-bg rounded-lg shadow-md overflow-hidden mb-8">
       <div className="p-6">
-        <h2 className="text-2xl font-semibold text-purple-400 mb-4">{title}</h2>
+        <h2 className="text-2xl font-semibold text-brand mb-4">{title}</h2>
         {children}
       </div>
     </div>
   );
 
   const p = ({ children }: { children: React.ReactNode }) => (
-    <p className="mb-4 text-gray-800 leading-relaxed">{children}</p>
+    <p className="mb-4 text-content-text-secondary leading-relaxed">{children}</p>
   );
 
   return (
@@ -127,7 +127,7 @@ const Mixes: React.FC = () => {
         </div>
 
         <Card title="About These Mixes">
-          <div className="space-y-4 text-gray-300">
+          <div className="space-y-4 text-content-text-primary">
             <p className="leading-relaxed">
               For many runners, long-form high-intensity music is the best way to get through a workout. As luck would
               have it, this is what The Disco Biscuits do best.
@@ -148,7 +148,7 @@ const Mixes: React.FC = () => {
                 href="https://livemusicblog.com/features/podcast-59-hippie-workout-mix-vol-1/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 hover:underline"
+                className="text-brand hover:text-hover-accent hover:underline"
               >
                 This specific mix from LiveMusicBlog.com
               </a>{" "}
@@ -167,7 +167,7 @@ const Mixes: React.FC = () => {
                 href="https://johnvantine.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 hover:underline"
+                className="text-brand hover:text-hover-accent hover:underline"
               >
                 John
               </a>
@@ -176,14 +176,14 @@ const Mixes: React.FC = () => {
         </Card>
 
         <Card title="Available Mixes">
-          <ul className="divide-y divide-gray-200">
+          <ul className="divide-y divide-divider">
             {mixes.map((mix) => (
               <li key={mix.name.replace(/\s+/g, "-").toLowerCase()} className="py-3">
                 <a
                   href={mix.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-purple-400 hover:text-purple-300 hover:underline flex items-center"
+                  className="text-brand hover:text-hover-accent hover:underline flex items-center"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

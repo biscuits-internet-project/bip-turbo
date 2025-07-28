@@ -310,9 +310,9 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       : Math.max(0, ...tracks.filter(t => t.set === formData.set).map(t => t.position)) + 1;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-[hsl(var(--content-bg))]/50 rounded-lg border border-[hsl(var(--content-bg-secondary))]">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-300 mb-1">Song</label>
+          <label className="block text-sm font-medium text-content-text-secondary mb-1">Song</label>
           <SongSearch
             value={formData.songId}
             onValueChange={(value) => setFormData(prev => ({ ...prev, songId: value }))}
@@ -323,17 +323,17 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Set</label>
+          <label className="block text-sm font-medium text-content-text-secondary mb-1">Set</label>
           <Select 
             value={formData.set} 
             onValueChange={(value) => setFormData(prev => ({ ...prev, set: value }))}
           >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+            <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
+            <SelectContent className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]">
               {SET_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value} className="text-white">
+                <SelectItem key={option.value} value={option.value} className="text-content-text-primary">
                   {option.label}
                 </SelectItem>
               ))}
@@ -342,17 +342,17 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Segue</label>
+          <label className="block text-sm font-medium text-content-text-secondary mb-1">Segue</label>
           <Select 
             value={formData.segue} 
             onValueChange={(value) => setFormData(prev => ({ ...prev, segue: value }))}
           >
-            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+            <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
+            <SelectContent className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]">
               {SEGUE_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value} className="text-white">
+                <SelectItem key={option.value} value={option.value} className="text-content-text-primary">
                   {option.label}
                 </SelectItem>
               ))}
@@ -364,7 +364,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           <Button
             onClick={() => handleSubmit(nextPosition)}
             disabled={createTrackMutation.isPending || updateTrackMutation.isPending}
-            className="bg-purple-600 hover:bg-purple-700"
+            className="bg-[hsl(var(--brand-primary))] hover:bg-[hsl(var(--hover-accent))]"
           >
             <Check className="h-4 w-4 mr-1" />
             {editingId ? "Update" : "Add"}
@@ -372,7 +372,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           <Button
             onClick={cancelEditing}
             variant="outline"
-            className="border-gray-600 text-gray-300"
+            className="border-content-bg-secondary text-content-text-secondary"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -382,14 +382,14 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   };
 
   return (
-    <Card className="border-gray-800 bg-gray-900/50">
+    <Card className="border-[hsl(var(--content-bg-secondary))] bg-[hsl(var(--content-bg))]/50">
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle className="text-white">Track List</CardTitle>
+          <CardTitle className="text-content-text-primary">Track List</CardTitle>
           <Button
             onClick={() => setIsAddingNew(true)}
             disabled={isAddingNew || editingId !== null}
-            className="bg-purple-600 hover:bg-purple-700"
+            className="bg-[hsl(var(--brand-primary))] hover:bg-[hsl(var(--hover-accent))]"
           >
             <Plus className="h-4 w-4 mr-1" />
             Add Track
@@ -401,7 +401,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         {isAddingNew && renderTrackForm()}
         
         {Object.keys(tracksBySet).length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
+          <div className="text-center py-8 text-content-text-tertiary">
             No tracks added yet. Click "Add Track" to get started.
           </div>
         ) : (
@@ -419,7 +419,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
                 
                 return (
                   <div key={setName} className="space-y-2">
-                    <h3 className="text-lg font-medium text-purple-300 border-b border-gray-700 pb-1">
+                    <h3 className="text-lg font-medium text-brand-secondary border-b border-content-bg-secondary pb-1">
                       {SET_OPTIONS.find(opt => opt.value === setName)?.label || setName}
                     </h3>
                     

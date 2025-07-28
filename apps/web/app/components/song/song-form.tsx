@@ -69,9 +69,9 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="title"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "title"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Song Title</FormLabel>
+              <FormLabel className="text-content-text-secondary">Song Title</FormLabel>
               <FormControl>
-                <Input placeholder="Enter song title" {...field} className="bg-gray-800 border-gray-700 text-white" />
+                <Input placeholder="Enter song title" {...field} className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -83,14 +83,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="lyrics"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "lyrics"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Lyrics</FormLabel>
+              <FormLabel className="text-content-text-secondary">Lyrics</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter lyrics"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white min-h-[200px]"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary min-h-[200px]"
                 />
               </FormControl>
               <FormMessage />
@@ -103,14 +103,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="tabs"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "tabs"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Tabs</FormLabel>
+              <FormLabel className="text-content-text-secondary">Tabs</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter tabs"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white min-h-[200px] font-mono"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary min-h-[200px] font-mono"
                 />
               </FormControl>
               <FormMessage />
@@ -123,14 +123,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="notes"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "notes"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Notes</FormLabel>
+              <FormLabel className="text-content-text-secondary">Notes</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter notes"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
                 />
               </FormControl>
               <FormMessage />
@@ -143,14 +143,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="history"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "history"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">History</FormLabel>
+              <FormLabel className="text-content-text-secondary">History</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter song history"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
                 />
               </FormControl>
               <FormMessage />
@@ -163,14 +163,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="featuredLyric"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "featuredLyric"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Featured Lyric</FormLabel>
+              <FormLabel className="text-content-text-secondary">Featured Lyric</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Enter featured lyric"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
                 />
               </FormControl>
               <FormMessage />
@@ -183,14 +183,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           name="guitarTabsUrl"
           render={({ field }: { field: ControllerRenderProps<SongFormValues, "guitarTabsUrl"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Guitar Tabs URL</FormLabel>
+              <FormLabel className="text-content-text-secondary">Guitar Tabs URL</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Enter guitar tabs URL"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
                 />
               </FormControl>
               <FormMessage />
@@ -207,10 +207,10 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                 <Checkbox
                   checked={field.value || false}
                   onCheckedChange={field.onChange}
-                  className="bg-gray-800 border-gray-700"
+                  className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]"
                 />
               </FormControl>
-              <FormLabel className="text-gray-200">Cover Song</FormLabel>
+              <FormLabel className="text-content-text-secondary">Cover Song</FormLabel>
               <FormMessage />
             </FormItem>
           )}
@@ -220,7 +220,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
           <Button
             type="button"
             onClick={form.handleSubmit(onSubmit)}
-            className="bg-purple-800 hover:bg-purple-700 text-white"
+            className="bg-brand-primary hover:bg-hover-accent text-content-text-primary"
           >
             {submitLabel}
           </Button>
@@ -228,7 +228,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
             type="button"
             variant="outline"
             onClick={() => navigate(cancelHref)}
-            className="border-gray-600 text-gray-200 hover:bg-gray-800 hover:text-white"
+            className="border-content-bg-secondary text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary"
           >
             Cancel
           </Button>

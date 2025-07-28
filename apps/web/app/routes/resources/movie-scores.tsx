@@ -23,28 +23,28 @@ export function meta() {
 
 const MovieScores: React.FC = () => {
   const MovieCard = ({ title, children }: { title: React.ReactNode; children: React.ReactNode }) => (
-    <Card className="bg-gray-900 border-gray-800 mb-6">
+    <Card className="bg-content-bg border-content-bg-secondary mb-6">
       <CardHeader>
-        <h2 className="text-2xl font-semibold text-white">{title}</h2>
+        <h2 className="text-2xl font-semibold text-content-text-primary">{title}</h2>
       </CardHeader>
-      <CardContent className="space-y-4 text-gray-200 leading-relaxed">{children}</CardContent>
+      <CardContent className="space-y-4 text-content-text-secondary leading-relaxed">{children}</CardContent>
     </Card>
   );
 
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Live Movie Scores</h1>
+        <h1 className="text-3xl font-bold text-content-text-primary">Live Movie Scores</h1>
       </div>
 
       <MovieCard
         title={
           <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">Akira</span>
-            <span className="text-lg text-gray-400">
+            <span className="text-2xl font-bold text-content-text-primary">Akira</span>
+            <span className="text-lg text-content-text-tertiary">
               <Link
                 to="/shows/1999-12-31-theater-of-the-living-arts-philadelphia-pa"
-                className="text-purple-400 hover:text-purple-300 hover:underline"
+                className="text-brand-secondary hover:text-hover-accent hover:underline"
               >
                 December 31, 1999 at Theater Of The Living Arts - Philadelphia, PA
               </Link>
@@ -63,7 +63,7 @@ const MovieScores: React.FC = () => {
           There are many theories as to where you should start the tape with the movie, so it might take you some
           experimenting to find the best sync. Here's a tip from one fan:
         </p>
-        <blockquote className="border-l-4 border-gray-700 pl-4 my-4 text-gray-300 italic">
+        <blockquote className="border-l-4 border-content-bg-secondary pl-4 my-4 text-content-text-secondary italic">
           "When the 1988 dateline appears, the first note of the DJ spinning should start up. When they first take off
           in the motorcycles, the beat should get noticeably more intense. When the kid is headbutted by the big Clown
           leader, the drum machines should stop completely, leaving just the vocal sample. When the first child subject
@@ -75,11 +75,11 @@ const MovieScores: React.FC = () => {
       <MovieCard
         title={
           <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">Tron</span>
-            <span className="text-lg text-gray-400">
+            <span className="text-2xl font-bold text-content-text-primary">Tron</span>
+            <span className="text-lg text-content-text-tertiary">
               <Link
                 to="/shows/2015-12-31-playstation-theater-new-york-ny"
-                className="text-purple-400 hover:text-purple-300 hover:underline"
+                className="text-brand-secondary hover:text-hover-accent hover:underline"
               >
                 December 31, 2015 at Playstation Theater - New York, NY
               </Link>
@@ -110,7 +110,7 @@ const MovieScores: React.FC = () => {
             Disney's Alice in Wonderland -{" "}
             <Link
               to="/shows/2001-10-31-woodmen-of-the-world-hall-eugene-or"
-              className="text-purple-400 hover:text-purple-300 hover:underline"
+              className="text-brand hover:text-hover-accent hover:underline"
             >
               10/31/01 Woodmen of the World Hall, Eugene, OR
             </Link>
@@ -119,7 +119,7 @@ const MovieScores: React.FC = () => {
             It's The Great Pumpkin, Charlie Brown -{" "}
             <Link
               to="/shows/2001-11-01-wett-bar-vancouver-bc"
-              className="text-purple-400 hover:text-purple-300 hover:underline"
+              className="text-brand hover:text-hover-accent hover:underline"
             >
               11/01/01 The Wett Bar, Vancouver, BC
             </Link>
@@ -128,7 +128,7 @@ const MovieScores: React.FC = () => {
             Koyaanisqatsi -{" "}
             <Link
               to="/shows/2001-11-02-crystal-ballroom-portland-or"
-              className="text-purple-400 hover:text-purple-300 hover:underline"
+              className="text-brand hover:text-hover-accent hover:underline"
             >
               11/02/01 Crystal Ballroom, Portland, OR
             </Link>
@@ -137,7 +137,7 @@ const MovieScores: React.FC = () => {
             Run Lola Run -{" "}
             <Link
               to="/shows/2001-11-03-king-cat-theatre-seattle-wa"
-              className="text-purple-400 hover:text-purple-300 hover:underline"
+              className="text-brand hover:text-hover-accent hover:underline"
             >
               11/03/01 King Cat Theatre, Seattle, WA
             </Link>

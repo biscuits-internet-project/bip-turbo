@@ -114,7 +114,7 @@ export default function Index() {
     <div className="w-full p-0">
       {/* Hero section */}
       <div className="py-2 text-center">
-        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-purple-600 to-purple-800 bg-clip-text text-transparent font-header">
+        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-brand-gradient-start via-brand-gradient-mid to-brand-gradient-end bg-clip-text text-transparent font-header">
           Biscuits Internet Project 3.0
         </h1>
         <p className="text-xl text-muted-foreground mb-8">
@@ -136,7 +136,7 @@ export default function Index() {
         <div className="lg:col-span-4 order-2 lg:order-1">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Recent Shows</h2>
-            <Link to="/shows" className="text-purple-500 hover:text-purple-400 flex items-center">
+            <Link to="/shows" className="text-brand hover:text-hover-accent flex items-center">
               View all <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </div>
@@ -166,13 +166,13 @@ export default function Index() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
-              <Link to="/shows/tour-dates" className="text-purple-500 hover:text-purple-400 flex items-center">
+              <Link to="/shows/tour-dates" className="text-brand hover:text-hover-accent flex items-center">
                 View more <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
 
             {tourDates.length > 0 ? (
-              <Card className="bg-gray-900 border-gray-800">
+              <Card className="bg-content-bg border-content-bg-secondary">
                 <div className="relative overflow-x-auto">
                   <table className="w-full text-md">
                     <thead>
@@ -194,7 +194,7 @@ export default function Index() {
                               : `${td.formattedStartDate} - ${td.formattedEndDate}`}
                           </td>
                           <td className="p-4 text-white font-medium">{td.venueName}</td>
-                          <td className="hidden md:table-cell p-4 text-gray-400">{td.address}</td>
+                          <td className="hidden md:table-cell p-4 text-content-text-secondary">{td.address}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -212,7 +212,7 @@ export default function Index() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Latest from the Blog</h2>
-              <Link to="/blog" className="text-purple-500 hover:text-purple-400 flex items-center">
+              <Link to="/blog" className="text-brand hover:text-hover-accent flex items-center">
                 View all <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>

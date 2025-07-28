@@ -30,25 +30,25 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
   }
 
   return (
-    <Card className="border-gray-800 bg-gradient-to-br from-gray-900 to-gray-900/80 h-full">
-      <CardHeader className="border-b border-gray-800/50 px-6 py-4">
-        <CardTitle className="text-xl text-white">Show Highlights</CardTitle>
+    <Card className="border-content-bg-secondary bg-content-bg h-full">
+      <CardHeader className="border-b border-content-bg-secondary/50 px-6 py-4">
+        <CardTitle className="text-xl text-content-text-primary">Show Highlights</CardTitle>
       </CardHeader>
       <CardContent className="px-6 py-4 space-y-6">
         {allTimerTracks.length > 0 && (
           <div>
-            <h3 className="text-lg font-medium text-white flex items-center gap-2 mb-3">
-              <Flame className="h-5 w-5 text-orange-500" />
+            <h3 className="text-lg font-medium text-content-text-primary flex items-center gap-2 mb-3">
+              <Flame className="h-5 w-5 text-warning" />
               <span>All-Timers</span>
             </h3>
             <ul className="space-y-2">
               {allTimerTracks.map((track) => (
-                <li key={track.id} className="text-gray-300">
+                <li key={track.id} className="text-content-text-secondary">
                   <div className="flex items-baseline">
-                    <span className="text-xs text-gray-500 font-medium w-6">{track.set}</span>
+                    <span className="text-xs text-content-text-tertiary font-medium w-6">{track.set}</span>
                     <Link
                       to={`/songs/${track.song?.slug}`}
-                      className="text-orange-300 hover:text-orange-200 hover:underline transition-colors"
+                      className="text-warning hover:text-hover-accent hover:underline transition-colors"
                     >
                       {track.song?.title}
                     </Link>
@@ -61,23 +61,23 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
 
         {tracksWithNotes.length > 0 && (
           <div>
-            <h3 className="text-lg font-medium text-white flex items-center gap-2 mb-3">
-              <FileText className="h-5 w-5 text-blue-400" />
+            <h3 className="text-lg font-medium text-content-text-primary flex items-center gap-2 mb-3">
+              <FileText className="h-5 w-5 text-info" />
               <span>Track Notes</span>
             </h3>
             <ul className="space-y-3">
               {tracksWithNotes.map((track) => (
-                <li key={track.id} className="text-gray-300">
+                <li key={track.id} className="text-content-text-secondary">
                   <div className="flex items-baseline">
-                    <span className="text-xs text-gray-500 font-medium w-6">{track.set}</span>
+                    <span className="text-xs text-content-text-tertiary font-medium w-6">{track.set}</span>
                     <div className="flex-1">
                       <Link
                         to={`/songs/${track.song?.slug}`}
-                        className="text-blue-300 hover:text-blue-200 hover:underline transition-colors"
+                        className="text-info hover:text-hover-accent hover:underline transition-colors"
                       >
                         {track.song?.title}
                       </Link>
-                      <p className="text-sm text-gray-400 mt-1 pl-1 border-l-2 border-gray-700 ml-1">{track.note}</p>
+                      <p className="text-sm text-content-text-tertiary mt-1 pl-1 border-l-2 border-content-bg-secondary ml-1">{track.note}</p>
                     </div>
                   </div>
                 </li>

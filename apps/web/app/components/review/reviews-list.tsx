@@ -13,7 +13,7 @@ export function ReviewsList({ reviews, title = "Reviews", currentUserId, onDelet
   if (reviews.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-400">No reviews yet. Be the first to share your thoughts!</p>
+        <p className="text-content-text-secondary">No reviews yet. Be the first to share your thoughts!</p>
       </div>
     );
   }

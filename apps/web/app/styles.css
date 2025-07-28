@@ -4,8 +4,9 @@
 @import "tailwindcss";
 
 @layer base {
-  /* Legacy CSS Custom Properties for backward compatibility */
+  /* Design Token System - Semantic Color Palette */
   :root {
+    /* Base system colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --laser-1: 267 100% 50%;
@@ -32,9 +33,52 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* Brand & Identity */
+    --brand-primary: 267 100% 50%;           /* Purple brand color */
+    --brand-secondary: 267 85% 65%;          /* Lighter purple */
+    --brand-gradient-start: 267 100% 80%;    /* Gradient start */
+    --brand-gradient-mid: 267 90% 65%;       /* Gradient middle */
+    --brand-gradient-end: 267 85% 50%;       /* Gradient end */
+    
+    /* Content Areas */
+    --content-bg: 0 0% 7%;                   /* Dark content backgrounds */
+    --content-bg-secondary: 217 33% 17%;     /* Secondary content areas */
+    --content-text-primary: 0 0% 100%;       /* Primary text on dark */
+    --content-text-secondary: 215 16% 47%;   /* Secondary text */
+    --content-text-tertiary: 215 16% 37%;    /* Tertiary/muted text */
+    
+    /* Interactive States */
+    --hover-accent: 267 75% 45%;             /* Purple hover state */
+    --hover-subtle: 210 40% 94%;             /* Subtle hover background */
+    --focus-ring: 267 75% 60%;               /* Focus ring color */
+    --active-state: 267 85% 55%;             /* Active/pressed state */
+    
+    /* Status & Feedback */
+    --success: 142 76% 36%;                  /* Success/positive */
+    --warning: 38 92% 50%;                   /* Warning/caution */
+    --info: 199 89% 48%;                     /* Information */
+    --rating-gold: 45 93% 47%;               /* Star ratings */
+    --rating-dim: 215 16% 25%;               /* Inactive ratings */
+    
+    /* Chart & Data Visualization */
+    --chart-primary: 267 100% 66%;           /* Primary chart color */
+    --chart-secondary: 267 75% 75%;          /* Secondary chart color */
+    --chart-tertiary: 267 50% 85%;           /* Tertiary chart color */
+    --chart-accent: 45 93% 47%;              /* Chart accent color */
+    
+    /* Component-Specific */
+    --card-overlay: 0 0% 7%;                 /* Card overlay backgrounds */
+    --nav-link-hover: 267 75% 45%;           /* Navigation hover */
+    --search-bg: 0 0% 7%;                    /* Search input backgrounds */
+    --filter-active: 267 100% 50%;           /* Active filter state */
+    --table-header: 217 33% 13%;             /* Table header background */
+    --table-row-hover: 217 33% 10%;          /* Table row hover */
+    --divider: 215 25% 20%;                  /* Dividers and separators */
   }
  
   .dark {
+    /* Base system colors */
     --background: 224 71% 4%;
     --foreground: 213 31% 91%;
     --laser-1: 267 100% 50%;
@@ -60,6 +104,48 @@
     --border: 216 34% 17%;
     --input: 216 34% 17%;
     --ring: 267 75% 25%;
+
+    /* Brand & Identity (same in dark mode) */
+    --brand-primary: 267 100% 60%;           /* Slightly brighter in dark */
+    --brand-secondary: 267 75% 70%;          /* Adjusted for dark contrast */
+    --brand-gradient-start: 267 90% 75%;     /* Gradient start */
+    --brand-gradient-mid: 267 80% 60%;       /* Gradient middle */
+    --brand-gradient-end: 267 75% 45%;       /* Gradient end */
+    
+    /* Content Areas (already dark-optimized) */
+    --content-bg: 224 71% 4%;                /* Match dark background */
+    --content-bg-secondary: 216 34% 17%;     /* Secondary areas */
+    --content-text-primary: 213 31% 91%;     /* Primary text */
+    --content-text-secondary: 215 16% 57%;   /* Secondary text */
+    --content-text-tertiary: 215 16% 47%;    /* Tertiary text */
+    
+    /* Interactive States */
+    --hover-accent: 267 85% 65%;             /* Brighter hover in dark */
+    --hover-subtle: 216 34% 12%;             /* Subtle dark hover */
+    --focus-ring: 267 85% 70%;               /* Bright focus ring */
+    --active-state: 267 75% 55%;             /* Active state */
+    
+    /* Status & Feedback */
+    --success: 142 69% 58%;                  /* Brighter success in dark */
+    --warning: 38 85% 65%;                   /* Adjusted warning */
+    --info: 199 89% 68%;                     /* Brighter info */
+    --rating-gold: 45 93% 57%;               /* Brighter gold */
+    --rating-dim: 215 16% 35%;               /* Dimmed ratings */
+    
+    /* Chart & Data Visualization */
+    --chart-primary: 267 100% 66%;           /* Same primary chart */
+    --chart-secondary: 267 75% 75%;          /* Same secondary */
+    --chart-tertiary: 267 50% 85%;           /* Same tertiary */
+    --chart-accent: 45 93% 57%;              /* Brighter accent */
+    
+    /* Component-Specific */
+    --card-overlay: 224 71% 4%;              /* Dark card overlay */
+    --nav-link-hover: 267 85% 65%;           /* Brighter nav hover */
+    --search-bg: 216 34% 17%;                /* Dark search bg */
+    --filter-active: 267 85% 65%;            /* Bright active filter */
+    --table-header: 216 34% 8%;              /* Darker table header */
+    --table-row-hover: 216 34% 12%;          /* Table row hover */
+    --divider: 216 34% 17%;                  /* Dark dividers */
   }
 
   /* Override the Tailwind background utility */

@@ -48,9 +48,9 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
           name="date"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Date</FormLabel>
+              <FormLabel className="text-content-text-secondary">Date</FormLabel>
               <FormControl>
-                <Input type="date" {...field} className="bg-gray-800 border-gray-700 text-white" />
+                <Input type="date" {...field} className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -62,7 +62,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
           name="venueId"
           render={({ field }: { field: ControllerRenderProps<ShowFormValues, "venueId"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Venue</FormLabel>
+              <FormLabel className="text-content-text-secondary">Venue</FormLabel>
               <FormControl>
                 <VenueSearch
                   value={field.value}
@@ -81,16 +81,16 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
           name="bandId"
           render={({ field }: { field: ControllerRenderProps<ShowFormValues, "bandId"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Band</FormLabel>
+              <FormLabel className="text-content-text-secondary">Band</FormLabel>
               <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                  <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
                     <SelectValue placeholder="Select a band" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectContent className="bg-[hsl(var(--content-bg-secondary))] border-[hsl(var(--content-bg-secondary))]">
                   <SelectItem value="none">No band</SelectItem>
-                  <SelectItem value="db7f2c5d-2727-41fd-bd6f-e91c74164f09" className="text-white hover:bg-gray-700">
+                  <SelectItem value="db7f2c5d-2727-41fd-bd6f-e91c74164f09" className="text-content-text-primary hover:bg-content-bg-secondary">
                     The Disco Biscuits
                   </SelectItem>
                 </SelectContent>
@@ -105,12 +105,12 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
           name="notes"
           render={({ field }: { field: ControllerRenderProps<ShowFormValues, "notes"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Notes</FormLabel>
+              <FormLabel className="text-content-text-secondary">Notes</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter show notes"
                   {...field}
-                  className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary min-h-[100px]"
                 />
               </FormControl>
               <FormMessage />
@@ -123,12 +123,12 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
           name="relistenUrl"
           render={({ field }: { field: ControllerRenderProps<ShowFormValues, "relistenUrl"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Relisten URL</FormLabel>
+              <FormLabel className="text-content-text-secondary">Relisten URL</FormLabel>
               <FormControl>
                 <Input
                   placeholder="Enter Relisten URL"
                   {...field}
-                  className="bg-gray-800 border-gray-700 text-white"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
                 />
               </FormControl>
               <FormMessage />
@@ -137,7 +137,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
         />
 
         <div className="flex gap-4 pt-2">
-          <Button type="submit" className="bg-purple-800 hover:bg-purple-700 text-white">
+          <Button type="submit" className="bg-brand-primary hover:bg-hover-accent text-content-text-primary">
             {submitLabel}
           </Button>
           {cancelHref && (
@@ -145,7 +145,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
               type="button"
               variant="outline"
               asChild
-              className="border-gray-600 text-gray-200 hover:bg-gray-800 hover:text-white"
+              className="border-content-bg-secondary text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary"
             >
               <a href={cancelHref}>Cancel</a>
             </Button>

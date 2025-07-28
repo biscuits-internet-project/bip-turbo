@@ -36,12 +36,12 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
   return (
     <Card
       key={blogPost.id}
-      className="bg-gray-900 border-gray-800 overflow-hidden flex flex-col h-full hover:border-gray-700 transition-colors"
+      className="bg-content-bg border-content-bg-secondary overflow-hidden flex flex-col h-full hover:border-content-bg-secondary transition-colors"
     >
       {/* Card Header */}
       <CardHeader className={compact ? "p-4 pb-2" : "pb-2"}>
         <div className="flex justify-between items-start">
-          <div className="flex items-center text-md text-gray-400">
+          <div className="flex items-center text-md text-content-text-secondary">
             <span>{formatDate(blogPost.publishedAt)}</span>
           </div>
         </div>
@@ -60,14 +60,14 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
       {/* Card Content */}
       <CardContent className="flex-grow flex flex-col h-full">
         <div className="flex-grow">
-          <div className="text-gray-400 text-sm">
+          <div className="text-content-text-secondary text-sm">
             <div className="line-clamp-5 prose prose-invert prose-sm">
               <Markdown>{blogPost.blurb}</Markdown>
             </div>
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="w-full mt-4 bg-gray-800 hover:bg-gray-700 border-gray-700">
+        <Button variant="outline" size="sm" className="w-full mt-4 bg-content-bg-secondary hover:bg-gray-700 border-content-bg-secondary">
           <Link to={`/blog/${blogPost.slug}`} className="w-full">
             Read More
           </Link>

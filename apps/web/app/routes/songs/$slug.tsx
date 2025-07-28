@@ -46,11 +46,11 @@ interface StatBoxProps {
 
 function StatBox({ label, value, sublabel }: StatBoxProps) {
   return (
-    <div className="p-6 bg-gray-900 rounded-lg border border-gray-800">
-      <dt className="text-sm font-medium text-gray-400">{label}</dt>
+    <div className="p-6 bg-content-bg rounded-lg border border-content-bg-secondary">
+      <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
       <dd className="mt-2">
-        <span className="text-3xl font-bold text-white">{value}</span>
-        {sublabel && <span className="ml-2 text-sm text-gray-500">{sublabel}</span>}
+        <span className="text-3xl font-bold text-content-text-primary">{value}</span>
+        {sublabel && <span className="ml-2 text-sm text-content-text-tertiary">{sublabel}</span>}
       </dd>
     </div>
   );
@@ -183,18 +183,18 @@ function PerformanceTable({ performances: initialPerformances }: { performances:
                       type="button"
                       className={
                         header.column.getCanSort()
-                          ? "cursor-pointer select-none hover:text-white w-full text-left"
+                          ? "cursor-pointer select-none hover:text-content-text-primary w-full text-left"
                           : "w-full text-left"
                       }
                       onClick={(e) => {
                         header.column.toggleSorting();
                       }}
                     >
-                      <span className={header.column.getIsSorted() ? "text-white font-semibold" : ""}>
+                      <span className={header.column.getIsSorted() ? "text-content-text-primary font-semibold" : ""}>
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </span>
                       {header.column.getIsSorted() && (
-                        <span className="text-purple-400 ml-1">
+                        <span className="text-brand ml-1">
                           {header.column.getIsSorted() === "asc" ? (
                             <ArrowUpIcon className="h-4 w-4 inline" />
                           ) : (
@@ -244,10 +244,10 @@ export default function SongPage() {
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex flex-wrap items-baseline gap-4">
-            <h1 className="text-3xl md:text-4xl font-bold text-white">{song.title}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">{song.title}</h1>
             {song.authorName && (
-              <span className="text-gray-400 text-lg">
-                by <span className="text-blue-400">{song.authorName}</span>
+              <span className="text-content-text-secondary text-lg">
+                by <span className="text-brand">{song.authorName}</span>
               </span>
             )}
           </div>
@@ -255,7 +255,7 @@ export default function SongPage() {
             <Button
               asChild
               variant="outline"
-              className="border-purple-800 hover:bg-purple-800/10 text-purple-400 hover:text-purple-300"
+              className="border-brand/50 hover:bg-brand/10 text-brand hover:text-hover-accent"
             >
               <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
                 <Pencil className="h-4 w-4" />
@@ -284,21 +284,21 @@ export default function SongPage() {
       </dl>
 
       {song.notes && (
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-          <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
+        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+          <div className="text-md text-content-text-tertiary whitespace-pre-wrap leading-relaxed">
             <Markdown>{song.notes}</Markdown>
           </div>
         </div>
       )}
 
       <Tabs defaultValue="all-timers" className="w-full">
-        <TabsList className="w-full flex justify-start border-b border-gray-800 rounded-none bg-transparent p-0">
+        <TabsList className="w-full flex justify-start border-b border-content-bg-secondary rounded-none bg-transparent p-0">
           <TabsTrigger
             value="all-timers"
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
             )}
           >
             <StarIcon className="h-4 w-4" />
@@ -308,8 +308,8 @@ export default function SongPage() {
             value="lyrics"
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
             )}
           >
             <FileTextIcon className="h-4 w-4" />
@@ -319,8 +319,8 @@ export default function SongPage() {
             value="yearly-plays"
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
             )}
           >
             <BarChart2Icon className="h-4 w-4" />
@@ -330,8 +330,8 @@ export default function SongPage() {
             value="guitar-tabs"
             className={cn(
               "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-              "data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:bg-transparent",
-              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-400",
+              "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
+              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
             )}
           >
             <GuitarIcon className="h-4 w-4" />
@@ -341,7 +341,7 @@ export default function SongPage() {
 
         <TabsContent value="all-timers" className="mt-4">
           {allTimers.length > 0 && (
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+            <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {allTimers.map((p) => (
                   <a
@@ -351,21 +351,21 @@ export default function SongPage() {
                   >
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="text-lg font-medium text-white">{p.show.date}</div>
+                        <div className="text-lg font-medium text-content-text-primary">{p.show.date}</div>
                         {p.rating && p.rating > 0 && (
-                          <div className="text-sm text-gray-400">{`★ ${p.rating.toFixed(1)}`}</div>
+                          <div className="text-sm text-content-text-tertiary">{`★ ${p.rating.toFixed(1)}`}</div>
                         )}
                       </div>
                       <div className="space-y-2">
-                        <div className="text-purple-400/90 font-medium text-base">{p.venue?.name}</div>
+                        <div className="text-brand-secondary/90 font-medium text-base">{p.venue?.name}</div>
                         {p.venue?.city && (
-                          <div className="text-sm text-gray-400">
+                          <div className="text-sm text-content-text-tertiary">
                             {p.venue.city}, {p.venue.state}
                           </div>
                         )}
                         {p.notes && (
                           <div className="mt-3 pt-3 border-t border-border/40">
-                            <div className="text-sm text-gray-400">{p.notes}</div>
+                            <div className="text-sm text-content-text-tertiary">{p.notes}</div>
                           </div>
                         )}
                       </div>
@@ -379,9 +379,9 @@ export default function SongPage() {
 
         <TabsContent value="lyrics" className="mt-4">
           {song.lyrics && (
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+            <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
               <div className="overflow-x-auto">
-                <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
+                <div className="text-md text-content-text-tertiary whitespace-pre-wrap leading-relaxed">
                   <Markdown>{song.lyrics.replace(/<br\/?>/g, "\n")}</Markdown>
                 </div>
               </div>
@@ -390,7 +390,7 @@ export default function SongPage() {
         </TabsContent>
 
         <TabsContent value="yearly-plays" className="mt-4">
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+          <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
             <ChartContainer config={{}} className="min-h-[300px] w-full">
               <BarChart
                 accessibilityLayer
@@ -414,16 +414,16 @@ export default function SongPage() {
                   tick={{ fill: "rgba(255,255,255,0.7)" }}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
-                <Bar dataKey="plays" fill="rgb(168, 85, 247)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="plays" fill="hsl(var(--chart-primary))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           </div>
         </TabsContent>
 
         <TabsContent value="guitar-tabs" className="mt-4">
-          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+          <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
             <div className="overflow-x-auto">
-              <div className="text-md text-gray-400 whitespace-pre-wrap leading-relaxed">
+              <div className="text-md text-content-text-tertiary whitespace-pre-wrap leading-relaxed">
                 {song.tabs ? (
                   <Markdown>{song.tabs}</Markdown>
                 ) : song.guitarTabsUrl ? (
@@ -431,7 +431,7 @@ export default function SongPage() {
                     href={song.guitarTabsUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-purple-400 hover:underline"
+                    className="text-brand-secondary hover:underline"
                   >
                     View Guitar Tabs
                   </a>
@@ -446,8 +446,8 @@ export default function SongPage() {
 
       {/* Performance History */}
       <div className="w-full">
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4 md:p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Performance History</h2>
+        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4 md:p-6">
+          <h2 className="text-xl font-semibold text-content-text-primary mb-4">Performance History</h2>
           <PerformanceTable performances={performances} />
         </div>
       </div>

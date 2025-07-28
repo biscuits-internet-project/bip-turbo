@@ -59,16 +59,16 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
 
   return (
     <>
-      <Card className="border-gray-800 bg-gradient-to-br from-gray-900 to-gray-900/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
-        <CardHeader className="border-b border-gray-800/50 px-6 py-4">
+      <Card className="border-content-bg-secondary bg-gradient-to-br from-gray-900 to-gray-900/80 overflow-hidden transition-all duration-300 hover:shadow-md hover:shadow-purple-900/20">
+        <CardHeader className="border-b border-content-bg-secondary/50 px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-purple-900/50 flex items-center justify-center text-purple-300 font-medium shadow-inner shadow-purple-950/50">
                 {review.user.username.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h3 className="font-medium text-gray-200">{review.user.username}</h3>
-                <p className="text-sm text-gray-400">{format(new Date(review.createdAt), "MMM d, yyyy")}</p>
+                <h3 className="font-medium text-content-text-primary">{review.user.username}</h3>
+                <p className="text-sm text-content-text-secondary">{format(new Date(review.createdAt), "MMM d, yyyy")}</p>
               </div>
             </div>
             {isOwner && (
@@ -78,7 +78,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
                   size="icon"
                   onClick={() => setIsEditing(!isEditing)}
                   disabled={isLoading}
-                  className="text-gray-400 hover:text-purple-300 hover:bg-purple-900/20 transition-colors"
+                  className="text-content-text-secondary hover:text-hover-accent hover:bg-purple-900/20 transition-colors"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -87,7 +87,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
                   size="icon"
                   onClick={() => setShowDeleteDialog(true)}
                   disabled={isLoading}
-                  className="text-gray-400 hover:text-purple-300 hover:bg-purple-900/20 transition-colors"
+                  className="text-content-text-secondary hover:text-hover-accent hover:bg-purple-900/20 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -101,18 +101,18 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
               <Textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="min-h-[100px] bg-gray-800 border-gray-700 text-white"
+                className="min-h-[100px] bg-content-bg-secondary border-content-bg-secondary text-white"
               />
               <div className="flex justify-end gap-2">
                 <Button
                   variant="ghost"
                   onClick={handleCancelEdit}
                   disabled={isLoading}
-                  className="text-gray-400 hover:text-purple-300"
+                  className="text-content-text-secondary hover:text-hover-accent"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleUpdate} disabled={isLoading} className="bg-purple-500 hover:bg-purple-600">
+                <Button onClick={handleUpdate} disabled={isLoading} className="bg-brand hover:bg-hover-accent">
                   Save
                 </Button>
               </div>

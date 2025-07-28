@@ -259,7 +259,7 @@ export default function Show() {
           <div className="mt-6">
             {reviews && reviews.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-gray-400">No reviews yet. Be the first to share your thoughts!</p>
+                <p className="text-content-text-secondary">No reviews yet. Be the first to share your thoughts!</p>
               </div>
             )}
             {user && !reviews.some((review: ReviewMinimal) => review.userId === user.id) && (

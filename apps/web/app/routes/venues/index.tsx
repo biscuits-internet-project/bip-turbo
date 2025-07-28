@@ -125,14 +125,14 @@ interface StatBoxProps {
 
 function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
   return (
-    <div className="p-6 bg-gray-900 rounded-lg border border-gray-800">
-      <dt className="flex items-center gap-2 text-sm font-medium text-gray-400">
+    <div className="p-6 bg-content-bg rounded-lg border border-content-bg-secondary">
+      <dt className="flex items-center gap-2 text-sm font-medium text-content-text-secondary">
         {icon}
         {label}
       </dt>
       <dd className="mt-2">
         <span className="text-3xl font-bold text-white">{value}</span>
-        {sublabel && <span className="ml-2 text-sm text-gray-500">{sublabel}</span>}
+        {sublabel && <span className="ml-2 text-sm text-content-text-tertiary">{sublabel}</span>}
       </dd>
     </div>
   );
@@ -145,10 +145,10 @@ interface VenueCardProps {
 
 function VenueCard({ venue, showStats = true }: VenueCardProps) {
   return (
-    <Card className="bg-gray-900 border-gray-800 hover:bg-accent/10 transition-colors">
+    <Card className="bg-content-bg border-content-bg-secondary hover:bg-accent/10 transition-colors">
       <CardHeader>
         <CardTitle className="text-xl">
-          <Link to={`/venues/${venue.slug}`} className="text-white hover:text-purple-400">
+          <Link to={`/venues/${venue.slug}`} className="text-content-text-primary hover:text-hover-accent">
             {venue.name || "Unnamed Venue"}
           </Link>
         </CardTitle>
@@ -156,8 +156,8 @@ function VenueCard({ venue, showStats = true }: VenueCardProps) {
       <CardContent>
         <div className="space-y-2">
           <div className="flex items-start gap-2">
-            <MapPin className="h-4 w-4 mt-1 text-gray-400 shrink-0" />
-            <p className="text-gray-400">
+            <MapPin className="h-4 w-4 mt-1 text-content-text-secondary shrink-0" />
+            <p className="text-content-text-secondary">
               {[venue.city, venue.state].filter(Boolean).join(", ") || "Location Unknown"}
               {venue.country &&
                 venue.country.toLowerCase() !== "usa" &&
@@ -167,9 +167,9 @@ function VenueCard({ venue, showStats = true }: VenueCardProps) {
           </div>
           {showStats && venue.timesPlayed > 0 && (
             <div className="flex items-start gap-2">
-              <Ticket className="h-4 w-4 mt-1 text-gray-400 shrink-0" />
+              <Ticket className="h-4 w-4 mt-1 text-content-text-secondary shrink-0" />
               <div className="space-y-1">
-                <p className="text-gray-400 text-sm">
+                <p className="text-content-text-secondary text-sm">
                   {venue.timesPlayed} {venue.timesPlayed === 1 ? "show" : "shows"}
                 </p>
               </div>
@@ -195,13 +195,13 @@ function SearchForm({ onSearch }: { onSearch: (query: string) => void }) {
 
   return (
     <div className="relative max-w-2xl mx-auto">
-      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-content-text-secondary" />
       <Input
         type="search"
         value={searchValue}
         onChange={handleChange}
         placeholder="Search venues..."
-        className="w-full pl-10 bg-gray-900 border-gray-800 text-white placeholder:text-gray-400"
+        className="w-full pl-10 bg-content-bg border-content-bg-secondary text-white placeholder:text-content-text-secondary"
       />
     </div>
   );
@@ -391,7 +391,7 @@ export default function VenuesPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-white">Venues</h1>
         <AdminOnly>
-          <Button asChild size="sm" className="bg-purple-800 hover:bg-purple-700 text-white">
+          <Button asChild size="sm" className="bg-brand hover:bg-hover-accent text-white">
             <Link to="/venues/new" className="flex items-center gap-1">
               <Plus className="h-4 w-4" />
               <span>Create Venue</span>
@@ -410,15 +410,15 @@ export default function VenuesPage() {
         </dl>
 
         {/* State Filter */}
-        <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-          <h2 className="text-sm font-medium text-gray-400 mb-3">Filter by State</h2>
+        <div className="bg-content-bg rounded-lg border border-content-bg-secondary p-4">
+          <h2 className="text-sm font-medium text-content-text-secondary mb-3">Filter by State</h2>
           <div className="flex flex-wrap gap-2 mb-3">
             <Button
               variant="ghost"
               size="sm"
               className={cn(
                 "px-3 py-1 text-sm rounded-md transition-colors",
-                !stateFilter ? "bg-purple-500 text-white" : "text-gray-400 hover:bg-accent/10 hover:text-white",
+                !stateFilter ? "bg-filter-active text-white" : "text-content-text-secondary hover:bg-accent/10 hover:text-white",
               )}
               onClick={() => handleStateFilter("")}
             >
@@ -431,8 +431,8 @@ export default function VenuesPage() {
               className={cn(
                 "px-3 py-1 text-sm rounded-md transition-colors",
                 stateFilter === "international"
-                  ? "bg-purple-500 text-white"
-                  : "text-gray-400 hover:bg-accent/10 hover:text-white",
+                  ? "bg-filter-active text-white"
+                  : "text-content-text-secondary hover:bg-accent/10 hover:text-white",
               )}
               onClick={() => handleStateFilter("international")}
             >
@@ -448,8 +448,8 @@ export default function VenuesPage() {
                 className={cn(
                   "px-3 py-1 text-sm rounded-md transition-colors",
                   stateFilter === state
-                    ? "bg-purple-500 text-white"
-                    : "text-gray-400 hover:bg-accent/10 hover:text-white",
+                    ? "bg-filter-active text-white"
+                    : "text-content-text-secondary hover:bg-accent/10 hover:text-white",
                 )}
                 onClick={() => handleStateFilter(state)}
               >
@@ -476,14 +476,14 @@ export default function VenuesPage() {
         {(stateFilter || searchQuery) && (
           <div className="flex flex-wrap items-center gap-2">
             {stateFilter && (
-              <div className="flex items-center gap-2 bg-gray-800 rounded-md px-3 py-1">
-                <span className="text-gray-300">
+              <div className="flex items-center gap-2 bg-content-bg-secondary rounded-md px-3 py-1">
+                <span className="text-content-text-primary">
                   {stateFilter === "international" ? "International Venues" : `State: ${stateFilter}`}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                  className="h-5 w-5 p-0 text-content-text-secondary hover:text-white"
                   onClick={() => handleStateFilter("")}
                 >
                   <span className="sr-only">Clear state filter</span>
@@ -509,7 +509,7 @@ export default function VenuesPage() {
         )}
 
         {filteredVenues.length === 0 ? (
-          <p className="text-gray-400">
+          <p className="text-content-text-secondary">
             {searchQuery || stateFilter ? "No venues found matching your filters" : "No venues found"}
           </p>
         ) : (
@@ -521,7 +521,7 @@ export default function VenuesPage() {
             </div>
 
             {hasMore && (
-              <div ref={loadMoreRef} className="py-8 text-center text-gray-400">
+              <div ref={loadMoreRef} className="py-8 text-center text-content-text-secondary">
                 {isLoading ? "Loading more venues..." : `${filteredVenues.length - displayCount} more venues`}
               </div>
             )}

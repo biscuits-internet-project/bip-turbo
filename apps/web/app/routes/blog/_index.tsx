@@ -67,7 +67,7 @@ export default function BlogPosts() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl md:text-4xl font-bold text-white">Blog Posts</h1>
           <AdminOnly>
-            <Button asChild className="bg-purple-800 hover:bg-purple-700 text-white">
+            <Button asChild className="bg-brand hover:bg-hover-accent text-content-text-primary">
               <Link to="/blog/new" className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 New Post
@@ -84,7 +84,7 @@ export default function BlogPosts() {
 
         {blogPosts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-400">No blog posts found.</p>
+            <p className="text-content-text-secondary">No blog posts found.</p>
           </div>
         )}
       </div>

@@ -19,7 +19,7 @@ interface SoundCloudLink {
 }
 
 const p = ({ children }: { children: React.ReactNode }) => {
-  return <div className="mb-4 text-gray-800">{children}</div>;
+  return <div className="mb-4 text-content-text-tertiary">{children}</div>;
 };
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -27,7 +27,7 @@ const ExternalLink = ({ href, children }: { href: string; children: React.ReactN
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="text-purple-400 hover:text-purple-300 hover:underline"
+    className="text-brand-secondary hover:text-hover-accent hover:underline"
   >
     {children}
   </a>
@@ -78,18 +78,18 @@ export default function ThinkTank() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-white mb-6">Think Tank Dubs</h1>
+      <h1 className="text-3xl font-bold text-content-text-primary mb-6">Think Tank Dubs</h1>
 
-      <div className="bg-gray-900 rounded-lg shadow-md p-6 mb-8">
-        <h2 className="text-2xl font-semibold text-purple-400 mb-4">The Basement Sessions</h2>
+      <div className="bg-content-bg rounded-lg shadow-md p-6 mb-8">
+        <h2 className="text-2xl font-semibold text-brand-secondary mb-4">The Basement Sessions</h2>
 
-        <p className="text-gray-300 mb-6">
+        <p className="text-content-text-secondary mb-6">
           Think Tank Dubs is a monthly livestream called "The Basement Sessions" where the DJ curates a unique set of
           music that blends Disco Biscuits jams with electronic, dub, and hip-hop tracks. The DJ is known for their
           expertise in creating seamless transitions between different genres and for their deep knowledge of music.
         </p>
 
-        <div className="text-gray-300 mb-6">
+        <div className="text-content-text-secondary mb-6">
           <div className="mb-2">You can find Think Tank Dubs on:</div>
           <ul className="list-disc pl-6 space-y-2">
             <li>
@@ -113,7 +113,7 @@ export default function ThinkTank() {
         </div>
 
         <div className="mt-6">
-          <h3 className="text-xl font-semibold text-purple-400 mb-3">Think Tank Dubs Starter Pack:</h3>
+          <h3 className="text-xl font-semibold text-brand mb-3">Think Tank Dubs Starter Pack:</h3>
           <ul className="list-disc pl-6 space-y-3 text-gray-300">
             {starterPack.map((link) => (
               <li key={link.id}>

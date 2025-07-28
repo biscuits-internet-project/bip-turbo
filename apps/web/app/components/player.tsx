@@ -506,11 +506,11 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (isLoading) {
     return (
-      <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 text-center">
+      <div className="bg-[hsl(var(--content-bg))] border border-[hsl(var(--content-bg-secondary))] rounded-lg p-6 text-center">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="h-4 bg-gray-700 rounded w-3/4 mb-4" />
-          <div className="h-10 bg-gray-800 rounded w-full mb-4" />
-          <div className="h-4 bg-gray-700 rounded w-1/2" />
+          <div className="h-4 bg-[hsl(var(--content-bg-secondary))] rounded w-3/4 mb-4" />
+          <div className="h-10 bg-[hsl(var(--content-bg-secondary))] rounded w-full mb-4" />
+          <div className="h-4 bg-[hsl(var(--content-bg-secondary))] rounded w-1/2" />
         </div>
       </div>
     );
@@ -518,7 +518,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (error) {
     return (
-      <div className="bg-gray-900 border border-red-900 rounded-lg p-6 text-red-400">
+      <div className="bg-content-bg border border-warning rounded-lg p-6 text-warning">
         <p>Error loading audio: {error}</p>
       </div>
     );
@@ -526,7 +526,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (!metadata || audioFiles.length === 0) {
     return (
-      <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 text-gray-400">
+      <div className="bg-content-bg border border-content-bg-secondary rounded-lg p-6 text-content-text-tertiary">
         <p>No audio files found for this Archive.org item</p>
       </div>
     );
@@ -538,7 +538,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   return (
     <div className={cn("archive-player", className)}>
-      <div className="player-container bg-gray-900 border border-gray-800 rounded-lg p-6 shadow-lg">
+      <div className="player-container bg-[hsl(var(--content-bg))] border border-[hsl(var(--content-bg-secondary))] rounded-lg p-6 shadow-lg">
         {/* Hidden audio element */}
         <audio ref={audioRef} src={audioUrl} preload="metadata">
           <track kind="captions" src="" />
@@ -546,20 +546,20 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
         {/* Player header */}
         <div className="mb-4">
-          <h3 className="text-xl font-semibold text-purple-300 mb-1 truncate">
+          <h3 className="text-xl font-semibold text-brand-secondary mb-1 truncate">
             {metadata.metadata.title || "Unknown Title"}
           </h3>
           {metadata.metadata.creator && (
-            <p className="text-sm text-gray-400 truncate">by {metadata.metadata.creator}</p>
+            <p className="text-sm text-content-text-tertiary truncate">by {metadata.metadata.creator}</p>
           )}
-          {metadata.metadata.date && <p className="text-xs text-gray-500 mt-1">{formatDate(metadata.metadata.date)}</p>}
+          {metadata.metadata.date && <p className="text-xs text-content-text-tertiary mt-1">{formatDate(metadata.metadata.date)}</p>}
         </div>
 
         {/* Now playing */}
-        <div className="mb-4 bg-gray-800/50 rounded-md p-3 border border-gray-700">
-          <div className="text-sm font-medium text-gray-400 mb-1">Now Playing:</div>
-          <div className="text-base text-white font-medium truncate">{getTrackName(currentFile)}</div>
-          <div className="text-xs text-gray-500 mt-1">
+        <div className="mb-4 bg-[hsl(var(--content-bg-secondary))]/50 rounded-md p-3 border border-[hsl(var(--content-bg-secondary))]">
+          <div className="text-sm font-medium text-content-text-tertiary mb-1">Now Playing:</div>
+          <div className="text-base text-content-text-primary font-medium truncate">{getTrackName(currentFile)}</div>
+          <div className="text-xs text-content-text-tertiary mt-1">
             Track {currentFile.track || currentTrackIndex + 1} of {audioFiles.length}
           </div>
         </div>
@@ -568,7 +568,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         <div className="mb-4">
           <div
             ref={progressRef}
-            className="h-2 bg-gray-800 rounded-full cursor-pointer overflow-hidden"
+            className="h-2 bg-[hsl(var(--content-bg-secondary))] rounded-full cursor-pointer overflow-hidden"
             onClick={handleProgressClick}
             onKeyDown={handleProgressKeyDown}
             role="slider"
@@ -579,11 +579,11 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             tabIndex={0}
           >
             <div
-              className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-full"
+              className="h-full bg-gradient-to-r from-[hsl(var(--brand-primary))] to-[hsl(var(--chart-primary))] rounded-full"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <div className="flex justify-between text-xs text-content-text-tertiary mt-1">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(currentFile.length || duration)}</span>
           </div>
@@ -597,7 +597,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               onClick={playPreviousTrack}
               disabled={currentTrackIndex === 0}
               className={cn(
-                "text-gray-300 hover:text-white transition-colors",
+                "text-content-text-secondary hover:text-content-text-primary transition-colors",
                 currentTrackIndex === 0 && "opacity-50 cursor-not-allowed",
               )}
               aria-label="Previous track"
@@ -608,7 +608,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             <button
               type="button"
               onClick={togglePlayPause}
-              className="text-white hover:text-purple-300 transition-colors"
+              className="text-content-text-primary hover:text-brand-secondary transition-colors"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? <PauseCircle size={36} /> : <PlayCircle size={36} />}
@@ -619,7 +619,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               onClick={playNextTrack}
               disabled={currentTrackIndex === audioFiles.length - 1}
               className={cn(
-                "text-gray-300 hover:text-white transition-colors",
+                "text-content-text-secondary hover:text-content-text-primary transition-colors",
                 currentTrackIndex === audioFiles.length - 1 && "opacity-50 cursor-not-allowed",
               )}
               aria-label="Next track"
@@ -632,7 +632,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             <button
               type="button"
               onClick={toggleMute}
-              className="text-gray-300 hover:text-white transition-colors"
+              className="text-content-text-secondary hover:text-content-text-primary transition-colors"
               aria-label={isMuted ? "Unmute" : "Mute"}
             >
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -645,7 +645,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               step="0.01"
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+              className="w-20 h-1 bg-[hsl(var(--content-bg-secondary))] rounded-lg appearance-none cursor-pointer"
               aria-label="Volume"
             />
           </div>
@@ -654,17 +654,17 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         {/* Track list */}
         {audioFiles.length > 1 && (
           <div className="track-list">
-            <h4 className="text-md font-medium text-gray-300 mb-2">Tracks</h4>
-            <div className="max-h-48 overflow-y-auto rounded-md border border-gray-800 bg-gray-800/30 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+            <h4 className="text-md font-medium text-content-text-secondary mb-2">Tracks</h4>
+            <div className="max-h-48 overflow-y-auto rounded-md border border-[hsl(var(--content-bg-secondary))] bg-[hsl(var(--content-bg-secondary))]/30 scrollbar-thin scrollbar-thumb-[hsl(var(--content-bg-secondary))] scrollbar-track-[hsl(var(--content-bg))]">
               {audioFiles.map((file, index) => (
                 <button
                   key={file.name}
                   type="button"
                   className={cn(
-                    "w-full p-2 cursor-pointer text-sm border-b border-gray-800 last:border-0 hover:bg-gray-800/80 transition-colors text-left",
+                    "w-full p-2 cursor-pointer text-sm border-b border-[hsl(var(--content-bg-secondary))] last:border-0 hover:bg-[hsl(var(--content-bg-secondary))]/80 transition-colors text-left",
                     currentTrackIndex === index
-                      ? "bg-gradient-to-r from-purple-900/50 to-indigo-900/30 text-purple-300"
-                      : "text-gray-300",
+                      ? "bg-gradient-to-r from-brand-primary/50 to-chart-primary/30 text-brand-secondary"
+                      : "text-content-text-secondary",
                   )}
                   onClick={() => playTrack(index)}
                   onKeyDown={(e) => handleTrackKeyDown(e, index)}
@@ -672,10 +672,10 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
                   aria-current={currentTrackIndex === index}
                 >
                   <div className="flex items-center">
-                    <span className="w-6 text-center text-gray-500">{file.track || index + 1}</span>
+                    <span className="w-6 text-center text-content-text-tertiary">{file.track || index + 1}</span>
                     <span className="flex-1 truncate ml-2">{getTrackName(file)}</span>
                     {file.length && (
-                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0">{formatTime(file.length)}</span>
+                      <span className="text-xs text-content-text-tertiary ml-2 flex-shrink-0">{formatTime(file.length)}</span>
                     )}
                   </div>
                 </button>
@@ -685,12 +685,12 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         )}
 
         {/* Footer */}
-        <div className="mt-4 text-xs text-gray-500 flex justify-between items-center">
+        <div className="mt-4 text-xs text-content-text-tertiary flex justify-between items-center">
           <a
             href={`https://archive.org/details/${identifier}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-purple-400 hover:text-purple-300 transition-colors"
+            className="text-brand-secondary hover:text-hover-accent transition-colors"
           >
             View on Archive.org
           </a>

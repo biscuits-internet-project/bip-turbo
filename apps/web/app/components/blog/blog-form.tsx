@@ -145,9 +145,9 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
           name="title"
           render={({ field }: { field: ControllerRenderProps<BlogPostFormValues, "title"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Title</FormLabel>
+              <FormLabel className="text-content-text-primary">Title</FormLabel>
               <FormControl>
-                <Input placeholder="Enter title" {...field} className="bg-gray-800 border-gray-700 text-white" />
+                <Input placeholder="Enter title" {...field} className="bg-content-bg-secondary border-content-bg-secondary text-white" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -159,14 +159,14 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
           name="blurb"
           render={({ field }: { field: ControllerRenderProps<BlogPostFormValues, "blurb"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Blurb</FormLabel>
+              <FormLabel className="text-content-text-primary">Blurb</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter blurb"
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-white min-h-[100px]"
                 />
               </FormControl>
               <FormMessage />
@@ -179,7 +179,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
           name="content"
           render={({ field }: { field: ControllerRenderProps<BlogPostFormValues, "content"> }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Content</FormLabel>
+              <FormLabel className="text-content-text-primary">Content</FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Enter content (Markdown supported)"
@@ -191,7 +191,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
                     e.target.style.height = "auto";
                     e.target.style.height = `${e.target.scrollHeight}px`;
                   }}
-                  className="bg-gray-800 border-gray-700 text-white min-h-[300px] font-mono resize-none overflow-hidden"
+                  className="bg-content-bg-secondary border-content-bg-secondary text-white min-h-[300px] font-mono resize-none overflow-hidden"
                 />
               </FormControl>
               <FormMessage />
@@ -204,14 +204,14 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
           name="state"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">State</FormLabel>
+              <FormLabel className="text-content-text-primary">State</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                  <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-white">
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent className="bg-gray-800 border-gray-700">
+                <SelectContent className="bg-content-bg-secondary border-content-bg-secondary">
                   <SelectItem value={BlogPostState.DRAFT} className="text-white">
                     Draft
                   </SelectItem>
@@ -226,13 +226,13 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
         />
 
         <FormItem>
-          <FormLabel className="text-gray-200">Images</FormLabel>
+          <FormLabel className="text-content-text-primary">Images</FormLabel>
           <div className="space-y-4">
             <FileUpload
               bucket="uploads"
               folder="blog"
               onUploadComplete={handleFileUpload}
-              className="bg-gray-800 border-gray-700"
+              className="bg-content-bg-secondary border-content-bg-secondary"
               accept="image/*"
             />
             {uploadedFiles.length > 0 && (
@@ -283,7 +283,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
           <Button
             type="button"
             onClick={form.handleSubmit(onSubmit)}
-            className="bg-purple-800 hover:bg-purple-700 text-white"
+            className="bg-brand hover:bg-hover-accent text-white"
           >
             {submitLabel}
           </Button>
@@ -291,7 +291,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
             type="button"
             variant="outline"
             onClick={() => navigate(cancelHref)}
-            className="border-gray-600 text-gray-200 hover:bg-gray-800 hover:text-white"
+            className="border-gray-600 text-content-text-primary hover:bg-content-bg-secondary hover:text-white"
           >
             Cancel
           </Button>
