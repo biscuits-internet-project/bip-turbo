@@ -112,6 +112,7 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
         
         <DropdownMenuSeparator className="my-2 bg-brand-primary/20" />
         
+        
         <DropdownMenuItem 
           asChild
           className={cn(

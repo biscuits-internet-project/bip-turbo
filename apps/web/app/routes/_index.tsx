@@ -114,10 +114,10 @@ export default function Index() {
     <div className="w-full p-0">
       {/* Hero section */}
       <div className="py-2 text-center">
-        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-brand-gradient-start via-brand-gradient-mid to-brand-gradient-end bg-clip-text text-transparent font-header">
+        <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-tertiary bg-clip-text text-transparent font-header">
           Biscuits Internet Project 3.0
         </h1>
-        <p className="text-xl text-muted-foreground mb-8">
+        <p className="text-xl text-content-text-secondary mb-8">
           Your ultimate resource for the Disco Biscuits - shows, setlists, stats, and more.
         </p>
         {/* <div className="relative max-w-2xl mx-auto mb-12">
@@ -172,11 +172,11 @@ export default function Index() {
             </div>
 
             {tourDates.length > 0 ? (
-              <Card className="bg-content-bg border-content-bg-secondary">
+              <Card className="card-premium">
                 <div className="relative overflow-x-auto">
                   <table className="w-full text-md">
                     <thead>
-                      <tr className="text-left text-sm text-muted-foreground border-b border-border/40">
+                      <tr className="text-left text-sm text-content-text-secondary border-b border-glass-border/40">
                         <th className="p-4">Date</th>
                         <th className="p-4">Venue</th>
                         <th className="hidden md:table-cell p-4">Address</th>
@@ -186,14 +186,14 @@ export default function Index() {
                       {tourDates.map((td: TourDate) => (
                         <tr
                           key={td.formattedStartDate + td.venueName}
-                          className="border-b border-border/40 hover:bg-accent/5"
+                          className="border-b border-glass-border/40 hover:bg-hover-glass"
                         >
-                          <td className="p-4 text-white">
+                          <td className="p-4 text-content-text-primary">
                             {td.formattedStartDate === td.formattedEndDate
                               ? td.formattedStartDate
                               : `${td.formattedStartDate} - ${td.formattedEndDate}`}
                           </td>
-                          <td className="p-4 text-white font-medium">{td.venueName}</td>
+                          <td className="p-4 text-brand-primary font-medium">{td.venueName}</td>
                           <td className="hidden md:table-cell p-4 text-content-text-secondary">{td.address}</td>
                         </tr>
                       ))}

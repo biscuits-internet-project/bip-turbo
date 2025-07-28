@@ -180,6 +180,31 @@
     --backdrop-blur: blur(12px);             /* Standard backdrop blur */
     --backdrop-blur-heavy: blur(20px);       /* Heavy backdrop blur */
   }
+
+  /* Light mode styles */
+  :root:not(.dark) {
+    /* Light mode color overrides */
+    --background: 0 0% 98%;                  /* Light background */
+    --foreground: 240 10% 12%;               /* Dark text on light */
+    --content-text-primary: 240 10% 12%;     /* Dark primary text */
+    --content-text-secondary: 240 8% 35%;    /* Medium gray text */
+    --content-text-tertiary: 240 6% 55%;     /* Light gray text */
+    --brand-primary: 263 85% 50%;            /* Darker purple for light mode */
+    --brand-secondary: 267 75% 60%;          /* Medium purple */
+    --brand-tertiary: 145 80% 45%;           /* Darker green for light mode */
+    
+    /* Light mode glass effects */
+    --glass-bg: hsla(263, 20%, 95%, 0.8);    /* Light glass background */
+    --glass-border: hsla(263, 60%, 70%, 0.6); /* Purple border for light */
+    --glass-border-accent: hsla(145, 60%, 55%, 0.6); /* Green border for light */
+    --content-glass: hsla(263, 15%, 92%, 0.9); /* Light content glass */
+    --content-glass-border: hsla(263, 50%, 60%, 0.8); /* Light content border */
+    
+    /* Light mode interactive states */
+    --hover-glass: hsla(263, 20%, 88%, 0.9); /* Light hover */
+    --hover-accent: 267 80% 60%;             /* Purple hover */
+    --hover-accent-green: 145 75% 50%;       /* Green hover */
+  }
  
   .dark {
     /* Dark mode inherits from root - already optimized for dark */
@@ -423,12 +448,25 @@
 
   /* Premium Card Styles */
   .card-premium {
-    background-color: var(--glass-bg) !important;
-    border: 1px solid var(--glass-border) !important;
+    background: linear-gradient(135deg, 
+      hsla(263, 25%, 8%, 0.95) 0%, 
+      hsla(263, 30%, 12%, 0.85) 50%, 
+      hsla(263, 15%, 3%, 0.98) 100%) !important;
+    border: 1px solid hsla(263, 30%, 20%, 0.4) !important;
     backdrop-filter: var(--backdrop-blur) !important;
     -webkit-backdrop-filter: var(--backdrop-blur) !important;
     border-radius: 0.75rem;
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1), 0 8px 32px var(--glass-shadow);
+  }
+
+  /* Light mode card override */
+  :root:not(.dark) .card-premium {
+    background: linear-gradient(135deg, 
+      hsla(263, 15%, 98%, 0.9) 0%, 
+      hsla(263, 20%, 95%, 0.85) 50%, 
+      hsla(263, 10%, 92%, 0.95) 100%) !important;
+    border: 1px solid hsla(263, 40%, 75%, 0.3) !important;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05), 0 8px 32px hsla(263, 50%, 60%, 0.1);
   }
 
   .card-premium-accent {

@@ -36,7 +36,7 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
   return (
     <Card
       key={blogPost.id}
-      className="bg-content-bg border-content-bg-secondary overflow-hidden flex flex-col h-full hover:border-content-bg-secondary transition-colors"
+      className="card-premium overflow-hidden flex flex-col h-full hover:border-brand-tertiary/60 transition-all duration-300"
     >
       {/* Card Header */}
       <CardHeader className={compact ? "p-4 pb-2" : "pb-2"}>
@@ -45,7 +45,7 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
             <span>{formatDate(blogPost.publishedAt)}</span>
           </div>
         </div>
-        <CardTitle className={`${compact ? "text-lg" : "text-xl"} mt-4 text-white`}>{blogPost.title}</CardTitle>
+        <CardTitle className={`${compact ? "text-lg" : "text-xl"} mt-4 text-brand-primary`}>{blogPost.title}</CardTitle>
         {coverImage && (
           <div className="w-full my-3">
             <img
@@ -67,7 +67,7 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="w-full mt-4 bg-content-bg-secondary hover:bg-gray-700 border-content-bg-secondary">
+        <Button variant="outline" size="sm" className="btn-secondary w-full mt-4">
           <Link to={`/blog/${blogPost.slug}`} className="w-full">
             Read More
           </Link>
