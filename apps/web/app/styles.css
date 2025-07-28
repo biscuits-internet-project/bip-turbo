@@ -1,151 +1,189 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand Colors - Purple Focus with Green Accents */
+  --color-brand-primary: hsl(263 85% 60%);
+  --color-brand-secondary: hsl(267 75% 70%);
+  --color-brand-tertiary: hsl(145 80% 55%);
+  
+  /* Purple Palette */
+  --color-purple-50: hsl(270 100% 98%);
+  --color-purple-100: hsl(269 100% 95%);
+  --color-purple-200: hsl(269 100% 90%);
+  --color-purple-300: hsl(268 100% 82%);
+  --color-purple-400: hsl(267 93% 73%);
+  --color-purple-500: hsl(263 85% 60%);
+  --color-purple-600: hsl(259 85% 50%);
+  --color-purple-700: hsl(255 85% 40%);
+  --color-purple-800: hsl(251 85% 30%);
+  --color-purple-900: hsl(247 85% 20%);
+  --color-purple-950: hsl(244 85% 12%);
+  
+  /* Green Palette */
+  --color-green-50: hsl(140 50% 98%);
+  --color-green-100: hsl(141 60% 93%);
+  --color-green-200: hsl(142 65% 85%);
+  --color-green-300: hsl(143 70% 75%);
+  --color-green-400: hsl(144 75% 65%);
+  --color-green-500: hsl(145 80% 55%);
+  --color-green-600: hsl(146 85% 45%);
+  --color-green-700: hsl(147 90% 35%);
+  --color-green-800: hsl(148 95% 25%);
+  --color-green-900: hsl(149 100% 15%);
+  --color-green-950: hsl(150 100% 8%);
+  
+  /* Content Text Colors */
+  --color-content-text-primary: hsl(0 0% 98%);
+  --color-content-text-secondary: hsl(240 5% 75%);
+  --color-content-text-tertiary: hsl(240 5% 55%);
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Monoton&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
-@import "tailwindcss";
 
 @layer base {
-  /* Design Token System - Semantic Color Palette */
+  /* Design Token System - Premium Purple & Vibrant Green Palette */
   :root {
-    /* Base system colors */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --laser-1: 267 100% 50%;
-    --laser-2: 140 100% 50%;
-    --laser-3: 135 100% 45%;
-    --laser-4: 145 100% 55%;
-    --laser-5: 130 100% 45%;
-    --laser-6: 150 100% 50%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    /* Base system colors - Dark mode optimized */
+    --background: 240 10% 3.9%;              /* Deep dark background */
+    --foreground: 0 0% 98%;                  /* High contrast white text */
+    --laser-1: 267 100% 50%;                 /* Deep purple laser */
+    --laser-2: 140 100% 50%;                 /* Vibrant green laser */
+    --laser-3: 270 95% 45%;                  /* Royal purple laser */
+    --laser-4: 145 100% 55%;                 /* Electric green laser */
+    --laser-5: 265 90% 40%;                  /* Deep violet laser */
+    --laser-6: 150 95% 50%;                  /* Bright green laser */
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 263 85% 60%;                  /* Deep purple primary */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 5% 16%;                 /* Dark secondary */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 263 85% 60%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 263 85% 60%;
+    --radius: 0.75rem;
 
-    /* Brand & Identity */
-    --brand-primary: 267 100% 50%;           /* Purple brand color */
-    --brand-secondary: 267 85% 65%;          /* Lighter purple */
-    --brand-gradient-start: 267 100% 80%;    /* Gradient start */
-    --brand-gradient-mid: 267 90% 65%;       /* Gradient middle */
-    --brand-gradient-end: 267 85% 50%;       /* Gradient end */
+    /* Premium Purple Palette - Deep & Rich */
+    --purple-50: 270 100% 98%;               /* Almost white with purple tint */
+    --purple-100: 269 100% 95%;              /* Very light purple */
+    --purple-200: 269 100% 90%;              /* Light purple */
+    --purple-300: 268 100% 82%;              /* Medium light purple */
+    --purple-400: 267 93% 73%;               /* Medium purple */
+    --purple-500: 263 85% 60%;               /* Core brand purple */
+    --purple-600: 259 85% 50%;               /* Deep brand purple */
+    --purple-700: 255 85% 40%;               /* Darker purple */
+    --purple-800: 251 85% 30%;               /* Very dark purple */
+    --purple-900: 247 85% 20%;               /* Almost black purple */
+    --purple-950: 244 85% 12%;               /* Near black purple */
+
+    /* Vibrant Green Palette - Electric but Controlled */
+    --green-50: 140 50% 98%;                 /* Almost white with green tint */
+    --green-100: 141 60% 93%;                /* Very light green */
+    --green-200: 142 65% 85%;                /* Light green */
+    --green-300: 143 70% 75%;                /* Medium light green */
+    --green-400: 144 75% 65%;                /* Medium green */
+    --green-500: 145 80% 55%;                /* Core accent green */
+    --green-600: 146 85% 45%;                /* Deep accent green */
+    --green-700: 147 90% 35%;                /* Darker green */
+    --green-800: 148 95% 25%;                /* Very dark green */
+    --green-900: 149 100% 15%;               /* Almost black green */
+    --green-950: 150 100% 8%;                /* Near black green */
+
+    /* Brand & Identity - Premium Purple Focus */
+    --brand-primary: 263 85% 60%;            /* Core purple brand */
+    --brand-secondary: 267 75% 70%;          /* Lighter purple secondary */
+    --brand-tertiary: 145 80% 55%;           /* Green accent brand */
+    --brand-gradient-start: 269 100% 82%;    /* Light purple gradient start */
+    --brand-gradient-mid: 263 85% 60%;       /* Core purple gradient mid */
+    --brand-gradient-end: 259 85% 50%;       /* Deep purple gradient end */
+    --brand-glow: 263 85% 60%;               /* Purple glow effect */
     
-    /* Content Areas */
-    --content-bg: 0 0% 7%;                   /* Dark content backgrounds */
-    --content-bg-secondary: 217 33% 17%;     /* Secondary content areas */
-    --content-text-primary: 0 0% 100%;       /* Primary text on dark */
-    --content-text-secondary: 215 16% 47%;   /* Secondary text */
-    --content-text-tertiary: 215 16% 37%;    /* Tertiary/muted text */
+    /* Content Areas - Glass-morphism Ready */
+    --content-bg: 240 10% 3.9%;              /* Primary dark background */
+    --content-bg-secondary: 240 6% 10%;      /* Secondary areas */
+    --content-bg-tertiary: 240 6% 15%;       /* Tertiary areas */
+    --content-glass: hsla(263, 20%, 15%, 0.6); /* Purple-tinted glass background with transparency */
+    --content-glass-border: hsla(263, 80%, 60%, 1); /* Glass border - very bright purple, fully opaque */
+    --content-text-primary: 0 0% 98%;        /* High contrast primary text */
+    --content-text-secondary: 240 5% 75%;    /* Secondary text */
+    --content-text-tertiary: 240 5% 55%;     /* Tertiary/muted text */
     
-    /* Interactive States */
-    --hover-accent: 267 75% 45%;             /* Purple hover state */
-    --hover-subtle: 210 40% 94%;             /* Subtle hover background */
-    --focus-ring: 267 75% 60%;               /* Focus ring color */
-    --active-state: 267 85% 55%;             /* Active/pressed state */
+    /* Interactive States - Purple Primary, Green Accents */
+    --hover-accent: 267 90% 70%;             /* Purple hover state */
+    --hover-accent-green: 145 85% 60%;       /* Green hover state */
+    --hover-subtle: 240 6% 12%;              /* Subtle hover background */
+    --hover-glass: 263 25% 18%;              /* Glass hover effect */
+    --focus-ring: 263 85% 60%;               /* Purple focus ring */
+    --focus-ring-green: 145 80% 55%;         /* Green focus ring */
+    --active-state: 259 85% 50%;             /* Purple active/pressed state */
+    --active-state-green: 146 85% 45%;       /* Green active state */
     
-    /* Status & Feedback */
-    --success: 142 76% 36%;                  /* Success/positive */
-    --warning: 38 92% 50%;                   /* Warning/caution */
-    --info: 199 89% 48%;                     /* Information */
-    --rating-gold: 45 93% 47%;               /* Star ratings */
-    --rating-dim: 215 16% 25%;               /* Inactive ratings */
+    /* Status & Feedback - Harmonized with Brand */
+    --success: 145 80% 55%;                  /* Brand green for success */
+    --success-bg: 145 50% 10%;               /* Success background */
+    --warning: 38 92% 60%;                   /* Warning amber */
+    --warning-bg: 38 50% 12%;                /* Warning background */
+    --error: 0 85% 65%;                      /* Error red */
+    --error-bg: 0 50% 12%;                   /* Error background */
+    --info: 205 100% 70%;                    /* Info blue */
+    --info-bg: 205 50% 12%;                  /* Info background */
+    --rating-gold: 45 93% 57%;               /* Star ratings */
+    --rating-dim: 240 5% 35%;                /* Inactive ratings */
     
-    /* Chart & Data Visualization */
-    --chart-primary: 267 100% 66%;           /* Primary chart color */
-    --chart-secondary: 267 75% 75%;          /* Secondary chart color */
-    --chart-tertiary: 267 50% 85%;           /* Tertiary chart color */
-    --chart-accent: 45 93% 47%;              /* Chart accent color */
+    /* Chart & Data Visualization - Purple Primary, Green Secondary */
+    --chart-primary: 263 85% 60%;            /* Purple primary chart */
+    --chart-secondary: 145 80% 55%;          /* Green secondary chart */
+    --chart-tertiary: 267 50% 75%;           /* Light purple tertiary */
+    --chart-quaternary: 145 50% 70%;         /* Light green quaternary */
+    --chart-accent: 45 93% 57%;              /* Gold accent for special data */
+    --chart-gradient-start: 263 85% 60%;     /* Chart gradient start */
+    --chart-gradient-end: 145 80% 55%;       /* Chart gradient end */
     
-    /* Component-Specific */
-    --card-overlay: 0 0% 7%;                 /* Card overlay backgrounds */
-    --nav-link-hover: 267 75% 45%;           /* Navigation hover */
-    --search-bg: 0 0% 7%;                    /* Search input backgrounds */
-    --filter-active: 267 100% 50%;           /* Active filter state */
-    --table-header: 217 33% 13%;             /* Table header background */
-    --table-row-hover: 217 33% 10%;          /* Table row hover */
-    --divider: 215 25% 20%;                  /* Dividers and separators */
+    /* Component-Specific - Glass-morphism Enhanced */
+    --card-overlay: 240 10% 3.9%;            /* Card background */
+    --card-glass: hsla(263, 15%, 10%, 0.6);  /* Glass card background with transparency */
+    --card-glass-border: hsla(263, 30%, 20%, 0.8); /* Glass card border with transparency */
+    --nav-link-hover: 267 90% 70%;           /* Navigation hover */
+    --nav-glass: hsla(263, 20%, 8%, 0.6);    /* Navigation glass background with transparency */
+    --search-bg: 240 6% 10%;                 /* Search input background */
+    --search-glass: hsla(263, 15%, 12%, 0.6); /* Glass search background with transparency */
+    --filter-active: 263 85% 60%;            /* Active filter - purple */
+    --filter-active-secondary: 145 80% 55%;  /* Secondary active filter - green */
+    --table-header: 240 6% 8%;               /* Table header background */
+    --table-row-hover: 240 6% 12%;           /* Table row hover */
+    --table-glass: hsla(263, 10%, 8%, 0.6);  /* Glass table background with transparency */
+    --divider: 240 6% 20%;                   /* Dividers and separators */
+    --divider-accent: 263 30% 25%;           /* Accent dividers */
+    
+    /* Glass-morphism Effects */
+    --glass-bg: hsla(263, 15%, 8%, 0.6);     /* Primary glass background with transparency */
+    --glass-bg-secondary: hsla(240, 8%, 12%, 0.5); /* Secondary glass background with transparency */
+    --glass-border: hsla(263, 80%, 60%, 1); /* Glass borders - very bright purple, fully opaque */
+    --glass-border-accent: hsla(145, 80%, 60%, 1); /* Green accent glass borders - very bright green, fully opaque */
+    --glass-shadow: hsla(263, 50%, 5%, 0.3); /* Glass shadow color with transparency */
+    --backdrop-blur: blur(12px);             /* Standard backdrop blur */
+    --backdrop-blur-heavy: blur(20px);       /* Heavy backdrop blur */
   }
  
   .dark {
-    /* Base system colors */
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --laser-1: 267 100% 50%;
-    --laser-2: 140 100% 50%;
-    --laser-3: 135 100% 45%;
-    --laser-4: 145 100% 55%;
-    --laser-5: 130 100% 45%;
-    --laser-6: 150 100% 50%;
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
-    --popover: 224 71% 4%;
-    --popover-foreground: 213 31% 91%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
-    --accent: 267 75% 25%;
-    --accent-foreground: 267 100% 85%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 267 75% 25%;
-
-    /* Brand & Identity (same in dark mode) */
-    --brand-primary: 267 100% 60%;           /* Slightly brighter in dark */
-    --brand-secondary: 267 75% 70%;          /* Adjusted for dark contrast */
-    --brand-gradient-start: 267 90% 75%;     /* Gradient start */
-    --brand-gradient-mid: 267 80% 60%;       /* Gradient middle */
-    --brand-gradient-end: 267 75% 45%;       /* Gradient end */
+    /* Dark mode inherits from root - already optimized for dark */
+    /* All color tokens above are designed for dark mode by default */
+    /* This maintains consistency between light/dark while being primarily dark-focused */
     
-    /* Content Areas (already dark-optimized) */
-    --content-bg: 224 71% 4%;                /* Match dark background */
-    --content-bg-secondary: 216 34% 17%;     /* Secondary areas */
-    --content-text-primary: 213 31% 91%;     /* Primary text */
-    --content-text-secondary: 215 16% 57%;   /* Secondary text */
-    --content-text-tertiary: 215 16% 47%;    /* Tertiary text */
-    
-    /* Interactive States */
-    --hover-accent: 267 85% 65%;             /* Brighter hover in dark */
-    --hover-subtle: 216 34% 12%;             /* Subtle dark hover */
-    --focus-ring: 267 85% 70%;               /* Bright focus ring */
-    --active-state: 267 75% 55%;             /* Active state */
-    
-    /* Status & Feedback */
-    --success: 142 69% 58%;                  /* Brighter success in dark */
-    --warning: 38 85% 65%;                   /* Adjusted warning */
-    --info: 199 89% 68%;                     /* Brighter info */
-    --rating-gold: 45 93% 57%;               /* Brighter gold */
-    --rating-dim: 215 16% 35%;               /* Dimmed ratings */
-    
-    /* Chart & Data Visualization */
-    --chart-primary: 267 100% 66%;           /* Same primary chart */
-    --chart-secondary: 267 75% 75%;          /* Same secondary */
-    --chart-tertiary: 267 50% 85%;           /* Same tertiary */
-    --chart-accent: 45 93% 57%;              /* Brighter accent */
-    
-    /* Component-Specific */
-    --card-overlay: 224 71% 4%;              /* Dark card overlay */
-    --nav-link-hover: 267 85% 65%;           /* Brighter nav hover */
-    --search-bg: 216 34% 17%;                /* Dark search bg */
-    --filter-active: 267 85% 65%;            /* Bright active filter */
-    --table-header: 216 34% 8%;              /* Darker table header */
-    --table-row-hover: 216 34% 12%;          /* Table row hover */
-    --divider: 216 34% 17%;                  /* Dark dividers */
+    /* Slightly enhanced purple glow for dark mode */
+    --brand-glow: 263 90% 70%;               /* Brighter purple glow in dark */
+    --glass-border: hsla(263, 80%, 60%, 1);  /* Very bright purple borders for dark mode */
+    --glass-border-accent: hsla(145, 80%, 60%, 1); /* Very bright green borders for dark mode */
   }
 
   /* Override the Tailwind background utility */
@@ -367,47 +405,284 @@
 }
 
 @layer components {
-  /* Show/Concert List */
+  /* Glass-morphism Utility Classes */
+  .glass {
+    background-color: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    backdrop-filter: var(--backdrop-blur) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur) !important;
+  }
+
+  .glass-secondary {
+    background-color: var(--glass-bg-secondary) !important;
+    border: 1px solid var(--glass-border) !important;
+    backdrop-filter: var(--backdrop-blur) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur) !important;
+  }
+
+  .glass-heavy {
+    background-color: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    backdrop-filter: var(--backdrop-blur-heavy) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur-heavy) !important;
+  }
+
+  .glass-accent {
+    background-color: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border-accent) !important;
+    backdrop-filter: var(--backdrop-blur) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur) !important;
+  }
+
+  .glass-content {
+    background-color: var(--content-glass) !important;
+    border: 1px solid var(--content-glass-border) !important;
+    backdrop-filter: var(--backdrop-blur) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur) !important;
+  }
+
+  /* Premium Card Styles */
+  .card-premium {
+    background-color: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    backdrop-filter: var(--backdrop-blur) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur) !important;
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1), 0 8px 32px var(--glass-shadow);
+  }
+
+  .card-premium-accent {
+    background-color: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border-accent) !important;
+    backdrop-filter: var(--backdrop-blur) !important;
+    -webkit-backdrop-filter: var(--backdrop-blur) !important;
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1), 0 8px 32px var(--glass-shadow);
+  }
+
+  /* Gradient Utilities */
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, 
+      hsl(var(--brand-gradient-start)) 0%,
+      hsl(var(--brand-gradient-mid)) 50%,
+      hsl(var(--brand-gradient-end)) 100%);
+  }
+
+  .bg-chart-gradient {
+    background: linear-gradient(135deg, 
+      hsl(var(--chart-gradient-start)) 0%,
+      hsl(var(--chart-gradient-end)) 100%);
+  }
+
+  /* Enhanced Interactive States */
+  .btn-primary {
+    background-color: hsl(var(--brand-primary));
+    color: hsl(var(--content-text-primary));
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 200ms;
+  }
+
+  .btn-primary:hover {
+    background-color: hsl(var(--hover-accent));
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  .btn-primary:focus {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
+  }
+
+  .btn-primary:active {
+    background-color: hsl(var(--active-state));
+    transform: scale(0.95);
+  }
+
+  .btn-secondary {
+    background-color: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    backdrop-filter: var(--backdrop-blur);
+    -webkit-backdrop-filter: var(--backdrop-blur);
+    color: hsl(var(--brand-primary));
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 200ms;
+  }
+
+  .btn-secondary:hover {
+    background-color: hsl(var(--hover-glass));
+    color: hsl(var(--hover-accent));
+  }
+
+  .btn-secondary:focus {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
+  }
+
+  .btn-accent {
+    background-color: hsl(var(--brand-tertiary));
+    color: hsl(var(--content-text-primary));
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 200ms;
+  }
+
+  .btn-accent:hover {
+    background-color: hsl(var(--hover-accent-green));
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  .btn-accent:focus {
+    outline: 2px solid hsl(var(--focus-ring-green));
+    outline-offset: 2px;
+  }
+
+  .btn-accent:active {
+    background-color: hsl(var(--active-state-green));
+    transform: scale(0.95);
+  }
+
+  /* Show/Concert List - Enhanced */
   .show-list {
-    @apply space-y-4;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
 
   .show-item {
-    @apply p-4 border rounded-lg;
+    background-color: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    backdrop-filter: var(--backdrop-blur);
+    -webkit-backdrop-filter: var(--backdrop-blur);
+    border-radius: 0.75rem;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1), 0 8px 32px hsl(var(--glass-shadow) / 0.3);
+    padding: 1.5rem;
+    transition: all 300ms;
+  }
+
+  .show-item:hover {
+    border-color: hsl(var(--glass-border-accent));
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
   }
 
   .show-header {
-    @apply flex items-center justify-between mb-2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
   }
 
   .show-title {
-    @apply text-lg font-semibold;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: hsl(var(--brand-primary));
   }
 
   .show-date {
-    @apply text-sm;
+    font-size: 0.875rem;
+    color: hsl(var(--content-text-secondary));
   }
 
   .show-details {
-    @apply space-y-2;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
-  /* Search and Filters */
+  /* Search and Filters - Glass Enhanced */
   .search-bar {
-    @apply mb-6;
+    margin-bottom: 2rem;
   }
 
   .search-input {
-    @apply w-full px-4 py-2 rounded-lg border;
+    background-color: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    backdrop-filter: var(--backdrop-blur);
+    -webkit-backdrop-filter: var(--backdrop-blur);
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    color: hsl(var(--content-text-primary));
+    transition: all 200ms;
   }
 
-  /* Year/Month Navigation */
+  .search-input::placeholder {
+    color: hsl(var(--content-text-tertiary));
+  }
+
+  .search-input:focus {
+    border-color: hsl(var(--glass-border-accent));
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 0;
+  }
+
+  /* Year/Month Navigation - Premium Style */
   .date-nav {
-    @apply flex flex-wrap gap-2 mb-6;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
   }
 
   .date-nav-item {
-    @apply px-3 py-1 rounded-md text-sm;
+    background-color: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    backdrop-filter: var(--backdrop-blur);
+    -webkit-backdrop-filter: var(--backdrop-blur);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--content-text-secondary));
+    transition: all 200ms;
+    cursor: pointer;
+  }
+
+  .date-nav-item:hover {
+    background-color: hsl(var(--hover-glass));
+    color: hsl(var(--brand-primary));
+    border-color: hsl(var(--glass-border-accent));
+  }
+
+  .date-nav-item.active {
+    background-color: hsl(var(--brand-primary));
+    color: hsl(var(--content-text-primary));
+    border-color: hsl(var(--brand-primary));
+  }
+
+  /* Table Enhancements */
+  .table-premium {
+    background-color: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+    backdrop-filter: var(--backdrop-blur);
+    -webkit-backdrop-filter: var(--backdrop-blur);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .table-premium thead {
+    background-color: hsl(var(--table-glass));
+  }
+
+  .table-premium th {
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-weight: 500;
+    color: hsl(var(--content-text-secondary));
+    border-bottom: 1px solid hsl(var(--divider));
+  }
+
+  .table-premium td {
+    padding: 1rem 1.5rem;
+    color: hsl(var(--content-text-primary));
+    border-bottom: 1px solid hsl(var(--divider));
+  }
+
+  .table-premium tr:hover {
+    background-color: hsl(var(--table-row-hover));
   }
 }
 

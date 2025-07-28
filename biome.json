@@ -1,5 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
+  "files": {
+    "experimentalScannerIgnores": [
+      ".react-router/**",
+      "**/build/**",
+      "**/dist/**",
+      "**/.turbo/**",
+      "**/node_modules/**",
+      "**/tailwind.config.js"
+    ]
+  },
   "linter": {
     "enabled": true,
     "rules": {
@@ -17,16 +27,5 @@
       "quoteStyle": "double",
       "lineWidth": 120
     }
-  },
-  "files": {
-    "includes": ["apps/**/*", "packages/**/*"],
-    "experimentalScannerIgnores": [
-      "**/build/**",
-      "**/dist/**",
-      "**/.turbo/**",
-      "**/node_modules/**",
-      "**/tailwind.config.js",
-      "**/.react-router/**"
-    ]
   }
 }

@@ -136,7 +136,7 @@ export default function Index() {
         <div className="lg:col-span-4 order-2 lg:order-1">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Recent Shows</h2>
-            <Link to="/shows" className="text-brand hover:text-hover-accent flex items-center">
+            <Link to="/shows" className="flex items-center" style={{color: "hsl(var(--brand-tertiary))"}}>
               View all <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </div>
@@ -166,7 +166,7 @@ export default function Index() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Upcoming Tour Dates</h2>
-              <Link to="/shows/tour-dates" className="text-brand hover:text-hover-accent flex items-center">
+              <Link to="/shows/tour-dates" className="flex items-center" style={{color: "hsl(var(--brand-tertiary))"}}>
                 View more <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
@@ -212,7 +212,7 @@ export default function Index() {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Latest from the Blog</h2>
-              <Link to="/blog" className="text-brand hover:text-hover-accent flex items-center">
+              <Link to="/blog" className="flex items-center" style={{color: "hsl(var(--brand-primary))"}}>
                 View all <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
             </div>
