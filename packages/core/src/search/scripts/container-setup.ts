@@ -45,6 +45,7 @@ searchIndexService.registerContentFormatter(new TrackContentFormatter());
 // Export container with search services
 export const container = {
   ...mainContainer,
+  db: () => db, // Expose raw Prisma client for search indexing
   embeddingService: () => embeddingService,
   searchIndexService: () => searchIndexService,
   songRepository: () => mainContainer.repositories.songs,

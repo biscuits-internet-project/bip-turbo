@@ -34,50 +34,8 @@ const ENTITY_LABELS = {
 
 export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogProps) {
   const [query, setQuery] = useState("");
-  const { results: realResults, isLoading, error, search, clear } = useVectorSearch();
+  const { results, isLoading, error, search, clear } = useVectorSearch();
   const navigate = useNavigate();
-
-  // Hardcoded results for styling purposes
-  const mockResults = [
-    {
-      id: "1",
-      entityType: "song",
-      entityId: "helicopters-id",
-      displayText: "Helicopters • 339 performances",
-      score: 87,
-      url: "/songs/helicopters",
-      metadata: { similarity: 0.87 }
-    },
-    {
-      id: "2", 
-      entityType: "song",
-      entityId: "air-song-id",
-      displayText: "Air Song • 60 performances",
-      score: 82,
-      url: "/songs/air-song",
-      metadata: { similarity: 0.82 }
-    },
-    {
-      id: "3",
-      entityType: "song", 
-      entityId: "flying-high-id",
-      displayText: "Flying High • 15 performances",
-      score: 78,
-      url: "/songs/flying-high",
-      metadata: { similarity: 0.78 }
-    },
-    {
-      id: "4",
-      entityType: "song",
-      entityId: "magellan-id", 
-      displayText: "Magellan • 221 performances",
-      score: 65,
-      url: "/songs/magellan",
-      metadata: { similarity: 0.65 }
-    }
-  ];
-
-  const results = query.trim() ? mockResults : [];
 
   // Debounced search
   useEffect(() => {

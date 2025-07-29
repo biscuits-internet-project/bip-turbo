@@ -4,6 +4,7 @@ export interface SearchIndexData {
 	id?: string;
 	entityType: string;
 	entityId: string;
+	entitySlug: string;
 	displayText: string;
 	content: string;
 	embeddingSmall: number[];
@@ -15,6 +16,7 @@ export interface SearchResult {
 	id: string;
 	entityType: string;
 	entityId: string;
+	entitySlug: string;
 	displayText: string;
 	content: string;
 	similarity: number;
@@ -33,40 +35,58 @@ export class SearchIndexRepository {
 	constructor(private readonly db: DbClient) {}
 
 	/**
-	 * Create a new search index entry using raw SQL
+	 * Upsert a search index entry using raw SQL
 	 */
-	async create(data: SearchIndexData): Promise<void> {
+	async upsert(data: SearchIndexData): Promise<void> {
 		await this.db.$executeRaw`
-			INSERT INTO search_indexes (entity_type, entity_id, display_text, content, embedding_small, embedding_large, model_used)
+			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used)
 			VALUES (
 				${data.entityType}, 
 				${data.entityId}::uuid, 
+				${data.entitySlug},
 				${data.displayText}, 
 				${data.content}, 
 				${JSON.stringify(data.embeddingSmall)}::vector(1536),
 				${data.embeddingLarge ? JSON.stringify(data.embeddingLarge) : null}::vector(3072),
 				${data.modelUsed}
 			)
+			ON CONFLICT (entity_type, entity_id) 
+			DO UPDATE SET
+				entity_slug = EXCLUDED.entity_slug,
+				display_text = EXCLUDED.display_text,
+				content = EXCLUDED.content,
+				embedding_small = EXCLUDED.embedding_small,
+				embedding_large = EXCLUDED.embedding_large,
+				model_used = EXCLUDED.model_used,
+				updated_at = NOW()
 		`;
 	}
 
 	/**
-	 * Create multiple search index entries in a batch using raw SQL
+	 * Create a new search index entry using raw SQL
+	 */
+	async create(data: SearchIndexData): Promise<void> {
+		await this.upsert(data);
+	}
+
+	/**
+	 * Create multiple search index entries in a batch using raw SQL with upsert
 	 */
 	async createMany(dataArray: SearchIndexData[]): Promise<void> {
 		if (dataArray.length === 0) return;
 
-		// Build bulk insert SQL with VALUES clause
+		// Build bulk upsert SQL with VALUES clause
 		const values = dataArray.map((data, index) => {
-			const paramBase = index * 7; // 7 parameters per record
+			const paramBase = index * 8; // 8 parameters per record
 			return `(
 				$${paramBase + 1}, 
 				$${paramBase + 2}::uuid, 
 				$${paramBase + 3}, 
 				$${paramBase + 4}, 
-				$${paramBase + 5}::vector(1536),
-				$${paramBase + 6}::vector(3072),
-				$${paramBase + 7}
+				$${paramBase + 5}, 
+				$${paramBase + 6}::vector(1536),
+				$${paramBase + 7}::vector(3072),
+				$${paramBase + 8}
 			)`;
 		}).join(', ');
 
@@ -74,6 +94,7 @@ export class SearchIndexRepository {
 		const params = dataArray.flatMap(data => [
 			data.entityType,
 			data.entityId,
+			data.entitySlug,
 			data.displayText,
 			data.content,
 			JSON.stringify(data.embeddingSmall),
@@ -82,8 +103,17 @@ export class SearchIndexRepository {
 		]);
 
 		const query = `
-			INSERT INTO search_indexes (entity_type, entity_id, display_text, content, embedding_small, embedding_large, model_used)
+			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used)
 			VALUES ${values}
+			ON CONFLICT (entity_type, entity_id) 
+			DO UPDATE SET
+				entity_slug = EXCLUDED.entity_slug,
+				display_text = EXCLUDED.display_text,
+				content = EXCLUDED.content,
+				embedding_small = EXCLUDED.embedding_small,
+				embedding_large = EXCLUDED.embedding_large,
+				model_used = EXCLUDED.model_used,
+				updated_at = NOW()
 		`;
 
 		await this.db.$executeRawUnsafe(query, ...params);
@@ -177,11 +207,13 @@ export class SearchIndexRepository {
 
 		// Perform vector similarity search using cosine distance
 		// Note: We use 1 - cosine_distance to get similarity (higher = more similar)
+		// Prioritize shows in search results since that's what most users search for
 		const query = `
       SELECT 
         id,
         entity_type as "entityType",
-        entity_id as "entityId", 
+        entity_id as "entityId",
+        entity_slug as "entitySlug", 
         display_text as "displayText",
         content,
         model_used as "modelUsed",
@@ -190,7 +222,14 @@ export class SearchIndexRepository {
         1 - (${embeddingField} <=> $1::vector) as similarity
       FROM search_indexes
       ${whereClause}
-      ORDER BY ${embeddingField} <=> $1::vector
+      ORDER BY 
+        CASE 
+          WHEN entity_type = 'show' THEN 1
+          WHEN entity_type = 'song' THEN 2  
+          WHEN entity_type = 'venue' THEN 3
+          ELSE 4
+        END,
+        ${embeddingField} <=> $1::vector
       LIMIT $${++paramIndex}
     `;
 

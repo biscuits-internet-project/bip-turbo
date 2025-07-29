@@ -14,17 +14,15 @@ export class SongContentFormatter implements ContentFormatter {
       displayText += " (Cover)";
     }
     
-    if (song.timesPlayed > 0) {
-      displayText += ` • ${song.timesPlayed} performances`;
-    }
-    
     return displayText;
   }
 
   generateContent(song: any): string {
     // Implementation following strategy: "[Song Title] by [Author]. [Lyrics excerpt]. Played [X] times. [Performance context: most/least common years, notable gaps from longestGapsData]. [Tabs/musical info]. [Notes/history]."
+    // Emphasize title by repeating it multiple times for better matching
     
-    let content = song.title || "Unknown Song";
+    const title = song.title || "Unknown Song";
+    let content = `${title}. Song title: ${title}. Track name: ${title}`;
     
     if (song.author?.name) {
       content += ` by ${song.author.name}`;

@@ -101,13 +101,11 @@ export class SearchIndexService {
       // Generate embedding for the content (using small model by default)
       const { embedding } = await this.embeddingService.generateEmbedding(content);
 
-      // Delete existing index entry if it exists
-      await this.repository.deleteByEntity(entityType, entityId);
-
-      // Create new index entry with small embedding
-      await this.repository.create({
+      // Upsert index entry with small embedding
+      await this.repository.upsert({
         entityType,
         entityId,
+        entitySlug: entity.slug || entityId, // Use slug if available, fallback to ID
         displayText,
         content,
         embeddingSmall: embedding,
@@ -149,6 +147,7 @@ export class SearchIndexService {
       const indexData = entities.map((entity, index) => ({
         entityType,
         entityId: entity.id,
+        entitySlug: entity.slug || entity.id, // Use slug if available, fallback to ID
         displayText: displayTexts[index],
         content: contents[index],
         embeddingSmall: embeddingResults[index].embedding,
@@ -156,12 +155,7 @@ export class SearchIndexService {
         modelUsed: 'text-embedding-3-small',
       }));
 
-      // Delete existing entries for these entities
-      await Promise.all(
-        entities.map(entity => this.repository.deleteByEntity(entityType, entity.id))
-      );
-
-      // Create new entries in batch
+      // Create new entries in batch (using upsert logic)
       await this.repository.createMany(indexData);
 
       this.logger.info(`Successfully batch indexed ${entities.length} ${entityType} entities`);

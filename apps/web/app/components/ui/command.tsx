@@ -63,7 +63,7 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn("flex-1 overflow-y-auto overflow-x-hidden", className)}
     {...props}
   />
 ))
@@ -118,7 +118,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer gap-3 select-none items-center rounded-lg mx-2 my-1 px-3 py-3 text-base text-white outline-none hover:bg-purple-500/20 data-[selected='true']:bg-green-500/20 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0",
+      "relative flex cursor-pointer gap-3 select-none items-center rounded-lg mx-2 my-1 px-3 py-3 text-base text-white outline-none hover:bg-green-500/20 data-[selected='true']:bg-purple-500/20 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-5 [&_svg]:shrink-0",
       className
     )}
     {...props}

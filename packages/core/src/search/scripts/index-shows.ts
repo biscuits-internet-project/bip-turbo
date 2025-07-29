@@ -14,9 +14,9 @@ async function indexShows() {
     const searchIndexService = container.searchIndexService();
     const showRepository = container.showRepository();
     
-    // Get all shows with related data
+    // Get all shows with related data - use raw Prisma client for search indexing
     console.log("📊 Fetching shows...");
-    const shows = await showRepository.findMany({
+    const shows = await container.db().show.findMany({
       include: {
         venue: true,
         tracks: {

@@ -552,6 +552,7 @@ model SearchIndex {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   entityType       String   @map("entity_type") @db.VarChar
   entityId         String   @map("entity_id") @db.Uuid
+  entitySlug       String   @map("entity_slug") @db.VarChar
   displayText      String   @map("display_text")
   content          String
   embeddingSmall   Unsupported("vector(1536)") @map("embedding_small")
@@ -560,6 +561,7 @@ model SearchIndex {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
+  @@unique([entityType, entityId])
   @@index([entityType])
   @@map("search_indexes")
 }

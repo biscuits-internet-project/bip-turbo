@@ -71,13 +71,13 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
       // Generate URLs based on entity type
       switch (result.entityType) {
         case "show":
-          url = `/shows/${result.entityId}`;
+          url = `/shows/${result.entitySlug}`;
           break;
         case "song":
-          url = `/songs/${result.entityId}`;
+          url = `/songs/${result.entitySlug}`;
           break;
         case "venue":
-          url = `/venues/${result.entityId}`;
+          url = `/venues/${result.entitySlug}`;
           break;
         case "track":
           url = `/tracks/${result.entityId}`;

@@ -20,7 +20,10 @@ export class VenueContentFormatter implements ContentFormatter {
   generateContent(venue: any): string {
     // Implementation following strategy: "[Venue Name] in [City, State]. [Times played]. Notable shows from database. [Basic characteristics from existing data]."
     
-    let content = venue.name || "Unknown Venue";
+    const venueName = venue.name || "Unknown Venue";
+    
+    // Emphasize venue name by repeating it (like we do for songs)
+    let content = `${venueName}. Venue name: ${venueName}. Concert venue: ${venueName}`;
     
     if (venue.city && venue.state) {
       content += ` in ${venue.city}, ${venue.state}`;
