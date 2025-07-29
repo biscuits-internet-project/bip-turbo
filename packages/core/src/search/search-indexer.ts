@@ -1,4 +1,4 @@
-import type { Show, Song, Venue, Track } from "@bip/domain";
+import type { Show, Song, Track, Venue } from "@bip/domain";
 import type { SearchIndexService } from "./search-index-service";
 
 export type IndexableEntity = Show | Song | Venue | Track;
@@ -33,7 +33,7 @@ export class SearchIndexer {
         if (!entity) {
           throw new Error(`Entity required for ${type} operation`);
         }
-        await this.searchIndexService.indexEntity(entityType, entityId, entity);
+        await this.searchIndexService.indexEntity(entityType, entityId);
       }
     } catch (error) {
       // Log error but don't throw to avoid breaking the main operation
@@ -45,9 +45,7 @@ export class SearchIndexer {
    * Bulk update multiple entities at once
    */
   async handleBulkUpdate(events: IndexUpdateEvent[]): Promise<void> {
-    const results = await Promise.allSettled(
-      events.map(event => this.handleEntityUpdate(event))
-    );
+    const results = await Promise.allSettled(events.map((event) => this.handleEntityUpdate(event)));
 
     // Log any failures
     results.forEach((result, index) => {
