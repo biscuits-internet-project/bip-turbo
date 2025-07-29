@@ -5,7 +5,7 @@
 
 @theme {
   /* Brand Colors - Purple Focus with Green Accents */
-  --color-brand-primary: hsl(263 85% 60%);
+  --color-brand-primary: hsl(267 90% 70%);
   --color-brand-secondary: hsl(267 75% 70%);
   --color-brand-tertiary: hsl(145 80% 55%);
   
@@ -66,7 +66,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 224 71% 4%;
     --popover-foreground: 0 0% 98%;
-    --primary: 263 85% 60%;                  /* Deep purple primary */
+    --primary: 267 90% 70%;                  /* Light purple primary (was hover) */
     --primary-foreground: 0 0% 98%;
     --secondary: 240 5% 16%;                 /* Dark secondary */
     --secondary-foreground: 0 0% 98%;
@@ -108,7 +108,7 @@
     --green-950: 150 100% 8%;                /* Near black green */
 
     /* Brand & Identity - Premium Purple Focus */
-    --brand-primary: 263 85% 60%;            /* Core purple brand */
+    --brand-primary: 267 90% 70%;            /* Core purple brand (lighter) */
     --brand-secondary: 267 75% 70%;          /* Lighter purple secondary */
     --brand-tertiary: 145 80% 55%;           /* Green accent brand */
     --brand-gradient-start: 269 100% 82%;    /* Light purple gradient start */
@@ -127,11 +127,11 @@
     --content-text-tertiary: 240 5% 55%;     /* Tertiary/muted text */
     
     /* Interactive States - Purple Primary, Green Accents */
-    --hover-accent: 267 90% 70%;             /* Purple hover state */
+    --hover-accent: 263 85% 60%;             /* Purple hover state (darker) */
     --hover-accent-green: 145 85% 60%;       /* Green hover state */
     --hover-subtle: 240 6% 12%;              /* Subtle hover background */
     --hover-glass: 263 25% 18%;              /* Glass hover effect */
-    --focus-ring: 263 85% 60%;               /* Purple focus ring */
+    --focus-ring: 267 90% 70%;               /* Purple focus ring (lighter) */
     --focus-ring-green: 145 80% 55%;         /* Green focus ring */
     --active-state: 259 85% 50%;             /* Purple active/pressed state */
     --active-state-green: 146 85% 45%;       /* Green active state */
@@ -161,7 +161,7 @@
     --card-overlay: 240 10% 3.9%;            /* Card background */
     --card-glass: hsla(263, 15%, 10%, 0.6);  /* Glass card background with transparency */
     --card-glass-border: hsla(263, 35%, 60%, 0.18); /* Glass card border - lighter and more subtle */
-    --nav-link-hover: 267 90% 70%;           /* Navigation hover */
+    --nav-link-hover: 263 85% 60%;           /* Navigation hover (was primary) */
     --nav-glass: hsla(263, 20%, 8%, 0.6);    /* Navigation glass background with transparency */
     --search-bg: 240 6% 10%;                 /* Search input background */
     --search-glass: hsla(263, 15%, 12%, 0.6); /* Glass search background with transparency */
