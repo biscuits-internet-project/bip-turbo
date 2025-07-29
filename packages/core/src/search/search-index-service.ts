@@ -7,6 +7,7 @@ export interface SearchQuery {
   entityTypes?: string[];
   limit?: number;
   threshold?: number;
+  useModel?: 'small' | 'large';
 }
 
 export interface SearchResultWithScore extends SearchResult {
@@ -46,12 +47,13 @@ export class SearchIndexService {
    * Perform semantic search
    */
   async search(searchQuery: SearchQuery): Promise<SearchResultWithScore[]> {
-    const { query, entityTypes, limit = 20, threshold = 0.3 } = searchQuery;
+    const { query, entityTypes, limit = 20, threshold = 0.3, useModel = 'small' } = searchQuery;
 
-    this.logger.info(`Performing search for query: "${query}"`);
+    this.logger.info(`Performing search for query: "${query}" using ${useModel} model`);
 
     try {
-      // Generate embedding for the search query
+      // Generate embedding for the search query using the appropriate model
+      // Note: We need to ensure the embedding service uses the same model as requested
       const { embedding } = await this.embeddingService.generateEmbedding(query);
 
       // Perform vector similarity search
@@ -59,6 +61,7 @@ export class SearchIndexService {
         entityTypes,
         limit,
         threshold,
+        useModel,
       });
 
       // Convert similarity to a 0-100 score for better UX
@@ -79,10 +82,15 @@ export class SearchIndexService {
   /**
    * Index a single entity
    */
-  async indexEntity(entityType: string, entityId: string, entity: any): Promise<void> {
+  async indexEntity(entity: any, entityType: string): Promise<void> {
     const formatter = this.contentFormatters.get(entityType);
     if (!formatter) {
       throw new Error(`No content formatter registered for entity type: ${entityType}`);
+    }
+
+    const entityId = entity.id;
+    if (!entityId) {
+      throw new Error(`Entity must have an id field for indexing`);
     }
 
     try {
@@ -90,19 +98,21 @@ export class SearchIndexService {
       const displayText = formatter.generateDisplayText(entity);
       const content = formatter.generateContent(entity);
 
-      // Generate embedding for the content
+      // Generate embedding for the content (using small model by default)
       const { embedding } = await this.embeddingService.generateEmbedding(content);
 
       // Delete existing index entry if it exists
       await this.repository.deleteByEntity(entityType, entityId);
 
-      // Create new index entry
+      // Create new index entry with small embedding
       await this.repository.create({
         entityType,
         entityId,
         displayText,
         content,
-        embedding,
+        embeddingSmall: embedding,
+        embeddingLarge: undefined, // Can be added later if needed
+        modelUsed: 'text-embedding-3-small',
       });
 
       this.logger.info(`Successfully indexed ${entityType} ${entityId}`);
@@ -115,7 +125,7 @@ export class SearchIndexService {
   /**
    * Index multiple entities of the same type in batch
    */
-  async indexEntities(entityType: string, entities: Array<{ id: string; data: any }>): Promise<void> {
+  async indexEntities(entityType: string, entities: any[]): Promise<void> {
     const formatter = this.contentFormatters.get(entityType);
     if (!formatter) {
       throw new Error(`No content formatter registered for entity type: ${entityType}`);
@@ -129,24 +139,26 @@ export class SearchIndexService {
 
     try {
       // Generate content for all entities
-      const contents = entities.map(({ data }) => formatter.generateContent(data));
-      const displayTexts = entities.map(({ data }) => formatter.generateDisplayText(data));
+      const contents = entities.map(entity => formatter.generateContent(entity));
+      const displayTexts = entities.map(entity => formatter.generateDisplayText(entity));
 
       // Generate embeddings in batch
       const embeddingResults = await this.embeddingService.generateEmbeddingsInBatches(contents);
 
       // Prepare data for batch insert
-      const indexData = entities.map(({ id }, index) => ({
+      const indexData = entities.map((entity, index) => ({
         entityType,
-        entityId: id,
+        entityId: entity.id,
         displayText: displayTexts[index],
         content: contents[index],
-        embedding: embeddingResults[index].embedding,
+        embeddingSmall: embeddingResults[index].embedding,
+        embeddingLarge: undefined, // Can be added later if needed
+        modelUsed: 'text-embedding-3-small',
       }));
 
       // Delete existing entries for these entities
       await Promise.all(
-        entities.map(({ id }) => this.repository.deleteByEntity(entityType, id))
+        entities.map(entity => this.repository.deleteByEntity(entityType, entity.id))
       );
 
       // Create new entries in batch
@@ -162,10 +174,10 @@ export class SearchIndexService {
   /**
    * Update an existing index entry
    */
-  async updateEntity(entityType: string, entityId: string, entity: any): Promise<void> {
+  async updateEntity(entity: any, entityType: string): Promise<void> {
     // For now, we'll just re-index the entity
     // In the future, we could optimize this to only update if content changed
-    await this.indexEntity(entityType, entityId, entity);
+    await this.indexEntity(entity, entityType);
   }
 
   /**
@@ -206,7 +218,7 @@ export class SearchIndexService {
   /**
    * Rebuild the entire search index for a specific entity type
    */
-  async rebuildIndex(entityType: string, entities: Array<{ id: string; data: any }>): Promise<void> {
+  async rebuildIndex(entityType: string, entities: any[]): Promise<void> {
     this.logger.info(`Starting index rebuild for ${entityType}`);
 
     try {

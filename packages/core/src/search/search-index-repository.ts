@@ -6,7 +6,9 @@ export interface SearchIndexData {
 	entityId: string;
 	displayText: string;
 	content: string;
-	embedding: number[];
+	embeddingSmall: number[];
+	embeddingLarge?: number[];
+	modelUsed: string;
 }
 
 export interface SearchResult {
@@ -24,46 +26,67 @@ export interface SearchOptions {
 	entityTypes?: string[];
 	limit?: number;
 	threshold?: number; // Minimum similarity score (0-1)
+	useModel?: 'small' | 'large'; // Which embedding model to use for search
 }
 
 export class SearchIndexRepository {
 	constructor(private readonly db: DbClient) {}
 
 	/**
-	 * Create a new search index entry
+	 * Create a new search index entry using raw SQL
 	 */
 	async create(data: SearchIndexData): Promise<void> {
-		await (this.db as any).searchIndex.create({
-			data: {
-				entityType: data.entityType,
-				entityId: data.entityId,
-				displayText: data.displayText,
-				content: data.content,
-				embedding: data.embedding as any, // Type assertion for Prisma
-			},
-		});
+		await this.db.$executeRaw`
+			INSERT INTO search_indexes (entity_type, entity_id, display_text, content, embedding_small, embedding_large, model_used)
+			VALUES (
+				${data.entityType}, 
+				${data.entityId}::uuid, 
+				${data.displayText}, 
+				${data.content}, 
+				${JSON.stringify(data.embeddingSmall)}::vector(1536),
+				${data.embeddingLarge ? JSON.stringify(data.embeddingLarge) : null}::vector(3072),
+				${data.modelUsed}
+			)
+		`;
 	}
 
 	/**
-	 * Create multiple search index entries in a batch
+	 * Create multiple search index entries in a batch using raw SQL
 	 */
 	async createMany(dataArray: SearchIndexData[]): Promise<void> {
 		if (dataArray.length === 0) return;
 
-		// Use a transaction for batch inserts
-		await this.db.$transaction(
-			dataArray.map((data) =>
-				(this.db as any).searchIndex.create({
-					data: {
-						entityType: data.entityType,
-						entityId: data.entityId,
-						displayText: data.displayText,
-						content: data.content,
-						embedding: data.embedding as any,
-					},
-				}),
-			),
-		);
+		// Build bulk insert SQL with VALUES clause
+		const values = dataArray.map((data, index) => {
+			const paramBase = index * 7; // 7 parameters per record
+			return `(
+				$${paramBase + 1}, 
+				$${paramBase + 2}::uuid, 
+				$${paramBase + 3}, 
+				$${paramBase + 4}, 
+				$${paramBase + 5}::vector(1536),
+				$${paramBase + 6}::vector(3072),
+				$${paramBase + 7}
+			)`;
+		}).join(', ');
+
+		// Flatten all parameters
+		const params = dataArray.flatMap(data => [
+			data.entityType,
+			data.entityId,
+			data.displayText,
+			data.content,
+			JSON.stringify(data.embeddingSmall),
+			data.embeddingLarge ? JSON.stringify(data.embeddingLarge) : null,
+			data.modelUsed
+		]);
+
+		const query = `
+			INSERT INTO search_indexes (entity_type, entity_id, display_text, content, embedding_small, embedding_large, model_used)
+			VALUES ${values}
+		`;
+
+		await this.db.$executeRawUnsafe(query, ...params);
 	}
 
 	/**
@@ -75,7 +98,9 @@ export class SearchIndexRepository {
 		if (data.displayText !== undefined)
 			updateData.displayText = data.displayText;
 		if (data.content !== undefined) updateData.content = data.content;
-		if (data.embedding !== undefined) updateData.embedding = data.embedding;
+		if (data.embeddingSmall !== undefined) updateData.embeddingSmall = data.embeddingSmall;
+		if (data.embeddingLarge !== undefined) updateData.embeddingLarge = data.embeddingLarge;
+		if (data.modelUsed !== undefined) updateData.modelUsed = data.modelUsed;
 
 		await this.db.searchIndex.update({
 			where: { id },
@@ -99,9 +124,16 @@ export class SearchIndexRepository {
 	 * Delete all search index entries for an entity type
 	 */
 	async deleteByEntityType(entityType: string): Promise<void> {
-		await this.db.searchIndex.deleteMany({
-			where: { entityType },
-		});
+		await this.db.$executeRaw`
+			DELETE FROM search_indexes WHERE entity_type = ${entityType}
+		`;
+	}
+
+	/**
+	 * Delete all search index entries
+	 */
+	async deleteAll(): Promise<void> {
+		await this.db.$executeRaw`TRUNCATE TABLE search_indexes`;
 	}
 
 	/**
@@ -111,7 +143,10 @@ export class SearchIndexRepository {
 		queryEmbedding: number[],
 		options: SearchOptions = {},
 	): Promise<SearchResult[]> {
-		const { entityTypes, limit = 20, threshold = 0.0 } = options;
+		const { entityTypes, limit = 20, threshold = 0.0, useModel = 'small' } = options;
+
+		// Choose embedding field based on model
+		const embeddingField = useModel === 'large' ? 'embedding_large' : 'embedding_small';
 
 		// Build the query dynamically based on filters
 		const whereConditions = [];
@@ -125,9 +160,14 @@ export class SearchIndexRepository {
 
 		if (threshold > 0) {
 			whereConditions.push(
-				`1 - (embedding <=> $1::vector) >= $${++paramIndex}`,
+				`1 - (${embeddingField} <=> $1::vector) >= $${++paramIndex}`,
 			);
 			queryParams.push(threshold);
+		}
+
+		// Only search records that have the requested embedding type
+		if (useModel === 'large') {
+			whereConditions.push(`${embeddingField} IS NOT NULL`);
 		}
 
 		const whereClause =
@@ -144,12 +184,13 @@ export class SearchIndexRepository {
         entity_id as "entityId", 
         display_text as "displayText",
         content,
+        model_used as "modelUsed",
         created_at as "createdAt",
         updated_at as "updatedAt",
-        1 - (embedding <=> $1::vector) as similarity
+        1 - (${embeddingField} <=> $1::vector) as similarity
       FROM search_indexes
       ${whereClause}
-      ORDER BY embedding <=> $1::vector
+      ORDER BY ${embeddingField} <=> $1::vector
       LIMIT $${++paramIndex}
     `;
 
@@ -221,6 +262,22 @@ export class SearchIndexRepository {
 	 */
 	async getTotalCount(): Promise<number> {
 		return await this.db.searchIndex.count();
+	}
+
+	/**
+	 * Get indexing statistics by entity type
+	 */
+	async getStats(): Promise<Record<string, number>> {
+		const results = await this.db.$queryRaw<Array<{entity_type: string, count: bigint}>>`
+			SELECT entity_type, COUNT(*) as count 
+			FROM search_indexes 
+			GROUP BY entity_type
+		`;
+		
+		return results.reduce((acc, row) => {
+			acc[row.entity_type] = Number(row.count);
+			return acc;
+		}, {} as Record<string, number>);
 	}
 
 	/**

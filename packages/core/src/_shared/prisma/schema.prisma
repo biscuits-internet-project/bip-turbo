@@ -549,14 +549,16 @@ model BlogPostToFile {
 }
 
 model SearchIndex {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  entityType  String   @map("entity_type") @db.VarChar
-  entityId    String   @map("entity_id") @db.Uuid
-  displayText String   @map("display_text")
-  content     String
-  embedding   Unsupported("vector(3072)")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType       String   @map("entity_type") @db.VarChar
+  entityId         String   @map("entity_id") @db.Uuid
+  displayText      String   @map("display_text")
+  content          String
+  embeddingSmall   Unsupported("vector(1536)") @map("embedding_small")
+  embeddingLarge   Unsupported("vector(3072)")?  @map("embedding_large")
+  modelUsed        String   @default("text-embedding-3-small") @map("model_used") @db.VarChar
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   @@index([entityType])
   @@map("search_indexes")

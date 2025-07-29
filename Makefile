@@ -61,3 +61,19 @@ db-introspect:
 
 db-studio:
 	cd packages/core && bun prisma:studio
+
+# Vector search indexing
+index-songs:
+	bun run index:songs
+
+index-shows:
+	bun run index:shows
+
+index-venues:
+	bun run index:venues
+
+index-tracks:
+	bun run index:tracks
+
+index-all:
+	bun run index:all

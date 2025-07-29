@@ -8,8 +8,8 @@ export interface EmbeddingResult {
 
 export class EmbeddingService {
   private openai: OpenAI;
-  private readonly model = "text-embedding-3-large";
-  private readonly dimensions = 3072;
+  private readonly model = "text-embedding-3-small";
+  private readonly dimensions = 1536;
 
   constructor(
     private readonly logger: Logger,
@@ -112,12 +112,12 @@ export class EmbeddingService {
 
   /**
    * Estimate the cost of embedding generation
-   * text-embedding-3-large: $0.00013 per 1K tokens
+   * text-embedding-3-small: $0.00002 per 1K tokens
    */
   estimateCost(texts: string[]): { estimatedTokens: number; estimatedCostUSD: number } {
     // Rough estimation: ~4 characters per token
     const estimatedTokens = texts.reduce((sum, text) => sum + Math.ceil(text.length / 4), 0);
-    const estimatedCostUSD = (estimatedTokens / 1000) * 0.00013;
+    const estimatedCostUSD = (estimatedTokens / 1000) * 0.00002;
     
     return {
       estimatedTokens,

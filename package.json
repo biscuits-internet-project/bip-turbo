@@ -9,7 +9,12 @@
     "typecheck": "cd apps/web && bun react-router typegen && cd ../.. && bun tsc --noEmit",
     "typecheck:all": "bun run -F '*' typecheck",
     "migrate:users": "cd packages/core && bun run migrate:users",
-    "truncate:auth:users": "cd packages/core && bun run truncate:auth:users"
+    "truncate:auth:users": "cd packages/core && bun run truncate:auth:users",
+    "index:songs": "doppler run -- bun ./packages/core/src/search/scripts/index-songs.ts",
+    "index:shows": "doppler run -- bun ./packages/core/src/search/scripts/index-shows.ts",
+    "index:venues": "doppler run -- bun ./packages/core/src/search/scripts/index-venues.ts",
+    "index:tracks": "doppler run -- bun ./packages/core/src/search/scripts/index-tracks.ts",
+    "index:all": "doppler run -- bun ./packages/core/src/search/scripts/index-all.ts"
   },
   "workspaces": [
     "apps/*",

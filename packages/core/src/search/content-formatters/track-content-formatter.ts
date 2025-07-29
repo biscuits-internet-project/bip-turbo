@@ -4,76 +4,117 @@ export class TrackContentFormatter implements ContentFormatter {
   entityType = "track";
 
   generateDisplayText(track: any): string {
-    // TODO: Implement proper track display text generation
-    
-    // Placeholder implementation
     const songTitle = track.song?.title || "Unknown Song";
     const showDate = track.show?.date || "Unknown Date";
     const venue = track.show?.venue?.name || "Unknown Venue";
     
-    return `${songTitle} - ${showDate} at ${venue}`;
+    let displayText = `${songTitle} • ${showDate} • ${venue}`;
+    
+    if (track.averageRating && track.averageRating > 0) {
+      displayText += ` • ★ ${track.averageRating.toFixed(1)}`;
+    }
+    
+    if (track.allTimer) {
+      displayText += " • All-Timer";
+    }
+    
+    return displayText;
   }
 
   generateContent(track: any): string {
-    // TODO: Implement comprehensive track content generation
-    // This should include performance context, ratings, notes, segues, etc.
+    // Implementation following strategy: "[Song] performed on [Date] at [Venue]. [Segue context: song before > current > song after]. [Track notes]. Rating: [X]. [All-timer status]."
     
-    // Placeholder implementation - basic track information
-    let content = `Track: ${track.song?.title || "Unknown Song"}\n`;
+    let content = track.song?.title || "Unknown Song";
     
     if (track.show) {
-      content += `Show: ${track.show.date || "Unknown Date"}\n`;
+      content += ` performed on ${track.show.date || "Unknown Date"}`;
       
       if (track.show.venue) {
-        content += `Venue: ${track.show.venue.name || "Unknown Venue"}\n`;
+        content += ` at ${track.show.venue.name || "Unknown Venue"}`;
         if (track.show.venue.city && track.show.venue.state) {
-          content += `Location: ${track.show.venue.city}, ${track.show.venue.state}\n`;
+          content += `, ${track.show.venue.city}, ${track.show.venue.state}`;
         }
       }
     }
     
-    content += `Set: ${track.set || "Unknown"}\n`;
-    content += `Position: ${track.position || "Unknown"}\n`;
+    // Add segue context (song before > current > song after)
+    // Note: This would require additional data about previous/next tracks
+    // For now, we'll use the segue field to indicate the flow
+    const segueContext: string[] = [];
     
-    if (track.segue && track.segue !== "none") {
-      content += `Segue: ${track.segue}\n`;
+    if (track.previousTrackId || track.nextTrackId) {
+      // If we have track linking data, we could fetch the adjacent songs
+      // For now, we'll just note the segue information
+      if (track.segue && track.segue !== "none") {
+        segueContext.push(`segues into ${track.segue}`);
+      }
+    } else if (track.segue && track.segue !== "none") {
+      segueContext.push(`segues into next song`);
     }
     
+    // Add set and position context
+    if (track.set) {
+      segueContext.push(`${track.set} set`);
+    }
+    
+    if (track.position) {
+      segueContext.push(`position ${track.position}`);
+    }
+    
+    if (segueContext.length > 0) {
+      content += `. Context: ${segueContext.join(", ")}`;
+    }
+    
+    // Add track notes
     if (track.note) {
-      content += `Notes: ${track.note}\n`;
+      content += `. ${track.note}`;
     }
     
-    if (track.averageRating) {
-      content += `Rating: ${track.averageRating}/5\n`;
+    // Add rating
+    if (track.averageRating && track.averageRating > 0) {
+      content += `. Rating: ${track.averageRating.toFixed(1)}`;
     }
     
+    // Add all-timer status
     if (track.allTimer) {
-      content += "Status: All-Timer Performance\n";
+      content += ". All-timer performance";
     }
     
     // Add song context
     if (track.song) {
+      const songDetails: string[] = [];
+      
       if (track.song.author?.name) {
-        content += `Songwriter: ${track.song.author.name}\n`;
+        songDetails.push(`by ${track.song.author.name}`);
       }
       
       if (track.song.cover) {
-        content += "Type: Cover Song\n";
+        songDetails.push("cover song");
       }
       
       if (track.song.timesPlayed) {
-        content += `Song Play Count: ${track.song.timesPlayed}\n`;
+        songDetails.push(`played ${track.song.timesPlayed} times total`);
+      }
+      
+      if (songDetails.length > 0) {
+        content += `. Song details: ${songDetails.join(", ")}`;
       }
     }
     
     // Add show context
     if (track.show) {
-      if (track.show.averageRating) {
-        content += `Show Rating: ${track.show.averageRating}/5\n`;
+      const showDetails: string[] = [];
+      
+      if (track.show.averageRating && track.show.averageRating > 0) {
+        showDetails.push(`show rated ${track.show.averageRating.toFixed(1)}`);
       }
       
       if (track.show.notes) {
-        content += `Show Notes: ${track.show.notes}\n`;
+        showDetails.push(`show notes: ${track.show.notes}`);
+      }
+      
+      if (showDetails.length > 0) {
+        content += `. Show context: ${showDetails.join(", ")}`;
       }
     }
     

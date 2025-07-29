@@ -7,6 +7,7 @@ export const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string(),
   SUPABASE_STORAGE_URL: z.string().url(),
+  OPENAI_API_KEY: z.string(),
 });
 
 export const env = envSchema.parse(process.env);
