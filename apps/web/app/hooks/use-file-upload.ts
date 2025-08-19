@@ -1,60 +1,28 @@
 import { useState } from "react";
-import { useSupabaseContext } from "~/context/supabase-provider";
-
-const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
-const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"] as const;
-
-type AllowedFileType = (typeof ALLOWED_FILE_TYPES)[number];
-
-const FILE_TYPE_NAMES: Record<AllowedFileType, string> = {
-  "image/jpeg": "JPEG",
-  "image/png": "PNG",
-  "image/gif": "GIF",
-  "image/webp": "WebP",
-  "image/svg+xml": "SVG",
-};
+import {
+  type FileCategory,
+  type AllowedImageType,
+  FILE_SIZE_LIMITS,
+  ALLOWED_IMAGE_TYPES,
+  FILE_TYPE_NAMES,
+  validateFileUpload,
+} from "@bip/domain";
 
 interface UploadOptions {
-  bucket: string;
-  folder: string;
+  category: FileCategory;
   maxSize?: number;
-  allowedTypes?: AllowedFileType[];
+  allowedTypes?: AllowedImageType[];
 }
 
 interface UploadResult {
-  path: string;
+  id: string;
+  filename: string;
   url: string;
-}
-
-interface ValidationError {
-  code: "FILE_TOO_LARGE" | "INVALID_FILE_TYPE";
-  message: string;
-}
-
-function validateFile(file: File, options: UploadOptions): ValidationError | null {
-  const maxSize = options.maxSize || MAX_FILE_SIZE;
-  const allowedTypes = options.allowedTypes || ALLOWED_FILE_TYPES;
-
-  if (file.size > maxSize) {
-    return {
-      code: "FILE_TOO_LARGE",
-      message: `File size must be less than ${Math.round(maxSize / 1024)}KB`,
-    };
-  }
-
-  if (!allowedTypes.includes(file.type as AllowedFileType)) {
-    const friendlyTypes = allowedTypes.map((type) => FILE_TYPE_NAMES[type]).join(", ");
-    return {
-      code: "INVALID_FILE_TYPE",
-      message: `Only ${friendlyTypes} images are allowed`,
-    };
-  }
-
-  return null;
+  size: number;
+  type: string;
 }
 
 export function useFileUpload() {
-  const { client, isLoaded, supabaseStorageUrl } = useSupabaseContext();
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,16 +30,10 @@ export function useFileUpload() {
     // Clear any previous errors
     setError(null);
 
-    console.log("Starting file upload with options:", { options, supabaseStorageUrl });
-
-    if (!isLoaded || !client) {
-      console.error("Upload service not ready:", { isLoaded, hasClient: !!client });
-      setError("Upload service is initializing. Please try again in a moment.");
-      return null;
-    }
+    console.log("Starting file upload with options:", { options });
 
     // Validate file before attempting upload
-    const validationError = validateFile(file, options);
+    const validationError = validateFileUpload(file, options.category);
     if (validationError) {
       console.error("File validation error:", validationError);
       setError(validationError.message);
@@ -81,40 +43,32 @@ export function useFileUpload() {
     try {
       setIsUploading(true);
 
-      const bucket = options.bucket;
-      const folder = options.folder;
+      // Create FormData for the upload
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("category", options.category);
 
-      // Generate a unique file path
-      const timestamp = new Date().getTime();
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
-      const path = `${folder}/${timestamp}-${sanitizedFileName}`;
-
-      console.log("Uploading file:", { bucket, path });
-
-      // Upload the file to Supabase Storage
-      const { data, error: uploadError } = await client.storage.from(bucket).upload(path, file, {
-        cacheControl: "3600",
-        upsert: false,
+      console.log("Uploading file via API:", { 
+        filename: file.name, 
+        category: options.category,
+        size: file.size 
       });
 
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        throw new Error(uploadError.message);
+      // Upload to our R2 API
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Upload failed" }));
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
       }
 
-      console.log("File uploaded successfully:", { data });
+      const result = await response.json();
+      console.log("File uploaded successfully:", result);
 
-      // Get the public URL - make sure we're using the correct bucket
-      const {
-        data: { publicUrl },
-      } = client.storage.from(bucket).getPublicUrl(path);
-
-      console.log("Generated public URL:", { publicUrl, bucket });
-
-      return {
-        path,
-        url: publicUrl,
-      };
+      return result.file;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to upload file";
       console.error("Upload failed:", err);
@@ -129,10 +83,10 @@ export function useFileUpload() {
     upload,
     isUploading,
     error,
-    isReady: isLoaded && !!client,
-    maxFileSize: MAX_FILE_SIZE,
-    allowedFileTypes: ALLOWED_FILE_TYPES,
+    isReady: true, // Always ready for R2 uploads
+    allowedFileTypes: ALLOWED_IMAGE_TYPES,
     fileTypeNames: FILE_TYPE_NAMES,
-    acceptedFormats: "image/jpeg, image/png, image/gif, image/webp, image/svg+xml",
+    categoryMaxSizes: FILE_SIZE_LIMITS.INPUT,
+    acceptedFormats: ALLOWED_IMAGE_TYPES.join(", "),
   };
 }

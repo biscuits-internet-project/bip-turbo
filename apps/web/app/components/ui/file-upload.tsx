@@ -3,17 +3,17 @@ import { useFileUpload } from "~/hooks/use-file-upload";
 import { cn } from "~/lib/utils";
 import { Button } from "./button";
 import { Icons } from "./icons";
+import type { FileCategory } from "@bip/domain";
 
 interface FileUploadProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onUpload?: (file: File) => Promise<void>;
-  onUploadComplete?: (result: { path: string; url: string }) => void;
+  onUploadComplete?: (result: { id: string; filename: string; url: string; size: number; type: string }) => void;
   isUploading?: boolean;
   error?: string | null;
   maxSize?: number;
   helperText?: string;
   className?: string;
-  bucket: string;
-  folder: string;
+  category: FileCategory;
 }
 
 export function FileUpload({
@@ -21,18 +21,19 @@ export function FileUpload({
   onUploadComplete,
   isUploading: externalIsUploading,
   error: externalError,
-  maxSize = 1024 * 1024, // 1MB
+  maxSize,
   helperText,
   className,
   accept,
-  bucket,
-  folder,
+  category,
   ...props
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const { upload, isUploading, error } = useFileUpload();
+  const { upload, isUploading, error, categoryMaxSizes } = useFileUpload();
+  
+  const categoryMaxSize = maxSize || categoryMaxSizes[category];
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
@@ -40,12 +41,10 @@ export function FileUpload({
       await onUpload(file);
     }
 
-    // Handle Supabase upload if bucket is provided
-    if (bucket) {
-      const result = await upload(file, { bucket, folder });
-      if (result && onUploadComplete) {
-        onUploadComplete(result);
-      }
+    // Handle R2 upload
+    const result = await upload(file, { category });
+    if (result && onUploadComplete) {
+      onUploadComplete(result);
     }
   };
 

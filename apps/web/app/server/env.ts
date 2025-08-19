@@ -12,6 +12,11 @@ export const envSchema = z.object({
   CONTACT_EMAIL: z.string().email(),
   HONEYBADGER_API_KEY: z.string(),
   APP_ENV: z.enum(["development", "staging", "production"]),
+  R2_ACCOUNT_ID: z.string(),
+  R2_ACCESS_KEY_ID: z.string(),
+  R2_SECRET_ACCESS_KEY: z.string(),
+  R2_BUCKET_NAME: z.string(),
+  R2_PUBLIC_URL: z.string().url(),
 });
 
 export const env = envSchema.parse(process.env);

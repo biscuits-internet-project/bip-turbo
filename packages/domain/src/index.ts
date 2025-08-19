@@ -14,3 +14,4 @@ export * from "./models/attendance";
 export * from "./views/song-page";
 export * from "./views/blog-post";
 export * from "./models/file";
+export * from "./models/file-upload";

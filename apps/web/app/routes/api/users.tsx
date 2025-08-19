@@ -6,6 +6,8 @@ import honeybadger from "~/lib/honeybadger";
 
 const updateUserSchema = z.object({
   username: z.string().min(3).max(50).optional(),
+  avatarUrl: z.string().url().optional().or(z.literal("")),
+  avatarFileId: z.string().optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -71,18 +73,28 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
-    // Sync username back to Supabase user metadata if it was updated
+    // Sync user data back to Supabase user metadata if updated
+    const metadataUpdates: Record<string, any> = {};
+    
     if (validatedData.username && validatedData.username !== user.user_metadata?.username) {
+      metadataUpdates.username = validatedData.username;
+    }
+    
+    if (validatedData.avatarUrl !== undefined && validatedData.avatarUrl !== user.user_metadata?.avatar_url) {
+      metadataUpdates.avatar_url = validatedData.avatarUrl || null;
+    }
+    
+    if (Object.keys(metadataUpdates).length > 0) {
       try {
         await supabase.auth.updateUser({
           data: {
             ...user.user_metadata,
-            username: validatedData.username,
+            ...metadataUpdates,
           },
         });
       } catch (error) {
         honeybadger.notify(error);
-        console.error("Failed to sync username to Supabase:", error);
+        console.error("Failed to sync user metadata to Supabase:", error);
         // Don't fail the request if Supabase sync fails
       }
     }

@@ -102,6 +102,7 @@ export default [
     route("search", "routes/api/search.tsx"),
     route("users", "routes/api/users.tsx"),
     route("contact", "routes/api/contact.tsx"),
+    route("upload", "routes/api/upload.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
   ]),
 
