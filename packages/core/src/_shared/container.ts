@@ -3,6 +3,7 @@ import type { RedisClientType } from "redis";
 import { AttendanceRepository } from "../attendances/attendance-repository";
 import { BlogPostRepository } from "../blog-posts/blog-post-repository";
 import { FileRepository } from "../files/file-repository";
+import { R2Service, type R2Config } from "../files/r2-service";
 import { RatingRepository } from "../ratings/rating-repository";
 import { ReviewRepository } from "../reviews/review-repository";
 import { SearchIndexRepository } from "../search/search-index-repository";
@@ -20,6 +21,7 @@ import { RedisService } from "./redis";
 export interface ServiceContainer {
   db: DbClient;
   redis: RedisService;
+  r2Service: R2Service;
   logger: Logger;
   searchIndexer: SearchIndexer;
   repositories: {
@@ -42,14 +44,16 @@ export interface ContainerArgs {
   db?: DbClient;
   logger: Logger;
   env: Env;
+  r2Config: R2Config;
   redis?: RedisClientType;
 }
 
 export function createContainer(args: ContainerArgs): ServiceContainer {
-  const { db, env, logger } = args;
+  const { db, env, logger, r2Config } = args;
 
   if (!db) throw new Error("Database connection required for container initialization");
   if (!env) throw new Error("Environment required for container initialization");
+  if (!r2Config) throw new Error("R2 configuration required for container initialization");
 
   // Create search index repository first
   const searchIndexRepository = new SearchIndexRepository(db);
@@ -71,6 +75,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
   };
 
   const redis = new RedisService(env.REDIS_URL);
+  const r2Service = new R2Service(r2Config, logger);
 
   // Create SearchIndexer - will be initialized with SearchIndexService later
   const searchIndexer = new SearchIndexer();
@@ -78,6 +83,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
   return {
     db,
     redis,
+    r2Service,
     logger,
     searchIndexer,
     repositories,

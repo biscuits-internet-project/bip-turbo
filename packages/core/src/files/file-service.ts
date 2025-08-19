@@ -1,5 +1,6 @@
-import type { File, Logger } from "@bip/domain";
+import type { File, Logger, FileCategory } from "@bip/domain";
 import type { FileRepository } from "./file-repository";
+import type { R2Service } from "./r2-service";
 
 interface FileCreateInput {
   path: string;
@@ -17,9 +18,22 @@ interface BlogPostFile {
   isCover?: boolean;
 }
 
+interface FileUploadInput {
+  buffer: Buffer;
+  filename: string;
+  contentType: string;
+  category: FileCategory;
+  userId: string;
+}
+
+interface FileUploadResult extends File {
+  url: string;
+}
+
 export class FileService {
   constructor(
     protected readonly repository: FileRepository,
+    protected readonly r2Service: R2Service,
     protected readonly logger: Logger,
   ) {}
 
@@ -58,5 +72,36 @@ export class FileService {
       });
     }
     console.log("File service: completed file associations");
+  }
+
+  async uploadFile(input: FileUploadInput): Promise<FileUploadResult> {
+    this.logger.info({
+      filename: input.filename, 
+      category: input.category,
+      userId: input.userId 
+    }, "Starting file upload");
+
+    // Upload to R2
+    const uploadResult = await this.r2Service.uploadFile(input);
+
+    // Create database record
+    const file = await this.repository.create({
+      path: uploadResult.path,
+      filename: input.filename,
+      type: input.contentType,
+      size: uploadResult.size,
+      userId: input.userId,
+    });
+
+    this.logger.info({ 
+      fileId: file.id, 
+      path: uploadResult.path,
+      url: uploadResult.url 
+    }, "File upload completed");
+
+    return {
+      ...file,
+      url: uploadResult.url,
+    };
   }
 }

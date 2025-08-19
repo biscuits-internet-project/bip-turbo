@@ -27,12 +27,14 @@
     "migrate:users": "doppler run -- bun run scripts/migrate-users-to-supabase.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.864.0",
     "@bip/domain": "workspace:*",
     "@prisma/client": "^6.12.0",
     "@supabase/supabase-js": "^2.52.1",
     "dotenv": "^17.2.1",
     "postgres": "^3.4.7",
     "redis": "^5.6.1",
+    "sharp": "^0.34.3",
     "zod": "^4.0.9"
   },
   "devDependencies": {

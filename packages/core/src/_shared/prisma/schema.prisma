@@ -466,6 +466,8 @@ model User {
   confirmationSentAt  DateTime?    @map("confirmation_sent_at") @db.Timestamp(6)
   passwordDigest      String       @map("password_digest") @db.VarChar
   username            String?      @unique(map: "users_username_unique") @db.VarChar
+  avatarUrl           String?      @map("avatar_url") @db.VarChar
+  avatarFileId        String?      @unique @map("avatar_file_id") @db.Uuid
   attendances         Attendance[]
   blogPosts           BlogPost[]
   comments            Comment[]
@@ -476,6 +478,7 @@ model User {
   showPhotos          ShowPhoto[]
   files               File[]
   userRoles           UserRole[]
+  avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@map("users")
 }
@@ -533,6 +536,7 @@ model File {
   updatedAt DateTime         @map("updated_at") @db.Timestamp(6)
   user      User             @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_files_users_user_id")
   blogPosts BlogPostToFile[]
+  avatarUser User?           @relation("UserAvatar")
 
   @@index([userId])
   @@map("files")

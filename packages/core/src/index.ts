@@ -15,6 +15,9 @@ export * from "./users/user-service";
 export * from "./users/user-repository";
 export * from "./venues/venue-service";
 export * from "./venues/venue-service";
+export * from "./files/file-service";
+export * from "./files/file-repository";
+export * from "./files/r2-service";
 
 // Shared exports
 export * from "./_shared/redis";

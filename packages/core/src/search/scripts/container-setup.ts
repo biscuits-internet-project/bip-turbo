@@ -25,11 +25,20 @@ const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
 };
 
+// Dummy R2 config for search scripts (not used)
+const r2Config = {
+  accountId: "dummy",
+  accessKeyId: "dummy",
+  secretAccessKey: "dummy",
+  bucketName: "dummy",
+  publicUrl: "https://dummy.com",
+};
+
 // Create database connection
 const db = new PrismaClient();
 
 // Create the main container
-const mainContainer = createContainer({ db, logger, env });
+const mainContainer = createContainer({ db, logger, env, r2Config });
 
 // Create search services
 const embeddingService = new EmbeddingService(logger, env.OPENAI_API_KEY);

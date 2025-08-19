@@ -64,7 +64,7 @@ export function createServices(container: ServiceContainer): Services {
     attendances: new AttendanceService(container.repositories.attendances, container.logger),
     songPageComposer: new SongPageComposer(container.db, container.repositories.songs),
     tourDatesService: new TourDatesService(container.redis),
-    files: new FileService(container.repositories.files, container.logger),
+    files: new FileService(container.repositories.files, container.r2Service, container.logger),
     search: searchIndexService,
     embedding: embeddingService,
     redis: container.redis,
