@@ -10,7 +10,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8">
         <div className="flex justify-center space-x-6 md:order-2">
           <ContactDialog>
-            <button className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200 flex items-center gap-2">
+            <button type="button" className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200 flex items-center gap-2">
               <Mail className="h-4 w-4" />
               Contact
             </button>

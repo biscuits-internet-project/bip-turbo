@@ -46,7 +46,7 @@ export default defineConfig({
       configureServer(server) {
         // Increase Node.js server header size limit
         const originalListen = server.listen.bind(server);
-        server.listen = function(...args) {
+        server.listen = (...args) => {
           if (server.httpServer) {
             (server.httpServer as any).maxHeaderSize = 32768;
           }

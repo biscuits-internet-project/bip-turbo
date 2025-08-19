@@ -50,7 +50,7 @@ export function ConcertLights() {
 
     let time = 0;
     let lightBeams: LightBeam[] = [];
-    let particles: Particle[] = [];
+    const particles: Particle[] = [];
 
     // Initialize lighting rig
     const initLights = () => {

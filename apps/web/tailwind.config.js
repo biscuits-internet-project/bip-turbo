@@ -2,6 +2,7 @@
 export default {
   content: ["./app/**/*.{js,jsx,ts,tsx}"],
   theme: {
+    extend: {
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -74,4 +75,4 @@ export default {
       },
     },
   },
-}
+};

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import * as React from "react";
+import type * as React from "react";
 
 interface GlobalSearchContextType {
   isOpen: boolean;
