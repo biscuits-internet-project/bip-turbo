@@ -48,7 +48,7 @@ export default defineConfig({
         const originalListen = server.listen.bind(server);
         server.listen = function(...args) {
           if (server.httpServer) {
-            server.httpServer.maxHeaderSize = 32768;
+            (server.httpServer as any).maxHeaderSize = 32768;
           }
           return originalListen(...args);
         };

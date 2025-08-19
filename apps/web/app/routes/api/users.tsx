@@ -57,7 +57,7 @@ export async function action({ request }: ActionFunctionArgs) {
           },
         });
       } catch (error) {
-        honeybadger.notify(error);
+        honeybadger.notify(error as Error);
         console.error("Failed to initialize username in Supabase:", error);
       }
     }
@@ -81,7 +81,7 @@ export async function action({ request }: ActionFunctionArgs) {
           },
         });
       } catch (error) {
-        honeybadger.notify(error);
+        honeybadger.notify(error as Error);
         console.error("Failed to sync username to Supabase:", error);
         // Don't fail the request if Supabase sync fails
       }
@@ -92,7 +92,7 @@ export async function action({ request }: ActionFunctionArgs) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    honeybadger.notify(error);
+    honeybadger.notify(error as Error);
     console.error("Error updating user:", error);
     return new Response(JSON.stringify({ error: "Invalid request data" }), {
       status: 400,

@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useState } from "react";
-import { redirect, useNavigate, useRouteLoaderData } from "react-router-dom";
 import type { LoaderFunctionArgs } from "react-router-dom";
+import { redirect, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { LoginForm } from "~/components/login-form";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
@@ -74,7 +74,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <div className="flex min-h-svh w-full items-start justify-center mt-30 p-6 md:p-10">
       <div className="w-full max-w-sm">
         <LoginForm onSubmit={doEmailLogin} onGoogleClick={doGoogleAuth} />
         {error && <p className="mt-4 text-sm text-red-500">{error}</p>}

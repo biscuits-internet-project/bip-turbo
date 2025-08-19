@@ -43,7 +43,7 @@ export default function handleRequest(
         pipe(body);
       },
       onShellError(error: unknown) {
-        honeybadger.notify(error);
+        honeybadger.notify(error as Error);
         reject(error);
       },
       onError(error: unknown) {
@@ -53,7 +53,7 @@ export default function handleRequest(
         // errors encountered during initial shell rendering since they'll
         // reject and get logged in handleDocumentRequest.
         if (shellRendered) {
-          honeybadger.notify(error);
+          honeybadger.notify(error as Error);
           console.error(error);
         }
       },

@@ -24,7 +24,7 @@ interface LoaderData {
     totalAttendances: number;
     totalRatings: number;
   };
-  lastUpdated?: string;
+  lastUpdated?: string | null;
 }
 
 export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
@@ -61,7 +61,7 @@ export const loader = publicLoader<LoaderData>(async ({ request, context }) => {
   let lastUpdated: string | undefined;
   try {
     const redis = services.redis;
-    lastUpdated = await redis.get<string>("community-last-updated");
+    lastUpdated = await redis.get<string>("community-last-updated") || undefined;
   } catch (error) {
     console.error("Failed to get last updated timestamp:", error);
   }
@@ -292,7 +292,7 @@ export default function Community() {
       <div className="text-center">
         <h1 className="page-heading">BISCUITS COMMUNITY</h1>
         <p className="text-xl text-content-text-secondary mb-2">Community scores, badges, and leaderboards</p>
-        <p className="text-sm text-content-text-secondary mb-6">Last calculated {getTimeAgo(lastUpdated)}</p>
+        <p className="text-sm text-content-text-secondary mb-6">Last calculated {getTimeAgo(lastUpdated || undefined)}</p>
 
         {/* Community Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

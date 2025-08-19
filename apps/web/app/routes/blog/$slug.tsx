@@ -35,9 +35,9 @@ export const loader = publicLoader(async ({ params }) => {
 export function meta({ data }: { data: LoaderData }) {
   return getBlogMeta({
     title: data.blogPost.title,
-    blurb: data.blogPost.blurb,
+    blurb: data.blogPost.blurb || undefined,
     slug: data.blogPost.slug,
-    publishedAt: data.blogPost.publishedAt,
+    publishedAt: data.blogPost.publishedAt ? data.blogPost.publishedAt.toISOString() : undefined,
   });
 }
 
@@ -62,9 +62,9 @@ export default function BlogPostPage() {
         dangerouslySetInnerHTML={{
           __html: getBlogStructuredData({
             title: blogPost.title,
-            blurb: blogPost.blurb,
+            blurb: blogPost.blurb || undefined,
             slug: blogPost.slug,
-            publishedAt: blogPost.publishedAt,
+            publishedAt: blogPost.publishedAt ? blogPost.publishedAt.toISOString() : undefined,
           }),
         }}
       />

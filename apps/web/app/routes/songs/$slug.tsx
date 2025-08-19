@@ -267,10 +267,7 @@ function ReviewNote({ notes }: { notes: string }) {
 export function meta({ data }: { data: SongPageView }) {
   return getSongMeta({
     ...data.song,
-    name: data.song.title,
-    slug: data.song.slug,
     timesPlayed: data.song.timesPlayed,
-    debutDate: data.song.debutDate,
   });
 }
 
@@ -286,8 +283,6 @@ export default function SongPage() {
         dangerouslySetInnerHTML={{
           __html: getSongStructuredData({
             ...song,
-            name: song.title,
-            slug: song.slug,
             timesPlayed: song.timesPlayed,
           }),
         }}

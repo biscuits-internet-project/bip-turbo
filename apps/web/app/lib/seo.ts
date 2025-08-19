@@ -80,17 +80,14 @@ export function getShowMeta(setlist: Setlist) {
   const location = show.venue ? `${show.venue.city}, ${show.venue.state}` : "";
 
   const title = `${date} - ${venue} ${location ? `- ${location}` : ""} | ${SEO_CONFIG.siteName}`;
-  const description = `View setlist, reviews, and recordings from ${SEO_CONFIG.bandName} show at ${venue}${location ? ` in ${location}` : ""} on ${date}. ${setlist.sets?.length || 0} sets with ${setlist.songs?.length || 0} songs.`;
+  const description = `View setlist, reviews, and recordings from ${SEO_CONFIG.bandName} show at ${venue}${location ? ` in ${location}` : ""} on ${date}.`;
   const url = `${SEO_CONFIG.url}/shows/${show.slug}`;
 
-  // Generate keywords based on songs played
-  const songNames = setlist.songs?.map((song) => song.name) || [];
   const keywords = [
     ...SEO_CONFIG.keywords,
     venue,
     show.venue?.city || "",
     date,
-    ...songNames.slice(0, 10), // Include first 10 songs as keywords
   ].filter(Boolean);
 
   return [
@@ -168,14 +165,14 @@ export function getSongsMeta() {
 
 // Generate meta tags for a song detail page
 export function getSongMeta(song: Song & { timesPlayed?: number; debutDate?: string }) {
-  const title = `${song.name} by ${SEO_CONFIG.bandName} | ${SEO_CONFIG.siteName}`;
+  const title = `${song.title} by ${SEO_CONFIG.bandName} | ${SEO_CONFIG.siteName}`;
   const debutYear = song.debutDate ? new Date(song.debutDate).getFullYear() : "";
-  const description = `View performance history, lyrics, tabs, and statistics for "${song.name}" by ${SEO_CONFIG.bandName}.${song.timesPlayed ? ` Played ${song.timesPlayed} times` : ""}${debutYear ? ` since ${debutYear}` : ""}.`;
+  const description = `View performance history, lyrics, tabs, and statistics for "${song.title}" by ${SEO_CONFIG.bandName}.${song.timesPlayed ? ` Played ${song.timesPlayed} times` : ""}${debutYear ? ` since ${debutYear}` : ""}.`;
   const url = `${SEO_CONFIG.url}/songs/${song.slug}`;
 
   const keywords = [
     ...SEO_CONFIG.keywords,
-    song.name,
+    song.title,
     "lyrics",
     "tabs",
     "performance history",
@@ -358,14 +355,14 @@ export function getSongStructuredData(song: Song & { timesPlayed?: number }) {
   const songData = {
     "@context": "https://schema.org",
     "@type": "MusicRecording",
-    name: song.name,
+    name: song.title,
     byArtist: {
       "@type": "MusicGroup",
       name: SEO_CONFIG.bandName,
     },
     genre: ["Jam Band", "Electronic", "Rock"],
     url: `${SEO_CONFIG.url}/songs/${song.slug}`,
-    description: `${song.name} by ${SEO_CONFIG.bandName}${song.timesPlayed ? ` - Played ${song.timesPlayed} times` : ""}`,
+    description: `${song.title} by ${SEO_CONFIG.bandName}${song.timesPlayed ? ` - Played ${song.timesPlayed} times` : ""}`,
   };
 
   return JSON.stringify(songData);
