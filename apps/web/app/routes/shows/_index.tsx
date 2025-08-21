@@ -1,4 +1,4 @@
-import { CacheKeys, type Setlist } from "@bip/domain";
+import { CacheKeys, type Rating, type Setlist } from "@bip/domain";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,6 +17,7 @@ interface LoaderData {
   setlists: Setlist[];
   year: number;
   searchQuery?: string;
+  userRatings: Record<string, Rating>;
 }
 
 const years = Array.from({ length: 30 }, (_, i) => 2025 - i).reverse();
@@ -25,7 +26,8 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 // Minimum characters required to trigger search
 const MIN_SEARCH_CHARS = 4;
 
-export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
+export const loader = publicLoader(async ({ request, context }): Promise<LoaderData> => {
+  const { currentUser } = context;
   const url = new URL(request.url);
   const year = url.searchParams.get("year") || new Date().getFullYear();
   const yearInt = Number.parseInt(year as string);
@@ -47,7 +49,25 @@ export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
       setlists = await services.setlists.findManyByShowIds(showIds);
     }
 
-    return { setlists, year: yearInt, searchQuery };
+    // Fetch user ratings for search results too
+    let userRatings: Record<string, Rating> = {};
+    if (currentUser && setlists.length > 0) {
+      try {
+        const localUser = await services.users.findByEmail(currentUser.email);
+        if (localUser) {
+          const showIds = setlists.map(setlist => setlist.show.id);
+          const ratings = await services.ratings.findManyByUserIdAndRateableIds(localUser.id, showIds, "Show");
+          userRatings = ratings.reduce((acc, rating) => {
+            acc[rating.rateableId] = rating;
+            return acc;
+          }, {} as Record<string, Rating>);
+        }
+      } catch (error) {
+        console.warn("Failed to load user ratings for search:", error);
+      }
+    }
+
+    return { setlists, year: yearInt, searchQuery, userRatings };
   }
 
   // Cache year-based listings - these are stable and cacheable
@@ -73,7 +93,27 @@ export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
   );
 
   console.log(`🎯 Year ${yearInt} shows loaded: ${setlists.length} shows`);
-  return { setlists, year: yearInt };
+
+  // Fetch user ratings for all shows if user is logged in
+  let userRatings: Record<string, Rating> = {};
+  if (currentUser && setlists.length > 0) {
+    try {
+      const localUser = await services.users.findByEmail(currentUser.email);
+      if (localUser) {
+        const showIds = setlists.map(setlist => setlist.show.id);
+        const ratings = await services.ratings.findManyByUserIdAndRateableIds(localUser.id, showIds, "Show");
+        userRatings = ratings.reduce((acc, rating) => {
+          acc[rating.rateableId] = rating;
+          return acc;
+        }, {} as Record<string, Rating>);
+      }
+    } catch (error) {
+      console.warn("Failed to load user ratings:", error);
+      // Continue without ratings - this is non-critical
+    }
+  }
+
+  return { setlists, year: yearInt, userRatings };
 });
 
 export function meta({ data }: { data: LoaderData }) {
@@ -81,7 +121,7 @@ export function meta({ data }: { data: LoaderData }) {
 }
 
 export default function Shows() {
-  const { setlists, year, searchQuery } = useSerializedLoaderData<LoaderData>();
+  const { setlists, year, searchQuery, userRatings } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const queryClient = useQueryClient();
 
@@ -287,7 +327,7 @@ export default function Shows() {
                       key={setlist.show.id}
                       setlist={setlist}
                       userAttendance={null}
-                      userRating={null}
+                      userRating={userRatings[setlist.show.id] || null}
                       showRating={setlist.show.averageRating}
                       className="transition-all duration-300 transform hover:scale-[1.01]"
                     />
@@ -311,7 +351,7 @@ export default function Shows() {
                               <SetlistCard
                                 setlist={setlist}
                                 userAttendance={null}
-                                userRating={null}
+                                userRating={userRatings[setlist.show.id] || null}
                                 showRating={setlist.show.averageRating}
                                 className="transition-all duration-300 transform hover:scale-[1.01]"
                               />
