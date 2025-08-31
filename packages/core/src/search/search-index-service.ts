@@ -125,6 +125,51 @@ export class SearchIndexService {
   }
 
   /**
+   * Index with a specific formatter (bypasses registration)
+   */
+  async indexWithFormatter(
+    entity: Record<string, unknown>, 
+    formatter: ContentFormatter,
+    overrideEntityType?: string
+  ): Promise<void> {
+    const entityId = entity.id as string;
+    if (!entityId) {
+      throw new Error(`Entity must have an id field for indexing`);
+    }
+
+    try {
+      // Generate content using the provided formatter
+      const displayText = formatter.generateDisplayText(entity);
+      const content = formatter.generateContent(entity);
+
+      // Generate embedding for the content
+      const { embedding } = await this.embeddingService.generateEmbedding(content);
+
+      // Use override entity type if provided, otherwise use formatter's type
+      const entityType = overrideEntityType || formatter.entityType;
+
+      // Upsert index entry
+      await this.repository.upsert({
+        entityType,
+        entityId,
+        entitySlug: (entity.slug as string) || entityId,
+        displayText,
+        content,
+        embeddingSmall: embedding,
+        embeddingLarge: undefined,
+        modelUsed: "text-embedding-3-small",
+      });
+
+      this.logger.info(`Successfully indexed ${entityType} ${entityId} using ${formatter.constructor.name}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to index ${entityId}: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Index multiple entities of the same type in batch
    */
   async indexEntities(entityType: string, entities: Record<string, unknown>[]): Promise<void> {

@@ -17,9 +17,6 @@ function asShow(show: Record<string, unknown>) {
       segue?: string;
       note?: string;
       allTimer?: boolean;
-      annotations?: Array<{
-        desc?: string;
-      }>;
     }>;
     notes?: string;
   };
@@ -116,12 +113,19 @@ export class ShowContentFormatter implements ContentFormatter {
       full.push(name);
       searchTerms.push(name);
       
-      // Extract individual words from venue names for partial matching
-      const nameWords = name.split(/\s+/).filter(word => 
-        word.length > 2 && 
-        !['The', 'A', 'An', 'Of', 'At', 'In', 'On', 'For', 'With'].includes(word)
-      );
-      nameWords.forEach(word => searchTerms.push(word));
+      // Common venue abbreviations
+      if (name.includes("Madison Square Garden")) {
+        searchTerms.push("MSG", "The Garden");
+      }
+      if (name.includes("Red Rocks")) {
+        searchTerms.push("Red Rocks", "RRAX");
+      }
+      if (name.includes("The Capitol Theatre")) {
+        searchTerms.push("The Cap", "Capitol", "Port Chester");
+      }
+      if (name.includes("The Fillmore")) {
+        searchTerms.push("Fillmore");
+      }
     }
     
     // Location formats
@@ -247,16 +251,6 @@ export class ShowContentFormatter implements ContentFormatter {
           
           if (track.note) {
             importantSongs.push(`${song} ${track.note}`);
-          }
-          
-          // Add track annotations
-          if (track.annotations && track.annotations.length > 0) {
-            track.annotations.forEach(annotation => {
-              if (annotation.desc) {
-                importantSongs.push(`${song} annotation ${annotation.desc}`);
-                importantSongs.push(`${annotation.desc} ${song}`);
-              }
-            });
           }
           
           return song;

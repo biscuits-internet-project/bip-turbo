@@ -2,8 +2,10 @@ import type { Logger } from "@bip/domain";
 import { PrismaClient } from "@prisma/client";
 import { createContainer } from "../../_shared/container";
 import { ShowContentFormatter } from "../content-formatters/show-content-formatter";
+import { ShowVenueFormatter } from "../content-formatters/show-venue-formatter";
 import { SongContentFormatter } from "../content-formatters/song-content-formatter";
 import { TrackContentFormatter } from "../content-formatters/track-content-formatter";
+import { TrackSongFormatter } from "../content-formatters/track-song-formatter";
 import { VenueContentFormatter } from "../content-formatters/venue-content-formatter";
 import { EmbeddingService } from "../embedding-service";
 import { SearchIndexService } from "../search-index-service";
@@ -38,8 +40,10 @@ const searchIndexService = new SearchIndexService(mainContainer.repositories.sea
 // Register content formatters
 searchIndexService.registerContentFormatter(new SongContentFormatter());
 searchIndexService.registerContentFormatter(new ShowContentFormatter());
+searchIndexService.registerContentFormatter(new ShowVenueFormatter());
 searchIndexService.registerContentFormatter(new VenueContentFormatter());
 searchIndexService.registerContentFormatter(new TrackContentFormatter());
+searchIndexService.registerContentFormatter(new TrackSongFormatter());
 
 // Export container with search services
 export const container = {

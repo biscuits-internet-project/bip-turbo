@@ -36,6 +36,7 @@ export class SearchIndexRepository {
 
   /**
    * Upsert a search index entry using raw SQL
+   * Note: Since we removed the unique constraint, this now just inserts
    */
   async upsert(data: SearchIndexData): Promise<void> {
     await this.db.$executeRaw`
@@ -50,15 +51,6 @@ export class SearchIndexRepository {
 				${data.embeddingLarge ? JSON.stringify(data.embeddingLarge) : null}::vector(3072),
 				${data.modelUsed}
 			)
-			ON CONFLICT (entity_type, entity_id) 
-			DO UPDATE SET
-				entity_slug = EXCLUDED.entity_slug,
-				display_text = EXCLUDED.display_text,
-				content = EXCLUDED.content,
-				embedding_small = EXCLUDED.embedding_small,
-				embedding_large = EXCLUDED.embedding_large,
-				model_used = EXCLUDED.model_used,
-				updated_at = NOW()
 		`;
   }
 
@@ -107,15 +99,6 @@ export class SearchIndexRepository {
     const query = `
 			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used)
 			VALUES ${values}
-			ON CONFLICT (entity_type, entity_id) 
-			DO UPDATE SET
-				entity_slug = EXCLUDED.entity_slug,
-				display_text = EXCLUDED.display_text,
-				content = EXCLUDED.content,
-				embedding_small = EXCLUDED.embedding_small,
-				embedding_large = EXCLUDED.embedding_large,
-				model_used = EXCLUDED.model_used,
-				updated_at = NOW()
 		`;
 
     await this.db.$executeRawUnsafe(query, ...params);

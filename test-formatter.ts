@@ -1,4 +1,4 @@
-import type { ContentFormatter } from "./base-content-formatter";
+import { dbClient } from "@bip/core";
 
 // Helper function to safely cast show data
 function asShow(show: Record<string, unknown>) {
@@ -10,6 +10,7 @@ function asShow(show: Record<string, unknown>) {
       state?: string;
       country?: string;
     };
+    averageRating?: number;
     tracks?: Array<{
       set: string;
       position: number;
@@ -17,15 +18,12 @@ function asShow(show: Record<string, unknown>) {
       segue?: string;
       note?: string;
       allTimer?: boolean;
-      annotations?: Array<{
-        desc?: string;
-      }>;
     }>;
     notes?: string;
   };
 }
 
-export class ShowContentFormatter implements ContentFormatter {
+class ShowContentFormatterV2 {
   entityType = "show";
 
   private parseDate(dateStr: string): {
@@ -49,20 +47,20 @@ export class ShowContentFormatter implements ContentFormatter {
       
       // Multiple date formats for better search matching
       formatted.push(
-        dateStr,                                    // 2024-12-31
-        `${month}/${day}/${year}`,                 // 12/31/2024
-        `${parseInt(month)}/${parseInt(day)}/${year}`, // 12/31/2024
-        `${monthName} ${parseInt(day)}, ${year}`,  // December 31, 2024
-        `${monthName} ${parseInt(day)} ${year}`,   // December 31 2024
-        `${parseInt(day)} ${monthName} ${year}`    // 31 December 2024
+        dateStr,                                    // 2025-02-28
+        `${month}/${day}/${year}`,                 // 02/28/2025
+        `${parseInt(month)}/${parseInt(day)}/${year}`, // 2/28/2025
+        `${monthName} ${parseInt(day)}, ${year}`,  // February 28, 2025
+        `${monthName} ${parseInt(day)} ${year}`,   // February 28 2025
+        `${parseInt(day)} ${monthName} ${year}`    // 28 February 2025
       );
       
       // Search terms for partial matching
       searchTerms.push(
-        year,                    // "2024"
-        monthName,              // "December"
-        `${monthName} ${year}`, // "December 2024"
-        `${monthName.slice(0, 3)} ${year}` // "Dec 2024"
+        year,                    // "2025"
+        monthName,              // "February"
+        `${monthName} ${year}`, // "February 2025"
+        `${monthName.slice(0, 3)} ${year}` // "Feb 2025"
       );
       
       // Check for special dates
@@ -110,18 +108,23 @@ export class ShowContentFormatter implements ContentFormatter {
     const name = venue.name || "";
     const city = venue.city || "";
     const state = venue.state || "";
+    const country = venue.country || "USA";
     
     // Full venue formats
     if (name) {
       full.push(name);
       searchTerms.push(name);
       
-      // Extract individual words from venue names for partial matching
-      const nameWords = name.split(/\s+/).filter(word => 
-        word.length > 2 && 
-        !['The', 'A', 'An', 'Of', 'At', 'In', 'On', 'For', 'With'].includes(word)
-      );
-      nameWords.forEach(word => searchTerms.push(word));
+      // Common venue abbreviations
+      if (name.includes("Madison Square Garden")) {
+        searchTerms.push("MSG", "The Garden");
+      }
+      if (name.includes("Red Rocks")) {
+        searchTerms.push("Red Rocks", "RRAX");
+      }
+      if (name.includes("The Capitol Theatre")) {
+        searchTerms.push("The Cap", "Capitol", "Port Chester");
+      }
     }
     
     // Location formats
@@ -249,16 +252,6 @@ export class ShowContentFormatter implements ContentFormatter {
             importantSongs.push(`${song} ${track.note}`);
           }
           
-          // Add track annotations
-          if (track.annotations && track.annotations.length > 0) {
-            track.annotations.forEach(annotation => {
-              if (annotation.desc) {
-                importantSongs.push(`${song} annotation ${annotation.desc}`);
-                importantSongs.push(`${annotation.desc} ${song}`);
-              }
-            });
-          }
-          
           return song;
         }).join(" ");
         
@@ -325,3 +318,89 @@ export class ShowContentFormatter implements ContentFormatter {
     return content;
   }
 }
+
+async function testFormatter() {
+  const formatter = new ShowContentFormatterV2();
+  
+  // Get complete shows from 2024
+  const shows = await dbClient.show.findMany({
+    where: {
+      date: {
+        gte: '2024-01-01',
+        lte: '2024-12-31'
+      }
+    },
+    take: 3,
+    orderBy: { date: 'desc' },
+    include: {
+      venue: true,
+      tracks: {
+        include: {
+          song: true
+        },
+        orderBy: [
+          { set: 'asc' },
+          { position: 'asc' }
+        ]
+      }
+    }
+  });
+
+  console.log('=== FORMATTED CONTENT EXAMPLES ===\n');
+  
+  shows.forEach((show, index) => {
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`SHOW ${index + 1}: ${show.date} at ${show.venue?.name || 'Unknown'}`);
+    console.log('='.repeat(80));
+    
+    console.log('\n📍 DISPLAY TEXT:');
+    console.log(formatter.generateDisplayText(show));
+    
+    const content = formatter.generateContent(show);
+    
+    console.log('\n📝 FULL EMBEDDED CONTENT:');
+    console.log('-'.repeat(80));
+    console.log(content);
+    console.log('-'.repeat(80));
+    
+    console.log(`\n📊 Total content length: ${content.length} characters`);
+    
+    // Show what this makes searchable
+    console.log('\n🔍 THIS ENABLES SEARCHES LIKE:');
+    const searchExamples = [];
+    
+    // Date searches
+    if (show.date) {
+      searchExamples.push(`"${show.date.substring(0, 7)}"`, `"${show.date.substring(0, 4)} shows"`);
+    }
+    
+    // Venue searches
+    if (show.venue?.name) {
+      searchExamples.push(`"${show.venue.name}"`, `"${show.venue.city} shows"`);
+    }
+    
+    // Song position searches
+    if (show.tracks && show.tracks.length > 0) {
+      const firstTrack = show.tracks[0];
+      if (firstTrack?.song?.title) {
+        searchExamples.push(`"${firstTrack.song.title} opener"`);
+      }
+      
+      // Find segues
+      const segue = show.tracks.find(t => t.segue && t.segue !== 'none');
+      if (segue) {
+        const idx = show.tracks.indexOf(segue);
+        const next = show.tracks[idx + 1];
+        if (next?.song?.title) {
+          searchExamples.push(`"${segue.song?.title} > ${next.song.title}"`);
+        }
+      }
+    }
+    
+    console.log('  • ' + searchExamples.join('\n  • '));
+  });
+
+  await dbClient.$disconnect();
+}
+
+testFormatter().catch(console.error);

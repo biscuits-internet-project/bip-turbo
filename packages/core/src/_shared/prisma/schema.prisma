@@ -569,8 +569,8 @@ model SearchIndex {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  @@unique([entityType, entityId])
   @@index([entityType])
+  @@index([entityId])
   @@map("search_indexes")
 }
 
