@@ -25,8 +25,6 @@ export class EmbeddingService {
    */
   async generateEmbedding(text: string): Promise<EmbeddingResult> {
     try {
-      this.logger.info(`Generating embedding for text (${text.length} chars)`);
-
       const response = await this.openai.embeddings.create({
         model: this.model,
         input: text,
@@ -35,8 +33,6 @@ export class EmbeddingService {
 
       const embedding = response.data[0].embedding;
       const tokens = response.usage?.total_tokens || 0;
-
-      this.logger.info(`Generated embedding with ${tokens} tokens`);
 
       return {
         embedding,

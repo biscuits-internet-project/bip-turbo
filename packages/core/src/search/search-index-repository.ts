@@ -10,6 +10,7 @@ export interface SearchIndexData {
   embeddingSmall: number[];
   embeddingLarge?: number[];
   modelUsed: string;
+  indexStrategy?: string;
 }
 
 export interface SearchResult {
@@ -22,6 +23,7 @@ export interface SearchResult {
   similarity: number;
   createdAt: Date;
   updatedAt: Date;
+  indexStrategy?: string;
 }
 
 export interface SearchOptions {
@@ -29,6 +31,7 @@ export interface SearchOptions {
   limit?: number;
   threshold?: number; // Minimum similarity score (0-1)
   useModel?: "small" | "large"; // Which embedding model to use for search
+  indexStrategies?: string[]; // Filter by index strategy
 }
 
 export class SearchIndexRepository {
@@ -40,7 +43,7 @@ export class SearchIndexRepository {
    */
   async upsert(data: SearchIndexData): Promise<void> {
     await this.db.$executeRaw`
-			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used)
+			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used, index_strategy)
 			VALUES (
 				${data.entityType}, 
 				${data.entityId}::uuid, 
@@ -49,7 +52,8 @@ export class SearchIndexRepository {
 				${data.content}, 
 				${JSON.stringify(data.embeddingSmall)}::vector(1536),
 				${data.embeddingLarge ? JSON.stringify(data.embeddingLarge) : null}::vector(3072),
-				${data.modelUsed}
+				${data.modelUsed},
+				${data.indexStrategy || 'date_venue'}
 			)
 		`;
   }
@@ -70,7 +74,7 @@ export class SearchIndexRepository {
     // Build bulk upsert SQL with VALUES clause
     const values = dataArray
       .map((_data, index) => {
-        const paramBase = index * 8; // 8 parameters per record
+        const paramBase = index * 9; // 9 parameters per record
         return `(
 				$${paramBase + 1}, 
 				$${paramBase + 2}::uuid, 
@@ -79,7 +83,8 @@ export class SearchIndexRepository {
 				$${paramBase + 5}, 
 				$${paramBase + 6}::vector(1536),
 				$${paramBase + 7}::vector(3072),
-				$${paramBase + 8}
+				$${paramBase + 8},
+				$${paramBase + 9}
 			)`;
       })
       .join(", ");
@@ -94,10 +99,11 @@ export class SearchIndexRepository {
       JSON.stringify(data.embeddingSmall),
       data.embeddingLarge ? JSON.stringify(data.embeddingLarge) : null,
       data.modelUsed,
+      data.indexStrategy || 'date_venue',
     ]);
 
     const query = `
-			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used)
+			INSERT INTO search_indexes (entity_type, entity_id, entity_slug, display_text, content, embedding_small, embedding_large, model_used, index_strategy)
 			VALUES ${values}
 		`;
 
@@ -154,7 +160,7 @@ export class SearchIndexRepository {
    * Perform vector similarity search
    */
   async search(queryEmbedding: number[], options: SearchOptions = {}): Promise<SearchResult[]> {
-    const { entityTypes, limit = 20, threshold = 0.0, useModel = "small" } = options;
+    const { entityTypes, limit = 20, threshold = 0.0, useModel = "small", indexStrategies } = options;
 
     // Choose embedding field based on model
     const embeddingField = useModel === "large" ? "embedding_large" : "embedding_small";
@@ -167,6 +173,11 @@ export class SearchIndexRepository {
     if (entityTypes && entityTypes.length > 0) {
       whereConditions.push(`"entity_type" = ANY($${++paramIndex})`);
       queryParams.push(entityTypes);
+    }
+
+    if (indexStrategies && indexStrategies.length > 0) {
+      whereConditions.push(`"index_strategy" = ANY($${++paramIndex})`);
+      queryParams.push(indexStrategies);
     }
 
     if (threshold > 0) {
@@ -193,6 +204,7 @@ export class SearchIndexRepository {
         display_text as "displayText",
         content,
         model_used as "modelUsed",
+        index_strategy as "indexStrategy",
         created_at as "createdAt",
         updated_at as "updatedAt",
         1 - (${embeddingField} <=> $1::vector) as similarity

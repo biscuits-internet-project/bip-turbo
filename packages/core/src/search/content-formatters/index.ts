@@ -1,5 +1,5 @@
 export type { ContentFormatter } from "./base-content-formatter";
-export { ShowContentFormatter } from "./show-content-formatter";
-export { SongContentFormatter } from "./song-content-formatter";
-export { TrackContentFormatter } from "./track-content-formatter";
-export { VenueContentFormatter } from "./venue-content-formatter";
+export { ShowDateVenueFormatter } from "./show-date-venue-formatter";
+export { ShowSeguePairFormatter } from "./show-segue-pair-formatter";
+export { ShowSegueSequenceFormatter } from "./show-segue-sequence-formatter";
+export { ShowSongIndividualFormatter } from "./show-song-individual-formatter";

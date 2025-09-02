@@ -28,6 +28,9 @@ clean:
 web:
 	cd apps/web && bun run dev
 
+docker: 
+	docker compose up -d
+
 dev:
 	bun run dev
 

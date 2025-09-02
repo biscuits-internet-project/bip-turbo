@@ -1,8 +1,12 @@
 import type * as React from "react";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
+const STORAGE_KEY = "global-search-query";
+
 interface GlobalSearchContextType {
   isOpen: boolean;
+  query: string;
+  setQuery: (query: string) => void;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -12,6 +16,23 @@ const GlobalSearchContext = createContext<GlobalSearchContextType | undefined>(u
 
 export function GlobalSearchProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQueryState] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(STORAGE_KEY) || "";
+    }
+    return "";
+  });
+
+  const setQuery = useCallback((newQuery: string) => {
+    setQueryState(newQuery);
+    if (typeof window !== "undefined") {
+      if (newQuery) {
+        localStorage.setItem(STORAGE_KEY, newQuery);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
 
   const open = useCallback(() => {
     setIsOpen(true);
@@ -47,6 +68,8 @@ export function GlobalSearchProvider({ children }: { children: React.ReactNode }
 
   const value = {
     isOpen,
+    query,
+    setQuery,
     open,
     close,
     toggle,

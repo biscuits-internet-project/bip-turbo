@@ -1,8 +1,8 @@
 import { Calendar, Loader2, MapPin, Music, Play } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Badge } from "~/components/ui/badge";
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "~/components/ui/command";
+import { useGlobalSearch } from "~/hooks/use-global-search";
 import { useVectorSearch } from "~/hooks/use-vector-search";
 
 interface GlobalSearchDialogProps {
@@ -25,7 +25,7 @@ const ENTITY_LABELS = {
 } as const;
 
 export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogProps) {
-  const [query, setQuery] = useState("");
+  const { query, setQuery } = useGlobalSearch();
   const { results, isLoading, error, search, clear } = useVectorSearch();
   const navigate = useNavigate();
 
@@ -38,30 +38,27 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
 
     const timeoutId = setTimeout(() => {
       search(query);
-    }, 300);
+    }, 600);
 
     return () => clearTimeout(timeoutId);
   }, [query, search, clear]);
 
   const handleSelect = useCallback(
     (url: string) => {
-      onOpenChange(false);
+      onOpenChange(false); // Close dialog but keep query
       navigate(url);
-      setQuery("");
-      clear();
     },
-    [onOpenChange, navigate, clear],
+    [onOpenChange, navigate],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
         onOpenChange(false);
-        setQuery("");
-        clear();
+        // Don't clear query, just close dialog
       }
     },
-    [onOpenChange, clear],
+    [onOpenChange],
   );
 
   // Group results by entity type
@@ -79,9 +76,9 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false}>
-      <div className="[&_[cmdk-root]]:max-h-[400px]">
+      <div className="[&_[cmdk-root]]:max-h-[600px] [&_[cmdk-root]]:max-w-[800px] [&_[cmdk-root]]:w-[800px]">
         <CommandInput
-          placeholder="Search shows, songs, venues, tracks..."
+          placeholder="Search shows, songs, venues..."
           value={query}
           onValueChange={setQuery}
           onKeyDown={handleKeyDown}
@@ -131,9 +128,6 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
                             <div className="text-sm text-gray-400">{Math.round(result.score as number)}% match</div>
                           ) : null}
                         </div>
-                        <Badge variant="outline" className="text-sm border-green-500/40 text-green-300 bg-green-500/10">
-                          {label}
-                        </Badge>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -152,26 +146,7 @@ export function GlobalSearchDialog({ open, onOpenChange }: GlobalSearchDialogPro
 
           {!query.trim() && (
             <div className="py-8 text-center">
-              <p className="text-base text-gray-300 mb-2">Search across all shows, songs, venues, and tracks</p>
-              <p className="text-sm text-amber-400 mb-4">⚠️ Search sucks right now. Working on it. B4L</p>
-              <div className="flex flex-wrap gap-3 justify-center">
-                <Badge variant="outline" className="text-sm border-purple-500/40 text-purple-300 bg-purple-500/10">
-                  <Music className="h-4 w-4 mr-2" />
-                  Songs
-                </Badge>
-                <Badge variant="outline" className="text-sm border-purple-500/40 text-purple-300 bg-purple-500/10">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Shows
-                </Badge>
-                <Badge variant="outline" className="text-sm border-green-500/40 text-green-300 bg-green-500/10">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Venues
-                </Badge>
-                <Badge variant="outline" className="text-sm border-green-500/40 text-green-300 bg-green-500/10">
-                  <Play className="h-4 w-4 mr-2" />
-                  Tracks
-                </Badge>
-              </div>
+              <p className="text-base text-gray-300">Search across all shows, songs, and venues</p>
             </div>
           )}
         </CommandList>

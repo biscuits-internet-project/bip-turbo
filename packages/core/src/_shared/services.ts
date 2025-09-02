@@ -6,12 +6,6 @@ import { FileService } from "../files/file-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
 import { RatingService } from "../ratings/rating-service";
 import { ReviewService } from "../reviews/review-service";
-import { ShowContentFormatter } from "../search/content-formatters/show-content-formatter";
-import { ShowVenueFormatter } from "../search/content-formatters/show-venue-formatter";
-import { SongContentFormatter } from "../search/content-formatters/song-content-formatter";
-import { TrackContentFormatter } from "../search/content-formatters/track-content-formatter";
-import { TrackSongFormatter } from "../search/content-formatters/track-song-formatter";
-import { VenueContentFormatter } from "../search/content-formatters/venue-content-formatter";
 import { EmbeddingService } from "../search/embedding-service";
 import { SearchIndexService } from "../search/search-index-service";
 import { SetlistService } from "../setlists/setlist-service";
@@ -57,14 +51,6 @@ export function createServices(container: ServiceContainer): Services {
     embeddingService,
     container.logger,
   );
-
-  // Register content formatters for search
-  searchIndexService.registerContentFormatter(new ShowContentFormatter());
-  searchIndexService.registerContentFormatter(new ShowVenueFormatter());
-  searchIndexService.registerContentFormatter(new SongContentFormatter());
-  searchIndexService.registerContentFormatter(new VenueContentFormatter());
-  searchIndexService.registerContentFormatter(new TrackContentFormatter());
-  searchIndexService.registerContentFormatter(new TrackSongFormatter());
 
   // Initialize the SearchIndexer with the SearchIndexService
   container.searchIndexer.searchIndexService = searchIndexService;

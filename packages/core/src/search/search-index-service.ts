@@ -1,6 +1,7 @@
 import type { Logger } from "@bip/domain";
 import type { EmbeddingService } from "./embedding-service";
 import type { SearchIndexRepository, SearchResult } from "./search-index-repository";
+import { SearchResultAggregator, type SearchResultWithScore } from "./search-result-aggregator";
 
 export interface SearchQuery {
   query: string;
@@ -10,9 +11,8 @@ export interface SearchQuery {
   useModel?: "small" | "large";
 }
 
-export interface SearchResultWithScore extends SearchResult {
-  score: number; // Normalized score 0-100
-}
+// Re-export from aggregator
+export type { SearchResultWithScore };
 
 export interface IndexStats {
   totalCount: number;
@@ -27,20 +27,14 @@ export interface ContentFormatter {
 }
 
 export class SearchIndexService {
-  private contentFormatters = new Map<string, ContentFormatter>();
+  private readonly resultAggregator: SearchResultAggregator;
 
   constructor(
     private readonly repository: SearchIndexRepository,
     private readonly embeddingService: EmbeddingService,
     private readonly logger: Logger,
-  ) {}
-
-  /**
-   * Register a content formatter for an entity type
-   */
-  registerContentFormatter(formatter: ContentFormatter): void {
-    this.contentFormatters.set(formatter.entityType, formatter);
-    this.logger.info(`Registered content formatter for entity type: ${formatter.entityType}`);
+  ) {
+    this.resultAggregator = new SearchResultAggregator();
   }
 
   /**
@@ -64,15 +58,33 @@ export class SearchIndexService {
         useModel,
       });
 
-      // Convert similarity to a 0-100 score for better UX
-      const resultsWithScore = results.map((result) => ({
-        ...result,
-        score: Math.round(result.similarity * 100),
-      }));
+      // Convert similarity to a 0-100 score for better UX with hybrid scoring
+      const resultsWithScore = results.map((result) => {
+        let score = Math.round(result.similarity * 100);
+        
+        // Apply hybrid scoring for segue searches
+        if (query.includes(' > ') && result.indexStrategy === 'segue_pair') {
+          score = this.calculateSegueMatchScore(query, result.content || '');
+        }
+        // Apply hybrid scoring for regular song searches
+        else if (!query.includes(' > ') && (result.indexStrategy === 'song_individual' || result.indexStrategy === 'segue_pair')) {
+          score = this.calculateSongMatchScore(query, result.content || '', result.displayText || '');
+        }
+        
+        return {
+          ...result,
+          score,
+        };
+      });
 
-      this.logger.info(`Search completed. Found ${resultsWithScore.length} results`);
+      // Aggregate results by entityId to handle multiple entries per show
+      const aggregatedResults = this.resultAggregator.aggregate(resultsWithScore);
 
-      return resultsWithScore;
+      this.logger.info(
+        `Search completed. Found ${resultsWithScore.length} raw results, ${aggregatedResults.length} unique entities`,
+      );
+
+      return aggregatedResults;
     } catch (error) {
       this.logger.error(
         `Search failed for query "${query}": ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -82,55 +94,27 @@ export class SearchIndexService {
   }
 
   /**
-   * Index a single entity
+   * Update search result aggregation weights
    */
-  async indexEntity(entity: Record<string, unknown>, entityType: string): Promise<void> {
-    const formatter = this.contentFormatters.get(entityType);
-    if (!formatter) {
-      throw new Error(`No content formatter registered for entity type: ${entityType}`);
-    }
+  updateAggregationWeights(weights: Record<string, number>): void {
+    this.resultAggregator.updateWeights(weights);
+    this.logger.info(`Updated search aggregation weights: ${JSON.stringify(weights)}`);
+  }
 
-    const entityId = entity.id as string;
-    if (!entityId) {
-      throw new Error(`Entity must have an id field for indexing`);
-    }
-
-    try {
-      // Generate content using the registered formatter
-      const displayText = formatter.generateDisplayText(entity);
-      const content = formatter.generateContent(entity);
-
-      // Generate embedding for the content (using small model by default)
-      const { embedding } = await this.embeddingService.generateEmbedding(content);
-
-      // Upsert index entry with small embedding
-      await this.repository.upsert({
-        entityType,
-        entityId,
-        entitySlug: (entity.slug as string) || entityId, // Use slug if available, fallback to ID
-        displayText,
-        content,
-        embeddingSmall: embedding,
-        embeddingLarge: undefined, // Can be added later if needed
-        modelUsed: "text-embedding-3-small",
-      });
-
-      this.logger.info(`Successfully indexed ${entityType} ${entityId}`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to index ${entityType} ${entityId}: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-      throw error;
-    }
+  /**
+   * Get current aggregation weights
+   */
+  getAggregationWeights(): Record<string, number> {
+    return this.resultAggregator.getWeights();
   }
 
   /**
    * Index with a specific formatter (bypasses registration)
    */
   async indexWithFormatter(
-    entity: Record<string, unknown>, 
+    entity: Record<string, unknown>,
     formatter: ContentFormatter,
-    overrideEntityType?: string
+    overrideEntityType?: string,
   ): Promise<void> {
     const entityId = entity.id as string;
     if (!entityId) {
@@ -159,12 +143,8 @@ export class SearchIndexService {
         embeddingLarge: undefined,
         modelUsed: "text-embedding-3-small",
       });
-
-      this.logger.info(`Successfully indexed ${entityType} ${entityId} using ${formatter.constructor.name}`);
     } catch (error) {
-      this.logger.error(
-        `Failed to index ${entityId}: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
+      this.logger.error(`Failed to index ${entityId}: ${error instanceof Error ? error.message : "Unknown error"}`);
       throw error;
     }
   }
@@ -287,6 +267,72 @@ export class SearchIndexService {
   }
 
   /**
+   * Calculate hybrid score for song searches combining vector similarity with exact text matching
+   */
+  private calculateSongMatchScore(query: string, content: string, displayText: string): number {
+    const queryLower = query.toLowerCase().trim();
+    const contentLower = content.toLowerCase();
+    const displayLower = displayText.toLowerCase();
+    
+    // Check for exact matches in display text (song titles)
+    if (displayLower.includes(queryLower)) {
+      return 95; // Exact match in song title
+    }
+    
+    // Check for exact matches in content
+    if (contentLower.includes(queryLower)) {
+      return 85; // Exact match in content
+    }
+    
+    // Check for partial word matches
+    const queryWords = queryLower.split(' ').filter(w => w.length > 2); // Ignore small words
+    if (queryWords.length === 0) return 30; // No meaningful words
+    
+    let matchCount = 0;
+    
+    for (const word of queryWords) {
+      if (displayLower.includes(word) || contentLower.includes(word)) {
+        matchCount++;
+      }
+    }
+    
+    const matchRatio = matchCount / queryWords.length;
+    if (matchRatio === 1) return 90;      // All words match
+    if (matchRatio >= 0.75) return 75;    // Most words match
+    if (matchRatio >= 0.5) return 60;     // Half words match
+    if (matchRatio > 0) return 40;        // Some words match
+    
+    return 25; // No exact matches, rely on vector similarity
+  }
+
+  /**
+   * Calculate hybrid score for segue searches combining vector similarity with exact text matching
+   */
+  private calculateSegueMatchScore(query: string, content: string): number {
+    // Parse the query (e.g., "basis > shanker")
+    const queryParts = query.toLowerCase().split(' > ').map(part => part.trim());
+    if (queryParts.length !== 2) return 50; // Default score if not a valid segue format
+    
+    const [queryFirstSong, querySecondSong] = queryParts;
+    
+    // Parse the content (e.g., "Basis For A Day > Boom Shanker") 
+    const contentParts = content.split(' > ');
+    if (contentParts.length !== 2) return 50; // Default score if not a valid segue format
+    
+    const [contentFirstSong, contentSecondSong] = contentParts.map(part => part.trim().toLowerCase());
+    
+    // Calculate exact match scores
+    const firstSongMatch = contentFirstSong.includes(queryFirstSong) ? 50 : 0;
+    const secondSongMatch = contentSecondSong.includes(querySecondSong) ? 50 : 0;
+    
+    // Perfect match gets 95+, partial match gets lower score
+    const totalMatch = firstSongMatch + secondSongMatch;
+    if (totalMatch === 100) return 95; // Both songs match
+    if (totalMatch === 50) return 45;  // One song matches  
+    return 25; // No exact matches, rely on vector similarity
+  }
+
+  /**
    * Initialize vector extension and indexes
    */
   async initializeVectorSupport(): Promise<void> {
@@ -308,12 +354,5 @@ export class SearchIndexService {
       );
       throw error;
     }
-  }
-
-  /**
-   * Get a list of registered content formatters
-   */
-  getRegisteredEntityTypes(): string[] {
-    return Array.from(this.contentFormatters.keys());
   }
 }

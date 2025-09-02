@@ -561,6 +561,7 @@ model SearchIndex {
   entityType       String   @map("entity_type") @db.VarChar
   entityId         String   @map("entity_id") @db.Uuid
   entitySlug       String   @map("entity_slug") @db.VarChar
+  indexStrategy    String   @default("date_venue") @map("index_strategy") @db.VarChar // date_venue, song_individual, segue_pair, segue_sequence
   displayText      String   @map("display_text")
   content          String
   embeddingSmall   Unsupported("vector(1536)") @map("embedding_small")
@@ -571,6 +572,7 @@ model SearchIndex {
 
   @@index([entityType])
   @@index([entityId])
+  @@index([indexStrategy])
   @@map("search_indexes")
 }
 

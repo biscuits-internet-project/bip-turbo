@@ -1,104 +1,256 @@
 #!/usr/bin/env bun
 
 /**
- * Script to index 2024 shows for vector search with annotations
- * Usage: bun run packages/core/src/search/scripts/index-shows-2024.ts
+ * Multi-methodology indexing for 2024 shows
+ * Creates multiple search entries per show for different search patterns
  */
 
-import { container } from "./container-setup";
+import { PrismaClient } from "@prisma/client";
+import OpenAI from "openai";
+import { 
+  ShowDateVenueFormatter,
+  ShowSongIndividualFormatter,
+  ShowSeguePairFormatter,
+  ShowSegueSequenceFormatter
+} from "../content-formatters";
+import type { SearchIndexData } from "../search-index-repository";
 
-async function indexShows2024() {
-  console.log("🎭 Starting 2024 show indexing...");
+const db = new PrismaClient();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  try {
-    const searchIndexService = container.searchIndexService();
+async function indexShows() {
+  console.log("🎭 Multi-methodology indexing for 2024 shows...");
 
-    // Get 2024 shows with related data including annotations
-    console.log("📊 Fetching 2024 shows...");
-    const shows = await container.db().show.findMany({
-      where: {
-        date: {
-          gte: '2024-01-01',
-          lte: '2024-12-31'
-        }
-      },
-      include: {
-        venue: true,
-        tracks: {
-          include: {
-            song: true,
-            annotations: true, // Include track annotations
-          },
-          orderBy: [{ set: "asc" }, { position: "asc" }],
+  // Clear old entries first
+  await db.$executeRaw`DELETE FROM search_indexes WHERE entity_type = 'show'`;
+  console.log("✅ Cleared old search entries");
+
+  // Get shows with all related data
+  const shows = await db.show.findMany({
+    where: {
+      date: {
+        gte: '2024-01-01',
+        lte: '2024-12-31'
+      }
+    },
+    include: {
+      venue: true,
+      tracks: {
+        include: {
+          song: true,
+          annotations: true
         },
-      },
-    });
-
-    console.log(`📦 Found ${shows.length} 2024 shows to index`);
-
-    // Estimate cost
-    const embeddingService = container.embeddingService();
-    const formatter = container.showContentFormatter();
-
-    const sampleContents = shows.slice(0, Math.min(10, shows.length)).map((show) => formatter.generateContent(show));
-    const { estimatedCostUSD, estimatedTokens } = embeddingService.estimateCost(sampleContents);
-    const totalEstimatedCost = (estimatedCostUSD * shows.length) / Math.min(10, shows.length);
-
-    console.log(
-      `💰 Estimated cost: $${totalEstimatedCost.toFixed(4)} (${Math.round((estimatedTokens * shows.length) / Math.min(10, shows.length))} tokens)`,
-    );
-
-    // Index shows in batches
-    let indexed = 0;
-    const batchSize = 5; // Smaller batches for shows since they have more content
-
-    for (let i = 0; i < shows.length; i += batchSize) {
-      const batch = shows.slice(i, i + batchSize);
-
-      console.log(
-        `📝 Indexing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(shows.length / batchSize)} (${batch.length} shows)...`,
-      );
-
-      for (const show of batch) {
-        try {
-          await searchIndexService.indexEntity(show, "show");
-          indexed++;
-
-          if (indexed % 25 === 0) {
-            console.log(`✅ Indexed ${indexed}/${shows.length} shows`);
-          }
-        } catch (error) {
-          console.error(`❌ Failed to index show ${show.date} (${show.id}):`, error);
-        }
-      }
-
-      // Small delay between batches to respect rate limits
-      if (i + batchSize < shows.length) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        orderBy: [{ set: "asc" }, { position: "asc" }]
       }
     }
+  });
 
-    console.log(`🎉 Successfully indexed ${indexed}/${shows.length} 2024 shows`);
+  console.log(`📊 Found ${shows.length} shows to index`);
 
-    if (indexed < shows.length) {
-      console.log(`⚠️  ${shows.length - indexed} shows failed to index`);
+  // Initialize formatters
+  const dateVenueFormatter = new ShowDateVenueFormatter();
+  const individualFormatter = new ShowSongIndividualFormatter();
+  const pairFormatter = new ShowSeguePairFormatter();
+  const sequenceFormatter = new ShowSegueSequenceFormatter();
+
+  // Counters
+  let totalShows = 0;
+  let dateVenueEntries = 0;
+  let individualEntries = 0;
+  let pairEntries = 0;
+  let sequenceEntries = 0;
+
+  const searchIndexData: SearchIndexData[] = [];
+
+  for (const show of shows) {
+    try {
+      // 1. Date/Venue Entry (1 per show)
+      const dateVenueContent = dateVenueFormatter.generateContent(show);
+      const dateVenueDisplay = dateVenueFormatter.generateDisplayText(show);
+      
+      const dateVenueEmbedding = await openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: dateVenueContent,
+        dimensions: 1536
+      });
+
+      searchIndexData.push({
+        entityType: "show",
+        entityId: show.id,
+        entitySlug: show.slug || show.id,
+        displayText: dateVenueDisplay,
+        content: dateVenueContent,
+        embeddingSmall: dateVenueEmbedding.data[0].embedding,
+        modelUsed: "text-embedding-3-small",
+        indexStrategy: "date_venue"
+      });
+      dateVenueEntries++;
+
+      // 2. Individual Song Entries (1 per track)
+      for (const track of show.tracks) {
+        const individualContent = individualFormatter.generateContent({ show, track });
+        const individualDisplay = individualFormatter.generateDisplayText({ show, track });
+        
+        const individualEmbedding = await openai.embeddings.create({
+          model: "text-embedding-3-small",
+          input: individualContent,
+          dimensions: 1536
+        });
+
+        searchIndexData.push({
+          entityType: "show",
+          entityId: show.id,
+          entitySlug: show.slug || show.id,
+          displayText: individualDisplay,
+          content: individualContent,
+          embeddingSmall: individualEmbedding.data[0].embedding,
+          modelUsed: "text-embedding-3-small",
+          indexStrategy: "song_individual"
+        });
+        individualEntries++;
+      }
+
+      // 3. Segue Pair Entries
+      const seguePairs = ShowSeguePairFormatter.extractSeguePairs(show);
+      for (const pair of seguePairs) {
+        const pairContent = pairFormatter.generateContent({ show, pair });
+        const pairDisplay = pairFormatter.generateDisplayText({ show, pair });
+        
+        const pairEmbedding = await openai.embeddings.create({
+          model: "text-embedding-3-small",
+          input: pairContent,
+          dimensions: 1536
+        });
+
+        searchIndexData.push({
+          entityType: "show",
+          entityId: show.id,
+          entitySlug: show.slug || show.id,
+          displayText: pairDisplay,
+          content: pairContent,
+          embeddingSmall: pairEmbedding.data[0].embedding,
+          modelUsed: "text-embedding-3-small",
+          indexStrategy: "segue_pair"
+        });
+        pairEntries++;
+      }
+
+      // 4. Segue Sequence Entries (3+ songs)
+      const segueSequences = ShowSegueSequenceFormatter.extractSegueSequences(show);
+      for (const sequence of segueSequences) {
+        const sequenceContent = sequenceFormatter.generateContent({ show, sequence });
+        const sequenceDisplay = sequenceFormatter.generateDisplayText({ show, sequence });
+        
+        const sequenceEmbedding = await openai.embeddings.create({
+          model: "text-embedding-3-small",
+          input: sequenceContent,
+          dimensions: 1536
+        });
+
+        searchIndexData.push({
+          entityType: "show",
+          entityId: show.id,
+          entitySlug: show.slug || show.id,
+          displayText: sequenceDisplay,
+          content: sequenceContent,
+          embeddingSmall: sequenceEmbedding.data[0].embedding,
+          modelUsed: "text-embedding-3-small",
+          indexStrategy: "segue_sequence"
+        });
+        sequenceEntries++;
+      }
+
+      totalShows++;
+      if (totalShows % 10 === 0) {
+        console.log(`⚡ Processed ${totalShows}/${shows.length} shows...`);
+      }
+
+      // Batch insert every 50 shows to avoid memory issues
+      if (searchIndexData.length >= 500) {
+        await bulkInsertSearchData(searchIndexData);
+        searchIndexData.length = 0; // Clear array
+      }
+
+    } catch (error) {
+      console.error(`❌ Failed processing show ${show.date}:`, error instanceof Error ? error.message : error);
     }
+  }
 
-    // Final cost report
-    console.log(`💰 Final estimated cost: $${totalEstimatedCost.toFixed(4)}`);
-  } catch (error) {
-    console.error("💥 2024 show indexing failed:", error);
-    process.exit(1);
+  // Insert any remaining data
+  if (searchIndexData.length > 0) {
+    await bulkInsertSearchData(searchIndexData);
+  }
+
+  // Final statistics
+  console.log(`\n✨ Indexing Complete!`);
+  console.log(`📈 Statistics:`);
+  console.log(`   Shows processed: ${totalShows}/${shows.length}`);
+  console.log(`   Date/venue entries: ${dateVenueEntries}`);
+  console.log(`   Individual song entries: ${individualEntries}`);
+  console.log(`   Segue pair entries: ${pairEntries}`);
+  console.log(`   Segue sequence entries: ${sequenceEntries}`);
+  console.log(`   Total search entries: ${dateVenueEntries + individualEntries + pairEntries + sequenceEntries}`);
+
+  // Verify multi-entry indexing
+  const strategyStats = await db.$queryRaw<Array<{ index_strategy: string; count: bigint }>>`
+    SELECT index_strategy, COUNT(*) as count
+    FROM search_indexes 
+    WHERE entity_type = 'show'
+    GROUP BY index_strategy
+    ORDER BY index_strategy
+  `;
+
+  console.log(`\n📊 Index Strategy Breakdown:`);
+  for (const stat of strategyStats) {
+    console.log(`   ${stat.index_strategy}: ${Number(stat.count)} entries`);
   }
 }
 
-// Run the script
-indexShows2024()
-  .then(() => {
-    console.log("✨ 2024 show indexing completed!");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("💥 Fatal error:", error);
-    process.exit(1);
-  });
+async function bulkInsertSearchData(data: SearchIndexData[]): Promise<void> {
+  if (data.length === 0) return;
+
+  // Build bulk insert SQL
+  const values = data
+    .map((_item, index) => {
+      const paramBase = index * 9;
+      return `(
+        $${paramBase + 1}, 
+        $${paramBase + 2}::uuid, 
+        $${paramBase + 3}, 
+        $${paramBase + 4}, 
+        $${paramBase + 5}, 
+        $${paramBase + 6}::vector(1536),
+        $${paramBase + 7}::vector(3072),
+        $${paramBase + 8},
+        $${paramBase + 9}
+      )`;
+    })
+    .join(", ");
+
+  const params = data.flatMap((item) => [
+    item.entityType,
+    item.entityId,
+    item.entitySlug,
+    item.displayText,
+    item.content,
+    JSON.stringify(item.embeddingSmall),
+    item.embeddingLarge ? JSON.stringify(item.embeddingLarge) : null,
+    item.modelUsed,
+    item.indexStrategy || 'date_venue',
+  ]);
+
+  const query = `
+    INSERT INTO search_indexes (
+      entity_type, entity_id, entity_slug, display_text, content, 
+      embedding_small, embedding_large, model_used, index_strategy
+    )
+    VALUES ${values}
+  `;
+
+  await db.$executeRawUnsafe(query, ...params);
+  console.log(`💾 Inserted ${data.length} search entries`);
+}
+
+indexShows()
+  .catch(console.error)
+  .finally(() => db.$disconnect());
