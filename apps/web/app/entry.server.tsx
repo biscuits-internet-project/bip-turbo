@@ -18,6 +18,7 @@ export default function handleRequest(
 ) {
   return new Promise((resolve, reject) => {
     let shellRendered = false;
+    let timeoutId: NodeJS.Timeout | null = null;
     const userAgent = request.headers.get("user-agent");
 
     // Ensure requests from bots and SPA Mode renders wait for all content to load before responding
@@ -28,6 +29,12 @@ export default function handleRequest(
     const { pipe, abort } = renderToPipeableStream(<ServerRouter context={routerContext} url={request.url} />, {
       [readyOption]() {
         shellRendered = true;
+        // Clear timeout when response is ready
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        
         const body = new PassThrough();
         const stream = createReadableStreamFromReadable(body);
 
@@ -43,6 +50,11 @@ export default function handleRequest(
         pipe(body);
       },
       onShellError(error: unknown) {
+        // Clear timeout on error
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         honeybadger.notify(error as Error);
         reject(error);
       },
@@ -61,6 +73,9 @@ export default function handleRequest(
 
     // Abort the rendering stream after the `streamTimeout` so it has time to
     // flush down the rejected boundaries
-    setTimeout(abort, streamTimeout + 1000);
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      abort();
+    }, streamTimeout + 1000);
   });
 }

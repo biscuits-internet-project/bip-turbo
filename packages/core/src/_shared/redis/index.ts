@@ -8,13 +8,36 @@ export class RedisService {
     if (!url) {
       throw new Error("Redis URL is required");
     }
-    this.client = createClient({ url: this.url });
+    this.client = createClient({ 
+      url: this.url,
+      // Add reconnection strategy to handle disconnections gracefully
+      socket: {
+        reconnectStrategy: (retries: number) => {
+          if (retries > 10) {
+            return new Error("Max reconnection attempts reached");
+          }
+          return Math.min(retries * 100, 3000);
+        }
+      }
+    });
+    
+    // Handle connection errors to prevent unhandled rejections
+    this.client.on('error', (err) => {
+      console.error('Redis Client Error:', err);
+    });
   }
 
   async connect(): Promise<void> {
     if (!this.isConnected) {
       await this.client.connect();
       this.isConnected = true;
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.isConnected) {
+      await this.client.disconnect();
+      this.isConnected = false;
     }
   }
 
