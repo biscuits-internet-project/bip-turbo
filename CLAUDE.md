@@ -144,3 +144,17 @@ This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime. Ke
 - Database uses **PostgreSQL with Prisma** - all DB operations should go through repositories
 - **Biome** handles both linting and formatting - don't use ESLint or Prettier
 - The web app uses **React Router v7** (latest version) with file-based routing
+
+# CRITICAL RULE: DON'T FUCKING GUESS
+
+**NEVER guess field names, function signatures, or code structure.** Always look at the actual files first. Guessing wastes time, causes bugs, and is lazy. If you're about to write code that uses specific fields or functions, CHECK THE SOURCE FILES FIRST.
+
+This applies to:
+- Database field names
+- Function parameters
+- API endpoints
+- File paths
+- Configuration keys
+- ANYTHING that has a definitive answer in the codebase
+
+No assumptions. No guessing. Look it up.
