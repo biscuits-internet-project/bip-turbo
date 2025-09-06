@@ -1,4 +1,4 @@
-import { CacheKeys, type ReviewMinimal, type Setlist } from "@bip/domain";
+import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -12,6 +12,7 @@ import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
+import { fetchUserAttendance } from "~/lib/fetch-utils";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
@@ -30,17 +31,18 @@ interface ShowLoaderData {
   setlist: Setlist;
   reviews: ReviewMinimal[];
   selectedRecordingId: string | null;
+  userAttendance: Attendance | null;
 }
 
 
-export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> => {
+export const loader = publicLoader(async ({ params, context }): Promise<ShowLoaderData> => {
   console.log("⚡️ shows.$slug loader:", params.slug);
   const slug = params.slug;
   if (!slug) throw notFound();
 
   // Cache the setlist data (core show data that's expensive to compute)
   const cacheKey = CacheKeys.show.data(slug);
-  
+
   const setlist = await services.cache.getOrSet(
     cacheKey,
     async () => {
@@ -50,10 +52,13 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
       return setlist;
     }
   );
-  
+
   // Load reviews fresh (not cached - infrequent access, simple query)
   const reviews = await services.reviews.findByShowId(setlist.show.id);
-  
+
+  // If user is authenticated, fetch their attendance for this show
+  const userAttendance = await fetchUserAttendance(context.currentUser, setlist.show.id);
+
   console.log(`🎯 Show data loaded for ${slug} - setlist cached, reviews fresh`);
 
   // Find Archive.org recordings for this show date with Redis caching
@@ -105,7 +110,7 @@ export const loader = publicLoader(async ({ params }): Promise<ShowLoaderData> =
     // Continue without recordings if there's an error
   }
 
-  return { setlist, reviews, selectedRecordingId };
+  return { setlist, reviews, selectedRecordingId, userAttendance };
 });
 
 export function meta({ data }: { data: ShowLoaderData }) {
@@ -113,10 +118,10 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const { setlist, reviews: initialReviews, selectedRecordingId } = useSerializedLoaderData<ShowLoaderData>();
+  const { setlist, reviews: initialReviews, selectedRecordingId, userAttendance } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const queryClient = useQueryClient();
-  
+
   // Get the internal user ID from Supabase metadata
   const internalUserId = user?.user_metadata?.internal_user_id;
 
@@ -156,7 +161,7 @@ export default function Show() {
       }
 
       const result = await response.json();
-      
+
       if (!result.review) {
         throw new Error("Invalid response format from server: missing review");
       }
@@ -166,7 +171,7 @@ export default function Show() {
     onSuccess: async (review) => {
       toast.success("Review submitted successfully");
       queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) => [...old, review]);
-      
+
       // Refresh the average rating for the show
       queryClient.invalidateQueries({ queryKey: ["ratings", setlist.show.id, "Show"] });
     },
@@ -288,7 +293,7 @@ export default function Show() {
           <SetlistCard
             key={setlist.show.id}
             setlist={setlist}
-            userAttendance={null}
+            userAttendance={userAttendance}
             userRating={null}
             showRating={setlist.show.averageRating}
           />
