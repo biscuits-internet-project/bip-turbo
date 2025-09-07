@@ -66,7 +66,9 @@ make db-scrub
 ```
 
 4. Run the app
+In two different shells:
 ```
+docker compose up
 make web
 ```
 
