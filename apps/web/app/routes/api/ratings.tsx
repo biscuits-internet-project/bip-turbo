@@ -33,7 +33,7 @@ export const action = protectedAction(async ({ request, context }) => {
       const body = await request.json();
       const { rateableId, rateableType, value } = body;
 
-      if (!rateableId || !rateableType || !value || value < 1 || value > 5) {
+      if (!rateableId || !rateableType || !value || value < 0.5 || value > 5) {
         return badRequest();
       }
 
