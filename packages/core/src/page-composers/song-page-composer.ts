@@ -30,7 +30,17 @@ export class SongPageComposer {
     let actualLastPlayedDate: Date | null = null;
     let lastVenue: { name: string; city?: string; state?: string } | null = null;
     let lastShowSlug: string | null = null;
-    const lastPerformance = await this.db.$queryRaw<[{ show_date: string | null; show_slug: string | null; venue_name: string | null; venue_city: string | null; venue_state: string | null }]>`
+    const lastPerformance = await this.db.$queryRaw<
+      [
+        {
+          show_date: string | null;
+          show_slug: string | null;
+          venue_name: string | null;
+          venue_city: string | null;
+          venue_state: string | null;
+        },
+      ]
+    >`
       SELECT shows.date as show_date, shows.slug as show_slug, venues.name as venue_name, venues.city as venue_city, venues.state as venue_state
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
@@ -39,7 +49,7 @@ export class SongPageComposer {
       ORDER BY shows.date DESC
       LIMIT 1
     `;
-    
+
     if (lastPerformance[0]) {
       if (lastPerformance[0].show_date) {
         actualLastPlayedDate = new Date(lastPerformance[0].show_date);
@@ -59,7 +69,9 @@ export class SongPageComposer {
     // Get first performance venue and show slug
     let firstVenue: { name: string; city?: string; state?: string } | null = null;
     let firstShowSlug: string | null = null;
-    const firstPerformance = await this.db.$queryRaw<[{ show_slug: string | null; venue_name: string | null; venue_city: string | null; venue_state: string | null }]>`
+    const firstPerformance = await this.db.$queryRaw<
+      [{ show_slug: string | null; venue_name: string | null; venue_city: string | null; venue_state: string | null }]
+    >`
       SELECT shows.slug as show_slug, venues.name as venue_name, venues.city as venue_city, venues.state as venue_state
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
@@ -68,7 +80,7 @@ export class SongPageComposer {
       ORDER BY shows.date ASC
       LIMIT 1
     `;
-    
+
     if (firstPerformance[0]) {
       if (firstPerformance[0].show_slug) {
         firstShowSlug = firstPerformance[0].show_slug;
@@ -138,12 +150,12 @@ export class SongPageComposer {
     const performances = result.map((row: PerformanceDto) => this.transformToSongPagePerformanceView(row));
 
     // Bulk fetch annotations for all tracks
-    const trackIds = performances.map(p => p.trackId);
+    const trackIds = performances.map((p) => p.trackId);
     const annotations = await this.db.annotation.findMany({
       where: {
         trackId: {
-          in: trackIds
-        }
+          in: trackIds,
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -161,7 +173,7 @@ export class SongPageComposer {
     }
 
     // Map annotations to performances
-    performances.forEach(perf => {
+    performances.forEach((perf) => {
       perf.annotations = annotationsByTrackId.get(perf.trackId) || [];
     });
 
@@ -185,19 +197,21 @@ export class SongPageComposer {
   private async computePerformanceTags(performances: SongPagePerformance[]): Promise<void> {
     // For set opener/closer computation, we need to know the min/max positions for each set in each show
     const setPositionData = new Map<string, { min: number; max: number }>();
-    
+
     // Get all unique show IDs
-    const showIds = [...new Set(performances.map(p => p.show.id))];
-    
+    const showIds = [...new Set(performances.map((p) => p.show.id))];
+
     if (showIds.length > 0) {
       // Get all set position ranges in a single query
-      const setRanges = await this.db.$queryRaw<Array<{ show_id: string; set: string; min_position: number; max_position: number }>>`
+      const setRanges = await this.db.$queryRaw<
+        Array<{ show_id: string; set: string; min_position: number; max_position: number }>
+      >`
         SELECT show_id, set, MIN(position) as min_position, MAX(position) as max_position
         FROM tracks 
         WHERE show_id = ANY(${showIds}::uuid[])
         GROUP BY show_id, set
       `;
-      
+
       // Build the lookup map
       for (const range of setRanges) {
         const key = `${range.show_id}|||${range.set}`;
@@ -209,42 +223,42 @@ export class SongPageComposer {
     }
 
     // Compute tags for each performance
-    performances.forEach(perf => {
-      const tags: SongPagePerformance['tags'] = {};
-      
+    performances.forEach((perf) => {
+      const tags: SongPagePerformance["tags"] = {};
+
       // Encore (sets that start with "E") - check this first
-      const isEncore = perf.set?.startsWith('E');
+      const isEncore = perf.set?.startsWith("E");
       if (isEncore) {
         tags.encore = true;
       }
-      
+
       // Set opener/closer (only for non-encore sets)
       if (perf.set && perf.position !== undefined && !isEncore) {
         const showSetKey = `${perf.show.id}|||${perf.set}`;
         const setRange = setPositionData.get(showSetKey);
-        
+
         if (setRange) {
           tags.setOpener = perf.position === setRange.min;
           tags.setCloser = perf.position === setRange.max;
         }
       }
-      
+
       // Segue in/out
       const hasSegueIn = perf.songBefore?.segue;
       const hasSegueOut = perf.segue;
       tags.segueIn = !!hasSegueIn;
       tags.segueOut = !!hasSegueOut;
-      
+
       // Standalone (no segue in or out)
       tags.standalone = !hasSegueIn && !hasSegueOut;
-      
+
       // Inverted/Dyslexic from annotations
       if (perf.annotations) {
-        const annotationText = perf.annotations.map(a => a.desc?.toLowerCase() || '').join(' ');
-        tags.inverted = annotationText.includes('inverted');
-        tags.dyslexic = annotationText.includes('dyslexic');
+        const annotationText = perf.annotations.map((a) => a.desc?.toLowerCase() || "").join(" ");
+        tags.inverted = annotationText.includes("inverted");
+        tags.dyslexic = annotationText.includes("dyslexic");
       }
-      
+
       perf.tags = tags;
     });
   }

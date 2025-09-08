@@ -19,62 +19,57 @@ interface LoaderData {
 }
 
 export const loader = publicLoader(async ({ request }): Promise<LoaderData> => {
-  const cacheKey = 'songs:index:full';
+  const cacheKey = "songs:index:full";
   const cacheOptions = { ttl: 3600 }; // 1 hour
 
-  return await services.cache.getOrSet(cacheKey, async () => {
-    const recentShowsCount = 10;
-    const [allSongs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
-      services.songs.findMany({}),
-      services.songs.findTrendingLastXShows(recentShowsCount, 6),
-      services.songs.findTrendingLastYear(),
-    ]);
+  return await services.cache.getOrSet(
+    cacheKey,
+    async () => {
+      const recentShowsCount = 10;
+      const [allSongs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
+        services.songs.findMany({}),
+        services.songs.findTrendingLastXShows(recentShowsCount, 6),
+        services.songs.findTrendingLastYear(),
+      ]);
 
-    // Filter out songs with no plays
-    const songs = allSongs.filter(song => song.timesPlayed > 0);
+      // Filter out songs with no plays
+      const songs = allSongs.filter((song) => song.timesPlayed > 0);
 
-    // Get unique show dates for first/last played venue lookup
-    const showDates = new Set<string>();
-    songs.forEach(song => {
-      if (song.dateFirstPlayed) {
-        showDates.add(song.dateFirstPlayed.toISOString().split('T')[0]);
-      }
-      if (song.dateLastPlayed) {
-        showDates.add(song.dateLastPlayed.toISOString().split('T')[0]);
-      }
-    });
+      // Get unique show dates for first/last played venue lookup
+      const showDates = new Set<string>();
+      songs.forEach((song) => {
+        if (song.dateFirstPlayed) {
+          showDates.add(song.dateFirstPlayed.toISOString().split("T")[0]);
+        }
+        if (song.dateLastPlayed) {
+          showDates.add(song.dateLastPlayed.toISOString().split("T")[0]);
+        }
+      });
 
-    // Fetch shows with venues for those dates
-    const showsWithVenues = showDates.size > 0 
-      ? await services.shows.findManyByDates(Array.from(showDates))
-      : [];
+      // Fetch shows with venues for those dates
+      const showsWithVenues = showDates.size > 0 ? await services.shows.findManyByDates(Array.from(showDates)) : [];
 
-    // Create lookup maps
-    const showsByDate = new Map(
-      showsWithVenues.map(show => [
-        show.date, 
-        show
-      ])
-    );
+      // Create lookup maps
+      const showsByDate = new Map(showsWithVenues.map((show) => [show.date, show]));
 
-    // Enhance songs with venue information
-    const enhancedSongs = songs.map(song => ({
-      ...song,
-      firstPlayedShow: song.dateFirstPlayed 
-        ? showsByDate.get(song.dateFirstPlayed.toISOString().split('T')[0])
-        : null,
-      lastPlayedShow: song.dateLastPlayed 
-        ? showsByDate.get(song.dateLastPlayed.toISOString().split('T')[0])
-        : null,
-    }));
+      // Enhance songs with venue information
+      const enhancedSongs = songs.map((song) => ({
+        ...song,
+        firstPlayedShow: song.dateFirstPlayed
+          ? showsByDate.get(song.dateFirstPlayed.toISOString().split("T")[0])
+          : null,
+        lastPlayedShow: song.dateLastPlayed ? showsByDate.get(song.dateLastPlayed.toISOString().split("T")[0]) : null,
+      }));
 
-    return { 
-      songs: enhancedSongs, 
-      trendingSongs, 
-      yearlyTrendingSongs, 
-      recentShowsCount 
-    };
-  }, cacheOptions);
+      return {
+        songs: enhancedSongs,
+        trendingSongs,
+        yearlyTrendingSongs,
+        recentShowsCount,
+      };
+    },
+    cacheOptions,
+  );
 });
 
 interface TrendingSongCardProps {
@@ -109,7 +104,6 @@ function TrendingSongCard({ song, recentShowsCount }: TrendingSongCardProps) {
     </Card>
   );
 }
-
 
 function YearlyTrendingSongs() {
   const { yearlyTrendingSongs } = useSerializedLoaderData<LoaderData>();
@@ -185,7 +179,13 @@ export default function Songs() {
           <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
         </div>
 
-        <DataTable columns={songsColumns} data={songs} searchKey="title" searchPlaceholder="Search songs..." hidePagination />
+        <DataTable
+          columns={songsColumns}
+          data={songs}
+          searchKey="title"
+          searchPlaceholder="Search songs..."
+          hidePagination
+        />
       </div>
     </div>
   );

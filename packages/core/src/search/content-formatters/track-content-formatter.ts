@@ -4,8 +4,8 @@ import type { ContentFormatter } from "./base-content-formatter";
 function asTrack(track: Record<string, unknown>) {
   return track as {
     song?: { title?: string; author?: { name?: string }; cover?: boolean; timesPlayed?: number };
-    show?: { 
-      date?: string; 
+    show?: {
+      date?: string;
       venue?: { name?: string; city?: string; state?: string };
       averageRating?: number;
       notes?: string;

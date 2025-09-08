@@ -29,7 +29,7 @@ export function TrackRatingOverlay({ track, children, className }: TrackRatingOv
   const { user } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const queryClient = useQueryClient();
-  
+
   // Fetch fresh track data when hover card opens
   const { data, isLoading } = useQuery<TrackDataResponse>({
     queryKey: ["track", track.id],
@@ -39,7 +39,7 @@ export function TrackRatingOverlay({ track, children, className }: TrackRatingOv
       });
       if (!response.ok) throw new Error("Failed to fetch track data");
       const data = await response.json();
-      console.log('Fresh track data received:', data);
+      console.log("Fresh track data received:", data);
       return data;
     },
     enabled: isOpen, // Only fetch when hover card is open
@@ -58,16 +58,14 @@ export function TrackRatingOverlay({ track, children, className }: TrackRatingOv
       <HoverCardTrigger asChild className={cn("cursor-pointer", className)}>
         {children}
       </HoverCardTrigger>
-      <HoverCardContent 
+      <HoverCardContent
         className="w-80 p-4 bg-black/90 backdrop-blur-md border-glass-border shadow-xl"
         side="top"
         align="start"
       >
         <div className="space-y-3">
-          <div className="text-lg font-medium text-brand-primary">
-            {track.song?.title}
-          </div>
-          
+          <div className="text-lg font-medium text-brand-primary">{track.song?.title}</div>
+
           {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-6 w-32" />
@@ -93,39 +91,33 @@ export function TrackRatingOverlay({ track, children, className }: TrackRatingOv
                       clipRule="evenodd"
                     />
                   </svg>
-                  <span 
-                    className="text-base font-medium"
-                    style={{ color: "hsl(var(--rating-gold))" }}
-                  >
+                  <span className="text-base font-medium" style={{ color: "hsl(var(--rating-gold))" }}>
                     {displayRating.toFixed(1)}
                   </span>
                 </div>
-                <span className="text-sm text-content-text-secondary">
-                  Average Rating
-                </span>
+                <span className="text-sm text-content-text-secondary">Average Rating</span>
               </div>
               <span className="text-xs text-content-text-tertiary">
-                {ratingCount} {ratingCount === 1 ? 'rating' : 'ratings'}
+                {ratingCount} {ratingCount === 1 ? "rating" : "ratings"}
               </span>
             </div>
           ) : (
-            <div className="text-sm text-content-text-secondary">
-              No ratings yet
-            </div>
+            <div className="text-sm text-content-text-secondary">No ratings yet</div>
           )}
-          
+
           {(data?.track.likesCount ?? track.likesCount) > 0 && (
             <div className="text-xs text-content-text-secondary">
-              {data?.track.likesCount ?? track.likesCount} {(data?.track.likesCount ?? track.likesCount) === 1 ? 'like' : 'likes'}
+              {data?.track.likesCount ?? track.likesCount}{" "}
+              {(data?.track.likesCount ?? track.likesCount) === 1 ? "like" : "likes"}
             </div>
           )}
-          
+
           {(data?.track.note ?? track.note) && (
             <div className="text-xs text-content-text-secondary border-t border-glass-border pt-2 mt-2">
               {data?.track.note ?? track.note}
             </div>
           )}
-          
+
           {user && (
             <div className="border-t border-glass-border pt-3 mt-3">
               <div className="flex items-center justify-between">

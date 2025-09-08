@@ -59,12 +59,16 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
             {/* Annotations */}
             {track.annotations && track.annotations.length > 0 && (
               <div className="mt-2 space-y-1">
-                {track.annotations.map((annotation, index) => 
-                  annotation.desc && (
-                    <div key={annotation.id || index} className="text-content-text-accent text-sm pl-2 border-l-2 border-content-bg-secondary">
-                      {annotation.desc}
-                    </div>
-                  )
+                {track.annotations.map(
+                  (annotation, index) =>
+                    annotation.desc && (
+                      <div
+                        key={annotation.id || index}
+                        className="text-content-text-accent text-sm pl-2 border-l-2 border-content-bg-secondary"
+                      >
+                        {annotation.desc}
+                      </div>
+                    ),
                 )}
               </div>
             )}

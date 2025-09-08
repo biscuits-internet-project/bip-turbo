@@ -31,8 +31,7 @@ export class ShowContentFormatter implements ContentFormatter {
     const s = asShow(show);
     const date = s.date || "Unknown Date";
     const venue = s.venue?.name || "Unknown Venue";
-    const location =
-      s.venue?.city && s.venue?.state ? `${s.venue.city}, ${s.venue.state}` : "Unknown Location";
+    const location = s.venue?.city && s.venue?.state ? `${s.venue.city}, ${s.venue.state}` : "Unknown Location";
 
     let displayText = `${date} • ${venue}, ${location}`;
 
@@ -49,8 +48,7 @@ export class ShowContentFormatter implements ContentFormatter {
     const s = asShow(show);
     const date = s.date || "Unknown Date";
     const venueName = s.venue?.name || "Unknown Venue";
-    const venueLocation =
-      s.venue?.city && s.venue?.state ? `${s.venue.city}, ${s.venue.state}` : "Unknown Location";
+    const venueLocation = s.venue?.city && s.venue?.state ? `${s.venue.city}, ${s.venue.state}` : "Unknown Location";
 
     // Emphasize date and venue by repeating them
     let content = `${date} at ${venueName}, ${venueLocation}. Show date: ${date}. Concert venue: ${venueName}. Concert at ${venueName}`;
@@ -58,11 +56,14 @@ export class ShowContentFormatter implements ContentFormatter {
     // Add comprehensive setlist with set numbers and key moments
     if (s.tracks && s.tracks.length > 0) {
       // Group tracks by set and sort by position
-      const tracksBySet = s.tracks.reduce((acc: Record<string, Array<NonNullable<typeof s.tracks>[0]>>, track) => {
-        if (!acc[track.set]) acc[track.set] = [];
-        acc[track.set].push(track);
-        return acc;
-      }, {} as Record<string, Array<NonNullable<typeof s.tracks>[0]>>);
+      const tracksBySet = s.tracks.reduce(
+        (acc: Record<string, Array<NonNullable<typeof s.tracks>[0]>>, track) => {
+          if (!acc[track.set]) acc[track.set] = [];
+          acc[track.set].push(track);
+          return acc;
+        },
+        {} as Record<string, Array<NonNullable<typeof s.tracks>[0]>>,
+      );
 
       const setlistParts: string[] = [];
       const keyMoments: string[] = [];
@@ -75,7 +76,9 @@ export class ShowContentFormatter implements ContentFormatter {
       });
 
       sortedSets.forEach((setName) => {
-        const setTracks = tracksBySet[setName].sort((a: Record<string, unknown>, b: Record<string, unknown>) => (a.position as number) - (b.position as number));
+        const setTracks = tracksBySet[setName].sort(
+          (a: Record<string, unknown>, b: Record<string, unknown>) => (a.position as number) - (b.position as number),
+        );
 
         // Identify set opener and closer
         if (setTracks.length > 0) {
@@ -111,7 +114,9 @@ export class ShowContentFormatter implements ContentFormatter {
 
       if (allTracks.length > 0) {
         keyMoments.unshift(`Show opener: ${(allTracks[0].song as Record<string, unknown>)?.title || "Unknown"}`);
-        keyMoments.push(`Show closer: ${(allTracks[allTracks.length - 1].song as Record<string, unknown>)?.title || "Unknown"}`);
+        keyMoments.push(
+          `Show closer: ${(allTracks[allTracks.length - 1].song as Record<string, unknown>)?.title || "Unknown"}`,
+        );
       }
 
       content += `. ${keyMoments.join(". ")}. Full setlist: ${setlistParts.join(". ")}`;

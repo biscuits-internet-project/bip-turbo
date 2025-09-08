@@ -454,12 +454,16 @@ export default function UserProfile() {
                         </Link>
                       </CardTitle>
                       <span className="text-sm text-content-text-tertiary">
-                        {formatDateLong(post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString())}
+                        {formatDateLong(
+                          post.createdAt ? new Date(post.createdAt).toISOString() : new Date().toISOString(),
+                        )}
                       </span>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-content-text-secondary line-clamp-3">{(post.content || "").substring(0, 200)}...</p>
+                    <p className="text-content-text-secondary line-clamp-3">
+                      {(post.content || "").substring(0, 200)}...
+                    </p>
                     <Link
                       to={`/blog/${post.slug}`}
                       className="inline-flex items-center gap-1 text-brand-primary hover:text-brand-secondary text-sm font-medium mt-3 hover:underline transition-colors"

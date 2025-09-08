@@ -1,4 +1,11 @@
-import { CacheKeys, type Attendance, type BlogPostWithUser, type Rating, type Setlist, type TourDate } from "@bip/domain";
+import {
+  CacheKeys,
+  type Attendance,
+  type BlogPostWithUser,
+  type Rating,
+  type Setlist,
+  type TourDate,
+} from "@bip/domain";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
@@ -48,16 +55,13 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
   // Cache the recent setlists (core show data only - user-specific data handled separately)
-  const recentSetlists = await services.cache.getOrSet(
-    CacheKeys.home.recentSetlists(15),
-    async () => {
-      console.log("📅 Loading recent setlists from DB for home page");
-      return await services.setlists.findMany({
-        pagination: { limit: 15 },
-        sort: [{ field: "date", direction: "desc" }],
-      });
-    }
-  );
+  const recentSetlists = await services.cache.getOrSet(CacheKeys.home.recentSetlists(15), async () => {
+    console.log("📅 Loading recent setlists from DB for home page");
+    return await services.setlists.findMany({
+      pagination: { limit: 15 },
+      sort: [{ field: "date", direction: "desc" }],
+    });
+  });
 
   console.log(`🎯 Home page setlists loaded: ${recentSetlists.length} shows`);
 

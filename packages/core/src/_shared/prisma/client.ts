@@ -9,13 +9,13 @@ declare global {
 // Add connection pool parameters for Supabase free tier (long-lived server)
 function addConnectionPoolParams(url: string): string {
   if (!url) return url;
-  
+
   const dbUrl = new URL(url);
-  
+
   // Conservative settings for Supabase free tier
   dbUrl.searchParams.set("connection_limit", "5");
   dbUrl.searchParams.set("pool_timeout", "20");
-  
+
   return dbUrl.toString();
 }
 

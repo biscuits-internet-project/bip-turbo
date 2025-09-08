@@ -52,7 +52,7 @@ async function fetchUserAttendances(context: Context, showIds: string[]): Promis
     console.log(`👤 Fetch ${userAttendances.length} user attendances from ${showIds.length} venue shows`);
     return userAttendances;
   } catch (error) {
-    console.warn('Failed to load user attendances:', error);
+    console.warn("Failed to load user attendances:", error);
     return [];
   }
 }
@@ -82,7 +82,10 @@ export const loader = publicLoader(async ({ params, context }: LoaderFunctionArg
   };
 
   // Get user attendances for all shows at this venue
-  const userAttendances = await fetchUserAttendances(context, setlists.map((setlist) => setlist.show.id));
+  const userAttendances = await fetchUserAttendances(
+    context,
+    setlists.map((setlist) => setlist.show.id),
+  );
 
   return { venue, setlists, stats, userAttendances };
 });
@@ -109,7 +112,6 @@ function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
   );
 }
 
-
 export function meta({ data }: { data: LoaderData }) {
   return getVenueMeta({
     ...data.venue,
@@ -124,9 +126,9 @@ export default function VenuePage() {
   const queryClient = useQueryClient();
 
   // Create a map for quick attendance lookup by showId
-  const attendanceMap = useMemo(() =>
-    new Map(userAttendances.map(attendance => [attendance.showId, attendance])),
-    [userAttendances]
+  const attendanceMap = useMemo(
+    () => new Map(userAttendances.map((attendance) => [attendance.showId, attendance])),
+    [userAttendances],
   );
 
   // Mutation for rating

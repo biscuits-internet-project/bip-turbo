@@ -34,7 +34,7 @@ export class AnnotationService {
   async upsertForTrack(trackId: string, desc: string | null): Promise<Annotation | null> {
     // Check if annotation exists for this track
     const existingAnnotations = await this.repository.findByTrackId(trackId);
-    
+
     if (existingAnnotations.length > 0) {
       // Update the first annotation
       const annotation = existingAnnotations[0];
@@ -49,31 +49,31 @@ export class AnnotationService {
       // Create new annotation if desc is provided
       return this.repository.create({ trackId, desc });
     }
-    
+
     return null;
   }
 
   async upsertMultipleForTrack(trackId: string, annotationsText: string | null): Promise<Annotation[]> {
     // Delete existing annotations first
     await this.repository.deleteByTrackId(trackId);
-    
+
     if (!annotationsText || annotationsText.trim() === "") {
       return [];
     }
-    
+
     // Split by line breaks and filter out empty lines
     const annotationLines = annotationsText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-    
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
     // Create new annotations
     const annotations: Annotation[] = [];
     for (const desc of annotationLines) {
       const annotation = await this.repository.create({ trackId, desc });
       annotations.push(annotation);
     }
-    
+
     return annotations;
   }
 }

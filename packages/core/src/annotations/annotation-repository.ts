@@ -67,7 +67,7 @@ export class AnnotationRepository {
       createdAt: now,
       updatedAt: now,
     };
-    console.log('Creating annotation with data:', createData);
+    console.log("Creating annotation with data:", createData);
     const result = await this.db.annotation.create({
       data: createData,
     });

@@ -42,27 +42,27 @@ export async function setCookie(name: string, value: string, options: CookieOpti
 
   // Fallback to document.cookie
   let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
-  
+
   if (cookieOptions.path) {
     cookieString += `; path=${cookieOptions.path}`;
   }
-  
+
   if (cookieOptions.maxAge !== undefined) {
     cookieString += `; max-age=${cookieOptions.maxAge}`;
   }
-  
+
   if (cookieOptions.expires) {
     cookieString += `; expires=${cookieOptions.expires.toUTCString()}`;
   }
-  
+
   if (cookieOptions.domain) {
     cookieString += `; domain=${cookieOptions.domain}`;
   }
-  
+
   if (cookieOptions.secure) {
     cookieString += "; secure";
   }
-  
+
   if (cookieOptions.sameSite) {
     cookieString += `; samesite=${cookieOptions.sameSite}`;
   }
@@ -93,7 +93,7 @@ export async function getCookie(name: string): Promise<string | null> {
       return decodeURIComponent(cookieValue.join("=").trim());
     }
   }
-  
+
   return null;
 }
 
@@ -131,7 +131,11 @@ export async function clearAllCookies(): Promise<void> {
     // Use Cookie Store API if available
     if ("cookieStore" in window) {
       const cookies = await (window as WindowWithCookieStore).cookieStore.getAll();
-      await Promise.all(cookies.map((cookie: { name: string }) => (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name)));
+      await Promise.all(
+        cookies.map((cookie: { name: string }) =>
+          (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name),
+        ),
+      );
       return;
     }
   } catch (error) {

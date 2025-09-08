@@ -1,9 +1,7 @@
 import type { RatingRepository, RatingWithShow, RatingWithTrack } from "./rating-repository";
 
 export class RatingService {
-  constructor(
-    private repository: RatingRepository,
-  ) {}
+  constructor(private repository: RatingRepository) {}
 
   async findManyByUserIdAndRateableIds(userId: string, rateableIds: string[], rateableType: string) {
     return this.repository.findManyByUserIdAndRateableIds(userId, rateableIds, rateableType);

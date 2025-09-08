@@ -11,15 +11,15 @@ export class RedisService {
     if (!url) {
       throw new Error("Redis URL is required");
     }
-    
+
     // Use existing global client if available
     if (globalRedisClient) {
       this.client = globalRedisClient;
       return;
     }
-    
+
     // Create new client and store globally
-    this.client = createClient({ 
+    this.client = createClient({
       url: this.url,
       // Add reconnection strategy to handle disconnections gracefully
       socket: {
@@ -28,16 +28,16 @@ export class RedisService {
             return new Error("Max reconnection attempts reached");
           }
           return Math.min(retries * 100, 3000);
-        }
-      }
+        },
+      },
     });
-    
+
     // Handle connection errors to prevent unhandled rejections
-    this.client.on('error', (err) => {
-      console.error('Redis Client Error:', err);
+    this.client.on("error", (err) => {
+      console.error("Redis Client Error:", err);
       globalIsConnected = false;
     });
-    
+
     // Store as global singleton
     globalRedisClient = this.client;
   }

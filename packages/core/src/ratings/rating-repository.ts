@@ -245,7 +245,7 @@ export class RatingRepository {
     const ratingsCount = stats._count.id;
 
     // Update the appropriate table based on rateable type
-    if (rateableType === 'Show') {
+    if (rateableType === "Show") {
       await this.db.show.update({
         where: { id: rateableId },
         data: {
@@ -254,7 +254,7 @@ export class RatingRepository {
           updatedAt: new Date(),
         },
       });
-    } else if (rateableType === 'Track') {
+    } else if (rateableType === "Track") {
       await this.db.track.update({
         where: { id: rateableId },
         data: {

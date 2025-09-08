@@ -34,7 +34,7 @@ export default function handleRequest(
           clearTimeout(timeoutId);
           timeoutId = null;
         }
-        
+
         const body = new PassThrough();
         const stream = createReadableStreamFromReadable(body);
 

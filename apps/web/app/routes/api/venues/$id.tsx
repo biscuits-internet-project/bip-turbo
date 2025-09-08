@@ -11,7 +11,7 @@ export const loader = publicLoader(async ({ params }) => {
 
   try {
     const venue = await services.venues.findById(id);
-    
+
     if (!venue) {
       throw new Response("Venue not found", { status: 404 });
     }

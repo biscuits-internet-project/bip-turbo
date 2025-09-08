@@ -86,7 +86,10 @@ export const songsColumns: ColumnDef<Song>[] = [
       return date ? (
         <div className="text-base">
           {show?.slug ? (
-            <Link to={`/shows/${show.slug}`} className="text-brand-primary hover:text-brand-secondary transition-colors">
+            <Link
+              to={`/shows/${show.slug}`}
+              className="text-brand-primary hover:text-brand-secondary transition-colors"
+            >
               <div>{formatDate(date)}</div>
               {show?.venue && (
                 <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary">
@@ -130,7 +133,10 @@ export const songsColumns: ColumnDef<Song>[] = [
       return date ? (
         <div className="text-base">
           {show?.slug ? (
-            <Link to={`/shows/${show.slug}`} className="text-brand-primary hover:text-brand-secondary transition-colors">
+            <Link
+              to={`/shows/${show.slug}`}
+              className="text-brand-primary hover:text-brand-secondary transition-colors"
+            >
               <div>{formatDate(date)}</div>
               {show?.venue && (
                 <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary">
@@ -155,7 +161,7 @@ export const songsColumns: ColumnDef<Song>[] = [
     },
   },
   {
-    accessorKey: "yearlyPlayData", 
+    accessorKey: "yearlyPlayData",
     header: ({ column }) => {
       return (
         <Button

@@ -42,7 +42,7 @@ async function fetchUserAttendances(context: Context, showIds: string[]): Promis
     console.log(`👤 Fetch ${userAttendances.length} user attendances from ${showIds.length} total shows`);
     return userAttendances;
   } catch (error) {
-    console.warn('Failed to load user attendances:', error);
+    console.warn("Failed to load user attendances:", error);
     return [];
   }
 }
@@ -77,7 +77,7 @@ export const loader = publicLoader(async ({ request, context }): Promise<LoaderD
       setlists,
       year: yearInt,
       searchQuery,
-      userAttendances
+      userAttendances,
     };
   }
 
@@ -87,30 +87,30 @@ export const loader = publicLoader(async ({ request, context }): Promise<LoaderD
 
   const yearCacheKey = CacheKeys.shows.list({
     year: yearInt,
-    sort: sortDirection
+    sort: sortDirection,
   });
 
-  setlists = await services.cache.getOrSet(
-    yearCacheKey,
-    async () => {
-      console.log(`📅 Loading shows from DB for year: ${yearInt}`);
-      return await services.setlists.findMany({
-        filters: {
-          year: yearInt,
-        },
-        sort: [{ field: "date", direction: sortDirection }],
-      });
-    }
-  );
+  setlists = await services.cache.getOrSet(yearCacheKey, async () => {
+    console.log(`📅 Loading shows from DB for year: ${yearInt}`);
+    return await services.setlists.findMany({
+      filters: {
+        year: yearInt,
+      },
+      sort: [{ field: "date", direction: sortDirection }],
+    });
+  });
 
-  userAttendances = await fetchUserAttendances(context, setlists.map(setlist => setlist.show.id));
+  userAttendances = await fetchUserAttendances(
+    context,
+    setlists.map((setlist) => setlist.show.id),
+  );
 
   console.log(`🎯 Year ${yearInt} shows loaded: ${setlists.length} shows`);
 
   return {
     setlists,
     year: yearInt,
-    userAttendances
+    userAttendances,
   };
 });
 
@@ -124,9 +124,9 @@ export default function Shows() {
   const queryClient = useQueryClient();
 
   // Create a map for quick attendance lookup by showId
-  const attendanceMap = useMemo(() =>
-    new Map(userAttendances.map(attendance => [attendance.showId, attendance])),
-    [userAttendances]
+  const attendanceMap = useMemo(
+    () => new Map(userAttendances.map((attendance) => [attendance.showId, attendance])),
+    [userAttendances],
   );
 
   const rateMutation = useMutation({

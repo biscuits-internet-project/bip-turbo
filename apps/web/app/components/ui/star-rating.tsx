@@ -40,7 +40,14 @@ interface SetlistData {
   [key: string]: unknown;
 }
 
-export function StarRating({ className, disabled, rateableId, rateableType, initialRating, onRatingChange }: StarRatingProps) {
+export function StarRating({
+  className,
+  disabled,
+  rateableId,
+  rateableType,
+  initialRating,
+  onRatingChange,
+}: StarRatingProps) {
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const queryClient = useQueryClient();

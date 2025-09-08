@@ -62,7 +62,10 @@ export class BlogPostRepository {
       ? `${process.env.SUPABASE_STORAGE_URL}/object/public/${(coverFile.file as Record<string, unknown>).path}`
       : undefined;
 
-    const imageUrls = files.map((f: Record<string, unknown>) => `${process.env.SUPABASE_STORAGE_URL}/object/public/${(f.file as Record<string, unknown>).path}`);
+    const imageUrls = files.map(
+      (f: Record<string, unknown>) =>
+        `${process.env.SUPABASE_STORAGE_URL}/object/public/${(f.file as Record<string, unknown>).path}`,
+    );
 
     return {
       ...mapBlogPostToDomainEntity(result),
@@ -146,11 +149,14 @@ export class BlogPostRepository {
         ? `${process.env.SUPABASE_STORAGE_URL}/object/public/${(coverFile.file as Record<string, unknown>).path}`
         : undefined;
 
-      const imageUrls = files.map((f: Record<string, unknown>) => `${process.env.SUPABASE_STORAGE_URL}/object/public/${(f.file as Record<string, unknown>).path}`);
+      const imageUrls = files.map(
+        (f: Record<string, unknown>) =>
+          `${process.env.SUPABASE_STORAGE_URL}/object/public/${(f.file as Record<string, unknown>).path}`,
+      );
 
       return {
         ...mapBlogPostToDomainEntity(blogPost as DbBlogPost),
-        user: blogPost.user as { id: string; username: string; avatarUrl: string | null; },
+        user: blogPost.user as { id: string; username: string; avatarUrl: string | null },
         coverImage,
         imageUrls,
       };

@@ -21,42 +21,41 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Get the user from the session
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
     if (authUser) {
       try {
         if (!authUser.email) {
-          throw new Error('User has no email address');
+          throw new Error("User has no email address");
         }
-        
+
         // Ensure local user exists (create if new, return existing if not)
         const localUser = await services.users.findOrCreate({
           id: authUser.id, // Use Supabase ID for new users (but existing users keep their ID)
           email: authUser.email,
-          username: authUser.user_metadata.username || authUser.email.split('@')[0]
+          username: authUser.user_metadata.username || authUser.email.split("@")[0],
         });
-        
-        logger.info({ 
-          message: "Local user synced", 
+
+        logger.info({
+          message: "Local user synced",
           authUserId: authUser.id,
           localUserId: localUser.id,
-          email: authUser.email 
+          email: authUser.email,
         });
-        
+
         // ALWAYS store the internal user ID in Supabase metadata
         // This is our single source of truth
         if (!authUser.user_metadata.internal_user_id || authUser.user_metadata.internal_user_id !== localUser.id) {
           const adminClient = getServiceRoleClient();
-          const { error: updateError } = await adminClient.auth.admin.updateUserById(
-            authUser.id,
-            {
-              user_metadata: {
-                ...authUser.user_metadata,
-                internal_user_id: localUser.id
-              }
-            }
-          );
-          
+          const { error: updateError } = await adminClient.auth.admin.updateUserById(authUser.id, {
+            user_metadata: {
+              ...authUser.user_metadata,
+              internal_user_id: localUser.id,
+            },
+          });
+
           if (updateError) {
             logger.error({ error: updateError, message: "Failed to update user metadata with internal_user_id" });
           } else {

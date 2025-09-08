@@ -8,7 +8,7 @@ import { getServerClient } from "~/server/supabase";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase } = getServerClient(request);
-  
+
   const {
     data: { user },
   } = await supabase.auth.getUser();

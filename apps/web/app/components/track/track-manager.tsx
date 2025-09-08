@@ -247,11 +247,12 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   const startEditing = (track: Track) => {
     setEditingId(track.id);
     // Join all annotations with line breaks for editing
-    const annotationsText = track.annotations
-      ?.map(annotation => annotation.desc)
-      .filter(desc => desc)
-      .join('\n') || null;
-    
+    const annotationsText =
+      track.annotations
+        ?.map((annotation) => annotation.desc)
+        .filter((desc) => desc)
+        .join("\n") || null;
+
     setFormData({
       id: track.id,
       songId: track.songId,
@@ -533,7 +534,10 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 text-white hover:bg-red-700 border-red-600">
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 text-white hover:bg-red-700 border-red-600"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

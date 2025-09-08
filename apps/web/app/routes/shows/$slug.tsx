@@ -49,7 +49,7 @@ async function fetchUserAttendance(context: Context, showId: string): Promise<At
     console.log(`👤 Fetch user attendance for show ${showId}: attended? ${!!userAttendance}`);
     return userAttendance;
   } catch (error) {
-    console.warn('Failed to load user attendance:', error);
+    console.warn("Failed to load user attendance:", error);
     return null;
   }
 }
@@ -62,15 +62,12 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
   // Cache the setlist data (core show data that's expensive to compute)
   const cacheKey = CacheKeys.show.data(slug);
 
-  const setlist = await services.cache.getOrSet(
-    cacheKey,
-    async () => {
-      console.log(`📀 Loading setlist data from DB for ${slug}`);
-      const setlist = await services.setlists.findByShowSlug(slug);
-      if (!setlist) throw notFound();
-      return setlist;
-    }
-  );
+  const setlist = await services.cache.getOrSet(cacheKey, async () => {
+    console.log(`📀 Loading setlist data from DB for ${slug}`);
+    const setlist = await services.setlists.findByShowSlug(slug);
+    if (!setlist) throw notFound();
+    return setlist;
+  });
 
   // Load reviews fresh (not cached - infrequent access, simple query)
   const reviews = await services.reviews.findByShowId(setlist.show.id);
@@ -137,7 +134,12 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const { setlist, reviews: initialReviews, selectedRecordingId, userAttendance } = useSerializedLoaderData<ShowLoaderData>();
+  const {
+    setlist,
+    reviews: initialReviews,
+    selectedRecordingId,
+    userAttendance,
+  } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const queryClient = useQueryClient();
 
@@ -155,7 +157,6 @@ export default function Show() {
     },
     initialData: initialReviews,
   });
-
 
   // Mutation for creating reviews
   const createReviewMutation = useMutation({

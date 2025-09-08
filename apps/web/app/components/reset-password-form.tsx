@@ -44,7 +44,7 @@ export function ResetPasswordForm({ className, onSubmit, ...props }: ResetPasswo
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-zinc-200">
                   Confirm New Password

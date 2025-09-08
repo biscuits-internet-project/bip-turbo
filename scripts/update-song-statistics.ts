@@ -57,7 +57,7 @@ async function updateAllSongStatistics() {
   console.log(`✅ Update complete!`);
   console.log(`   Updated: ${updated} songs`);
   console.log(`   Errors: ${errors} songs`);
-  
+
   process.exit(0);
 }
 

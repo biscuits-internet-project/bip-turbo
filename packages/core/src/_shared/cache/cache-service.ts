@@ -55,7 +55,10 @@ export class CacheService {
       this.logger.debug(`Cache pattern delete: ${pattern} (${deletedCount} keys)`);
       return deletedCount;
     } catch (error) {
-      this.logger.error(`Cache pattern delete error for pattern ${pattern}:`, error instanceof Error ? error.message : String(error));
+      this.logger.error(
+        `Cache pattern delete error for pattern ${pattern}:`,
+        error instanceof Error ? error.message : String(error),
+      );
       return 0;
     }
   }
@@ -72,11 +75,7 @@ export class CacheService {
   /**
    * Cache-aside pattern helper. Gets value from cache, or executes fetcher and caches result.
    */
-  async getOrSet<T>(
-    key: string,
-    fetcher: () => Promise<T>,
-    options?: CacheOptions,
-  ): Promise<T> {
+  async getOrSet<T>(key: string, fetcher: () => Promise<T>, options?: CacheOptions): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== null) {
       return cached;

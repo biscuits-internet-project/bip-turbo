@@ -18,16 +18,20 @@ export const songSchema = z.object({
   dateFirstPlayed: z.date().nullable(),
   actualLastPlayedDate: z.date().nullable(),
   showsSinceLastPlayed: z.number().nullable(),
-  lastVenue: z.object({
-    name: z.string(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-  }).nullable(),
-  firstVenue: z.object({
-    name: z.string(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-  }).nullable(),
+  lastVenue: z
+    .object({
+      name: z.string(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+    })
+    .nullable(),
+  firstVenue: z
+    .object({
+      name: z.string(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+    })
+    .nullable(),
   firstShowSlug: z.string().nullable(),
   lastShowSlug: z.string().nullable(),
   yearlyPlayData: z.record(z.string(), z.unknown()).default({}),

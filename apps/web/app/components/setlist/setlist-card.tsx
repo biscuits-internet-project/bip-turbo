@@ -137,7 +137,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
 
       <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
         {setlist.show.notes && (
-          <div 
+          <div
             className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"
             dangerouslySetInnerHTML={{ __html: setlist.show.notes }}
           />
@@ -164,7 +164,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                         {trackAnnotationMap.has(track.id) && (
                           <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
                             {trackAnnotationMap.get(track.id)?.map((index, i) => (
-                              <span key={index} className={i > 0 ? 'ml-1' : ''}>
+                              <span key={index} className={i > 0 ? "ml-1" : ""}>
                                 {index}
                               </span>
                             ))}

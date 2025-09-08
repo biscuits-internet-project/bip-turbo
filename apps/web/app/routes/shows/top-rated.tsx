@@ -54,11 +54,7 @@ const columns: ColumnDef<ShowWithRank>[] = [
   {
     accessorKey: "rank",
     header: "#",
-    cell: ({ row }) => (
-      <span className="font-medium text-content-text-primary">
-        {row.original.rank}
-      </span>
-    ),
+    cell: ({ row }) => <span className="font-medium text-content-text-primary">{row.original.rank}</span>,
   },
   {
     accessorKey: "averageRating",
@@ -67,13 +63,9 @@ const columns: ColumnDef<ShowWithRank>[] = [
       <div className="flex items-center gap-3">
         <div className="flex items-center">
           <Star className="h-4 w-4 text-rating-gold mr-1" />
-          <span className="font-medium text-content-text-primary">
-            {row.original.averageRating?.toFixed(1) || "—"}
-          </span>
+          <span className="font-medium text-content-text-primary">{row.original.averageRating?.toFixed(1) || "—"}</span>
         </div>
-        <span className="text-content-text-tertiary text-sm">
-          ({row.original.ratingsCount})
-        </span>
+        <span className="text-content-text-tertiary text-sm">({row.original.ratingsCount})</span>
       </div>
     ),
   },
@@ -81,7 +73,7 @@ const columns: ColumnDef<ShowWithRank>[] = [
     accessorKey: "date",
     header: "Date",
     cell: ({ row }) => (
-      <Link 
+      <Link
         to={`/shows/${row.original.slug}`}
         className="text-brand-primary hover:text-brand-secondary hover:underline"
       >
@@ -95,7 +87,7 @@ const columns: ColumnDef<ShowWithRank>[] = [
     cell: ({ row }) => {
       const venue = row.original.venue;
       if (!venue) return <span className="text-content-text-secondary">—</span>;
-      
+
       return (
         <div>
           <div className="text-content-text-primary">{venue.name}</div>
@@ -110,7 +102,7 @@ const columns: ColumnDef<ShowWithRank>[] = [
 
 export default function TopRated() {
   const { shows = [] } = useSerializedLoaderData<LoaderData>();
-  
+
   // Add rank to each show
   const showsWithRank: ShowWithRank[] = shows.map((show, index) => ({
     ...show,
@@ -124,12 +116,7 @@ export default function TopRated() {
           <h1 className="page-heading">TOP RATED SHOWS</h1>
         </div>
 
-        <DataTable 
-          columns={columns} 
-          data={showsWithRank}
-          hideSearch={true}
-          hidePaginationText={true}
-        />
+        <DataTable columns={columns} data={showsWithRank} hideSearch={true} hidePaginationText={true} />
       </div>
     </div>
   );

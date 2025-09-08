@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
-
 // Add a loader function
 export const loader = publicLoader<void>(async () => {});
 

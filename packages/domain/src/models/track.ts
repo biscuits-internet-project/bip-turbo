@@ -35,14 +35,17 @@ export const trackMinimalSchema = z.object({
 
 export type TrackMinimal = z.infer<typeof trackMinimalSchema>;
 
-export const trackUpdateSchema = trackSchema.pick({
-  set: true,
-  position: true,
-  segue: true,
-  note: true,
-  allTimer: true,
-}).extend({
-  annotationDesc: z.string().nullable().optional(),
-}).partial();
+export const trackUpdateSchema = trackSchema
+  .pick({
+    set: true,
+    position: true,
+    segue: true,
+    note: true,
+    allTimer: true,
+  })
+  .extend({
+    annotationDesc: z.string().nullable().optional(),
+  })
+  .partial();
 
 export type TrackUpdate = z.infer<typeof trackUpdateSchema>;

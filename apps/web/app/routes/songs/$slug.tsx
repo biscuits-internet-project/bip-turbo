@@ -58,7 +58,13 @@ function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
   );
 }
 
-function PerformanceTable({ performances: initialPerformances, songTitle }: { performances: SongPagePerformance[]; songTitle: string }) {
+function PerformanceTable({
+  performances: initialPerformances,
+  songTitle,
+}: {
+  performances: SongPagePerformance[];
+  songTitle: string;
+}) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
 
@@ -79,19 +85,28 @@ function PerformanceTable({ performances: initialPerformances, songTitle }: { pe
   // Filter performances based on active filters
   const filteredPerformances = useMemo(() => {
     if (activeFilters.size === 0) return initialPerformances;
-    
-    return initialPerformances.filter(perf => {
-      return Array.from(activeFilters).some(filterKey => {
+
+    return initialPerformances.filter((perf) => {
+      return Array.from(activeFilters).some((filterKey) => {
         switch (filterKey) {
-          case 'setOpener': return perf.tags?.setOpener;
-          case 'setCloser': return perf.tags?.setCloser;
-          case 'encore': return perf.tags?.encore;
-          case 'segueIn': return perf.tags?.segueIn;
-          case 'segueOut': return perf.tags?.segueOut;
-          case 'standalone': return perf.tags?.standalone;
-          case 'inverted': return perf.tags?.inverted;
-          case 'dyslexic': return perf.tags?.dyslexic;
-          default: return false;
+          case "setOpener":
+            return perf.tags?.setOpener;
+          case "setCloser":
+            return perf.tags?.setCloser;
+          case "encore":
+            return perf.tags?.encore;
+          case "segueIn":
+            return perf.tags?.segueIn;
+          case "segueOut":
+            return perf.tags?.segueOut;
+          case "standalone":
+            return perf.tags?.standalone;
+          case "inverted":
+            return perf.tags?.inverted;
+          case "dyslexic":
+            return perf.tags?.dyslexic;
+          default:
+            return false;
         }
       });
     });
@@ -160,44 +175,70 @@ function PerformanceTable({ performances: initialPerformances, songTitle }: { pe
         enableSorting: false,
         cell: (info) => {
           const { before, after, currentSong } = info.getValue();
-          
+
           const parts = [];
-          
+
           // Add song before
           if (before?.songTitle) {
             parts.push(
-              <a key="before" href={`/songs/${before.songSlug}`} className="text-content-text-secondary hover:text-brand-primary">
+              <a
+                key="before"
+                href={`/songs/${before.songSlug}`}
+                className="text-content-text-secondary hover:text-brand-primary"
+              >
                 {before.songTitle}
-              </a>
+              </a>,
             );
             if (before.segue) {
-              parts.push(<span key="segue1" className="text-content-text-tertiary mx-1"> &gt; </span>);
+              parts.push(
+                <span key="segue1" className="text-content-text-tertiary mx-1">
+                  {" "}
+                  &gt;{" "}
+                </span>,
+              );
             } else {
-              parts.push(<span key="sep1" className="text-content-text-tertiary">,&nbsp;</span>);
+              parts.push(
+                <span key="sep1" className="text-content-text-tertiary">
+                  ,&nbsp;
+                </span>,
+              );
             }
           }
-          
+
           // Add current song
           parts.push(
-            <span key="current" className="font-bold" style={{ color: '#DDD6FE' }}>
+            <span key="current" className="font-bold" style={{ color: "#DDD6FE" }}>
               {currentSong}
-            </span>
+            </span>,
           );
-          
+
           // Add song after
           if (after?.songTitle) {
             if (info.row.original.segue) {
-              parts.push(<span key="segue2" className="text-content-text-tertiary mx-1"> &gt; </span>);
+              parts.push(
+                <span key="segue2" className="text-content-text-tertiary mx-1">
+                  {" "}
+                  &gt;{" "}
+                </span>,
+              );
             } else {
-              parts.push(<span key="sep2" className="text-content-text-tertiary">,&nbsp;</span>);
+              parts.push(
+                <span key="sep2" className="text-content-text-tertiary">
+                  ,&nbsp;
+                </span>,
+              );
             }
             parts.push(
-              <a key="after" href={`/songs/${after.songSlug}`} className="text-content-text-secondary hover:text-brand-primary">
+              <a
+                key="after"
+                href={`/songs/${after.songSlug}`}
+                className="text-content-text-secondary hover:text-brand-primary"
+              >
                 {after.songTitle}
-              </a>
+              </a>,
             );
           }
-          
+
           return parts.length > 0 ? <div className="flex items-center flex-wrap">{parts}</div> : null;
         },
       },
@@ -214,25 +255,25 @@ function PerformanceTable({ performances: initialPerformances, songTitle }: { pe
         enableSorting: false,
         cell: (info) => {
           const { annotations, notes } = info.getValue();
-          
+
           const items = [];
-          
+
           // Add annotations first
           if (annotations && annotations.length > 0) {
-            annotations.forEach(annotation => {
+            annotations.forEach((annotation) => {
               if (annotation.desc) {
                 items.push(annotation.desc);
               }
             });
           }
-          
+
           // Add track notes
           if (notes) {
             items.push(notes);
           }
-          
+
           if (items.length === 0) return null;
-          
+
           return <CombinedNotes items={items} />;
         },
       },
@@ -266,14 +307,14 @@ function PerformanceTable({ performances: initialPerformances, songTitle }: { pe
   });
 
   const filterButtons = [
-    { key: 'setOpener', label: 'Set Opener' },
-    { key: 'setCloser', label: 'Set Closer' },
-    { key: 'encore', label: 'Encore' },
-    { key: 'segueIn', label: 'Segue In' },
-    { key: 'segueOut', label: 'Segue Out' },
-    { key: 'standalone', label: 'Standalone' },
-    { key: 'inverted', label: 'Inverted' },
-    { key: 'dyslexic', label: 'Dyslexic' },
+    { key: "setOpener", label: "Set Opener" },
+    { key: "setCloser", label: "Set Closer" },
+    { key: "encore", label: "Encore" },
+    { key: "segueIn", label: "Segue In" },
+    { key: "segueOut", label: "Segue Out" },
+    { key: "standalone", label: "Standalone" },
+    { key: "inverted", label: "Inverted" },
+    { key: "dyslexic", label: "Dyslexic" },
   ];
 
   return (
@@ -281,15 +322,15 @@ function PerformanceTable({ performances: initialPerformances, songTitle }: { pe
       {/* Filter Controls */}
       <div className="flex flex-wrap gap-2">
         <span className="text-sm text-content-text-secondary mr-2 self-center">Filters:</span>
-        {filterButtons.map(filter => (
+        {filterButtons.map((filter) => (
           <button
             type="button"
             key={filter.key}
             onClick={() => toggleFilter(filter.key)}
             className={`px-3 py-1 text-sm rounded-md border transition-colors ${
               activeFilters.has(filter.key)
-                ? 'bg-brand-primary border-brand-primary text-white'
-                : 'bg-transparent border-glass-border text-content-text-secondary hover:border-brand-primary/60'
+                ? "bg-brand-primary border-brand-primary text-white"
+                : "bg-transparent border-glass-border text-content-text-secondary hover:border-brand-primary/60"
             }`}
           >
             {filter.label}
@@ -313,54 +354,54 @@ function PerformanceTable({ performances: initialPerformances, songTitle }: { pe
 
       <div className="relative overflow-x-auto">
         <table className="w-full text-md">
-        <thead>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
-              {headerGroup.headers.map((header) => (
-                <th key={header.id} className="p-3" style={{ width: header.getSize() }}>
-                  {header.isPlaceholder ? null : (
-                    <button
-                      type="button"
-                      className={
-                        header.column.getCanSort()
-                          ? "cursor-pointer select-none hover:text-content-text-primary w-full text-left"
-                          : "w-full text-left"
-                      }
-                      onClick={(_e) => {
-                        header.column.toggleSorting();
-                      }}
-                    >
-                      <span className={header.column.getIsSorted() ? "text-content-text-primary font-semibold" : ""}>
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                      </span>
-                      {header.column.getIsSorted() && (
-                        <span className="text-brand-primary ml-1">
-                          {header.column.getIsSorted() === "asc" ? (
-                            <ArrowUpIcon className="h-4 w-4 inline" />
-                          ) : (
-                            <ArrowDownIcon className="h-4 w-4 inline" />
-                          )}
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
+                {headerGroup.headers.map((header) => (
+                  <th key={header.id} className="p-3" style={{ width: header.getSize() }}>
+                    {header.isPlaceholder ? null : (
+                      <button
+                        type="button"
+                        className={
+                          header.column.getCanSort()
+                            ? "cursor-pointer select-none hover:text-content-text-primary w-full text-left"
+                            : "w-full text-left"
+                        }
+                        onClick={(_e) => {
+                          header.column.toggleSorting();
+                        }}
+                      >
+                        <span className={header.column.getIsSorted() ? "text-content-text-primary font-semibold" : ""}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
                         </span>
-                      )}
-                    </button>
-                  )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="border-t border-glass-border/30 hover:bg-hover-glass">
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="p-3">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                        {header.column.getIsSorted() && (
+                          <span className="text-brand-primary ml-1">
+                            {header.column.getIsSorted() === "asc" ? (
+                              <ArrowUpIcon className="h-4 w-4 inline" />
+                            ) : (
+                              <ArrowDownIcon className="h-4 w-4 inline" />
+                            )}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr key={row.id} className="border-t border-glass-border/30 hover:bg-hover-glass">
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="p-3">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -370,31 +411,32 @@ function CombinedNotes({ items }: { items: string[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Count total lines across all items
-  const allLines = items.flatMap(item => item.split("\n"));
+  const allLines = items.flatMap((item) => item.split("\n"));
   const shouldTruncate = allLines.length > 2;
 
-  const displayItems = shouldTruncate && !isExpanded ? 
-    // Show only first 2 lines total
-    (() => {
-      const result = [];
-      let lineCount = 0;
-      for (const item of items) {
-        const itemLines = item.split("\n");
-        const remainingLines = 2 - lineCount;
-        if (remainingLines <= 0) break;
-        
-        if (itemLines.length <= remainingLines) {
-          result.push(item);
-          lineCount += itemLines.length;
-        } else {
-          result.push(itemLines.slice(0, remainingLines).join("\n"));
-          lineCount = 2;
-          break;
-        }
-      }
-      return result;
-    })()
-    : items;
+  const displayItems =
+    shouldTruncate && !isExpanded
+      ? // Show only first 2 lines total
+        (() => {
+          const result = [];
+          let lineCount = 0;
+          for (const item of items) {
+            const itemLines = item.split("\n");
+            const remainingLines = 2 - lineCount;
+            if (remainingLines <= 0) break;
+
+            if (itemLines.length <= remainingLines) {
+              result.push(item);
+              lineCount += itemLines.length;
+            } else {
+              result.push(itemLines.slice(0, remainingLines).join("\n"));
+              lineCount = 2;
+              break;
+            }
+          }
+          return result;
+        })()
+      : items;
 
   const showBullets = items.length > 1;
 
@@ -608,7 +650,9 @@ export default function SongPage() {
                   : "Never"
               }
               sublabel={
-                song.actualLastPlayedDate && song.showsSinceLastPlayed !== null && song.showsSinceLastPlayed !== undefined
+                song.actualLastPlayedDate &&
+                song.showsSinceLastPlayed !== null &&
+                song.showsSinceLastPlayed !== undefined
                   ? song.showsSinceLastPlayed <= 1
                     ? "last show"
                     : `${song.showsSinceLastPlayed} shows ago`
@@ -653,10 +697,7 @@ export default function SongPage() {
             }
           />
         )}
-        <StatBox 
-          label="Most Common Year" 
-          value={song.mostCommonYear || "—"} 
-        />
+        <StatBox label="Most Common Year" value={song.mostCommonYear || "—"} />
       </dl>
 
       {song.notes && (

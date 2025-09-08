@@ -6,7 +6,8 @@ import { slugify } from "../_shared/utils/slugify";
 import type { CreateSongInput, UpdateSongInput } from "./song-service";
 
 export function mapSongToDomainEntity(dbSong: DbSong): Song {
-  const { createdAt, updatedAt, dateLastPlayed, dateFirstPlayed, yearlyPlayData, longestGapsData, cover, ...rest } = dbSong;
+  const { createdAt, updatedAt, dateLastPlayed, dateFirstPlayed, yearlyPlayData, longestGapsData, cover, ...rest } =
+    dbSong;
 
   return {
     ...rest,
@@ -232,17 +233,17 @@ export class SongRepository {
     // Get all unique shows for this song (count shows, not individual tracks)
     const uniqueShows = await this.db.track.findMany({
       where: { songId },
-      distinct: ['showId'],
+      distinct: ["showId"],
       include: {
         show: {
-          select: { date: true }
-        }
+          select: { date: true },
+        },
       },
       orderBy: {
         show: {
-          date: 'asc'
-        }
-      }
+          date: "asc",
+        },
+      },
     });
 
     if (uniqueShows.length === 0) {
@@ -254,7 +255,7 @@ export class SongRepository {
           dateFirstPlayed: null,
           dateLastPlayed: null,
           yearlyPlayData: {},
-        }
+        },
       });
       return;
     }
@@ -263,16 +264,15 @@ export class SongRepository {
     const timesPlayed = uniqueShows.length;
     const firstShow = uniqueShows[0];
     const lastShow = uniqueShows[uniqueShows.length - 1];
-    
+
     // Build yearly play data (count unique shows per year)
     const yearlyPlayData: Record<string, number> = {};
-    uniqueShows.forEach(track => {
+    uniqueShows.forEach((track) => {
       if (track.show?.date) {
         const year = new Date(track.show.date).getFullYear().toString();
         yearlyPlayData[year] = (yearlyPlayData[year] || 0) + 1;
       }
     });
-
 
     // Update the song
     await this.db.song.update({
@@ -283,7 +283,7 @@ export class SongRepository {
         dateLastPlayed: lastShow.show?.date ? new Date(lastShow.show.date) : null,
         yearlyPlayData: yearlyPlayData as any,
         updatedAt: new Date(),
-      }
+      },
     });
   }
 }

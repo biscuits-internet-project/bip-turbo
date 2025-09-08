@@ -244,8 +244,8 @@ export class ShowRepository {
 
   async findManyByDates(dates: string[]): Promise<Show[]> {
     // Ensure dates are strings and properly formatted
-    const stringDates = dates.map(date => String(date));
-    
+    const stringDates = dates.map((date) => String(date));
+
     const results = await this.db.show.findMany({
       where: {
         date: {
@@ -256,7 +256,7 @@ export class ShowRepository {
         venue: true,
       },
       orderBy: {
-        date: 'asc',
+        date: "asc",
       },
     });
 

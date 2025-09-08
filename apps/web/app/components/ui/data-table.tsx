@@ -78,7 +78,7 @@ export function DataTable<TData, TValue>({
           </div>
         </div>
       )}
-      
+
       <div className="card-premium rounded-lg shadow-lg overflow-hidden">
         <Table>
           <TableHeader>
@@ -86,8 +86,8 @@ export function DataTable<TData, TValue>({
               <TableRow key={headerGroup.id} className="border-glass-border/60 hover:bg-transparent bg-glass-bg/30">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead 
-                      key={header.id} 
+                    <TableHead
+                      key={header.id}
                       className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-8 first:pl-8 last:pr-8"
                     >
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -104,7 +104,7 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   className={`border-glass-border/30 transition-all duration-200 hover:bg-hover-glass/80 ${
-                    index % 2 === 0 ? 'bg-glass-bg/5' : 'bg-glass-bg/15'
+                    index % 2 === 0 ? "bg-glass-bg/5" : "bg-glass-bg/15"
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -120,9 +120,7 @@ export function DataTable<TData, TValue>({
                   <div className="flex flex-col items-center gap-2">
                     <div className="text-lg">No results found</div>
                     {searchKey && table.getColumn(searchKey)?.getFilterValue() ? (
-                      <div className="text-sm">
-                        Try adjusting your search terms
-                      </div>
+                      <div className="text-sm">Try adjusting your search terms</div>
                     ) : null}
                   </div>
                 </TableCell>
@@ -131,14 +129,17 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      
+
       {!hidePagination && (
         <div className="flex items-center justify-between px-2">
           {!hidePaginationText ? (
             <div className="text-sm text-content-text-secondary font-medium">
               Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
-              {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)} of{" "}
-              {table.getFilteredRowModel().rows.length} results
+              {Math.min(
+                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                table.getFilteredRowModel().rows.length,
+              )}{" "}
+              of {table.getFilteredRowModel().rows.length} results
             </div>
           ) : (
             <div></div>

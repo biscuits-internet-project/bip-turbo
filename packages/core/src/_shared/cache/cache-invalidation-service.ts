@@ -12,11 +12,8 @@ export class CacheInvalidationService {
    */
   async invalidateShow(slug: string): Promise<void> {
     this.logger.info(`Invalidating show cache for slug: ${slug}`);
-    
-    await Promise.all([
-      this.cache.del(CacheKeys.show.data(slug)),
-      this.cache.del(CacheKeys.setlist.data(slug)),
-    ]);
+
+    await Promise.all([this.cache.del(CacheKeys.show.data(slug)), this.cache.del(CacheKeys.setlist.data(slug))]);
   }
 
   /**
@@ -31,11 +28,8 @@ export class CacheInvalidationService {
     }
 
     this.logger.info(`Invalidating show cache for ID: ${showId}, slug: ${slug}`);
-    
-    await Promise.all([
-      this.cache.del(CacheKeys.show.data(slug)),
-      this.cache.del(CacheKeys.setlist.data(slug)),
-    ]);
+
+    await Promise.all([this.cache.del(CacheKeys.show.data(slug)), this.cache.del(CacheKeys.setlist.data(slug))]);
   }
 
   /**
@@ -62,7 +56,7 @@ export class CacheInvalidationService {
    */
   async invalidateShowComprehensive(showId: string, slug?: string): Promise<void> {
     this.logger.info(`Comprehensive invalidation for show: ${showId}, slug: ${slug}`);
-    
+
     await Promise.all([
       slug ? this.invalidateShow(slug) : Promise.resolve(),
       this.invalidateShowReviews(showId),
@@ -75,14 +69,9 @@ export class CacheInvalidationService {
    */
   async invalidateShows(shows: Array<{ id: string; slug?: string }>): Promise<void> {
     this.logger.info(`Bulk invalidating ${shows.length} shows`);
-    
-    const invalidations = shows.map(show => 
-      this.invalidateShowByShowId(show.id, show.slug)
-    );
-    
-    await Promise.all([
-      ...invalidations,
-      this.invalidateShowListings(),
-    ]);
+
+    const invalidations = shows.map((show) => this.invalidateShowByShowId(show.id, show.slug));
+
+    await Promise.all([...invalidations, this.invalidateShowListings()]);
   }
 }
