@@ -205,6 +205,8 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
               rateableType="Show"
               className="hover:scale-105 transition-transform"
               initialRating={userRating?.value}
+              showDate={setlist.show.date}
+              showSlug={setlist.show.slug}
             />
             <AttendanceToggle showId={setlist.show.id} initialAttendance={userAttendance} />
           </div>
