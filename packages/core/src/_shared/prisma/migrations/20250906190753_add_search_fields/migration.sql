@@ -75,7 +75,7 @@ BEGIN
     -- Add position context
     CASE 
       WHEN t.position = 1 THEN 'opener '
-      WHEN t.position = (SELECT MAX(position) FROM tracks WHERE show_id = t.show_id AND set = t.set) THEN 'closer '
+      WHEN t.position = (SELECT MAX(position) FROM tracks tr WHERE tr.show_id = t.show_id AND tr.set = t.set) THEN 'closer '
       ELSE ''
     END ||
     -- Add segue information
