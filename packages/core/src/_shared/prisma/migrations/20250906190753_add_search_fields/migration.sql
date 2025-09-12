@@ -30,7 +30,7 @@ BEGIN
   INTO venue_info
   FROM shows s
   LEFT JOIN venues v ON s.venue_id = v.id
-  WHERE s.id = show_id;
+  WHERE s.id = build_show_search_text.show_id;
   
   -- Get complete setlist with songs, annotations, and segues
   SELECT string_agg(
@@ -56,7 +56,7 @@ BEGIN
     COALESCE(setlist_info, '')
   INTO search_content
   FROM shows s
-  WHERE s.id = show_id;
+  WHERE s.id = build_show_search_text.show_id;
   
   RETURN search_content;
 END;
@@ -93,7 +93,7 @@ BEGIN
   LEFT JOIN tracks next_track ON t.next_track_id = next_track.id
   LEFT JOIN songs next_song ON next_track.song_id = next_song.id
   LEFT JOIN annotations ann ON ann.track_id = t.id
-  WHERE t.id = track_id;
+  WHERE t.id = build_track_search_text.track_id;
   
   RETURN search_content;
 END;
