@@ -1,3 +1,4 @@
+import { CacheKeys } from "@bip/domain/index";
 import { protectedAction, publicLoader } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
 import { services } from "~/server/services";
@@ -31,7 +32,7 @@ export const action = protectedAction(async ({ request, context }) => {
   if (request.method === "POST") {
     try {
       const body = await request.json();
-      const { rateableId, rateableType, value } = body;
+      const { rateableId, rateableType, value, showDate, showSlug } = body;
 
       if (!rateableId || !rateableType || !value || value < 0.5 || value > 5) {
         return badRequest();
@@ -56,6 +57,23 @@ export const action = protectedAction(async ({ request, context }) => {
 
       // Get the updated average rating for the show
       const averageRating = await services.ratings.getAverageForRateable(rateableId, rateableType);
+      if (showSlug && rateableType === "Show") {
+        const showCacheKey = CacheKeys.show.data(showSlug);
+        services.cache.del(showCacheKey);
+        if (showDate) {
+          const yearInt = new Date(showDate).getFullYear();
+          const yearCacheKeyAsc = CacheKeys.shows.list({
+            year: yearInt,
+            sort: "asc",
+          });
+          const yearCacheKeyDesc = CacheKeys.shows.list({
+            year: yearInt,
+            sort: "desc",
+          });
+          services.cache.del(yearCacheKeyAsc);
+          services.cache.del(yearCacheKeyDesc);
+        }
+      }
 
       return { userRating: updatedRating.value, averageRating };
     } catch (error) {
