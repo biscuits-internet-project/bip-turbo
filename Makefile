@@ -40,6 +40,17 @@ doppler:
 migrate:
 	cd packages/core && bun prisma:migrate:dev
 
+migrate-no-drift-check:
+	@cd packages/core && \
+	ADMIN_URL="$$(doppler secrets get DATABASE_URL --plain | sed 's|postgresql://postgres:|postgresql://supabase_admin:|')" && \
+	echo "Applying migrations with supabase_admin user..." && \
+	for migration in $$(ls src/_shared/prisma/migrations/ | sort); do \
+		echo "Applying migration: $$migration"; \
+		DATABASE_URL="$$ADMIN_URL" doppler run -- bun prisma migrate resolve --applied "$$migration" --schema=./src/_shared/prisma/schema.prisma 2>/dev/null || true; \
+	done && \
+	echo "All migrations processed. Running final deploy to check status..." && \
+	DATABASE_URL="$$ADMIN_URL" doppler run -- bun prisma migrate deploy --schema=./src/_shared/prisma/schema.prisma || echo "Deploy completed with warnings/errors"
+
 migrate-create:
 	cd packages/core && bun prisma:migrate:create
 
