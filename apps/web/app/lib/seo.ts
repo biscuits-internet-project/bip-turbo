@@ -120,7 +120,7 @@ export function getShowsMeta(year?: number, searchQuery?: string) {
   } else if (year) {
     title = `${year} Shows | ${SEO_CONFIG.siteName}`;
     description = `Browse all ${SEO_CONFIG.bandName} shows from ${year}. View setlists, recordings, reviews and ratings from every show.`;
-    url = `${SEO_CONFIG.url}/shows?year=${year}`;
+    url = `${SEO_CONFIG.url}/shows/year/${year}`;
   } else {
     title = `Shows | ${SEO_CONFIG.siteName}`;
     description = `Browse and discover ${SEO_CONFIG.bandName} shows, including setlists, recordings, and ratings. Complete show database from 1995 to present.`;

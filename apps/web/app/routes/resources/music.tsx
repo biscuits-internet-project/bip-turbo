@@ -147,11 +147,11 @@ export default function Music() {
             synthesizers taking a more prominent role.
           </p>
           <p className="text-content-text-secondary mb-4">
-            <Link to="/shows?year=2003" className="text-brand-primary hover:text-brand-secondary hover:underline">
+            <Link to="/shows/year/2003" className="text-brand-primary hover:text-brand-secondary hover:underline">
               2003
             </Link>{" "}
             and{" "}
-            <Link to="/shows?year=2004" className="text-brand-primary hover:text-brand-secondary hover:underline">
+            <Link to="/shows/year/2004" className="text-brand-primary hover:text-brand-secondary hover:underline">
               2004
             </Link>{" "}
             were particularly notable years for these techno experiments, with songs like "I-Man" and "7-11" receiving

@@ -2,7 +2,7 @@ import { CacheKeys, type Attendance, type Setlist } from "@bip/domain";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, type LoaderFunctionArgs } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
@@ -47,28 +47,10 @@ async function fetchUserAttendances(context: Context, showIds: string[]): Promis
   }
 }
 
-export const loader = publicLoader(async ({ request, context }): Promise<LoaderData> => {
+export const loader = publicLoader(async ({ request, context, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
-  const yearParam = url.searchParams.get("year");
-
-  // If there's a year parameter, redirect to the new path-based URL
-  if (yearParam) {
-    const redirectUrl = new URL(`/shows/year/${yearParam}`, url.origin);
-    // Preserve any other search parameters (like q for search)
-    const searchQuery = url.searchParams.get("q");
-    if (searchQuery) {
-      redirectUrl.searchParams.set("q", searchQuery);
-    }
-    throw new Response(null, {
-      status: 301,
-      headers: {
-        Location: redirectUrl.toString(),
-      },
-    });
-  }
-
-  const year = new Date().getFullYear();
-  const yearInt = year;
+  const year = params.year || new Date().getFullYear();
+  const yearInt = Number.parseInt(year as string);
   const searchQuery = url.searchParams.get("q") || undefined;
 
   let setlists: Setlist[] = [];
@@ -136,7 +118,7 @@ export function meta({ data }: { data: LoaderData }) {
   return getShowsMeta(data.year, data.searchQuery);
 }
 
-export default function Shows() {
+export default function ShowsByYear() {
   const { setlists, year, searchQuery, userAttendances } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const queryClient = useQueryClient();

@@ -70,6 +70,7 @@ export default [
   layout("routes/shows/_layout.tsx", [
     ...prefix("shows", [
       index("routes/shows/_index.tsx"),
+      route("year/:year", "routes/shows/year/$year.tsx"),
       route(":slug", "routes/shows/$slug.tsx"),
       route("top-rated", "routes/shows/top-rated.tsx"),
       route("tour-dates", "routes/shows/tour-dates.tsx"),
