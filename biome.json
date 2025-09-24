@@ -20,6 +20,9 @@
       "recommended": true,
       "security": {
         "noDangerouslySetInnerHtml": "off"
+      },
+      "suspicious": {
+        "noConsole": "warn"
       }
     }
   },
