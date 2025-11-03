@@ -23,6 +23,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
+import { RatingComponent } from "~/components/rating";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -278,19 +279,21 @@ function PerformanceTable({
         },
       },
     ),
-    columnHelper.accessor("rating", {
-      header: "Rating",
-      size: 64,
-      enableSorting: true,
-      cell: (info) => {
-        const rating = info.getValue();
-        return rating && rating > 0 ? (
-          <span className="text-right block text-yellow-500">{`★ ${rating.toFixed(1)}`}</span>
-        ) : (
-          <span className="text-right block">—</span>
-        );
+    columnHelper.accessor(
+      (row) => ({
+        rating: row.rating,
+        ratingsCount: row.ratingsCount,
+      }),
+      {
+        header: "Rating",
+        size: 64,
+        enableSorting: true,
+        cell: (info) => {
+          const { rating, ratingsCount } = info.getValue();
+          return <RatingComponent rating={rating || null} ratingsCount={ratingsCount || null} />;
+        },
       },
-    }),
+    ),
   ];
 
   const table = useReactTable({
@@ -806,9 +809,7 @@ export default function SongPage() {
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="text-lg font-medium text-content-text-primary">{p.show.date}</div>
-                          {p.rating && p.rating > 0 && (
-                            <div className="text-base text-yellow-500">{`★ ${p.rating.toFixed(1)}`}</div>
-                          )}
+                          <RatingComponent rating={p.rating || null} ratingsCount={p.ratingsCount} />
                         </div>
                         <div className="space-y-2">
                           <div className="text-brand-secondary/90 font-medium text-base">{p.venue?.name}</div>
