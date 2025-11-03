@@ -1,7 +1,7 @@
 import type { Show } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Star } from "lucide-react";
 import { Link } from "react-router-dom";
+import { RatingComponent } from "~/components/rating";
 import { DataTable } from "~/components/ui/data-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -59,15 +59,7 @@ const columns: ColumnDef<ShowWithRank>[] = [
   {
     accessorKey: "averageRating",
     header: "Rating",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <div className="flex items-center">
-          <Star className="h-4 w-4 text-rating-gold mr-1" />
-          <span className="font-medium text-content-text-primary">{row.original.averageRating?.toFixed(1) || "—"}</span>
-        </div>
-        <span className="text-content-text-tertiary text-sm">({row.original.ratingsCount})</span>
-      </div>
-    ),
+    cell: ({ row }) => <RatingComponent rating={row.original.averageRating} ratingsCount={row.original.ratingsCount} />,
   },
   {
     accessorKey: "date",
