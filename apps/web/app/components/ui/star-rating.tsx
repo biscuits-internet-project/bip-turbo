@@ -12,7 +12,6 @@ interface StarRatingProps {
   rateableId: string;
   rateableType: string;
   initialRating?: number | null;
-  showDate?: string;
   showSlug?: string;
   onRatingChange?: (rating: number) => void;
 }
@@ -48,7 +47,6 @@ export function StarRating({
   rateableId,
   rateableType,
   initialRating,
-  showDate,
   showSlug,
   onRatingChange,
 }: StarRatingProps) {
@@ -89,7 +87,6 @@ export function StarRating({
           rateableId,
           rateableType,
           value,
-          showDate,
           showSlug,
         }),
       });
