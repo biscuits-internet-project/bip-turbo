@@ -71,11 +71,19 @@ export function getHomeMeta() {
 // Generate meta tags for a show page
 export function getShowMeta(setlist: Setlist) {
   const show = setlist.show;
-  const date = new Date(show.date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // Parse date manually to avoid timezone offset issues
+  const dateParts = show.date.split("T")[0].split("-");
+  const date =
+    dateParts.length === 3
+      ? (() => {
+          const [year, month, day] = dateParts;
+          const monthName = new Date(Number(year), Number(month) - 1, Number(day)).toLocaleString("default", {
+            month: "long",
+          });
+          return `${monthName} ${day}, ${year}`;
+        })()
+      : show.date;
+
   const venue = show.venue?.name || "Unknown Venue";
   const location = show.venue ? `${show.venue.city}, ${show.venue.state}` : "";
 
