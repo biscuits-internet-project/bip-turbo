@@ -71,7 +71,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
     venues: new VenueRepository(db),
     blogPosts: new BlogPostRepository(db),
     reviews: new ReviewRepository(db),
-    ratings: new RatingRepository(db),
+    ratings: new RatingRepository(db, cacheInvalidation),
     attendances: new AttendanceRepository(db),
     files: new FileRepository(db),
     searchHistories: new SearchHistoryRepository(db),

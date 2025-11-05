@@ -1,4 +1,5 @@
 import type { Rating } from "@bip/domain";
+import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbClient, DbRating } from "../_shared/database/models";
 
 export interface RatingWithShow extends Rating {
@@ -61,7 +62,10 @@ export function mapRatingToDbModel(entity: Partial<Rating>): Partial<DbRating> {
 }
 
 export class RatingRepository {
-  constructor(protected db: DbClient) {}
+  constructor(
+    protected db: DbClient,
+    protected cacheInvalidation: CacheInvalidationService,
+  ) {}
 
   async findManyByUserIdAndRateableIds(userId: string, rateableIds: string[], rateableType: string): Promise<Rating[]> {
     const results = await this.db.rating.findMany({
@@ -70,7 +74,13 @@ export class RatingRepository {
     return results.map((result) => mapRatingToDomainEntity(result));
   }
 
-  async upsert(data: { rateableId: string; rateableType: string; userId: string; value: number }): Promise<Rating> {
+  async upsert(data: {
+    rateableId: string;
+    rateableType: string;
+    userId: string;
+    value: number;
+    showSlug?: string;
+  }): Promise<Rating> {
     const result = await this.db.rating.upsert({
       where: {
         userId_rateableId_rateableType: {
@@ -92,6 +102,10 @@ export class RatingRepository {
         updatedAt: new Date(),
       },
     });
+
+    if (data.rateableType === "Show" && data.showSlug) {
+      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug);
+    }
 
     // Update the related show/track average rating and count
     await this.updateRateableAverageRating(data.rateableId, data.rateableType);

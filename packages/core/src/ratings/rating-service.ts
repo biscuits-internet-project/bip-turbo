@@ -1,3 +1,4 @@
+import type { Rating } from "@bip/domain";
 import type { RatingRepository, RatingWithShow, RatingWithTrack } from "./rating-repository";
 
 export class RatingService {
@@ -7,7 +8,13 @@ export class RatingService {
     return this.repository.findManyByUserIdAndRateableIds(userId, rateableIds, rateableType);
   }
 
-  async upsert(data: { rateableId: string; rateableType: string; userId: string; value: number }) {
+  async upsert(data: {
+    rateableId: string;
+    rateableType: string;
+    userId: string;
+    value: number;
+    showSlug?: string;
+  }): Promise<Rating> {
     return this.repository.upsert(data);
   }
 

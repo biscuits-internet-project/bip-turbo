@@ -31,7 +31,7 @@ export const action = protectedAction(async ({ request, context }) => {
   if (request.method === "POST") {
     try {
       const body = await request.json();
-      const { rateableId, rateableType, value } = body;
+      const { rateableId, rateableType, value, showSlug } = body;
 
       if (!rateableId || !rateableType || !value || value < 0.5 || value > 5) {
         return badRequest();
@@ -52,6 +52,7 @@ export const action = protectedAction(async ({ request, context }) => {
         rateableType,
         userId: user.id,
         value,
+        showSlug,
       });
 
       // Get the updated average rating for the show

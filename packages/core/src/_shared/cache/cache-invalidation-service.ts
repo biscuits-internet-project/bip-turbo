@@ -54,12 +54,12 @@ export class CacheInvalidationService {
   /**
    * Comprehensive show invalidation - clears all caches related to a show
    */
-  async invalidateShowComprehensive(showId: string, slug?: string): Promise<void> {
+  async invalidateShowComprehensive(showId?: string, slug?: string): Promise<void> {
     this.logger.info(`Comprehensive invalidation for show: ${showId}, slug: ${slug}`);
 
     await Promise.all([
       slug ? this.invalidateShow(slug) : Promise.resolve(),
-      this.invalidateShowReviews(showId),
+      showId ? this.invalidateShowReviews(showId) : Promise.resolve(),
       this.invalidateShowListings(),
     ]);
   }
