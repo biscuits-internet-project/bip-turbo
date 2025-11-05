@@ -16,6 +16,7 @@ export type SongPagePerformance = {
   songBefore?: TrackMinimal;
   songAfter?: TrackMinimal;
   rating?: number;
+  ratingsCount?: number;
   notes?: string;
   allTimer?: boolean;
   segue?: string | null;

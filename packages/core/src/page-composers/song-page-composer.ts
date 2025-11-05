@@ -1,4 +1,4 @@
-import type { SongPagePerformance, SongPageView, Annotation } from "@bip/domain";
+import type { Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
 import type { DbClient } from "../_shared/database/models";
 import type { SongRepository } from "../songs/song-repository";
 
@@ -18,7 +18,7 @@ export class SongPageComposer {
     if (song.dateLastPlayed) {
       const showsAfterLastPlayed = await this.db.$queryRaw<[{ count: string }]>`
         SELECT COUNT(*)::text as count
-        FROM shows 
+        FROM shows
         WHERE date::date > ${song.dateLastPlayed}::date
       `;
       showsSinceLastPlayed = parseInt(showsAfterLastPlayed[0].count);
@@ -96,7 +96,7 @@ export class SongPageComposer {
     if (actualLastPlayedDate) {
       const showsAfterLastPlayed = await this.db.$queryRaw<[{ count: string }]>`
         SELECT COUNT(*)::text as count
-        FROM shows 
+        FROM shows
         WHERE date::date > ${actualLastPlayedDate}::date
       `;
       showsSinceLastPlayed = parseInt(showsAfterLastPlayed[0].count);
@@ -121,6 +121,7 @@ export class SongPageComposer {
         tracks.position,
         tracks.all_timer,
         tracks.average_rating,
+        tracks.ratings_count,
         tracks.note,
         nextTracks.segue as next_track_segue,
         prevTracks.segue as prev_track_segue,
@@ -133,11 +134,11 @@ export class SongPageComposer {
       FROM tracks
       JOIN shows on tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
-      LEFT JOIN tracks nextTracks ON tracks.show_id = nextTracks.show_id 
+      LEFT JOIN tracks nextTracks ON tracks.show_id = nextTracks.show_id
         and nextTracks.position = tracks.position + 1
         and nextTracks.set = tracks.set
       LEFT JOIN songs nextSongs ON nextTracks.song_id = nextSongs.id
-      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id 
+      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id
         and prevTracks.position = tracks.position - 1
         and prevTracks.set = tracks.set
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
@@ -201,7 +202,7 @@ export class SongPageComposer {
         Array<{ show_id: string; set: string; min_position: number; max_position: number }>
       >`
         SELECT show_id, set, MIN(position) as min_position, MAX(position) as max_position
-        FROM tracks 
+        FROM tracks
         WHERE show_id = ANY(${showIds}::uuid[])
         GROUP BY show_id, set
       `;
@@ -298,6 +299,7 @@ export class SongPageComposer {
             }
           : undefined,
       rating: row.average_rating || undefined,
+      ratingsCount: row.ratings_count || undefined,
       notes: row.note || undefined,
       allTimer: row.all_timer,
       segue: row.segue,
@@ -329,6 +331,7 @@ type PerformanceDto = {
   position: number;
   all_timer: boolean;
   average_rating: number;
+  ratings_count: number;
   note: string | null;
 
   // Next/Prev track fields
