@@ -8,12 +8,8 @@ build
 .coverage
 .next
 data-migrations
-<<<<<<< Updated upstream
 *.bak
 tmp/
 *.DS_Store
 .vscode/chrome-debug-profile
 apps/web/.react-router/*
-=======
-.DS_Store
->>>>>>> Stashed changes
