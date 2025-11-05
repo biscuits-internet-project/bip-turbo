@@ -843,7 +843,7 @@ export default function SongPage() {
                             <th className="p-3">Date</th>
                             <th className="p-3">Venue</th>
                             <th className="p-3">Location</th>
-                            <th className="p-3 text-right">Rating</th>
+                            <th className="p-3">Rating</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -869,11 +869,7 @@ export default function SongPage() {
                                 {p.venue?.city && `${p.venue.city}, ${p.venue.state}`}
                               </td>
                               <td className="p-3 text-right">
-                                {p.rating && p.rating > 0 ? (
-                                  <span className="text-yellow-500">{`★ ${p.rating.toFixed(1)}`}</span>
-                                ) : (
-                                  <span className="text-content-text-tertiary">—</span>
-                                )}
+                                <RatingComponent rating={p.rating || null} ratingsCount={p.ratingsCount} />
                               </td>
                             </tr>
                           ))}
