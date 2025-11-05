@@ -1,5 +1,5 @@
 app = "bip-web-prd"
-primary_region = "bos"
+primary_region = "iad"
 kill_signal = "SIGINT"
 kill_timeout = "5s"
 
