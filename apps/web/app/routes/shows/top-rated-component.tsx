@@ -8,6 +8,8 @@ import { YearFilterNav } from "~/components/year-filter-nav";
 import { formatDateShort } from "~/lib/utils";
 import { services } from "~/server/services";
 
+const MIN_SHOW_RATINGS = 10;
+
 export interface LoaderData {
   shows: Show[];
   year: number | null;
@@ -40,7 +42,7 @@ export async function getTopRatedShows(year: number | null): Promise<LoaderData>
       {
         field: "ratingsCount",
         operator: "gt",
-        value: 10,
+        value: MIN_SHOW_RATINGS,
       },
       ...yearFilters,
     ],
@@ -107,7 +109,12 @@ export function TopRatedComponent({ shows, year }: { shows: Show[]; year: number
         <div>
           <h1 className="page-heading">TOP RATED SHOWS</h1>
         </div>
-        <YearFilterNav currentYear={year} basePath="/shows/top-rated/" showAllButton={true} />
+        <YearFilterNav
+          currentYear={year}
+          basePath="/shows/top-rated/"
+          showAllButton={true}
+          additionalText={`min ${MIN_SHOW_RATINGS} ratings`}
+        />
         <DataTable columns={columns} data={showsWithRank} hideSearch={true} hidePaginationText={true} />
       </div>
     </div>

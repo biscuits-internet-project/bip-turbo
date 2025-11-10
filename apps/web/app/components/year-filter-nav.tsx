@@ -9,9 +9,10 @@ interface YearFilterNavProps {
   currentYear?: number | null;
   basePath: string;
   showAllButton?: boolean;
+  additionalText?: string;
 }
 
-export function YearFilterNav({ currentYear, basePath, showAllButton }: YearFilterNavProps) {
+export function YearFilterNav({ currentYear, basePath, showAllButton, additionalText }: YearFilterNavProps) {
   return (
     <div className="card-premium rounded-lg overflow-hidden">
       <div className="p-6 border-b border-content-bg-secondary">
@@ -34,6 +35,11 @@ export function YearFilterNav({ currentYear, basePath, showAllButton }: YearFilt
             >
               {years.length} years
             </Link>
+          )}
+          {additionalText && (
+            <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-1 rounded-full">
+              {additionalText}
+            </span>
           )}
         </h2>
         <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
