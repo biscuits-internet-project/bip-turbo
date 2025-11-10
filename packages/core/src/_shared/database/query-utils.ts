@@ -1,5 +1,33 @@
 import type { FilterCondition, QueryOptions, SortOptions } from "./types";
 
+const operatorToRecord = (operator: string, value: unknown) => {
+  switch (operator) {
+    case "eq":
+      return { equals: value };
+    case "neq":
+      return { not: value };
+    case "gt":
+      return { gt: value };
+    case "gte":
+      return { gte: value };
+    case "lt":
+      return { lt: value };
+    case "lte":
+      return { lte: value };
+    case "contains":
+      return { contains: value, mode: "insensitive" };
+    case "startsWith":
+      return { startsWith: value };
+    case "endsWith":
+      return { endsWith: value };
+    case "in":
+      return { in: value };
+    case "notIn":
+      return { notIn: value };
+  }
+  return {};
+};
+
 /**
  * Builds a Prisma-compatible where clause from our generic filter conditions
  */
@@ -14,43 +42,11 @@ export function buildWhereClause<T>(filters?: FilterCondition<T>[]): Record<stri
     const { field, operator, value } = filter;
     const fieldName = String(field);
 
-    switch (operator) {
-      case "eq":
-        whereConditions[fieldName] = { equals: value };
-        break;
-      case "neq":
-        whereConditions[fieldName] = { not: value };
-        break;
-      case "gt":
-        whereConditions[fieldName] = { gt: value };
-        break;
-      case "gte":
-        whereConditions[fieldName] = { gte: value };
-        break;
-      case "lt":
-        whereConditions[fieldName] = { lt: value };
-        break;
-      case "lte":
-        whereConditions[fieldName] = { lte: value };
-        break;
-      case "contains":
-        whereConditions[fieldName] = { contains: value, mode: "insensitive" };
-        break;
-      case "startsWith":
-        whereConditions[fieldName] = { startsWith: value };
-        break;
-      case "endsWith":
-        whereConditions[fieldName] = { endsWith: value };
-        break;
-      case "in":
-        whereConditions[fieldName] = { in: value };
-        break;
-      case "notIn":
-        whereConditions[fieldName] = { notIn: value };
-        break;
-      default:
-        break;
-    }
+    const newCondition = operatorToRecord(operator, value);
+    whereConditions[fieldName] = {
+      ...newCondition,
+      ...(whereConditions[fieldName] ? whereConditions[fieldName] : {}),
+    };
   }
 
   return whereConditions;
