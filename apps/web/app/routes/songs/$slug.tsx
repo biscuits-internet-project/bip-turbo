@@ -279,21 +279,18 @@ function PerformanceTable({
         },
       },
     ),
-    columnHelper.accessor(
-      (row) => ({
-        rating: row.rating,
-        ratingsCount: row.ratingsCount,
-      }),
-      {
-        header: "Rating",
-        size: 64,
-        enableSorting: true,
-        cell: (info) => {
-          const { rating, ratingsCount } = info.getValue();
-          return <RatingComponent rating={rating || null} ratingsCount={ratingsCount || null} />;
-        },
+    columnHelper.accessor((row) => row.rating ?? 0, {
+      id: "rating",
+      header: "Rating",
+      size: 64,
+      enableSorting: true,
+      sortingFn: "basic",
+      cell: (info) => {
+        const rating = info.getValue();
+        const ratingsCount = info.row.original.ratingsCount;
+        return <RatingComponent rating={rating || null} ratingsCount={ratingsCount || null} />;
       },
-    ),
+    }),
   ];
 
   const table = useReactTable({
