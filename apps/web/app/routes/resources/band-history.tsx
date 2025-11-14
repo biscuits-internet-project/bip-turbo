@@ -41,7 +41,7 @@ const BandHistory: React.FC = () => {
       { name: "Jon Gutwillig", instrument: "Guitar", twitter: "BarberShreds" },
       { name: "Marc Brownstein", instrument: "Bass", twitter: "Marc_Brownstein" },
       { name: "Aron Magner", instrument: "Keys", twitter: "aronmagner" },
-      { name: "Allen Aucoin", instrument: "Drums", twitter: "DrFameus" },
+      { name: "Marlon B Lewis", instrument: "Drums", twitter: "" },
     ],
   });
 
