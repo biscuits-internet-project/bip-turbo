@@ -73,6 +73,7 @@ export default [
       route("year/:year", "routes/shows/year/$year.tsx"),
       route(":slug", "routes/shows/$slug.tsx"),
       route("top-rated", "routes/shows/top-rated.tsx"),
+      route("top-rated/:year", "routes/shows/top-rated/$year.tsx"),
       route("tour-dates", "routes/shows/tour-dates.tsx"),
       route("new", "routes/shows/new.tsx"),
       route(":slug/edit", "routes/shows/$slug.edit.tsx"),

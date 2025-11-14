@@ -1,4 +1,4 @@
-import { CacheKeys, type Attendance, type Setlist } from "@bip/domain";
+import { type Attendance, CacheKeys, type Setlist } from "@bip/domain";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Button } from "~/components/ui/button";
+import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { getShowsMeta } from "~/lib/seo";
@@ -20,7 +21,6 @@ interface LoaderData {
   userAttendances: Attendance[];
 }
 
-const years = Array.from({ length: 30 }, (_, i) => 2025 - i).reverse();
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 // Minimum characters required to trigger search
@@ -250,59 +250,36 @@ export default function ShowsByYear() {
 
         {/* Navigation - Only show when not searching */}
         {!searchQuery && (
-          <div className="card-premium rounded-lg overflow-hidden">
-            {/* Year navigation */}
-            <div className="p-6 border-b border-content-bg-secondary">
-              <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
-                Filter by Year
-                <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-1 rounded-full">
-                  {years.length} years
-                </span>
-              </h2>
-              <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-                {years.map((y) => (
-                  <Link
-                    key={y}
-                    to={`/shows/year/${y}`}
-                    className={cn(
-                      "px-3 py-2 text-sm font-medium rounded-lg transition-all duration-300 text-center relative overflow-hidden shadow-sm",
-                      y === year
-                        ? "text-white bg-gradient-to-r from-brand-primary to-brand-secondary border-2 border-brand-primary/50 shadow-lg shadow-brand-primary/30 scale-110 font-bold ring-2 ring-brand-primary/20"
-                        : "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white hover:scale-105 hover:shadow-md",
-                    )}
-                  >
-                    {y}
-                  </Link>
-                ))}
+          <>
+            <YearFilterNav currentYear={year} basePath="/shows/year/" />
+            <div className="card-premium rounded-lg overflow-hidden">
+              {/* Month navigation */}
+              <div className="p-6">
+                <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+                  Jump to Month
+                  <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-1 rounded-full">
+                    {monthsWithShows.length} active
+                  </span>
+                </h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+                  {months.map((month, index) => (
+                    <a
+                      key={month}
+                      href={monthsWithShows.includes(index) ? `#month-${index}` : undefined}
+                      className={cn(
+                        "px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 text-center",
+                        monthsWithShows.includes(index)
+                          ? "text-content-text-secondary bg-content-bg-secondary hover:bg-accent/20 hover:text-white cursor-pointer hover:scale-105"
+                          : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
+                      )}
+                    >
+                      {month}
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
-
-            {/* Month navigation */}
-            <div className="p-6">
-              <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
-                Jump to Month
-                <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-1 rounded-full">
-                  {monthsWithShows.length} active
-                </span>
-              </h2>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
-                {months.map((month, index) => (
-                  <a
-                    key={month}
-                    href={monthsWithShows.includes(index) ? `#month-${index}` : undefined}
-                    className={cn(
-                      "px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 text-center",
-                      monthsWithShows.includes(index)
-                        ? "text-content-text-secondary bg-content-bg-secondary hover:bg-accent/20 hover:text-white cursor-pointer hover:scale-105"
-                        : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
-                    )}
-                  >
-                    {month}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
+          </>
         )}
 
         {/* Results Section */}
