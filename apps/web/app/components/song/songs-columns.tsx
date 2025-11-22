@@ -35,31 +35,32 @@ const cellSecondaryClass = `text-content-text-secondary ${cellWrapClass}`;
 const cellYearPrimaryClass = `text-content-text-primary font-medium ${cellWrapClass}`;
 const cellYearTertiaryClass = `text-content-text-tertiary text-sm ${cellWrapClass}`;
 
-function renderShowDateCell(date: Date | null, show: Show | null | undefined) {
-  if (!date) return <span className={cellYearTertiaryClass}>—</span>;
+function renderVenue(show: Show | null | undefined) {
+  if (!show?.venue) return null;
+  const baseClass = show?.slug ? cellVenueClass : cellVenueClass.replace("hover:text-content-text-secondary", "");
   return (
-    <div className={cellBaseClass}>
-      {show?.slug ? (
-        <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
-          <div className={cellWrapClass}>{formatDate(date)}</div>
-          {show?.venue && (
-            <div className={cellVenueClass}>
-              {show.venue.name}, {show.venue.city} {show.venue.state}
-            </div>
-          )}
-        </Link>
-      ) : (
-        <div>
-          <div className={cellSecondaryClass}>{formatDate(date)}</div>
-          {show?.venue && (
-            <div className={cellVenueClass.replace("hover:text-content-text-secondary", "")}>
-              {show.venue.name}, {show.venue.city} {show.venue.state}
-            </div>
-          )}
-        </div>
-      )}
+    <div className={baseClass}>
+      {show.venue.name}, {show.venue.city} {show.venue.state}
     </div>
   );
+}
+
+function renderShowDateCell(date: Date | null, show: Show | null | undefined) {
+  if (!date) return <span className={cellYearTertiaryClass}>—</span>;
+
+  const mainContent = show?.slug ? (
+    <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
+      <div className={cellWrapClass}>{formatDate(date)}</div>
+      {renderVenue(show)}
+    </Link>
+  ) : (
+    <div>
+      <div className={cellSecondaryClass}>{formatDate(date)}</div>
+      {renderVenue(show)}
+    </div>
+  );
+
+  return <div className={cellBaseClass}>{mainContent}</div>;
 }
 
 export const songsColumns: ColumnDef<SongWithShows>[] = [
