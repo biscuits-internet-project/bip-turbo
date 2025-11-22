@@ -35,6 +35,33 @@ const cellSecondaryClass = `text-content-text-secondary ${cellWrapClass}`;
 const cellYearPrimaryClass = `text-content-text-primary font-medium ${cellWrapClass}`;
 const cellYearTertiaryClass = `text-content-text-tertiary text-sm ${cellWrapClass}`;
 
+function renderShowDateCell(date: Date | null, show: Show | null | undefined) {
+  if (!date) return <span className={cellYearTertiaryClass}>—</span>;
+  return (
+    <div className={cellBaseClass}>
+      {show?.slug ? (
+        <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
+          <div className={cellWrapClass}>{formatDate(date)}</div>
+          {show?.venue && (
+            <div className={cellVenueClass}>
+              {show.venue.name}, {show.venue.city} {show.venue.state}
+            </div>
+          )}
+        </Link>
+      ) : (
+        <div>
+          <div className={cellSecondaryClass}>{formatDate(date)}</div>
+          {show?.venue && (
+            <div className={cellVenueClass.replace("hover:text-content-text-secondary", "")}>
+              {show.venue.name}, {show.venue.city} {show.venue.state}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const songsColumns: ColumnDef<SongWithShows>[] = [
   {
     accessorKey: "title",
@@ -97,33 +124,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       );
     },
     cell: ({ row }) => {
-      const date = row.original.dateLastPlayed;
-      const show = row.original.lastPlayedShow;
-      return date ? (
-        <div className={cellBaseClass}>
-          {show?.slug ? (
-            <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
-              <div className={cellWrapClass}>{formatDate(date)}</div>
-              {show?.venue && (
-                <div className={cellVenueClass}>
-                  {show.venue.name}, {show.venue.city} {show.venue.state}
-                </div>
-              )}
-            </Link>
-          ) : (
-            <div>
-              <div className={cellSecondaryClass}>{formatDate(date)}</div>
-              {show?.venue && (
-                <div className={cellVenueClass.replace("hover:text-content-text-secondary", "")}>
-                  {show.venue.name}, {show.venue.city} {show.venue.state}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        <span className={cellYearTertiaryClass}>—</span>
-      );
+      return renderShowDateCell(row.original.dateLastPlayed, row.original.lastPlayedShow);
     },
   },
   {
@@ -141,33 +142,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       );
     },
     cell: ({ row }) => {
-      const date = row.original.dateFirstPlayed;
-      const show = row.original.firstPlayedShow;
-      return date ? (
-        <div className={cellBaseClass}>
-          {show?.slug ? (
-            <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
-              <div className={cellWrapClass}>{formatDate(date)}</div>
-              {show?.venue && (
-                <div className={cellVenueClass}>
-                  {show.venue.name}, {show.venue.city} {show.venue.state}
-                </div>
-              )}
-            </Link>
-          ) : (
-            <div>
-              <div className={cellSecondaryClass}>{formatDate(date)}</div>
-              {show?.venue && (
-                <div className={cellVenueClass.replace("hover:text-content-text-secondary", "")}>
-                  {show.venue.name}, {show.venue.city} {show.venue.state}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        <span className={cellYearTertiaryClass}>—</span>
-      );
+      return renderShowDateCell(row.original.dateFirstPlayed, row.original.firstPlayedShow);
     },
   },
   {
