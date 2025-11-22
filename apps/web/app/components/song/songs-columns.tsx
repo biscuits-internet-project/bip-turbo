@@ -26,6 +26,15 @@ const getSortIcon = (sortState: false | "asc" | "desc") => {
   return <ArrowUpDown className="ml-2 h-4 w-4" />;
 };
 
+const cellWrapClass = "whitespace-normal break-words";
+const cellPrimaryClass = `text-brand-primary hover:text-brand-secondary font-medium ${cellWrapClass}`;
+const cellTertiaryClass = `text-content-text-tertiary text-sm italic ${cellWrapClass}`;
+const cellBaseClass = `text-base ${cellWrapClass}`;
+const cellVenueClass = `text-content-text-tertiary text-sm hover:text-content-text-secondary ${cellWrapClass}`;
+const cellSecondaryClass = `text-content-text-secondary ${cellWrapClass}`;
+const cellYearPrimaryClass = `text-content-text-primary font-medium ${cellWrapClass}`;
+const cellYearTertiaryClass = `text-content-text-tertiary text-sm ${cellWrapClass}`;
+
 export const songsColumns: ColumnDef<SongWithShows>[] = [
   {
     accessorKey: "title",
@@ -44,10 +53,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
     cell: ({ row }) => {
       const song = row.original;
       return (
-        <Link
-          to={`/songs/${song.slug}`}
-          className="text-brand-primary hover:text-brand-secondary font-medium whitespace-normal break-words"
-        >
+        <Link to={`/songs/${song.slug}`} className={cellPrimaryClass}>
           {song.title}
         </Link>
       );
@@ -72,7 +78,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       return plays > 0 ? (
         <span className="text-content-text-primary font-semibold whitespace-normal break-words">{plays}</span>
       ) : (
-        <span className="text-content-text-tertiary text-sm italic whitespace-normal break-words">Never performed</span>
+        <span className={cellTertiaryClass}>Never performed</span>
       );
     },
   },
@@ -94,24 +100,21 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateLastPlayed;
       const show = row.original.lastPlayedShow;
       return date ? (
-        <div className="text-base whitespace-normal break-words">
+        <div className={cellBaseClass}>
           {show?.slug ? (
-            <Link
-              to={`/shows/${show.slug}`}
-              className="text-brand-primary hover:text-brand-secondary transition-colors whitespace-normal break-words"
-            >
-              <div className="whitespace-normal break-words">{formatDate(date)}</div>
+            <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
+              <div className={cellWrapClass}>{formatDate(date)}</div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary whitespace-normal break-words">
+                <div className={cellVenueClass}>
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
             </Link>
           ) : (
             <div>
-              <div className="text-content-text-secondary whitespace-normal break-words">{formatDate(date)}</div>
+              <div className={cellSecondaryClass}>{formatDate(date)}</div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm whitespace-normal break-words">
+                <div className={cellVenueClass.replace("hover:text-content-text-secondary", "")}>
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
@@ -119,7 +122,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
           )}
         </div>
       ) : (
-        <span className="text-content-text-tertiary text-sm whitespace-normal break-words">—</span>
+        <span className={cellYearTertiaryClass}>—</span>
       );
     },
   },
@@ -141,24 +144,21 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateFirstPlayed;
       const show = row.original.firstPlayedShow;
       return date ? (
-        <div className="text-base whitespace-normal break-words">
+        <div className={cellBaseClass}>
           {show?.slug ? (
-            <Link
-              to={`/shows/${show.slug}`}
-              className="text-brand-primary hover:text-brand-secondary transition-colors whitespace-normal break-words"
-            >
-              <div className="whitespace-normal break-words">{formatDate(date)}</div>
+            <Link to={`/shows/${show.slug}`} className={cellPrimaryClass}>
+              <div className={cellWrapClass}>{formatDate(date)}</div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary whitespace-normal break-words">
+                <div className={cellVenueClass}>
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
             </Link>
           ) : (
             <div>
-              <div className="text-content-text-secondary whitespace-normal break-words">{formatDate(date)}</div>
+              <div className={cellSecondaryClass}>{formatDate(date)}</div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm whitespace-normal break-words">
+                <div className={cellVenueClass.replace("hover:text-content-text-secondary", "")}>
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
@@ -166,7 +166,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
           )}
         </div>
       ) : (
-        <span className="text-content-text-tertiary text-sm whitespace-normal break-words">—</span>
+        <span className={cellYearTertiaryClass}>—</span>
       );
     },
   },
@@ -189,9 +189,9 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const currentYear = new Date().getFullYear().toString();
       const thisYearPlays = yearlyData?.[currentYear] || 0;
       return thisYearPlays > 0 ? (
-        <span className="text-content-text-primary font-medium whitespace-normal break-words">{thisYearPlays}</span>
+        <span className={cellYearPrimaryClass}>{thisYearPlays}</span>
       ) : (
-        <span className="text-content-text-tertiary text-sm whitespace-normal break-words">—</span>
+        <span className={cellYearTertiaryClass}>—</span>
       );
     },
     sortingFn: (rowA, rowB) => {
