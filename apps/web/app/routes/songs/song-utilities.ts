@@ -3,8 +3,7 @@ import { dateToISOStringSansTime } from "~/lib/date";
 import { services } from "~/server/services";
 
 /**
- * Enhances songs with firstPlayedShow and lastPlayedShow venue info.
- * Filters out songs with no plays, collects show dates, fetches shows, and returns enhanced songs.
+ * Adds the venue info to a songs firstPlayedShow and lastPlayedShow.
  */
 export async function addVenueInfoToSongs(
   songs: Song[],
