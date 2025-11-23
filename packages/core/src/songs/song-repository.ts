@@ -114,20 +114,33 @@ export class SongRepository {
       distinct: ["songId", "showId"],
     });
 
-    const trackCounts = new Map<string, number>();
+    const songShowDates = new Map<string, Date[]>();
     for (const track of tracks) {
       const dbSong = (track as { song?: DbSong }).song;
-      if (!dbSong) continue;
+      if (!dbSong || !track.show?.date) continue;
       const songId = dbSong.id;
-      trackCounts.set(songId, (trackCounts.get(songId) ?? 0) + 1);
+      const showDate = new Date(track.show.date);
+      if (!songShowDates.has(songId)) {
+        songShowDates.set(songId, []);
+      }
+      const dates = songShowDates.get(songId);
+      if (dates) {
+        dates.push(showDate);
+      }
     }
 
-    // Map original songs, clear timesPlayed, and set new timesPlayed from times played in this date range
+    // Map original songs, set timesPlayed, dateFirstPlayed, dateLastPlayed
     const songsWithStatsForDateRange = songs.map((dbSong) => {
-      const timesPlayed = trackCounts.get(dbSong.id) ?? 0;
+      const showDates = songShowDates.get(dbSong.id) ?? [];
+      showDates.sort((a, b) => a.getTime() - b.getTime());
+      const timesPlayed = showDates.length;
+      const dateFirstPlayed = timesPlayed > 0 ? showDates[0] : null;
+      const dateLastPlayed = timesPlayed > 0 ? showDates[showDates.length - 1] : null;
       return {
         ...this.mapToDomainEntity(dbSong),
         timesPlayed,
+        dateFirstPlayed,
+        dateLastPlayed,
       };
     });
 
