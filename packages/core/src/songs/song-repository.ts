@@ -69,7 +69,10 @@ export class SongRepository {
     return song;
   }
 
-  async findMany(options?: QueryOptions<Song>): Promise<Song[]> {
+  async findMany(options?: QueryOptions<Song>, startDate?: Date, endDate?: Date): Promise<Song[]> {
+    if (startDate || endDate) {
+      return this.findManyInDateRange(options, startDate, endDate);
+    }
     const where = options?.filters ? buildWhereClause(options.filters) : {};
     const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
     const skip =
@@ -86,6 +89,52 @@ export class SongRepository {
     });
 
     return results.map((result: DbSong) => this.mapToDomainEntity(result));
+  }
+
+  async findManyInDateRange(options?: QueryOptions<Song>, startDate?: Date, endDate?: Date): Promise<Song[]> {
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const songs: DbSong[] = await this.db.song.findMany({
+      where,
+    });
+
+    // Get tracks in date range, unique by song per show
+    const tracks = await this.db.track.findMany({
+      where: {
+        show: {
+          date: {
+            ...(startDate ? { gte: startDate.toISOString().slice(0, 10) } : {}),
+            ...(endDate ? { lte: endDate.toISOString().slice(0, 10) } : {}),
+          },
+        },
+      },
+      include: {
+        song: true,
+        show: true,
+      },
+      distinct: ["songId", "showId"],
+    });
+
+    const trackCounts = new Map<string, number>();
+    for (const track of tracks) {
+      const dbSong = (track as { song?: DbSong }).song;
+      if (!dbSong) continue;
+      const songId = dbSong.id;
+      trackCounts.set(songId, (trackCounts.get(songId) ?? 0) + 1);
+    }
+
+    // Map original songs, clear timesPlayed, and set new timesPlayed from times played in this date range
+    const songsWithStatsForDateRange = songs.map((dbSong) => {
+      const timesPlayed = trackCounts.get(dbSong.id) ?? 0;
+      return {
+        ...this.mapToDomainEntity(dbSong),
+        timesPlayed,
+      };
+    });
+
+    // Sort by new timesPlayed descending
+    songsWithStatsForDateRange.sort((a, b) => b.timesPlayed - a.timesPlayed);
+
+    return songsWithStatsForDateRange;
   }
 
   async create(input: CreateSongInput): Promise<Song> {

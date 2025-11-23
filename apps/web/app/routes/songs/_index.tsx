@@ -2,6 +2,7 @@ import type { Song, TrendingSong } from "@bip/domain";
 import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
+import { SongsFilterNav } from "~/components/song/songs-filter-nav";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -122,7 +123,7 @@ export default function Songs() {
 
   return (
     <div className="">
-      <div className="space-y-6 md:space-y-8">
+      <div>
         <div className="relative">
           <h1 className="page-heading">SONGS</h1>
           <div className="absolute top-0 right-0">
@@ -149,11 +150,12 @@ export default function Songs() {
                 </div>
               </div>
             )}
+            <SongsFilterNav />
           </div>
           <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
         </div>
 
-        <SongsTable songs={songs} />
+        <SongsTable songs={songs} displayFilterNav={false} />
       </div>
     </div>
   );

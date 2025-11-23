@@ -84,6 +84,7 @@ export default [
   layout("routes/songs/_layout.tsx", [
     ...prefix("songs", [
       index("routes/songs/_index.tsx"),
+      route("filter/:filter", "routes/songs/filter/$filter.tsx"),
       route(":slug", "routes/songs/$slug.tsx"),
       route("new", "routes/songs/new.tsx"),
       route(":slug/edit", "routes/songs/$slug.edit.tsx"),
