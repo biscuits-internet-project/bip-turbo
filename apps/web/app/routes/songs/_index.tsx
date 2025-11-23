@@ -2,14 +2,14 @@ import type { Song, TrendingSong } from "@bip/domain";
 import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { songsColumns } from "~/components/song/songs-columns";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { DataTable } from "~/components/ui/data-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
 import { services } from "~/server/services";
+import { SongsTable } from "../../components/song/songs-table";
+import { addVenueInfoToSongs } from "./song-utilities";
 
 interface LoaderData {
   songs: Song[];
@@ -31,38 +31,12 @@ export const loader = publicLoader(async (): Promise<LoaderData> => {
         services.songs.findTrendingLastXShows(recentShowsCount, 6),
         services.songs.findTrendingLastYear(),
       ]);
-
       // Filter out songs with no plays
       const songs = allSongs.filter((song) => song.timesPlayed > 0);
 
-      // Get unique show dates for first/last played venue lookup
-      const showDates = new Set<string>();
-      songs.forEach((song) => {
-        if (song.dateFirstPlayed) {
-          showDates.add(song.dateFirstPlayed.toISOString().split("T")[0]);
-        }
-        if (song.dateLastPlayed) {
-          showDates.add(song.dateLastPlayed.toISOString().split("T")[0]);
-        }
-      });
-
-      // Fetch shows with venues for those dates
-      const showsWithVenues = showDates.size > 0 ? await services.shows.findManyByDates(Array.from(showDates)) : [];
-
-      // Create lookup maps
-      const showsByDate = new Map(showsWithVenues.map((show) => [show.date, show]));
-
-      // Enhance songs with venue information
-      const enhancedSongs = songs.map((song) => ({
-        ...song,
-        firstPlayedShow: song.dateFirstPlayed
-          ? showsByDate.get(song.dateFirstPlayed.toISOString().split("T")[0])
-          : null,
-        lastPlayedShow: song.dateLastPlayed ? showsByDate.get(song.dateLastPlayed.toISOString().split("T")[0]) : null,
-      }));
-
+      const songsWithVenueInfo = await addVenueInfoToSongs(songs);
       return {
-        songs: enhancedSongs,
+        songs: songsWithVenueInfo,
         trendingSongs,
         yearlyTrendingSongs,
         recentShowsCount,
@@ -179,13 +153,7 @@ export default function Songs() {
           <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
         </div>
 
-        <DataTable
-          columns={songsColumns}
-          data={songs}
-          searchKey="title"
-          searchPlaceholder="Search songs..."
-          hidePagination
-        />
+        <SongsTable songs={songs} />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { PauseCircle, PlayCircle, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { dateToISOStringSansTime } from "~/lib/date";
 import { cn } from "~/lib/utils";
 
 // Define TypeScript interfaces
@@ -78,7 +79,7 @@ export const convertToArchiveDate = (dateString: string): string => {
     // Try to parse with Date object as fallback
     const date = new Date(dateString);
     if (!Number.isNaN(date.getTime())) {
-      return date.toISOString().split("T")[0];
+      return dateToISOStringSansTime(date);
     }
 
     // If all else fails, return original string
