@@ -7,12 +7,20 @@ interface SongsTableProps {
   songs: Song[];
   displayFilterNav?: boolean;
   currentSongFilter?: string | null;
+  currentURLParameters?: URLSearchParams;
 }
 
-export function SongsTable({ songs, displayFilterNav = true, currentSongFilter }: SongsTableProps) {
+export function SongsTable({
+  songs,
+  displayFilterNav = true,
+  currentSongFilter,
+  currentURLParameters = new URLSearchParams(),
+}: SongsTableProps) {
   return (
     <div>
-      {displayFilterNav && <SongsFilterNav currentSongFilter={currentSongFilter} />}
+      {displayFilterNav && (
+        <SongsFilterNav currentSongFilter={currentSongFilter} currentURLParameters={currentURLParameters} />
+      )}
       <DataTable
         columns={songsColumns}
         data={songs}

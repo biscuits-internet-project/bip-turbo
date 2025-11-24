@@ -1,20 +1,23 @@
 import { FilterNav } from "~/components/filter-nav";
-import { SONG_FILTERS } from "~/components/song/song-filters";
+import { NOT_PLAYED_SONG_FILTER_PARAM, SONG_FILTERS } from "~/components/song/song-filters";
 
 interface SongsFilterNavProps {
+  currentURLParameters?: URLSearchParams;
   currentSongFilter?: string | null;
 }
 
-export function SongsFilterNav({ currentSongFilter }: SongsFilterNavProps) {
+export function SongsFilterNav({ currentURLParameters, currentSongFilter }: SongsFilterNavProps) {
   return (
     <FilterNav
       title={"Filter Songs"}
-      items={Object.keys(SONG_FILTERS)}
+      filters={Object.keys(SONG_FILTERS)}
       basePath="/songs/filter/"
       showAllButton={true}
       allURL="/songs"
-      currentItem={currentSongFilter}
+      currentFilter={currentSongFilter}
       widerItems={true}
+      parameters={[NOT_PLAYED_SONG_FILTER_PARAM]}
+      currentURLParameters={currentURLParameters}
     />
   );
 }

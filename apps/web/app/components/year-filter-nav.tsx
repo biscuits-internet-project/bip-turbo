@@ -14,8 +14,8 @@ interface YearFilterNavProps {
 export function YearFilterNav({ currentYear, basePath, showAllButton, additionalText }: YearFilterNavProps) {
   return FilterNav({
     title: "Filter by Year",
-    items: years.map(String),
-    currentItem: currentYear ? String(currentYear) : null,
+    filters: years.map(String),
+    currentFilter: currentYear ? String(currentYear) : null,
     basePath,
     showAllButton,
     subtitle: `${years.length} years`,
