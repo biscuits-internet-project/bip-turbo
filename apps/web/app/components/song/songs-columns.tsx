@@ -106,7 +106,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
     cell: ({ row }) => {
       const plays = row.original.timesPlayed;
       return plays > 0 ? (
-        <span className="text-content-text-primary font-semibold whitespace-normal break-words">{plays}</span>
+        <span className={cn("text-content-text-primary font-semibold", cellWrapClass)}>{plays}</span>
       ) : (
         <span className={cellTertiaryClass}>Never performed</span>
       );
