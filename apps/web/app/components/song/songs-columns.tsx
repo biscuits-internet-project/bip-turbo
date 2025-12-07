@@ -10,6 +10,7 @@ interface SongWithShows extends Song {
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
 
 const formatDate = (date: Date) => {
   return new Date(date).toLocaleDateString("en-US", {
@@ -27,17 +28,18 @@ const getSortIcon = (sortState: false | "asc" | "desc") => {
 };
 
 const cellWrapClass = "whitespace-normal break-words";
-const cellPrimaryClass = `text-brand-primary hover:text-brand-secondary font-medium ${cellWrapClass}`;
-const cellTertiaryClass = `text-content-text-tertiary text-sm italic ${cellWrapClass}`;
-const cellBaseClass = `text-base ${cellWrapClass}`;
-const cellVenueClass = `text-content-text-tertiary text-sm hover:text-content-text-secondary ${cellWrapClass}`;
-const cellSecondaryClass = `text-content-text-secondary ${cellWrapClass}`;
-const cellYearPrimaryClass = `text-content-text-primary font-medium ${cellWrapClass}`;
-const cellYearTertiaryClass = `text-content-text-tertiary text-sm ${cellWrapClass}`;
+const cellPrimaryClass = cn("text-brand-primary", "hover:text-brand-secondary", "font-medium", cellWrapClass);
+const cellTertiaryClass = cn("text-content-text-tertiary", "text-sm", "italic", cellWrapClass);
+const cellBaseClass = cn("text-base", cellWrapClass);
+const cellSecondaryClass = cn("text-content-text-secondary", cellWrapClass);
+const cellYearPrimaryClass = cn("text-content-text-primary", "font-medium", cellWrapClass);
+const cellYearTertiaryClass = cn("text-content-text-tertiary", "text-sm", cellWrapClass);
 
 function renderVenue(show: Show | null | undefined) {
   if (!show?.venue) return null;
-  const baseClass = show?.slug ? cellVenueClass : cellVenueClass.replace("hover:text-content-text-secondary", "");
+  const baseClass = cn("text-content-text-tertiary", "text-sm", cellWrapClass, {
+    "hover:text-content-text-secondary": !!show?.slug,
+  });
   return (
     <div className={baseClass}>
       {show.venue.name}, {show.venue.city} {show.venue.state}
