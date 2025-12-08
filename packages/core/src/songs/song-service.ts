@@ -38,6 +38,17 @@ export class SongService {
   }
 
   async findMany(filter: SongFilter): Promise<Song[]> {
+    const queryOptions: QueryOptions<Song> = {
+      filters: Object.entries(filter).map(([field, value]) => ({
+        field: field as keyof Song,
+        operator: "eq",
+        value,
+      })) as FilterCondition<Song>[],
+    };
+    return this.repository.findMany(queryOptions);
+  }
+
+  async findManyInDateRange(filter: SongFilter): Promise<Song[]> {
     const { startDate, endDate, ...restFilter } = filter;
     const queryOptions: QueryOptions<Song> = {
       filters: Object.entries(restFilter).map(([field, value]) => ({
@@ -46,8 +57,7 @@ export class SongService {
         value,
       })) as FilterCondition<Song>[],
     };
-
-    return this.repository.findMany(queryOptions, startDate, endDate);
+    return this.repository.findManyInDateRange(queryOptions, startDate, endDate);
   }
 
   async search(query: string, limit = 20): Promise<Song[]> {

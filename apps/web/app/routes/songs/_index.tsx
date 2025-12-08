@@ -36,7 +36,7 @@ export const loader = publicLoader(async ({ request }: LoaderFunctionArgs): Prom
       const recentShowsCount = 10;
       const [allSongs, filteredSongs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
         services.songs.findMany({}),
-        services.songs.findMany(filter ? SONG_FILTERS[filter as keyof typeof SONG_FILTERS] || {} : {}),
+        services.songs.findManyInDateRange(filter ? SONG_FILTERS[filter as keyof typeof SONG_FILTERS] || {} : {}),
         services.songs.findTrendingLastXShows(recentShowsCount, 6),
         services.songs.findTrendingLastYear(),
       ]);

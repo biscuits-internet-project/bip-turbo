@@ -69,10 +69,7 @@ export class SongRepository {
     return song;
   }
 
-  async findMany(options?: QueryOptions<Song>, startDate?: Date, endDate?: Date): Promise<Song[]> {
-    if (startDate || endDate) {
-      return this.findManyInDateRange(options, startDate, endDate);
-    }
+  async findMany(options?: QueryOptions<Song>): Promise<Song[]> {
     const where = options?.filters ? buildWhereClause(options.filters) : {};
     const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ timesPlayed: "desc" }];
     const skip =
