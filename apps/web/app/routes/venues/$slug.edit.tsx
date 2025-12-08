@@ -30,7 +30,7 @@ export const action = adminAction(async ({ request, params }) => {
   const formData = await request.formData();
   const name = formData.get("name") as string;
   const city = formData.get("city") as string;
-  const state = formData.get("state") as string || null;
+  const state = (formData.get("state") as string) || null;
   const country = formData.get("country") as string;
 
   // Update the venue
@@ -85,7 +85,7 @@ export default function EditVenue() {
   }
 
   return (
-    <div className="">
+    <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-content-text-primary">Edit Venue</h1>
         <Button variant="outline" size="sm" asChild>

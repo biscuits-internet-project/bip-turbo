@@ -33,7 +33,7 @@ export default function TourDates() {
   const dates = Array.isArray(tourDates) ? tourDates : [];
 
   return (
-    <div className="">
+    <div>
       <div className="space-y-6 md:space-y-8">
         <div>
           <h1 className="page-heading">TOUR DATES</h1>

@@ -76,7 +76,7 @@ export default function TopRatedYear() {
   }));
 
   return (
-    <div className="">
+    <div>
       <div className="space-y-6 md:space-y-8">
         <div>
           <h1 className="page-heading">TOP RATED SHOWS</h1>

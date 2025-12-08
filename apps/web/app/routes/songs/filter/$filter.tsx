@@ -4,7 +4,7 @@ import { NOT_PLAYED_SONG_FILTER_PARAM, SONG_FILTERS } from "~/components/song/so
 import { SongsTable } from "~/components/song/songs-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { addVenueInfoToSongs } from "~/routes/songs/song-utilities";
+import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -55,7 +55,7 @@ export default function FilteredSongs() {
   const urlSearchParams = new URLSearchParams(searchParams);
   const showNotPlayed = urlSearchParams.has(NOT_PLAYED_SONG_FILTER_PARAM);
   return (
-    <div className="">
+    <div>
       <div>
         <div className="relative">
           <h1 className="page-heading">Songs - {filter}</h1>

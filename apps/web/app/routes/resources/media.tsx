@@ -29,7 +29,7 @@ export default function MediaResources(): ReactElement {
   }, []);
 
   return (
-    <div className="">
+    <div>
       <div className="space-y-6 md:space-y-8">
         <div>
           <h1 className="page-heading">NEWS FROM NOWHERE</h1>

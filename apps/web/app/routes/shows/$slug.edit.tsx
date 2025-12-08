@@ -113,7 +113,7 @@ export default function EditShow() {
   }
 
   return (
-    <div className="">
+    <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-content-text-primary">Edit Show</h1>
         <Button variant="outline" size="sm" asChild>

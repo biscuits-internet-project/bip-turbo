@@ -12,13 +12,15 @@ interface YearFilterNavProps {
 }
 
 export function YearFilterNav({ currentYear, basePath, showAllButton, additionalText }: YearFilterNavProps) {
-  return FilterNav({
-    title: "Filter by Year",
-    filters: years.map(String),
-    currentFilter: currentYear ? String(currentYear) : null,
-    basePath,
-    showAllButton,
-    subtitle: `${years.length} years`,
-    additionalText,
-  });
+  return (
+    <FilterNav
+      title="Filter by Year"
+      filters={years.map(String)}
+      currentFilter={currentYear ? String(currentYear) : null}
+      basePath={basePath}
+      showAllButton={showAllButton}
+      subtitle={`${years.length} years`}
+      additionalText={additionalText}
+    />
+  );
 }

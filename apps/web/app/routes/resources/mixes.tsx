@@ -120,7 +120,7 @@ const Mixes: React.FC = () => {
   );
 
   return (
-    <div className="">
+    <div>
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="page-heading">RUNNING MIXES</h1>

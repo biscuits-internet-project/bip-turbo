@@ -3,14 +3,14 @@ import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SongsFilterNav } from "~/components/song/songs-filter-nav";
+import { SongsTable } from "~/components/song/songs-table";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
+import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
-import { SongsTable } from "../../components/song/songs-table";
-import { addVenueInfoToSongs } from "./song-utilities";
 
 interface LoaderData {
   songs: Song[];
@@ -122,7 +122,7 @@ export default function Songs() {
   const { songs, trendingSongs, yearlyTrendingSongs, recentShowsCount } = useSerializedLoaderData<LoaderData>();
 
   return (
-    <div className="">
+    <div>
       <div>
         <div className="relative">
           <h1 className="page-heading">SONGS</h1>
