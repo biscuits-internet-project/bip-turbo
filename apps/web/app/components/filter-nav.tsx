@@ -49,7 +49,7 @@ export function FilterNav({
     "hover:bg-content-bg-tertiary hover:text-white hover:scale-105 hover:shadow-md",
   );
   const columnCSS = cn({
-    "grid-cols-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6": widerItems,
+    "grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8": widerItems,
     "grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12": !widerItems,
   });
 
