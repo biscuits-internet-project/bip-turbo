@@ -76,6 +76,7 @@ export function FilterNav({
                 "hover:text-brand-secondary": !expanded,
               },
             )}
+            style={{ cursor: "pointer" }}
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}
           >
