@@ -19,6 +19,7 @@ export function SongsFilterNav({ currentURLParameters, currentSongFilter }: Song
       parameters={[NOT_PLAYED_SONG_FILTER_PARAM]}
       filterAsParameter={true}
       currentURLParameters={currentURLParameters}
+      defaultExpanded={!!currentSongFilter}
     />
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SONGS_FILTER_PARAM } from "~/components/song/song-filters";
 import { cn } from "~/lib/utils";
@@ -15,6 +16,7 @@ interface FilterNavProps {
   parameters?: string[];
   filterAsParameter?: boolean;
   currentURLParameters?: URLSearchParams;
+  defaultExpanded?: boolean;
 }
 
 export function FilterNav({
@@ -30,7 +32,10 @@ export function FilterNav({
   parameters = [],
   filterAsParameter = false,
   currentURLParameters = new URLSearchParams(),
+  defaultExpanded = true,
 }: FilterNavProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
   const subtitleCSS = cn(
     "text-xs font-normal text-content-text-tertiary",
     "bg-content-bg-secondary px-2 py-1 rounded-full",
@@ -56,60 +61,106 @@ export function FilterNav({
   const allSelected = currentFilter === null || currentFilter === undefined;
   const actualAllURL = allURL || basePath;
   const currentURL = allSelected ? actualAllURL : filterAsParameter ? basePath : `${basePath}${currentFilter}`;
+  const canBeCollapsed = !defaultExpanded;
+
   return (
     <div className="card-premium rounded-lg overflow-hidden">
       <div className="p-6 border-b border-content-bg-secondary">
-        <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
-          {title}
-          {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
-          {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
-        </h2>
-        <div className={cn("grid gap-2", columnCSS)}>
-          {filters.map((filter) => {
-            const linkURL = filterAsParameter ? `${basePath}` : `${basePath}${filter}`;
-            const linkParams = filterAsParameter
-              ? new URLSearchParams(currentURLParameters.toString())
-              : currentURLParameters;
-            if (filterAsParameter) {
-              linkParams.set(SONGS_FILTER_PARAM, filter);
-            }
-            return (
-              <Link
-                key={filter}
-                to={{ pathname: linkURL, search: linkParams.toString() }}
-                className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
-              >
-                {filter}
-              </Link>
-            );
+        {canBeCollapsed ? (
+          <button
+            type="button"
+            className={cn(
+              "w-full flex items-center gap-2 text-base font-semibold text-white mb-4 cursor-pointer select-none transition-colors",
+              {
+                "hover:text-brand-primary": expanded,
+                "hover:text-brand-secondary": !expanded,
+              },
+            )}
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+          >
+            {title}
+            {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
+            {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
+            <span
+              className={cn("transition-transform duration-300 ml-2", {
+                "rotate-90": expanded,
+                "rotate-0": !expanded,
+              })}
+              aria-hidden
+            >
+              ▶
+            </span>
+          </button>
+        ) : (
+          <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+            {title}
+            {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
+            {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
+          </h2>
+        )}
+        <div
+          className={cn("overflow-hidden transition-all duration-300", {
+            "max-h-[1000px] opacity-100": expanded || !canBeCollapsed,
+            "max-h-0 opacity-0 pointer-events-none": !expanded && canBeCollapsed,
           })}
-          {showAllButton && (
-            <Link to={actualAllURL} className={cn(itemCSS, allSelected ? highlightedItemCSS : nonHighlightedItemCSS)}>
-              All
-            </Link>
-          )}
-          {!allSelected &&
-            parameters.map((parameter) => {
-              const newParams = new URLSearchParams(currentURLParameters.toString());
-              if (filterAsParameter && currentFilter) {
-                newParams.set(SONGS_FILTER_PARAM, currentFilter);
-              }
-              const hasParam = currentURLParameters.has(parameter);
-              if (hasParam) {
-                newParams.delete(parameter);
-              } else {
-                newParams.append(parameter, "true");
+        >
+          <div className={cn("grid gap-2", columnCSS)}>
+            {filters.map((filter) => {
+              const linkURL = filterAsParameter ? `${basePath}` : `${basePath}${filter}`;
+              const linkParams = filterAsParameter
+                ? new URLSearchParams(currentURLParameters.toString())
+                : currentURLParameters;
+              if (filterAsParameter) {
+                linkParams.set(SONGS_FILTER_PARAM, filter);
               }
               return (
                 <Link
-                  key={parameter}
-                  to={{ pathname: currentURL, search: newParams.toString() }}
-                  className={cn(itemCSS, hasParam ? highlightedItemCSS : nonHighlightedItemCSS)}
+                  key={filter}
+                  to={{ pathname: linkURL, search: linkParams.toString() }}
+                  className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
                 >
-                  {parameter}
+                  {filter}
                 </Link>
               );
             })}
+            {showAllButton && (
+              <Link
+                to={actualAllURL}
+                className={cn(itemCSS, {
+                  [highlightedItemCSS]: allSelected,
+                  [nonHighlightedItemCSS]: !allSelected,
+                })}
+              >
+                All
+              </Link>
+            )}
+            {!allSelected &&
+              parameters.map((parameter) => {
+                const newParams = new URLSearchParams(currentURLParameters.toString());
+                if (filterAsParameter && currentFilter) {
+                  newParams.set(SONGS_FILTER_PARAM, currentFilter);
+                }
+                const hasParam = currentURLParameters.has(parameter);
+                if (hasParam) {
+                  newParams.delete(parameter);
+                } else {
+                  newParams.append(parameter, "true");
+                }
+                return (
+                  <Link
+                    key={parameter}
+                    to={{ pathname: currentURL, search: newParams.toString() }}
+                    className={cn(itemCSS, {
+                      [highlightedItemCSS]: hasParam,
+                      [nonHighlightedItemCSS]: !hasParam,
+                    })}
+                  >
+                    {parameter}
+                  </Link>
+                );
+              })}
+          </div>
         </div>
       </div>
     </div>
