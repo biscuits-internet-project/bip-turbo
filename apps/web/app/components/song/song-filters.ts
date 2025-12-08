@@ -6,3 +6,4 @@ export const SONG_FILTERS = {
 };
 
 export const NOT_PLAYED_SONG_FILTER_PARAM = "Not Played";
+export const SONGS_FILTER_PARAM = "filter";

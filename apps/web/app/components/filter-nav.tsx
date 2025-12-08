@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SONGS_FILTER_PARAM } from "~/components/song/song-filters";
 import { cn } from "~/lib/utils";
 
 interface FilterNavProps {
@@ -12,6 +13,7 @@ interface FilterNavProps {
   additionalText?: string;
   widerItems?: boolean;
   parameters?: string[];
+  filterAsParameter?: boolean;
   currentURLParameters?: URLSearchParams;
 }
 
@@ -26,6 +28,7 @@ export function FilterNav({
   additionalText,
   widerItems = false,
   parameters = [],
+  filterAsParameter = false,
   currentURLParameters = new URLSearchParams(),
 }: FilterNavProps) {
   const subtitleCSS = cn(
@@ -52,7 +55,7 @@ export function FilterNav({
 
   const allSelected = currentFilter === null || currentFilter === undefined;
   const actualAllURL = allURL || basePath;
-  const currentURL = allSelected ? actualAllURL : `${basePath}${currentFilter}`;
+  const currentURL = allSelected ? actualAllURL : filterAsParameter ? basePath : `${basePath}${currentFilter}`;
   return (
     <div className="card-premium rounded-lg overflow-hidden">
       <div className="p-6 border-b border-content-bg-secondary">
@@ -62,15 +65,24 @@ export function FilterNav({
           {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
         </h2>
         <div className={cn("grid gap-2", columnCSS)}>
-          {filters.map((filter) => (
-            <Link
-              key={filter}
-              to={{ pathname: `${basePath}${filter}`, search: currentURLParameters.toString() }}
-              className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
-            >
-              {filter}
-            </Link>
-          ))}
+          {filters.map((filter) => {
+            const linkURL = filterAsParameter ? `${basePath}` : `${basePath}${filter}`;
+            const linkParams = filterAsParameter
+              ? new URLSearchParams(currentURLParameters.toString())
+              : currentURLParameters;
+            if (filterAsParameter) {
+              linkParams.set(SONGS_FILTER_PARAM, filter);
+            }
+            return (
+              <Link
+                key={filter}
+                to={{ pathname: linkURL, search: linkParams.toString() }}
+                className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
+              >
+                {filter}
+              </Link>
+            );
+          })}
           {showAllButton && (
             <Link to={actualAllURL} className={cn(itemCSS, allSelected ? highlightedItemCSS : nonHighlightedItemCSS)}>
               All
@@ -79,6 +91,9 @@ export function FilterNav({
           {!allSelected &&
             parameters.map((parameter) => {
               const newParams = new URLSearchParams(currentURLParameters.toString());
+              if (filterAsParameter && currentFilter) {
+                newParams.set(SONGS_FILTER_PARAM, currentFilter);
+              }
               const hasParam = currentURLParameters.has(parameter);
               if (hasParam) {
                 newParams.delete(parameter);

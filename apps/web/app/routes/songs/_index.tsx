@@ -1,8 +1,8 @@
 import type { Song, TrendingSong } from "@bip/domain";
 import { Plus } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, type LoaderFunctionArgs } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { SongsFilterNav } from "~/components/song/songs-filter-nav";
+import { NOT_PLAYED_SONG_FILTER_PARAM, SONG_FILTERS, SONGS_FILTER_PARAM } from "~/components/song/song-filters";
 import { SongsTable } from "~/components/song/songs-table";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
@@ -14,30 +14,45 @@ import { services } from "~/server/services";
 
 interface LoaderData {
   songs: Song[];
+  songsNotPlayed: Song[];
+  filter: string | null;
+  searchParams: string;
   trendingSongs: TrendingSong[];
   yearlyTrendingSongs: TrendingSong[];
   recentShowsCount: number;
 }
 
-export const loader = publicLoader(async (): Promise<LoaderData> => {
-  const cacheKey = "songs:index:full";
+export const loader = publicLoader(async ({ request }: LoaderFunctionArgs): Promise<LoaderData> => {
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
+  const filter = searchParams.get(SONGS_FILTER_PARAM) || null;
+  searchParams.delete(SONGS_FILTER_PARAM);
+  const cacheKey = filter ? `songs:index:filter-${filter}` : "songs:index:full";
   const cacheOptions = { ttl: 3600 }; // 1 hour
 
-  return await services.cache.getOrSet(
+  const results = await services.cache.getOrSet(
     cacheKey,
     async () => {
       const recentShowsCount = 10;
-      const [allSongs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
+      const [allSongs, filteredSongs, trendingSongs, yearlyTrendingSongs] = await Promise.all([
         services.songs.findMany({}),
+        services.songs.findMany(filter ? SONG_FILTERS[filter as keyof typeof SONG_FILTERS] || {} : {}),
         services.songs.findTrendingLastXShows(recentShowsCount, 6),
         services.songs.findTrendingLastYear(),
       ]);
       // Filter out songs with no plays
-      const songs = allSongs.filter((song) => song.timesPlayed > 0);
+      const allSongsPlayed = allSongs.filter((song) => song.timesPlayed > 0);
+      const filteredSongsPlayed = filteredSongs.filter((song) => song.timesPlayed > 0);
 
-      const songsWithVenueInfo = await addVenueInfoToSongs(songs);
+      // Remove all songs in filteredSongsPlayed from allSongsPlayed
+      const songIdsPlayed = new Set(filteredSongsPlayed.map((song) => song.id));
+      const songsNotPlayed = allSongsPlayed.filter((song) => !songIdsPlayed.has(song.id));
+
+      const songsWithVenueInfo = await addVenueInfoToSongs(filteredSongsPlayed);
+      const songsNotPlayedWithVenueInfo = await addVenueInfoToSongs(songsNotPlayed);
       return {
         songs: songsWithVenueInfo,
+        songsNotPlayed: songsNotPlayedWithVenueInfo,
         trendingSongs,
         yearlyTrendingSongs,
         recentShowsCount,
@@ -45,6 +60,11 @@ export const loader = publicLoader(async (): Promise<LoaderData> => {
     },
     cacheOptions,
   );
+  return {
+    ...results,
+    filter,
+    searchParams: searchParams.toString(),
+  };
 });
 
 interface TrendingSongCardProps {
@@ -119,13 +139,17 @@ export function meta() {
 }
 
 export default function Songs() {
-  const { songs, trendingSongs, yearlyTrendingSongs, recentShowsCount } = useSerializedLoaderData<LoaderData>();
+  const { songs, songsNotPlayed, trendingSongs, yearlyTrendingSongs, recentShowsCount, filter, searchParams } =
+    useSerializedLoaderData<LoaderData>();
+  const urlSearchParams = new URLSearchParams(searchParams);
+  const showNotPlayed = urlSearchParams.has(NOT_PLAYED_SONG_FILTER_PARAM);
+  const title = filter ? `Songs - ${filter}` : "Songs";
 
   return (
     <div>
       <div>
         <div className="relative">
-          <h1 className="page-heading">SONGS</h1>
+          <h1 className="page-heading">{title}</h1>
           <div className="absolute top-0 right-0">
             <AdminOnly>
               <Button asChild className="btn-primary">
@@ -138,24 +162,29 @@ export default function Songs() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            {trendingSongs.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Trending in Recent Shows</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {trendingSongs.map((song: TrendingSong) => (
-                    <TrendingSongCard key={song.id} song={song} recentShowsCount={recentShowsCount} />
-                  ))}
+        {!filter && (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-3">
+              {trendingSongs.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Trending in Recent Shows</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {trendingSongs.map((song: TrendingSong) => (
+                      <TrendingSongCard key={song.id} song={song} recentShowsCount={recentShowsCount} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            <SongsFilterNav />
+              )}
+            </div>
+            <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
           </div>
-          <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
-        </div>
+        )}
 
-        <SongsTable songs={songs} displayFilterNav={false} />
+        <SongsTable
+          songs={showNotPlayed ? songsNotPlayed : songs}
+          currentSongFilter={filter}
+          currentURLParameters={urlSearchParams}
+        />
       </div>
     </div>
   );
