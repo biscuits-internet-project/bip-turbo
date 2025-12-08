@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 import { SONGS_FILTER_PARAM } from "~/components/song/song-filters";
 import { cn } from "~/lib/utils";
 
+function getLink(filter: string, filterAsParameter: boolean, basePath: string, currentURLParameters: URLSearchParams) {
+  if (filterAsParameter) {
+    const params = new URLSearchParams(currentURLParameters.toString());
+    params.set(SONGS_FILTER_PARAM, filter);
+    return { pathname: basePath, search: params.toString() };
+  }
+  return { pathname: `${basePath}${filter}`, search: currentURLParameters.toString() };
+}
+
 interface FilterNavProps {
   title: string;
   filters: string[];
@@ -60,7 +69,6 @@ export function FilterNav({
 
   const allSelected = currentFilter === null || currentFilter === undefined;
   const actualAllURL = allURL || basePath;
-  const currentURL = allSelected ? actualAllURL : filterAsParameter ? basePath : `${basePath}${currentFilter}`;
   const canBeCollapsed = !defaultExpanded;
 
   return (
@@ -108,17 +116,11 @@ export function FilterNav({
         >
           <div className={cn("grid gap-2", columnCSS)}>
             {filters.map((filter) => {
-              const linkURL = filterAsParameter ? `${basePath}` : `${basePath}${filter}`;
-              const linkParams = filterAsParameter
-                ? new URLSearchParams(currentURLParameters.toString())
-                : currentURLParameters;
-              if (filterAsParameter) {
-                linkParams.set(SONGS_FILTER_PARAM, filter);
-              }
+              const link = getLink(filter, filterAsParameter, basePath, currentURLParameters);
               return (
                 <Link
                   key={filter}
-                  to={{ pathname: linkURL, search: linkParams.toString() }}
+                  to={link}
                   className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
                 >
                   {filter}
@@ -139,19 +141,17 @@ export function FilterNav({
             {!allSelected &&
               parameters.map((parameter) => {
                 const newParams = new URLSearchParams(currentURLParameters.toString());
-                if (filterAsParameter && currentFilter) {
-                  newParams.set(SONGS_FILTER_PARAM, currentFilter);
-                }
                 const hasParam = currentURLParameters.has(parameter);
                 if (hasParam) {
                   newParams.delete(parameter);
                 } else {
                   newParams.append(parameter, "true");
                 }
+                const link = getLink(currentFilter || "", filterAsParameter, basePath, newParams);
                 return (
                   <Link
                     key={parameter}
-                    to={{ pathname: currentURL, search: newParams.toString() }}
+                    to={link}
                     className={cn(itemCSS, {
                       [highlightedItemCSS]: hasParam,
                       [nonHighlightedItemCSS]: !hasParam,
