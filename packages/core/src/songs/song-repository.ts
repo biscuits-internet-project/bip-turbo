@@ -88,6 +88,65 @@ export class SongRepository {
     return results.map((result: DbSong) => this.mapToDomainEntity(result));
   }
 
+  async findManyInDateRange(options?: QueryOptions<Song>, startDate?: Date, endDate?: Date): Promise<Song[]> {
+    const where = options?.filters ? buildWhereClause(options.filters) : {};
+    const songs: DbSong[] = await this.db.song.findMany({
+      where,
+    });
+
+    // Get tracks in date range, unique by song per show
+    const tracks = await this.db.track.findMany({
+      where: {
+        show: {
+          date: {
+            ...(startDate ? { gte: startDate.toISOString().slice(0, 10) } : {}),
+            ...(endDate ? { lte: endDate.toISOString().slice(0, 10) } : {}),
+          },
+        },
+      },
+      include: {
+        song: true,
+        show: true,
+      },
+      distinct: ["songId", "showId"],
+    });
+
+    const songShowDates = new Map<string, Date[]>();
+    for (const track of tracks) {
+      const dbSong = (track as { song?: DbSong }).song;
+      if (!dbSong || !track.show?.date) continue;
+      const songId = dbSong.id;
+      const showDate = new Date(track.show.date);
+      if (!songShowDates.has(songId)) {
+        songShowDates.set(songId, []);
+      }
+      const dates = songShowDates.get(songId);
+      if (dates) {
+        dates.push(showDate);
+      }
+    }
+
+    // Map original songs, set timesPlayed, dateFirstPlayed, dateLastPlayed
+    const songsWithStatsForDateRange = songs.map((dbSong) => {
+      const showDates = songShowDates.get(dbSong.id) ?? [];
+      showDates.sort((a, b) => a.getTime() - b.getTime());
+      const timesPlayed = showDates.length;
+      const dateFirstPlayed = timesPlayed > 0 ? showDates[0] : null;
+      const dateLastPlayed = timesPlayed > 0 ? showDates[showDates.length - 1] : null;
+      return {
+        ...this.mapToDomainEntity(dbSong),
+        timesPlayed,
+        dateFirstPlayed,
+        dateLastPlayed,
+      };
+    });
+
+    // Sort by new timesPlayed descending
+    songsWithStatsForDateRange.sort((a, b) => b.timesPlayed - a.timesPlayed);
+
+    return songsWithStatsForDateRange;
+  }
+
   async create(input: CreateSongInput): Promise<Song> {
     const slug = slugify(input.title);
     const now = new Date();

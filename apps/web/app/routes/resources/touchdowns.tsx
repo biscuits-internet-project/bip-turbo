@@ -53,7 +53,7 @@ export default function Touchdowns() {
   }, []);
 
   return (
-    <div className="">
+    <div>
       <div className="space-y-6 md:space-y-8">
         <div>
           <h1 className="page-heading">TOUCHDOWNS ALL DAY PODCAST</h1>

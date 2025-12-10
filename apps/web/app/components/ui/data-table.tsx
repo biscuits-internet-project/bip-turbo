@@ -1,16 +1,16 @@
 import {
   type ColumnDef,
-  type SortingState,
   type ColumnFiltersState,
-  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -25,6 +25,9 @@ interface DataTableProps<TData, TValue> {
   hideSearch?: boolean;
   hidePaginationText?: boolean;
   hidePagination?: boolean;
+  searchActions?: ReactNode;
+  filterComponent?: ReactNode;
+  isLoading?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -36,6 +39,9 @@ export function DataTable<TData, TValue>({
   hideSearch = false,
   hidePaginationText = false,
   hidePagination = false,
+  searchActions,
+  filterComponent,
+  isLoading = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -64,23 +70,28 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full overflow-hidden">
       {searchKey && !hideSearch && (
         <div className="flex items-center justify-between">
-          <Input
-            placeholder={searchPlaceholder}
-            value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-            onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
-            className="max-w-sm search-input"
-          />
+          <div className="flex items-center gap-8 flex-1">
+            <Input
+              placeholder={searchPlaceholder}
+              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+              onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
+              className="search-input w-auto min-w-[400px] max-w-2xl pr-8"
+            />
+            {searchActions}
+          </div>
           <div className="text-sm text-content-text-secondary">
             {table.getFilteredRowModel().rows.length} of {data.length} results
           </div>
         </div>
       )}
 
-      <div className="card-premium rounded-lg shadow-lg overflow-hidden">
-        <Table>
+      {filterComponent && <div>{filterComponent}</div>}
+
+      <div className="card-premium rounded-lg shadow-lg overflow-hidden w-full">
+        <Table className="w-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-glass-border/60 hover:bg-transparent bg-glass-bg/30">
@@ -88,7 +99,17 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableHead
                       key={header.id}
-                      className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-8 first:pl-8 last:pr-8"
+                      className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8"
+                      style={{
+                        width:
+                          header.id === "title"
+                            ? "30%"
+                            : header.id === "timesPlayed"
+                              ? "10%"
+                              : header.id === "yearlyPlayData"
+                                ? "10%"
+                                : "25%",
+                      }}
                     >
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
@@ -98,7 +119,18 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody className="bg-glass-bg/10">
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center text-content-text-tertiary py-12 px-4 sm:px-6 md:px-8"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="text-lg">Loading...</div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row, index) => (
                 <TableRow
                   key={row.id}
@@ -108,7 +140,10 @@ export function DataTable<TData, TValue>({
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-5 px-8 first:pl-8 last:pr-8 text-base">
+                    <TableCell
+                      key={cell.id}
+                      className="py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8 text-base"
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -116,7 +151,10 @@ export function DataTable<TData, TValue>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-32 text-center text-content-text-tertiary py-12 px-8">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-32 text-center text-content-text-tertiary py-12 px-4 sm:px-6 md:px-8"
+                >
                   <div className="flex flex-col items-center gap-2">
                     <div className="text-lg">No results found</div>
                     {searchKey && table.getColumn(searchKey)?.getFilterValue() ? (

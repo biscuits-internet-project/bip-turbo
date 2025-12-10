@@ -65,7 +65,7 @@ export const action = adminAction(async ({ request, context }: ActionFunctionArg
 
 export default function NewBlogPost() {
   return (
-    <div className="">
+    <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-content-text-primary">Create Blog Post</h1>
         <Button variant="outline" size="sm" asChild>

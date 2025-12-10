@@ -5,6 +5,8 @@ import type { SongRepository } from "./song-repository";
 export interface SongFilter {
   title?: string;
   legacyId?: number;
+  startDate?: Date;
+  endDate?: Date;
 }
 
 export interface CreateSongInput {
@@ -43,8 +45,19 @@ export class SongService {
         value,
       })) as FilterCondition<Song>[],
     };
-
     return this.repository.findMany(queryOptions);
+  }
+
+  async findManyInDateRange(filter: SongFilter): Promise<Song[]> {
+    const { startDate, endDate, ...restFilter } = filter;
+    const queryOptions: QueryOptions<Song> = {
+      filters: Object.entries(restFilter).map(([field, value]) => ({
+        field: field as keyof Song,
+        operator: "eq",
+        value,
+      })) as FilterCondition<Song>[],
+    };
+    return this.repository.findManyInDateRange(queryOptions, startDate, endDate);
   }
 
   async search(query: string, limit = 20): Promise<Song[]> {
