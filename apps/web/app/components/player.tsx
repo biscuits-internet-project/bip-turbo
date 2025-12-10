@@ -103,6 +103,15 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+
+  // Track mounted state for cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Fetch metadata and audio files for the provided Archive.org identifier
   useEffect(() => {
@@ -265,10 +274,12 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         setCurrentTrackIndex(index);
 
         setTimeout(() => {
-          if (audioRef.current) {
+          if (isMountedRef.current && audioRef.current) {
             audioRef.current
               .play()
-              .then(() => setIsPlaying(true))
+              .then(() => {
+                if (isMountedRef.current) setIsPlaying(true);
+              })
               .catch((err) => console.error("Playback failed:", err));
           }
         }, 100);

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, MessageSquare, User } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ControllerRenderProps } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -35,6 +35,16 @@ export function ContactDialog({ children }: ContactDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -71,7 +81,7 @@ export function ContactDialog({ children }: ContactDialogProps) {
       toast.success("Message sent successfully! We'll get back to you soon.");
 
       // Close dialog after success message
-      setTimeout(() => {
+      closeTimeoutRef.current = setTimeout(() => {
         setOpen(false);
         setIsSubmitted(false);
       }, 3000);

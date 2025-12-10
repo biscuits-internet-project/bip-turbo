@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
@@ -54,6 +54,15 @@ export function StarRating({
   const [isAnimating, setIsAnimating] = useState(false);
   const queryClient = useQueryClient();
   const { user, loading: isSessionLoading } = useSession();
+  const isMountedRef = useRef<boolean>(true);
+
+  // Track mounted state for cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Query for rating
   const { data: rating } = useQuery({
@@ -174,7 +183,7 @@ export function StarRating({
 
     // Reset animation after it completes
     setTimeout(() => {
-      setIsAnimating(false);
+      if (isMountedRef.current) setIsAnimating(false);
     }, 1000);
   };
 

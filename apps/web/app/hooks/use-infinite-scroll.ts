@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseInfiniteScrollOptions {
   totalItems: number;
@@ -21,6 +21,7 @@ export function useInfiniteScroll({
 }: UseInfiniteScrollOptions): UseInfiniteScrollReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [currentCount, setCurrentCount] = useState(itemsPerPage);
+  const nodeRef = useRef<HTMLDivElement | null>(null);
 
   const handleLoadMore = useCallback(() => {
     setIsLoading(true);
@@ -34,31 +35,35 @@ export function useInfiniteScroll({
     setCurrentCount(itemsPerPage);
   }, [itemsPerPage]);
 
-  const ref = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (!node) return;
+  // Callback ref to capture the node
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    nodeRef.current = node;
+  }, []);
 
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const first = entries[0];
-          if (first.isIntersecting && !isLoading && currentCount < totalItems) {
-            handleLoadMore();
-          }
-        },
-        { rootMargin: "800px" },
-      );
+  // useEffect handles observer lifecycle with proper cleanup
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node) return;
 
-      observer.observe(node);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && !isLoading && currentCount < totalItems) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: "800px" },
+    );
 
-      return () => {
-        observer.disconnect();
-      };
-    },
-    [currentCount, totalItems, isLoading, handleLoadMore],
-  );
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [currentCount, totalItems, isLoading, handleLoadMore]);
 
   return {
-    loadMoreRef: ref,
+    loadMoreRef,
     isLoading,
     currentCount,
     hasMore: currentCount < totalItems,

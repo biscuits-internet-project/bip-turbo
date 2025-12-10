@@ -1,6 +1,6 @@
 import type { Venue } from "@bip/domain";
 import { Globe, MapPin, Plus, Search, Ticket } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -354,29 +354,38 @@ export default function VenuesPage() {
 
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(false);
+  const nodeRef = useRef<HTMLDivElement | null>(null);
 
-  const loadMoreRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (!node) return;
+  // Callback ref to capture the node
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    nodeRef.current = node;
+  }, []);
 
-      const observer = new IntersectionObserver(
-        (entries) => {
-          const first = entries[0];
-          if (first.isIntersecting && !isLoading && displayCount < filteredVenues.length) {
-            setIsLoading(true);
-            setTimeout(() => {
-              setDisplayCount((prev) => Math.min(prev + ITEMS_PER_PAGE, filteredVenues.length));
-              setIsLoading(false);
-            }, 100);
-          }
-        },
-        { rootMargin: "800px" },
-      );
+  // useEffect handles observer lifecycle with proper cleanup
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node) return;
 
-      observer.observe(node);
-    },
-    [displayCount, filteredVenues.length, isLoading],
-  );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && !isLoading && displayCount < filteredVenues.length) {
+          setIsLoading(true);
+          setTimeout(() => {
+            setDisplayCount((prev) => Math.min(prev + ITEMS_PER_PAGE, filteredVenues.length));
+            setIsLoading(false);
+          }, 100);
+        }
+      },
+      { rootMargin: "800px" },
+    );
+
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [displayCount, filteredVenues.length, isLoading]);
 
   const visibleVenues = useMemo(() => filteredVenues.slice(0, displayCount), [filteredVenues, displayCount]);
   const hasMore = displayCount < filteredVenues.length;

@@ -69,7 +69,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
     setFeedback("");
     setShowFeedbackText(false);
     setShowThanks(false);
-  }, []);
+  }, [searchId]);
 
   if (showThanks) {
     return (
