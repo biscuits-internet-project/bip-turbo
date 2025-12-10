@@ -1,14 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { SONGS_FILTER_PARAM } from "~/components/song/song-filters";
 import { cn } from "~/lib/utils";
 
-function getLink(filter: string, filterAsParameter: boolean, basePath: string, currentURLParameters: URLSearchParams) {
-  if (filterAsParameter) {
-    const params = new URLSearchParams(currentURLParameters.toString());
-    params.set(SONGS_FILTER_PARAM, filter);
-    return { pathname: basePath, search: params.toString() };
-  }
+function getLink(filter: string, basePath: string, currentURLParameters: URLSearchParams) {
   return { pathname: `${basePath}${filter}`, search: currentURLParameters.toString() };
 }
 
@@ -23,7 +17,6 @@ interface FilterNavProps {
   additionalText?: string;
   widerItems?: boolean;
   parameters?: string[];
-  filterAsParameter?: boolean;
   currentURLParameters?: URLSearchParams;
   defaultExpanded?: boolean;
 }
@@ -39,7 +32,6 @@ export function FilterNav({
   additionalText,
   widerItems = false,
   parameters = [],
-  filterAsParameter = false,
   currentURLParameters = new URLSearchParams(),
   defaultExpanded = true,
 }: FilterNavProps) {
@@ -116,7 +108,7 @@ export function FilterNav({
         >
           <div className={cn("grid gap-2", columnCSS)}>
             {filters.map((filter) => {
-              const link = getLink(filter, filterAsParameter, basePath, currentURLParameters);
+              const link = getLink(filter, basePath, currentURLParameters);
               return (
                 <Link
                   key={filter}
@@ -147,7 +139,7 @@ export function FilterNav({
                 } else {
                   newParams.append(parameter, "true");
                 }
-                const link = getLink(currentFilter || "", filterAsParameter, basePath, newParams);
+                const link = getLink(currentFilter || "", basePath, newParams);
                 return (
                   <Link
                     key={parameter}

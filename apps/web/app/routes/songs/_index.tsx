@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
+import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 import { SongsTable } from "../../components/song/songs-table";
-import { addVenueInfoToSongs } from "./song-utilities";
 
 interface LoaderData {
   songs: Song[];

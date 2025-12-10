@@ -1,6 +1,6 @@
 import type { Song } from "@bip/domain";
 import { publicLoader } from "~/lib/base-loaders";
-import { addVenueInfoToSongs } from "~/routes/songs/song-utilities";
+import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
 export const SONG_FILTERS = {
@@ -22,7 +22,7 @@ export const loader = publicLoader(async ({ request }) => {
   if (era && era in SONG_FILTERS) {
     const eraFilter = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
     try {
-      const filteredSongs = await services.songs.findMany(eraFilter);
+      const filteredSongs = await services.songs.findManyInDateRange(eraFilter);
 
       // For "not played" songs, we need to get their overall timesPlayed for sorting
       // The findMany with date range recalculates timesPlayed for that era only
