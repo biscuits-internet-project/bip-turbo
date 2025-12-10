@@ -1,28 +1,27 @@
 import type { Song } from "@bip/domain";
+import type { ReactNode } from "react";
 import { songsColumns } from "~/components/song/songs-columns";
-import { SongsFilterNav } from "~/components/song/songs-filter-nav";
 import { DataTable } from "~/components/ui/data-table";
 
 interface SongsTableProps {
   songs: Song[];
-  currentSongFilter?: string | null;
-  currentURLParameters?: URLSearchParams;
+  filterComponent?: ReactNode;
+  searchActions?: ReactNode;
+  isLoading?: boolean;
 }
 
-export function SongsTable({
-  songs,
-  currentSongFilter,
-  currentURLParameters = new URLSearchParams(),
-}: SongsTableProps) {
+export function SongsTable({ songs, filterComponent, searchActions, isLoading = false }: SongsTableProps) {
   return (
     <div>
-      <SongsFilterNav currentSongFilter={currentSongFilter} currentURLParameters={currentURLParameters} />
       <DataTable
         columns={songsColumns}
         data={songs}
         searchKey="title"
         searchPlaceholder="Search songs..."
         hidePagination
+        filterComponent={filterComponent}
+        searchActions={searchActions}
+        isLoading={isLoading}
       />
     </div>
   );
