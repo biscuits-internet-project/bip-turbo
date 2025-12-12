@@ -1,4 +1,4 @@
-import type { User, UserMinimal } from "@bip/domain";
+import type { Logger, User, UserMinimal } from "@bip/domain";
 import type { DbClient, DbUser } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
@@ -46,7 +46,10 @@ export function mapToUserMinimal(dbUser: DbUser): UserMinimal {
 }
 
 export class UserRepository {
-  constructor(private readonly db: DbClient) {}
+  constructor(
+    private readonly db: DbClient,
+    private readonly logger?: Logger,
+  ) {}
 
   private calculateCommunityScore(
     reviewCount: number,
@@ -75,7 +78,7 @@ export class UserRepository {
   }
 
   private calculateBadges(reviewCount: number, attendanceCount: number, ratingCount: number): Badge[] {
-    console.log(`calculateBadges called with: ${reviewCount}, ${attendanceCount}, ${ratingCount}`);
+    this.logger?.info("calculateBadges called", { reviewCount, attendanceCount, ratingCount });
     const badges: Badge[] = [];
 
     // Review badges - users can earn multiple badges in each category
@@ -239,7 +242,7 @@ export class UserRepository {
   }
 
   async getUserStats(userId?: string): Promise<UserStats[]> {
-    console.log("DEBUG: getUserStats called with userId:", userId);
+    this.logger?.info("getUserStats called", { userId });
     const whereClause = userId ? { id: userId } : {};
 
     const users = await this.db.user.findMany({
@@ -294,9 +297,7 @@ export class UserRepository {
       );
 
       // Debug: Check if methods are returning undefined
-      console.log(`DEBUG: ${user.username} - badges result:`, badges);
-      console.log(`DEBUG: ${user.username} - communityScore result:`, communityScore);
-      console.log(`DEBUG: ${user.username} - blogPostCount:`, user._count.blogPosts);
+      this.logger?.info("User stats calculated", { username: user.username, badges, communityScore, blogPostCount: user._count.blogPosts });
 
       return {
         user: mapUserToDomainEntity(user),
@@ -328,7 +329,7 @@ export class UserRepository {
           return stats.ratingCount > 0;
         case "blogPostCount": {
           const hasBlogs = stats.blogPostCount > 0;
-          console.log(`DEBUG: ${stats.user.username} - blogPostCount: ${stats.blogPostCount}, hasBlogs: ${hasBlogs}`);
+          this.logger?.info("Checking blogPostCount filter", { username: stats.user.username, blogPostCount: stats.blogPostCount, hasBlogs });
           return hasBlogs;
         }
         default:
@@ -336,13 +337,12 @@ export class UserRepository {
       }
     });
 
-    console.log(`DEBUG: For metric "${metric}", filtered ${userStats.length} users down to ${filteredStats.length}`);
+    this.logger?.info("Metric filter applied", { metric, totalUsers: userStats.length, filteredUsers: filteredStats.length });
 
     if (metric === "blogPostCount") {
-      console.log(
-        `DEBUG: Top bloggers after filter:`,
-        filteredStats.slice(0, 3).map((s) => `${s.user.username}: ${s.blogPostCount}`),
-      );
+      this.logger?.info("Top bloggers after filter", {
+        topBloggers: filteredStats.slice(0, 3).map((s) => ({ username: s.user.username, blogPostCount: s.blogPostCount })),
+      });
     }
 
     const sortedStats = filteredStats.sort((a, b) => {

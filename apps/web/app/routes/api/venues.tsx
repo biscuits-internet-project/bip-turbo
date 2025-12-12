@@ -1,4 +1,5 @@
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 export const loader = publicLoader(async ({ request }) => {
@@ -28,13 +29,13 @@ export const loader = publicLoader(async ({ request }) => {
       sort: [{ field: "name", direction: "asc" }],
     });
 
-    console.log(`Venue search for "${query}" returned ${venues.length} results`);
+    logger.info(`Venue search for "${query}" returned ${venues.length} results`);
     return new Response(JSON.stringify(venues), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Venue search error:", error);
+    logger.error("Venue search error", { error });
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return new Response(JSON.stringify({ error: errorMessage, query }), {
       status: 500,

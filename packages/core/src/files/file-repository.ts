@@ -1,4 +1,4 @@
-import type { File } from "@bip/domain";
+import type { File, Logger } from "@bip/domain";
 import type { PrismaClient } from "@prisma/client";
 
 interface FileCreateInput {
@@ -28,10 +28,13 @@ interface DbFile {
 }
 
 export class FileRepository {
-  constructor(protected db: PrismaClient) {}
+  constructor(
+    protected db: PrismaClient,
+    protected logger: Logger,
+  ) {}
 
   async create(data: FileCreateInput): Promise<File> {
-    console.log("Creating file record:", data);
+    this.logger.info("Creating file record", { data });
     const now = new Date();
     const file = await this.db.file.create({
       data: {
@@ -44,12 +47,12 @@ export class FileRepository {
         updatedAt: now,
       },
     });
-    console.log("Created file record:", file);
+    this.logger.info("Created file record", { file });
     return this.mapToDomainEntity(file);
   }
 
   async findByBlogPostId(blogPostId: string): Promise<File[]> {
-    console.log("Finding files for blog post:", blogPostId);
+    this.logger.info("Finding files for blog post", { blogPostId });
     const files = await this.db.file.findMany({
       where: {
         blogPosts: {
@@ -67,10 +70,9 @@ export class FileRepository {
       },
     });
 
-    console.log("Found files:", files);
+    this.logger.info("Found files for blog post", { blogPostId, count: files.length });
     return files.map((file) => {
       const url = this.getPublicUrl(file.path);
-      console.log("Generated URL for file:", { path: file.path, url });
       return {
         ...this.mapToDomainEntity(file as DbFile),
         isCover: file.blogPosts[0]?.isCover || false,
@@ -80,7 +82,7 @@ export class FileRepository {
   }
 
   async associateWithBlogPost(data: BlogPostFileAssociation): Promise<void> {
-    console.log("Looking up file to associate:", data);
+    this.logger.info("Looking up file to associate", { data });
     const file = await this.db.file.findFirst({
       where: {
         path: data.path,
@@ -88,11 +90,11 @@ export class FileRepository {
     });
 
     if (!file) {
-      console.error("File not found during association:", data.path);
+      this.logger.error("File not found during association", { path: data.path });
       throw new Error(`File not found with path: ${data.path}`);
     }
 
-    console.log("Found file to associate:", file);
+    this.logger.info("Found file to associate", { file });
     await this.db.blogPostToFile.create({
       data: {
         blogPostId: data.blogPostId,
@@ -101,7 +103,7 @@ export class FileRepository {
         createdAt: new Date(),
       },
     });
-    console.log("Created blog post to file association");
+    this.logger.info("Created blog post to file association");
   }
 
   async removeAllBlogPostFiles(blogPostId: string): Promise<void> {

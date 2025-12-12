@@ -11,6 +11,7 @@ import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { getShowsMeta } from "~/lib/seo";
+import { logger } from "~/lib/logger";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
 
@@ -34,15 +35,15 @@ async function fetchUserAttendances(context: Context, showIds: string[]): Promis
   try {
     const user = await services.users.findByEmail(context.currentUser.email);
     if (!user) {
-      console.warn(`User not found with email ${context.currentUser.email}`);
+      logger.warn(`User not found with email ${context.currentUser.email}`);
       return [];
     }
 
     const userAttendances = await services.attendances.findManyByUserIdAndShowIds(user.id, showIds);
-    console.log(`👤 Fetch ${userAttendances.length} user attendances from ${showIds.length} total shows`);
+    logger.info(`Fetch ${userAttendances.length} user attendances from ${showIds.length} total shows`);
     return userAttendances;
   } catch (error) {
-    console.warn("Failed to load user attendances:", error);
+    logger.warn("Failed to load user attendances", { error });
     return [];
   }
 }
@@ -58,7 +59,7 @@ export const loader = publicLoader(async ({ request, context, params }: LoaderFu
 
   // If there's a search query with at least MIN_SEARCH_CHARS characters, use the search functionality
   if (searchQuery && searchQuery.length >= MIN_SEARCH_CHARS) {
-    console.log(`🔍 Loading search results for query: ${searchQuery}`);
+    logger.info(`Loading search results for query: ${searchQuery}`);
     // Get show IDs from search
     const shows = await services.shows.search(searchQuery);
 
@@ -91,7 +92,7 @@ export const loader = publicLoader(async ({ request, context, params }: LoaderFu
   });
 
   setlists = await services.cache.getOrSet(yearCacheKey, async () => {
-    console.log(`📅 Loading shows from DB for year: ${yearInt}`);
+    logger.info(`Loading shows from DB for year: ${yearInt}`);
     return await services.setlists.findMany({
       filters: {
         year: yearInt,
@@ -105,7 +106,7 @@ export const loader = publicLoader(async ({ request, context, params }: LoaderFu
     setlists.map((setlist) => setlist.show.id),
   );
 
-  console.log(`🎯 Year ${yearInt} shows loaded: ${setlists.length} shows`);
+  logger.info(`Year ${yearInt} shows loaded: ${setlists.length} shows`);
 
   return {
     setlists,

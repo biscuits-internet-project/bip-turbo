@@ -9,6 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -38,10 +39,10 @@ export const loader = publicLoader<LoaderData>(async () => {
     ]);
 
     if (cached) {
-      console.log("Community data served from Redis cache");
+      logger.info("Community data served from Redis cache");
       // Debug: Log a sample user to see what we got from cache
       if (cached.allUserStats && cached.allUserStats.length > 0) {
-        console.log("Sample cached user stats:", JSON.stringify(cached.allUserStats[0], null, 2));
+        logger.info("Sample cached user stats", { userStats: cached.allUserStats[0] });
       }
       return {
         ...cached,
@@ -49,12 +50,12 @@ export const loader = publicLoader<LoaderData>(async () => {
       };
     }
   } catch (error) {
-    console.error("Redis cache read failed for community page:", error);
+    logger.error("Redis cache read failed for community page", { error });
   }
 
   // If no cache exists, return minimal fallback data
   // The cron job should populate the cache soon
-  console.warn("No community cache found - returning minimal fallback data");
+  logger.warn("No community cache found - returning minimal fallback data");
 
   // Still try to get the last updated timestamp even without cached data
   let lastUpdated: string | undefined;
@@ -62,7 +63,7 @@ export const loader = publicLoader<LoaderData>(async () => {
     const redis = services.redis;
     lastUpdated = (await redis.get<string>("community-last-updated")) || undefined;
   } catch (error) {
-    console.error("Failed to get last updated timestamp:", error);
+    logger.error("Failed to get last updated timestamp", { error });
   }
 
   return {

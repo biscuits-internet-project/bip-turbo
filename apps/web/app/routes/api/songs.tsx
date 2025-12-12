@@ -1,5 +1,6 @@
 import type { Song } from "@bip/domain";
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
@@ -56,7 +57,7 @@ export const loader = publicLoader(async ({ request }) => {
       const songsWithVenueInfo = await addVenueInfoToSongs(filteredSongsByPlayStatus);
       return songsWithVenueInfo;
     } catch (error) {
-      console.error("Error fetching filtered songs:", error);
+      logger.error("Error fetching filtered songs", { error });
       return [];
     }
   }
@@ -66,16 +67,16 @@ export const loader = publicLoader(async ({ request }) => {
     return [];
   }
 
-  console.log(`Song search for '${query}'`);
+  logger.info(`Song search for '${query}'`);
 
   try {
     // Search songs by title
     const songs = await services.songs.search(query, 20);
 
-    console.log(`Song search for '${query}' returned ${songs.length} results`);
+    logger.info(`Song search for '${query}' returned ${songs.length} results`);
     return songs;
   } catch (error) {
-    console.error("Song search error:", error);
+    logger.error("Song search error", { error });
     return [];
   }
 });

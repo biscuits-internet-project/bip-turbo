@@ -63,6 +63,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
   }, [showThanks]);
 
   // Reset state when searchId changes (new search)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: searchId is a prop and a valid dependency
   useEffect(() => {
     setIsComplete(false);
     setSentiment(null);

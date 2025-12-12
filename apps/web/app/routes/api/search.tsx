@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 interface SearchRequest {
@@ -72,7 +73,7 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
       },
     });
   } catch (error) {
-    console.error("Search API error:", error);
+    logger.error("Search API error", { error });
 
     const errorMessage = error instanceof Error ? error.message : "Search failed";
     const executionTimeMs = Date.now() - startTime;

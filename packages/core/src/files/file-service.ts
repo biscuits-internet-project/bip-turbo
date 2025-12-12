@@ -42,21 +42,19 @@ export class FileService {
   }
 
   async updateBlogPostFiles(blogPostId: string, files: BlogPostFile[]): Promise<void> {
-    console.log("File service: updating files for blog post:", { blogPostId, files });
+    this.logger.info("Updating files for blog post", { blogPostId, fileCount: files.length });
 
     // First, remove all existing file associations for this blog post
     await this.repository.removeAllBlogPostFiles(blogPostId);
-    console.log("File service: removed existing file associations");
 
     // Then create new associations for each file
     for (const file of files) {
-      console.log("File service: associating file:", file);
       await this.repository.associateWithBlogPost({
         path: file.path,
         blogPostId,
         isCover: file.isCover || false,
       });
     }
-    console.log("File service: completed file associations");
+    this.logger.info("Completed file associations for blog post", { blogPostId, fileCount: files.length });
   }
 }

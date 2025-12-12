@@ -1,6 +1,7 @@
 import { trackUpdateSchema } from "@bip/domain";
 import { protectedAction, publicLoader } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 export const loader = publicLoader(async ({ params, context }) => {
@@ -77,7 +78,7 @@ export const action = protectedAction(async ({ request, params }) => {
 
       return completeTrack;
     } catch (error) {
-      console.error("Error updating track:", error);
+      logger.error("Error updating track", { error });
       return new Response(JSON.stringify({ error: "Failed to update track" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -94,7 +95,7 @@ export const action = protectedAction(async ({ request, params }) => {
       await services.tracks.delete(trackId);
       return { success: true };
     } catch (error) {
-      console.error("Error deleting track:", error);
+      logger.error("Error deleting track", { error });
       return new Response(JSON.stringify({ error: "Failed to delete track" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },

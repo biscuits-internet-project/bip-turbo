@@ -21,20 +21,16 @@ interface SetlistCardProps {
 function SetlistCardComponent({ setlist, className, userAttendance, userRating, showRating }: SetlistCardProps) {
   const { user } = useSession();
   const formattedDate = formatDateShort(setlist.show.date);
-  const [isAnimating, setIsAnimating] = useState(false);
   const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
 
-  // Trigger animation only when rating updates
+  // Update displayed rating when props change
   useEffect(() => {
     const newRating = showRating ?? setlist.show.averageRating ?? 0;
     if (newRating !== displayedRating) {
-      setIsAnimating(true);
       // Wait for animation to reach peak before updating displayed value
       const updateTimer = setTimeout(() => setDisplayedRating(newRating), 800);
-      const animationTimer = setTimeout(() => setIsAnimating(false), 2000);
       return () => {
         clearTimeout(updateTimer);
-        clearTimeout(animationTimer);
       };
     }
   }, [showRating, setlist.show.averageRating, displayedRating]);

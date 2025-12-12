@@ -1,4 +1,5 @@
 import { adminAction } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 // PUT /api/tracks/reorder - Bulk update track positions
@@ -7,7 +8,7 @@ export const action = adminAction(async ({ request }) => {
 
   if (method === "PUT") {
     const { updates } = await request.json();
-    console.log("Reordering tracks:", updates);
+    logger.info("Reordering tracks", { updates });
 
     if (!Array.isArray(updates)) {
       throw new Response("Updates must be an array", { status: 400 });
@@ -24,10 +25,10 @@ export const action = adminAction(async ({ request }) => {
         }),
       );
 
-      console.log(`Updated ${updatedTracks.length} track positions`);
+      logger.info(`Updated ${updatedTracks.length} track positions`);
       return updatedTracks;
     } catch (error) {
-      console.error("Error reordering tracks:", error);
+      logger.error("Error reordering tracks", { error });
       throw new Response("Failed to reorder tracks", { status: 500 });
     }
   }
