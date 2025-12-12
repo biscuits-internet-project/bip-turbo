@@ -34,7 +34,7 @@ async function main() {
     
     logger.info("SegueRun generation complete");
   } catch (error) {
-    logger.error("Error generating SegueRuns", error as string);
+    logger.error("Error generating SegueRuns", { error });
     process.exit(1);
   } finally {
     await db.$disconnect();

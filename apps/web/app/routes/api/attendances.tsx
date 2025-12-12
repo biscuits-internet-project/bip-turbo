@@ -34,7 +34,7 @@ export const action = protectedAction(async ({ request, context }) => {
       // Get the actual user from the database by email
       const user = await services.users.findByEmail(currentUser.email);
       if (!user) {
-        logger.error("User not found in local database:", { email: currentUser.email });
+        logger.error("User not found in local database", { email: currentUser.email });
         return new Response(JSON.stringify({ error: "User not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
@@ -44,7 +44,7 @@ export const action = protectedAction(async ({ request, context }) => {
       // Validate that the show exists
       const show = await services.shows.findById(showId);
       if (!show) {
-        logger.error("Show not found for attendance creation:", { showId, userId: user.id });
+        logger.error("Show not found for attendance creation", { showId, userId: user.id });
         return new Response(JSON.stringify({ error: "Show not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
@@ -64,7 +64,7 @@ export const action = protectedAction(async ({ request, context }) => {
 
       return { attendance };
     } catch (error) {
-      logger.error("Error creating attendance:", error);
+      logger.error("Error creating attendance", { error });
       throw new Error(error instanceof Error ? error.message : "Failed to create attendance");
     }
   }
@@ -93,7 +93,7 @@ export const action = protectedAction(async ({ request, context }) => {
         headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
-      logger.error("Error deleting attendance:", error);
+      logger.error("Error deleting attendance", { error });
       return new Response(JSON.stringify({ error: "Failed to delete attendance" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },

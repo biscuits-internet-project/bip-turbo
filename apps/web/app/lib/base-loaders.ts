@@ -55,7 +55,7 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
 
       return result;
     } catch (error) {
-      logger.error("❌ Request failed:", error);
+      logger.error("❌ Request failed", { error });
       throw error;
     }
   };
@@ -89,7 +89,7 @@ export function createAction<T, TContext extends PublicContext = PublicContext>(
 
       return result;
     } catch (error) {
-      logger.error("❌ Request failed:", error);
+      logger.error("❌ Request failed", { error });
       throw error;
     }
   };

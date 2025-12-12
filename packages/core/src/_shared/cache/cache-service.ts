@@ -24,7 +24,7 @@ export class CacheService {
       }
       return value;
     } catch (error) {
-      this.logger.error(`Cache get error for key ${key}:`, error instanceof Error ? error.message : String(error));
+      this.logger.error(`Cache get error for key ${key}`, { error: error instanceof Error ? error.message : String(error) });
       return null;
     }
   }
@@ -35,7 +35,7 @@ export class CacheService {
       await this.redis.set(key, value, { EX: ttl });
       this.logger.debug(`Cache set: ${key} (TTL: ${ttl}s)`);
     } catch (error) {
-      this.logger.error(`Cache set error for key ${key}:`, error instanceof Error ? error.message : String(error));
+      this.logger.error(`Cache set error for key ${key}`, { error: error instanceof Error ? error.message : String(error) });
       // Don't throw - caching failures should not break the application
     }
   }
@@ -45,7 +45,7 @@ export class CacheService {
       await this.redis.del(key);
       this.logger.debug(`Cache delete: ${key}`);
     } catch (error) {
-      this.logger.error(`Cache delete error for key ${key}:`, error instanceof Error ? error.message : String(error));
+      this.logger.error(`Cache delete error for key ${key}`, { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -55,10 +55,7 @@ export class CacheService {
       this.logger.debug(`Cache pattern delete: ${pattern} (${deletedCount} keys)`);
       return deletedCount;
     } catch (error) {
-      this.logger.error(
-        `Cache pattern delete error for pattern ${pattern}:`,
-        error instanceof Error ? error.message : String(error),
-      );
+      this.logger.error(`Cache pattern delete error for pattern ${pattern}`, { error: error instanceof Error ? error.message : String(error) });
       return 0;
     }
   }
@@ -67,7 +64,7 @@ export class CacheService {
     try {
       return await this.redis.exists(key);
     } catch (error) {
-      this.logger.error(`Cache exists error for key ${key}:`, error instanceof Error ? error.message : String(error));
+      this.logger.error(`Cache exists error for key ${key}`, { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }

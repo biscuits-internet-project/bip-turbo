@@ -161,7 +161,7 @@ export class SearchTestRunner {
       };
       
     } catch (error) {
-      logger.error(`Test failed for "${testCase.query}":`, error instanceof Error ? error.message : String(error));
+      logger.error(`Test failed for "${testCase.query}"`, { error: error instanceof Error ? error.message : String(error) });
       return {
         testCase,
         searchResults: [],
@@ -557,7 +557,7 @@ async function main() {
     process.exit(summary.criticalPassRate < 80 ? 1 : 0);
     
   } catch (error) {
-    logger.error("❌ Test suite failed:", error instanceof Error ? error.message : String(error));
+    logger.error("❌ Test suite failed", { error: error instanceof Error ? error.message : String(error) });
     process.exit(1);
   } finally {
     await runner.cleanup();

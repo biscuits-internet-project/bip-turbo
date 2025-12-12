@@ -9,14 +9,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const type = requestUrl.searchParams.get("type");
   const next = requestUrl.searchParams.get("next") || "/";
 
-  logger.info({ message: "Auth callback", url: requestUrl.toString(), code: !!code, type });
+  logger.info("Auth callback", { url: requestUrl.toString(), code: !!code, type });
 
   if (code) {
     const { supabase, headers } = getServerClient(request);
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
-      logger.error({ error, message: "Failed to exchange code for session" });
+      logger.error("Failed to exchange code for session", { error });
       return redirect("/auth/login", { headers });
     }
 
@@ -38,8 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           username: authUser.user_metadata.username || authUser.email.split("@")[0],
         });
 
-        logger.info({
-          message: "Local user synced",
+        logger.info("Local user synced", {
           authUserId: authUser.id,
           localUserId: localUser.id,
           email: authUser.email,
@@ -57,13 +56,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
           });
 
           if (updateError) {
-            logger.error({ error: updateError, message: "Failed to update user metadata with internal_user_id" });
+            logger.error("Failed to update user metadata with internal_user_id", { error: updateError });
           } else {
-            logger.info({ message: "Updated user metadata with internal_user_id", userId: localUser.id });
+            logger.info("Updated user metadata with internal_user_id", { userId: localUser.id });
           }
         }
       } catch (err) {
-        logger.error({ error: err, message: "Failed to sync local user" });
+        logger.error("Failed to sync local user", { error: err });
         // Continue anyway - user can still log in
       }
     }
@@ -74,7 +73,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return redirect("/auth/reset-password", { headers });
     }
 
-    logger.info({ message: "Redirecting to next page", next });
+    logger.info("Redirecting to next page", { next });
     return redirect(next, { headers });
   }
 

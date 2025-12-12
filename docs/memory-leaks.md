@@ -2,9 +2,38 @@
 
 ## Summary
 
-The primary server-side memory leak is caused by a **module-level QueryClient singleton** in `apps/web/app/root.tsx` that accumulates state across all SSR requests without cleanup.
+Two primary server-side memory leaks were identified:
 
-## Root Cause
+1. **QueryClient singleton** in `apps/web/app/root.tsx` - accumulated state across all SSR requests (FIXED)
+2. **setTimeout closure leak** in `apps/web/app/entry.server.tsx` - held entire React tree in memory until timeout fired (FIXED)
+
+## Root Cause #1: entry.server.tsx setTimeout Closure
+
+**File:** `apps/web/app/entry.server.tsx`
+
+The `setTimeout` for aborting slow renders holds a closure reference to the entire React rendering context. If the timeout isn't cleared when streaming completes, the closure retains all that memory until the timeout fires (6 seconds later).
+
+This was a known issue fixed in React Router v7.8.2 (PR #14200, Issue #13416).
+
+### Fix Applied
+
+Added a `final` callback to the PassThrough stream to clear the timeout when streaming completes:
+
+```typescript
+const body = new PassThrough({
+  // Clear the timeout when streaming completes to prevent retaining
+  // the closure and causing a memory leak
+  final(callback) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    callback();
+  },
+});
+```
+
+## Root Cause #2: QueryClient Singleton (Previously Fixed)
 
 **File:** `apps/web/app/root.tsx:50-58`
 

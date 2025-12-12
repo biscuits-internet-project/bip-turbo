@@ -71,7 +71,7 @@ export const action = protectedAction(async ({ request, context }) => {
 
       return { review: serializedReview };
     } catch (error) {
-      logger.error("Error creating review:", error);
+      logger.error("Error creating review", { error });
       throw new Error(error instanceof Error ? error.message : "Failed to create review");
     }
   }
@@ -97,7 +97,7 @@ export const action = protectedAction(async ({ request, context }) => {
       await services.reviews.delete(id);
       return new Response(null, { status: 204 });
     } catch (error) {
-      logger.error("Error deleting review:", error);
+      logger.error("Error deleting review", { error });
       return new Response(JSON.stringify({ error: "Failed to delete review" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -142,7 +142,7 @@ export const action = protectedAction(async ({ request, context }) => {
       };
       return responseData;
     } catch (error) {
-      logger.error("Error updating review:", error);
+      logger.error("Error updating review", { error });
       throw new Error(error instanceof Error ? error.message : "Failed to update review");
     }
   }

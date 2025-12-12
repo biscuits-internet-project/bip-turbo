@@ -63,7 +63,7 @@ export class PostgresSearchService {
         searchHistoryId,
       };
     } catch (error) {
-      this.logger.error(`Search failed for query "${query}":`, error instanceof Error ? error.message : String(error));
+      this.logger.error(`Search failed for query "${query}"`, { error: error instanceof Error ? error.message : String(error) });
       
       // Log the failed search
       await this.logSearch(query, []);
