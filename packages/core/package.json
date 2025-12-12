@@ -33,6 +33,7 @@
     "dotenv": "^17.2.1",
     "postgres": "^3.4.7",
     "redis": "^5.6.1",
+    "winston": "^3.17.0",
     "zod": "^4.0.9"
   },
   "devDependencies": {
