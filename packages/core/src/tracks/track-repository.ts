@@ -1,4 +1,4 @@
-import type { Annotation, Track } from "@bip/domain";
+import type { Annotation, Logger, Track } from "@bip/domain";
 import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbAnnotation, DbClient, DbSong, DbTrack } from "../_shared/database/models";
 
@@ -40,6 +40,7 @@ export class TrackRepository {
   constructor(
     private readonly db: DbClient,
     private readonly cacheInvalidation?: CacheInvalidationService,
+    private readonly logger?: Logger,
   ) {}
 
   protected mapToDomainEntity(dbTrack: DbTrack): Track {
@@ -103,11 +104,11 @@ export class TrackRepository {
 
     if (!result) return null;
 
-    console.log("Raw DB result has ratingsCount:", "ratingsCount" in result, result.ratingsCount);
+    this.logger?.info("Raw DB result has ratingsCount", { hasRatingsCount: "ratingsCount" in result, ratingsCount: result.ratingsCount });
 
     const track = this.mapToDomainEntity(result);
 
-    console.log("Mapped domain entity has ratingsCount:", "ratingsCount" in track, track.ratingsCount);
+    this.logger?.info("Mapped domain entity has ratingsCount", { hasRatingsCount: "ratingsCount" in track, ratingsCount: track.ratingsCount });
     if (result.annotations) {
       track.annotations = result.annotations.map(mapAnnotationToDomainEntity);
     }

@@ -10,6 +10,7 @@ import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -66,7 +67,7 @@ export const action = adminAction(async ({ request, params, context }: ActionFun
     }
   }
 
-  console.log("Files to update:", files);
+  logger.info("Files to update", { files });
 
   const blogPost = await services.blogPosts.update(slug as string, {
     title,
@@ -78,11 +79,11 @@ export const action = adminAction(async ({ request, params, context }: ActionFun
     postType: "blog",
   });
 
-  console.log("Updated blog post:", blogPost);
+  logger.info("Updated blog post", { blogPost });
 
   // Create file records for each uploaded file if they don't exist
   if (files.length > 0) {
-    console.log("Creating file records...");
+    logger.info("Creating file records...");
     await Promise.all(
       files.map(async (file) => {
         try {
@@ -98,14 +99,14 @@ export const action = adminAction(async ({ request, params, context }: ActionFun
           });
         } catch (error) {
           // If file already exists, that's fine - we'll associate it in the next step
-          console.log("File might already exist:", error);
+          logger.info("File might already exist", { error });
         }
       }),
     );
   }
 
   // Update file associations
-  console.log("Updating file associations for blog post:", blogPost.id);
+  logger.info("Updating file associations for blog post", { blogPostId: blogPost.id });
   await services.files.updateBlogPostFiles(blogPost.id, files);
 
   return redirect(`/blog/${blogPost.slug}`);

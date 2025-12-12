@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { publicAction } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
+import { logger } from "~/lib/logger";
 import { env } from "~/server/env";
 
 const resend = new Resend(env.RESEND_API_KEY);
@@ -78,15 +79,15 @@ Reply directly to this email to respond to ${validatedData.name}.
     });
 
     if (emailResult.error) {
-      console.error("Failed to send email:", emailResult.error);
+      logger.error("Failed to send email", { error: emailResult.error });
       throw new Error("Failed to send email");
     }
 
-    console.log("Contact form email sent successfully:", emailResult.data?.id);
+    logger.info("Contact form email sent successfully", { emailId: emailResult.data?.id });
 
     return { success: true, message: "Message sent successfully!" };
   } catch (error) {
-    console.error("Contact form submission error:", error);
+    logger.error("Contact form submission error", { error });
 
     if (error instanceof z.ZodError) {
       return badRequest("Invalid form data");

@@ -1,4 +1,4 @@
-import type { BlogPost, BlogPostState, BlogPostType, BlogPostWithUser, BlogPostWithFiles } from "@bip/domain";
+import type { BlogPost, BlogPostState, BlogPostType, BlogPostWithUser, BlogPostWithFiles, Logger } from "@bip/domain";
 import type { DbBlogPost, DbClient } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
@@ -26,7 +26,10 @@ export function mapBlogPostToDbModel(entity: Partial<BlogPost>): Partial<DbBlogP
 }
 
 export class BlogPostRepository {
-  constructor(protected db: DbClient) {}
+  constructor(
+    protected db: DbClient,
+    protected logger?: Logger,
+  ) {}
 
   async findById(id: string): Promise<BlogPost | null> {
     const result = await this.db.blogPost.findUnique({
@@ -167,8 +170,7 @@ export class BlogPostRepository {
 
   async create(data: Omit<BlogPost, "id" | "createdAt" | "updatedAt">): Promise<BlogPost> {
     const slug = slugify(data.title);
-    console.log("data", data);
-    console.log(data.userId);
+    this.logger?.info("Creating blog post", { data, userId: data.userId });
     const result = await this.db.blogPost.create({
       data: {
         title: data.title,

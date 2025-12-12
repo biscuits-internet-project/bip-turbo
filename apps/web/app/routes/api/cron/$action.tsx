@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 interface CronJobResult {
@@ -12,7 +13,7 @@ async function refreshCommunityCache(): Promise<CronJobResult> {
   const startTime = Date.now();
 
   try {
-    console.log("Starting community cache refresh...");
+    logger.info("Starting community cache refresh...");
 
     // Clear existing cache
     const redis = services.redis;
@@ -40,9 +41,9 @@ async function refreshCommunityCache(): Promise<CronJobResult> {
 
     // Debug: Log a sample user to see the structure
     if (allUserStats.length > 0) {
-      console.log("COMMUNITY_SCORE_DEBUG:", allUserStats[0].communityScore);
-      console.log("BADGES_DEBUG:", allUserStats[0].badges);
-      console.log("REVIEW_COUNT_DEBUG:", allUserStats[0].reviewCount);
+      logger.info("COMMUNITY_SCORE_DEBUG", { communityScore: allUserStats[0].communityScore });
+      logger.info("BADGES_DEBUG", { badges: allUserStats[0].badges });
+      logger.info("REVIEW_COUNT_DEBUG", { reviewCount: allUserStats[0].reviewCount });
     }
 
     // Cache the fresh data (no expiration - refreshed by cron)
@@ -52,7 +53,7 @@ async function refreshCommunityCache(): Promise<CronJobResult> {
     await redis.set("community-last-updated", new Date().toISOString());
 
     const duration = Date.now() - startTime;
-    console.log(`Community cache refreshed successfully in ${duration}ms`);
+    logger.info(`Community cache refreshed successfully in ${duration}ms`);
 
     return {
       success: true,
@@ -62,7 +63,7 @@ async function refreshCommunityCache(): Promise<CronJobResult> {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error("Failed to refresh community cache:", error);
+    logger.error("Failed to refresh community cache", { error });
 
     return {
       success: false,
@@ -93,7 +94,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   const isGitHubActions = userAgent.includes("curl") || userAgent.includes("GitHub-Actions");
 
   if (!isGitHubActions) {
-    console.warn(`Unauthorized cron access attempt from: ${userAgent}`);
+    logger.warn(`Unauthorized cron access attempt from: ${userAgent}`);
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
@@ -114,7 +115,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
   }
 
   try {
-    console.log(`🤖 Executing cron job: ${action}`);
+    logger.info(`🤖 Executing cron job: ${action}`);
     const result = await cronJob();
 
     return new Response(
@@ -127,7 +128,7 @@ export async function action({ params, request }: ActionFunctionArgs) {
       },
     );
   } catch (error) {
-    console.error(`Cron job ${action} failed:`, error);
+    logger.error(`Cron job ${action} failed`, { error });
 
     return new Response(
       JSON.stringify({

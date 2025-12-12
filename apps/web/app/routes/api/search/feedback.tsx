@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 interface FeedbackRequest {
@@ -52,7 +53,7 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
       },
     });
   } catch (error) {
-    console.error("Search feedback API error:", error);
+    logger.error("Search feedback API error", { error });
 
     const errorMessage = error instanceof Error ? error.message : "Failed to submit feedback";
 

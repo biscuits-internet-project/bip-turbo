@@ -1,5 +1,6 @@
 import { protectedAction, publicLoader } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 export const loader = publicLoader(async ({ request, context }) => {
@@ -60,7 +61,7 @@ export const action = protectedAction(async ({ request, context }) => {
 
       return { userRating: updatedRating.value, averageRating };
     } catch (error) {
-      console.error("Error rating rateable:", error);
+      logger.error("Error rating rateable", { error });
       throw new Error(error instanceof Error ? error.message : "Failed to rate rateable");
     }
   }

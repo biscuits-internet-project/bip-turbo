@@ -2,6 +2,7 @@ import type { TourDate } from "@bip/domain";
 import { Card } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -13,7 +14,7 @@ export const loader = publicLoader<LoaderData>(async () => {
     ? await services.tourDatesService.getTourDates()
     : [];
 
-  console.log(tourDates);
+  logger.info("Tour dates loaded", { count: tourDates.length });
 
   return { tourDates };
 });

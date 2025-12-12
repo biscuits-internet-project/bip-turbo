@@ -54,7 +54,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
   if (!db) throw new Error("Database connection required for container initialization");
   if (!env) throw new Error("Environment required for container initialization");
 
-  const redis = new RedisService(env.REDIS_URL);
+  const redis = new RedisService(env.REDIS_URL, logger);
 
   // Create cache services
   const cache = new CacheService(redis, logger);
@@ -62,18 +62,18 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
 
   // Create repositories
   const repositories = {
-    annotations: new AnnotationRepository(db, cacheInvalidation),
+    annotations: new AnnotationRepository(db, cacheInvalidation, logger),
     setlists: new SetlistRepository(db),
-    shows: new ShowRepository(db, cacheInvalidation),
+    shows: new ShowRepository(db, cacheInvalidation, logger),
     songs: new SongRepository(db),
-    tracks: new TrackRepository(db, cacheInvalidation),
-    users: new UserRepository(db),
+    tracks: new TrackRepository(db, cacheInvalidation, logger),
+    users: new UserRepository(db, logger),
     venues: new VenueRepository(db),
-    blogPosts: new BlogPostRepository(db),
+    blogPosts: new BlogPostRepository(db, logger),
     reviews: new ReviewRepository(db),
     ratings: new RatingRepository(db, cacheInvalidation),
     attendances: new AttendanceRepository(db),
-    files: new FileRepository(db),
+    files: new FileRepository(db, logger),
     searchHistories: new SearchHistoryRepository(db),
   };
 

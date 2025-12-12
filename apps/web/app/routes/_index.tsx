@@ -13,6 +13,7 @@ import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Card } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { getHomeMeta } from "~/lib/seo";
 import { services } from "~/server/services";
 
@@ -56,14 +57,14 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
 
   // Cache the recent setlists (core show data only - user-specific data handled separately)
   const recentSetlists = await services.cache.getOrSet(CacheKeys.home.recentSetlists(15), async () => {
-    console.log("📅 Loading recent setlists from DB for home page");
+    logger.info("Loading recent setlists from DB for home page");
     return await services.setlists.findMany({
       pagination: { limit: 15 },
       sort: [{ field: "date", direction: "desc" }],
     });
   });
 
-  console.log(`🎯 Home page setlists loaded: ${recentSetlists.length} shows`);
+  logger.info(`Home page setlists loaded: ${recentSetlists.length} shows`);
 
   // Filter to shows from last 3 days
   const recentShows = recentSetlists.filter((setlist) => {
@@ -142,7 +143,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     const data = await response.json();
     latestEpisode = data.episodes?.[0] || null;
   } catch (error) {
-    console.error("Error fetching latest episode:", error);
+    logger.error("Error fetching latest episode", { error });
   }
 
   return {

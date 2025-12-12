@@ -35,7 +35,17 @@ export default function handleRequest(
           timeoutId = null;
         }
 
-        const body = new PassThrough();
+        const body = new PassThrough({
+          // Clear the timeout when streaming completes to prevent retaining
+          // the closure and causing a memory leak
+          final(callback) {
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            callback();
+          },
+        });
         const stream = createReadableStreamFromReadable(body);
 
         responseHeaders.set("Content-Type", "text/html");

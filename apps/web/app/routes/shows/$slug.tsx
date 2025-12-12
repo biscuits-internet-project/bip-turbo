@@ -15,6 +15,7 @@ import { useSession } from "~/hooks/use-session";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
+import { logger } from "~/lib/logger";
 import { formatDateLong } from "~/lib/utils";
 import { services } from "~/server/services";
 
@@ -41,21 +42,21 @@ async function fetchUserAttendance(context: Context, showId: string): Promise<At
   try {
     const user = await services.users.findByEmail(context.currentUser.email);
     if (!user) {
-      console.warn(`User not found with email ${context.currentUser.email}`);
+      logger.warn(`User not found with email ${context.currentUser.email}`);
       return null;
     }
 
     const userAttendance = await services.attendances.findByUserIdAndShowId(user.id, showId);
-    console.log(`👤 Fetch user attendance for show ${showId}: attended? ${!!userAttendance}`);
+    logger.info(`Fetch user attendance for show ${showId}: attended? ${!!userAttendance}`);
     return userAttendance;
   } catch (error) {
-    console.warn("Failed to load user attendance:", error);
+    logger.warn("Failed to load user attendance", { error });
     return null;
   }
 }
 
 export const loader = publicLoader(async ({ params, context }): Promise<ShowLoaderData> => {
-  console.log("⚡️ shows.$slug loader:", params.slug);
+  logger.info("shows.$slug loader", { slug: params.slug });
   const slug = params.slug;
   if (!slug) throw notFound();
 
@@ -63,7 +64,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
   const cacheKey = CacheKeys.show.data(slug);
 
   const setlist = await services.cache.getOrSet(cacheKey, async () => {
-    console.log(`📀 Loading setlist data from DB for ${slug}`);
+    logger.info(`Loading setlist data from DB for ${slug}`);
     const setlist = await services.setlists.findByShowSlug(slug);
     if (!setlist) throw notFound();
     return setlist;
@@ -75,7 +76,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
   // If user is authenticated, fetch their attendance data for search results
   const userAttendance = await fetchUserAttendance(context, setlist.show.id);
 
-  console.log(`🎯 Show data loaded for ${slug} - setlist cached, reviews fresh`);
+  logger.info(`Show data loaded for ${slug} - setlist cached, reviews fresh`);
 
   // Find Archive.org recordings for this show date with Redis caching
   let selectedRecordingId: string | null = null;
@@ -87,7 +88,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     const cachedRecordings = await redis.get<ArchiveItem[]>(archiveCacheKey);
 
     if (cachedRecordings) {
-      console.log(`Archive.org recordings served from Redis cache for ${setlist.show.date}`);
+      logger.info(`Archive.org recordings served from Redis cache for ${setlist.show.date}`);
       if (cachedRecordings.length > 0) {
         selectedRecordingId = cachedRecordings[0].identifier;
       }
@@ -95,7 +96,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
       // Fetch from archive.org if not cached
       const detailsUrl = `https://archive.org/advancedsearch.php?q=collection:DiscoBiscuits AND date:${setlist.show.date}&fl=identifier,title,date&sort=date desc&rows=100&output=json`;
 
-      console.log("Fetching recording details from archive.org:", detailsUrl);
+      logger.info("Fetching recording details from archive.org", { detailsUrl });
 
       const detailsResponse = await fetch(detailsUrl);
       if (!detailsResponse.ok) {
@@ -116,13 +117,13 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
       // Cache the results with no expiration (permanent cache)
       try {
         await redis.set(archiveCacheKey, archiveRecordings);
-        console.log(`Archive.org recordings cached permanently for ${setlist.show.date}`);
+        logger.info(`Archive.org recordings cached permanently for ${setlist.show.date}`);
       } catch (error) {
-        console.warn("Failed to cache archive.org recordings:", error);
+        logger.warn("Failed to cache archive.org recordings", { error });
       }
     }
   } catch (error) {
-    console.error("Error fetching archive.org recordings:", error);
+    logger.error("Error fetching archive.org recordings", { error });
     // Continue without recordings if there's an error
   }
 

@@ -12,6 +12,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { getVenueMeta, getVenueStructuredData } from "~/lib/seo";
 import { services } from "~/server/services";
 
@@ -44,15 +45,15 @@ async function fetchUserAttendances(context: Context, showIds: string[]): Promis
   try {
     const user = await services.users.findByEmail(context.currentUser.email);
     if (!user) {
-      console.warn(`User not found with email ${context.currentUser.email}`);
+      logger.warn(`User not found with email ${context.currentUser.email}`);
       return [];
     }
 
     const userAttendances = await services.attendances.findManyByUserIdAndShowIds(user.id, showIds);
-    console.log(`👤 Fetch ${userAttendances.length} user attendances from ${showIds.length} venue shows`);
+    logger.info(`Fetch ${userAttendances.length} user attendances from ${showIds.length} venue shows`);
     return userAttendances;
   } catch (error) {
-    console.warn("Failed to load user attendances:", error);
+    logger.warn("Failed to load user attendances", { error });
     return [];
   }
 }

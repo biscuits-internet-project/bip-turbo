@@ -1,4 +1,5 @@
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 export const loader = publicLoader(async ({ params }) => {
@@ -17,7 +18,7 @@ export const loader = publicLoader(async ({ params }) => {
 
     return song;
   } catch (error) {
-    console.error("Error fetching song:", error);
+    logger.error("Error fetching song", { error });
     throw new Response("Failed to fetch song", { status: 500 });
   }
 });

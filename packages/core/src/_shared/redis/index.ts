@@ -1,3 +1,4 @@
+import type { Logger } from "@bip/domain";
 import { createClient, type RedisClientType } from "redis";
 
 // Global singleton instance
@@ -6,8 +7,10 @@ let globalIsConnected = false;
 
 export class RedisService {
   private client: RedisClientType;
+  private logger?: Logger;
 
-  constructor(private readonly url: string) {
+  constructor(private readonly url: string, logger?: Logger) {
+    this.logger = logger;
     if (!url) {
       throw new Error("Redis URL is required");
     }
@@ -34,7 +37,7 @@ export class RedisService {
 
     // Handle connection errors to prevent unhandled rejections
     this.client.on("error", (err) => {
-      console.error("Redis Client Error:", err);
+      this.logger?.error("Redis Client Error", { error: err });
       globalIsConnected = false;
     });
 

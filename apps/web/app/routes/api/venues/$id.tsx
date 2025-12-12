@@ -1,4 +1,5 @@
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 // GET /api/venues/:id - Get a single venue by ID
@@ -21,7 +22,7 @@ export const loader = publicLoader(async ({ params }) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error(`Error loading venue ${id}:`, error);
+    logger.error(`Error loading venue ${id}`, { error });
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,

@@ -1,4 +1,4 @@
-import type { Show } from "@bip/domain";
+import type { Logger, Show } from "@bip/domain";
 import type { Prisma } from "@prisma/client";
 import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbClient, DbShow } from "../_shared/database/models";
@@ -30,6 +30,7 @@ export class ShowRepository {
   constructor(
     protected db: DbClient,
     protected cacheInvalidation?: CacheInvalidationService,
+    protected logger?: Logger,
   ) {}
 
   private async generateShowSlug(date: string, venueId?: string): Promise<string> {
@@ -61,7 +62,7 @@ export class ShowRepository {
   }
 
   async findMany(options?: QueryOptions<Show>): Promise<Show[]> {
-    console.log("🔍 Options:", options);
+    this.logger?.info("findMany options", { options });
     const include = options?.includes ? buildIncludeClause(options.includes) : {};
     const where = options?.filters ? buildWhereClause(options.filters) : {};
     const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ date: "desc" }];
@@ -93,22 +94,22 @@ export class ShowRepository {
       return this.findMany(options);
     }
 
-    console.log("🔍 Searching for:", query);
+    this.logger?.info("Searching for", { query });
 
     // First, let's see what the tokenization looks like
     const tokenDebug = await this.db.$queryRaw<Array<{ tokens: string }>>`
       SELECT to_tsvector('english', ${query})::text as tokens;
     `;
-    console.log("🔤 Query tokens:", tokenDebug[0]?.tokens);
+    this.logger?.info("Query tokens", { tokens: tokenDebug[0]?.tokens });
 
     // Let's also check what's in the pg_search_documents table
     const sampleContent = await this.db.$queryRaw<Array<{ content: string }>>`
-      SELECT content 
-      FROM pg_search_documents 
+      SELECT content
+      FROM pg_search_documents
       WHERE content ILIKE ${`%${query}%`}
       LIMIT 1;
     `;
-    console.log("📄 Matching content sample:", sampleContent[0]?.content);
+    this.logger?.info("Matching content sample", { content: sampleContent[0]?.content });
 
     const searchResults = await this.db.$queryRaw<Array<{ searchable_id: string; rank: number }>>`
       SELECT 
@@ -121,7 +122,7 @@ export class ShowRepository {
       ORDER BY rank DESC
     `;
 
-    console.log("✨ Search results count:", searchResults.length);
+    this.logger?.info("Search results count", { count: searchResults.length });
 
     // Get the show IDs from the search results
     const showIds = searchResults.map((result) => result.searchable_id);

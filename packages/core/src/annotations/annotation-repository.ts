@@ -1,4 +1,4 @@
-import type { Annotation } from "@bip/domain";
+import type { Annotation, Logger } from "@bip/domain";
 import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbAnnotation, DbClient } from "../_shared/database/models";
 
@@ -20,6 +20,7 @@ export class AnnotationRepository {
   constructor(
     private readonly db: DbClient,
     private readonly cacheInvalidation?: CacheInvalidationService,
+    private readonly logger?: Logger,
   ) {}
 
   protected mapToDomainEntity(dbAnnotation: DbAnnotation): Annotation {
@@ -71,7 +72,7 @@ export class AnnotationRepository {
       createdAt: now,
       updatedAt: now,
     };
-    console.log("Creating annotation with data:", createData);
+    this.logger?.info("Creating annotation with data", { createData });
     const result = await this.db.annotation.create({
       data: createData,
     });

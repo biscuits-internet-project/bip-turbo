@@ -36,13 +36,13 @@ export class UserService {
   }
 
   async getUserStats(userId?: string): Promise<UserStats[]> {
-    console.log("DEBUG: UserService.getUserStats called");
+    this.logger.info("UserService.getUserStats called");
     try {
       const result = await this.repository.getUserStats(userId);
-      console.log("DEBUG: Repository call succeeded, result length:", result.length);
+      this.logger.info("Repository call succeeded", { resultLength: result.length });
       return result;
     } catch (error) {
-      console.error("DEBUG: Repository call failed:", error);
+      this.logger.error("Repository call failed", { error });
       throw error;
     }
   }
