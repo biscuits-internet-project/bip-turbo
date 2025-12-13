@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { z } from "zod";
 import { mcpError, mcpSuccess, parseRequestBody } from "~/lib/mcp-utils";
-import { publicLoader } from "~/lib/base-loaders";
+import { protectedAction } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
 const requestSchema = z.object({
@@ -11,7 +11,7 @@ const requestSchema = z.object({
 });
 
 // POST /mcp/get-shows-by-year
-export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
+export const action = protectedAction(async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
     return mcpError("Method not allowed", undefined, 405);
   }
