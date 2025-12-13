@@ -50,6 +50,11 @@ export default [
     route("reset-password", "routes/auth/reset-password.tsx"),
   ]),
 
+  // OAuth routes
+  ...prefix("oauth", [
+    route("consent", "routes/oauth/consent.tsx"),
+  ]),
+
   // Profile routes
   ...prefix("profile", [route("edit", "routes/profile/edit.tsx")]),
 
