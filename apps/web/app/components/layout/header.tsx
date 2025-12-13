@@ -7,6 +7,7 @@ import {
   Eye,
   FileText,
   Headphones,
+  Heart,
   LogOut,
   Menu,
   TrendingUp,
@@ -29,8 +30,7 @@ const navigation = [
   { name: "venues", href: "/venues", icon: Building2 },
   { name: "resources", href: "/resources", icon: BookOpen },
   { name: "blog", href: "/blog", icon: FileText },
-  { name: "top rated", href: "/shows/top-rated", icon: TrendingUp },
-  { name: "tour dates", href: "/shows/tour-dates", icon: CalendarDays },
+  { name: "support", href: "/support", icon: Heart },
 ];
 
 export function Header() {

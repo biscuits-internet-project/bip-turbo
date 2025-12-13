@@ -7,6 +7,7 @@ export default [
 
   // Legal and info pages
   route("about", "routes/about.tsx"),
+  route("support", "routes/support.tsx"),
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),
   route("community", "routes/community.tsx"),
@@ -106,6 +107,7 @@ export default [
     route("users", "routes/api/users.tsx"),
     route("contact", "routes/api/contact.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
+    route("support", "routes/api/support.tsx"),
   ]),
 
   // Health check route
