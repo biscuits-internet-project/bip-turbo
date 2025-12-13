@@ -115,4 +115,7 @@ export default [
 
   // Health check route
   route("healthcheck", "routes/healthcheck.tsx"),
+
+  // Well-known endpoints for OAuth discovery
+  route(".well-known/oauth-authorization-server", "routes/.well-known/oauth-authorization-server.tsx"),
 ] satisfies RouteConfig;
