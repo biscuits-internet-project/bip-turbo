@@ -7,7 +7,7 @@ type DbTrackWithSongAndAnnotations = DbTrack & {
   song?: DbSong | null;
   annotations?: DbAnnotation[] | null;
 };
-import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
+import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
 
@@ -132,15 +132,27 @@ export class TrackRepository {
         ? (options.pagination.page - 1) * options.pagination.limit
         : undefined;
     const take = options?.pagination?.limit;
+    const include = options?.includes ? buildIncludeClause(options.includes) : undefined;
 
     const results = await this.db.track.findMany({
       where,
       orderBy,
       skip,
       take,
+      include,
     });
 
-    return results.map((result: DbTrack) => this.mapToDomainEntity(result));
+    return results.map((result) => {
+      const track = this.mapToDomainEntity(result as DbTrack);
+      // Attach related data if included
+      if ((result as DbTrackWithSongAndAnnotations).annotations) {
+        track.annotations = (result as DbTrackWithSongAndAnnotations).annotations?.map(mapAnnotationToDomainEntity);
+      }
+      if ((result as unknown as { show?: unknown }).show) {
+        (track as unknown as { show?: unknown }).show = (result as unknown as { show?: unknown }).show;
+      }
+      return track;
+    });
   }
 
   async create(data: Partial<Track>): Promise<Track> {

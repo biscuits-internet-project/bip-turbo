@@ -29,7 +29,14 @@ export class ShowService {
     return this.repository.findBySlug(slug);
   }
 
-  async findMany(filter: ShowFilter = {}): Promise<Show[]> {
+  async findMany(filterOrOptions: ShowFilter | QueryOptions<Show> = {}): Promise<Show[]> {
+    // Check if it's QueryOptions (has filters, sort, pagination, or includes)
+    if ('filters' in filterOrOptions || 'sort' in filterOrOptions || 'pagination' in filterOrOptions || 'includes' in filterOrOptions) {
+      return this.repository.findMany(filterOrOptions as QueryOptions<Show>);
+    }
+
+    // Legacy ShowFilter support
+    const filter = filterOrOptions as ShowFilter;
     return this.repository.findMany({
       filters: Object.entries(filter).map(([field, value]) => ({
         field: field as keyof Show,

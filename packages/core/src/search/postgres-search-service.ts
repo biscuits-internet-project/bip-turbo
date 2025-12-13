@@ -192,6 +192,44 @@ export class PostgresSearchService {
     }
   }
 
+  async searchSongs(query: string, limit: number = 50) {
+    const results = await this.performSongSearch(query);
+    const songIds = results.slice(0, limit).map((r) => r.song_id);
+
+    if (songIds.length === 0) return [];
+
+    const songs = await this.db.song.findMany({
+      where: { id: { in: songIds } },
+      include: { author: true },
+    });
+
+    // Sort by original search order and add authorName
+    const songMap = new Map(songs.map((s) => [s.id, s]));
+    return songIds
+      .map((id) => songMap.get(id))
+      .filter((s): s is NonNullable<typeof s> => s !== undefined)
+      .map((s) => ({
+        ...s,
+        authorName: s.author?.name || null,
+      }));
+  }
+
+  async searchVenues(query: string, limit: number = 50) {
+    const results = await this.performVenueSearch(query);
+    const venueIds = results.slice(0, limit).map((r) => r.venue_id);
+
+    if (venueIds.length === 0) return [];
+
+    const venues = await this.db.venue.findMany({
+      where: { id: { in: venueIds } },
+    });
+
+    // Sort by original search order
+    const venueMap = new Map(venues.map((v) => [v.id, v]));
+    return venueIds
+      .map((id) => venueMap.get(id))
+      .filter((v): v is NonNullable<typeof v> => v !== undefined);
+  }
 
   private async performVenueSearch(query: string): Promise<VenueResult[]> {
     return this.db.$queryRawUnsafe<VenueResult[]>(
