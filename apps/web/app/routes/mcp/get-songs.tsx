@@ -60,9 +60,10 @@ export const action = protectedAction(async ({ request }: ActionFunctionArgs) =>
       }
     }
 
-    // Format response
+    // Format response - filter out nulls with proper type guard
+    const validSongs = songs.filter((s): s is NonNullable<typeof s> => s !== null);
     const response = {
-      songs: songs.filter(Boolean).map((song) => ({
+      songs: validSongs.map((song) => ({
         id: song.id,
         slug: song.slug,
         title: song.title,

@@ -37,8 +37,24 @@ export const action = protectedAction(async ({ request }: ActionFunctionArgs) =>
         ? [{ field: "averageRating", direction: "desc" }]
         : [{ field: "createdAt", direction: "desc" }],
       pagination: { page: 1, limit },
-      includes: ["show", "show.venue", "annotations"],
+      includes: ["annotations"],
     });
+
+    // Fetch show and venue data for each track
+    const showIds = [...new Set(tracks.map((t) => t.showId))];
+    const showsData = await Promise.all(
+      showIds.map(async (showId) => {
+        const show = await services.shows.findById(showId);
+        if (!show) return null;
+        const venue = show.venueId ? await services.venues.findById(show.venueId) : null;
+        return { showId, show, venue };
+      })
+    );
+    const showMap = new Map(
+      showsData
+        .filter((d): d is NonNullable<typeof d> => d !== null)
+        .map((d) => [d.showId, d])
+    );
 
     // Format response
     const response = {
@@ -47,22 +63,25 @@ export const action = protectedAction(async ({ request }: ActionFunctionArgs) =>
         slug: song.slug,
         title: song.title,
       },
-      performances: tracks.map((track) => ({
-        trackId: track.id,
-        showId: track.showId,
-        showSlug: track.show?.slug || "",
-        showDate: track.show?.date || "",
-        venueSlug: track.show?.venue?.slug || "",
-        venueName: track.show?.venue?.name || "",
-        venueCity: track.show?.venue?.city || "",
-        set: track.set,
-        position: track.position,
-        averageRating: track.averageRating || null,
-        ratingsCount: track.ratingsCount,
-        allTimer: track.allTimer || false,
-        note: track.note || null,
-        annotations: track.annotations?.map((ann) => ({ desc: ann.desc })) || [],
-      })),
+      performances: tracks.map((track) => {
+        const showData = showMap.get(track.showId);
+        return {
+          trackId: track.id,
+          showId: track.showId,
+          showSlug: showData?.show.slug || "",
+          showDate: showData?.show.date || "",
+          venueSlug: showData?.venue?.slug || "",
+          venueName: showData?.venue?.name || "",
+          venueCity: showData?.venue?.city || "",
+          set: track.set,
+          position: track.position,
+          averageRating: track.averageRating || null,
+          ratingsCount: track.ratingsCount,
+          allTimer: track.allTimer || false,
+          note: track.note || null,
+          annotations: track.annotations?.map((ann) => ({ desc: ann.desc })) || [],
+        };
+      }),
     };
 
     return mcpSuccess(response);

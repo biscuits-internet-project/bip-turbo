@@ -60,21 +60,16 @@ export const action = protectedAction(async ({ request }: ActionFunctionArgs) =>
       }
     }
 
-    // Format response
+    // Format response - filter out nulls with proper type guard
+    const validVenues = venues.filter((v): v is NonNullable<typeof v> => v !== null);
     const response = {
-      venues: venues.filter(Boolean).map((venue) => ({
+      venues: validVenues.map((venue) => ({
         id: venue.id,
         slug: venue.slug,
         name: venue.name,
         city: venue.city,
         state: venue.state || null,
         country: venue.country,
-        street: venue.street || null,
-        postalCode: venue.postalCode || null,
-        latitude: venue.latitude || null,
-        longitude: venue.longitude || null,
-        phone: venue.phone || null,
-        website: venue.website || null,
         timesPlayed: venue.timesPlayed,
       })),
       ...(errors.length > 0 && { errors }),

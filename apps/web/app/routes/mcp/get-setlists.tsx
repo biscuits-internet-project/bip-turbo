@@ -76,8 +76,9 @@ export const action = protectedAction(async ({ request }: ActionFunctionArgs) =>
     }
 
     // Format response
+    const validSetlists = setlists.filter((s): s is NonNullable<typeof s> => s !== null);
     const response = {
-      setlists: setlists.filter(Boolean).map((setlist) => ({
+      setlists: validSetlists.map((setlist) => ({
         showId: setlist.show.id,
         showSlug: setlist.show.slug,
         showDate: setlist.show.date,

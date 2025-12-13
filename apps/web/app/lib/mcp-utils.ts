@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 
 /**
  * MCP Utility Functions
@@ -33,8 +33,8 @@ export function mcpError(error: string, details?: unknown, status = 500) {
 }
 
 // Validation error response
-export function mcpValidationError(zodError: z.ZodError) {
-  return mcpError("Validation failed", zodError.errors, 400);
+export function mcpValidationError(zodError: z.ZodError<unknown>) {
+  return mcpError("Validation failed", zodError.issues, 400);
 }
 
 // Parse and validate JSON request body
