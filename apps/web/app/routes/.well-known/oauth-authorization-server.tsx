@@ -9,6 +9,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     issuer: env.SUPABASE_URL,
     authorization_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/authorize`,
     token_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/token`,
+    registration_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/register`,
 
     // Supported features
     response_types_supported: ["code"],
