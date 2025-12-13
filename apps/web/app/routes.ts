@@ -115,6 +115,7 @@ export default [
 
   // MCP endpoints
   ...prefix("mcp", [
+    index("routes/mcp/index.tsx"),
     route("search-shows", "routes/mcp/search-shows.tsx"),
     route("search-songs", "routes/mcp/search-songs.tsx"),
     route("search-venues", "routes/mcp/search-venues.tsx"),
