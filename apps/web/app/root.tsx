@@ -1,7 +1,6 @@
 import type { Route } from ".react-router/types/app/+types/root";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -21,6 +20,29 @@ import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
+
+const makeQueryClient = () => {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+};
+
+let browserQueryClient: QueryClient | undefined;
+
+function getQueryClient() {
+  if (typeof window === "undefined") {
+    // Server: always make a new query client
+    return makeQueryClient();
+  }
+  // Browser: reuse the same query client
+  if (!browserQueryClient) browserQueryClient = makeQueryClient();
+  return browserQueryClient;
+}
 
 export type RootData = {
   env: ClientSideEnv;
@@ -49,18 +71,7 @@ export async function loader(): Promise<RootData> {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  // Create QueryClient per-request to avoid memory leak from shared SSR state
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 1000 * 60 * 5, // 5 minutes
-            refetchOnWindowFocus: false,
-          },
-        },
-      }),
-  );
+  const queryClient = getQueryClient();
 
   const data = useLoaderData() as RootData | undefined;
   const env = data?.env;
