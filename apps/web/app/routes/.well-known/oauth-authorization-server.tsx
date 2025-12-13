@@ -20,6 +20,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     // Token info
     token_endpoint_auth_methods_supported: ["none"], // Public clients use PKCE
+
+    // MCP OAuth client (public client, uses PKCE)
+    client_id: "d202b41b-9391-403d-a4d3-f3cdd68d7c8b",
   };
 
   return new Response(JSON.stringify(metadata, null, 2), {
