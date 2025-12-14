@@ -137,4 +137,5 @@ export default [
 
   // Well-known endpoints for OAuth discovery
   route(".well-known/oauth-authorization-server", "routes/.well-known/oauth-authorization-server.tsx"),
+  route(".well-known/oauth-protected-resource", "routes/.well-known/oauth-protected-resource.tsx"),
 ] satisfies RouteConfig;
