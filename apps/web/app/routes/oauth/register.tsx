@@ -18,22 +18,17 @@ export async function action({ request }: ActionFunctionArgs) {
     // Empty body is fine
   }
 
-  // Forward registration to Supabase with service role key
+  // Forward registration to Supabase (no auth required for dynamic registration)
   const supabaseResponse = await fetch(
-    `${env.SUPABASE_URL}/auth/v1/oauth/register`,
+    `${env.SUPABASE_URL}/auth/v1/oauth/clients/register`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         redirect_uris: body.redirect_uris || [],
         grant_types: body.grant_types || ["authorization_code", "refresh_token"],
         response_types: body.response_types || ["code"],
         token_endpoint_auth_method: body.token_endpoint_auth_method || "none",
-        client_name: body.client_name || "MCP Client",
       }),
     }
   );
