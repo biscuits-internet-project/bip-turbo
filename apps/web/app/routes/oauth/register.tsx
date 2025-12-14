@@ -28,7 +28,8 @@ export async function action({ request }: ActionFunctionArgs) {
         redirect_uris: body.redirect_uris || [],
         grant_types: body.grant_types || ["authorization_code", "refresh_token"],
         response_types: body.response_types || ["code"],
-        token_endpoint_auth_method: body.token_endpoint_auth_method || "none",
+        token_endpoint_auth_method: "none",
+        client_type: "public", // MCP clients use PKCE, no secret needed
       }),
     }
   );
