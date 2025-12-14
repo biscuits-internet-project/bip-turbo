@@ -4,12 +4,15 @@ import { env } from "~/server/env";
 // OAuth 2.0 Authorization Server Metadata (RFC 8414)
 // This endpoint allows MCP clients to discover OAuth configuration
 export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const baseUrl = `https://${url.host}`;
+
   const metadata = {
-    // Supabase is the authorization server
+    // Supabase is the authorization server, we just handle registration
     issuer: env.SUPABASE_URL,
     authorization_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/authorize`,
     token_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/token`,
-    registration_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/register`,
+    registration_endpoint: `${baseUrl}/oauth/register`,
 
     // Supported features
     response_types_supported: ["code"],

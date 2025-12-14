@@ -53,6 +53,7 @@ export default [
   // OAuth routes
   ...prefix("oauth", [
     route("consent", "routes/oauth/consent.tsx"),
+    route("register", "routes/oauth/register.tsx"),
   ]),
 
   // Profile routes
