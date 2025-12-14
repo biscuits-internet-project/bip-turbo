@@ -1,8 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
+import { env } from "~/server/env";
 
 // OAuth 2.0 Dynamic Client Registration (RFC 7591)
-// Returns our pre-registered public client since all MCP clients can share it
-// (public clients with PKCE don't need unique client_ids for security)
+// Proxies to Supabase's registration endpoint with our service role key
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ error: "method_not_allowed" }), {
@@ -18,18 +18,30 @@ export async function action({ request }: ActionFunctionArgs) {
     // Empty body is fine
   }
 
-  // Return our pre-registered public client
-  const response = {
-    client_id: "d202b41b-9391-403d-a4d3-f3cdd68d7c8b",
-    client_id_issued_at: Math.floor(Date.now() / 1000),
-    token_endpoint_auth_method: "none",
-    grant_types: ["authorization_code", "refresh_token"],
-    response_types: ["code"],
-    redirect_uris: body.redirect_uris || [],
-  };
+  // Forward registration to Supabase with service role key
+  const supabaseResponse = await fetch(
+    `${env.SUPABASE_URL}/auth/v1/oauth/register`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({
+        redirect_uris: body.redirect_uris || [],
+        grant_types: body.grant_types || ["authorization_code", "refresh_token"],
+        response_types: body.response_types || ["code"],
+        token_endpoint_auth_method: body.token_endpoint_auth_method || "none",
+        client_name: body.client_name || "MCP Client",
+      }),
+    }
+  );
 
-  return new Response(JSON.stringify(response), {
-    status: 201,
+  const data = await supabaseResponse.json();
+
+  return new Response(JSON.stringify(data), {
+    status: supabaseResponse.status,
     headers: { "Content-Type": "application/json" },
   });
 }
