@@ -1,6 +1,12 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { Form, useLoaderData, redirect } from "react-router";
+import { Check } from "lucide-react";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { ServerError } from "~/components/layout/errors";
 import { getServerClient } from "~/server/supabase";
+
+export const ErrorBoundary = ServerError;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -66,60 +72,66 @@ export default function OAuthConsent() {
   const { authorizationId, client, scopes, user } = useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
-      <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8">
-        <h1 className="text-2xl font-bold text-white mb-6 text-center">
-          Authorize Application
-        </h1>
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+      <div className="w-full max-w-md">
+        <Card className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300">
+          <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
+          <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
+          <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />
 
-        <div className="mb-6">
-          <p className="text-gray-300 text-center mb-4">
-            <strong className="text-white">{client?.name || "An application"}</strong> wants to access your account
-          </p>
-          <p className="text-gray-400 text-sm text-center">
-            Signed in as {user.email}
-          </p>
-        </div>
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold tracking-tight text-content-text-primary">
+              Authorize Application
+            </CardTitle>
+            <CardDescription className="text-base text-content-text-secondary">
+              <strong className="text-content-text-primary">{client?.name || "An application"}</strong> wants to access your account
+            </CardDescription>
+            <p className="text-sm text-content-text-tertiary">
+              Signed in as {user.email}
+            </p>
+          </CardHeader>
 
-        {scopes && scopes.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase mb-2">
-              This will allow the app to:
-            </h2>
-            <ul className="space-y-2">
-              {scopes.map((scope: string) => (
-                <li key={scope} className="flex items-center text-gray-300">
-                  <svg className="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                  {scopeDescription(scope)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+          <CardContent className="relative space-y-6">
+            {scopes && scopes.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold text-content-text-tertiary uppercase tracking-wide mb-3">
+                  This will allow the app to:
+                </h2>
+                <ul className="space-y-2">
+                  {scopes.map((scope: string) => (
+                    <li key={scope} className="flex items-center text-content-text-secondary">
+                      <Check className="w-4 h-4 mr-2 text-brand-secondary" />
+                      {scopeDescription(scope)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-        <Form method="post" className="space-y-3">
-          <input type="hidden" name="authorization_id" value={authorizationId} />
+            <Form method="post" className="space-y-3">
+              <input type="hidden" name="authorization_id" value={authorizationId} />
 
-          <button
-            type="submit"
-            name="decision"
-            value="approve"
-            className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
-          >
-            Authorize
-          </button>
+              <Button
+                type="submit"
+                name="decision"
+                value="approve"
+                className="w-full bg-brand-secondary hover:bg-brand-secondary/90 text-white font-semibold"
+              >
+                Authorize
+              </Button>
 
-          <button
-            type="submit"
-            name="decision"
-            value="deny"
-            className="w-full py-3 px-4 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold rounded-lg transition-colors"
-          >
-            Deny
-          </button>
-        </Form>
+              <Button
+                type="submit"
+                name="decision"
+                value="deny"
+                variant="outline"
+                className="w-full text-content-text-secondary border-content-bg-secondary hover:bg-content-bg-secondary/50"
+              >
+                Deny
+              </Button>
+            </Form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -128,9 +140,8 @@ export default function OAuthConsent() {
 function scopeDescription(scope: string): string {
   const descriptions: Record<string, string> = {
     openid: "Verify your identity",
-    email: "View your email address",
     profile: "View your profile information",
-    offline_access: "Access your data when you're not using the app",
+    email: "View your email address",
   };
   return descriptions[scope] || scope;
 }

@@ -19,8 +19,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
 
-    // Scopes (must match Supabase supported scopes)
-    scopes_supported: ["openid", "profile", "email", "phone"],
+    // Scopes we actually need (subset of Supabase supported scopes)
+    scopes_supported: ["openid", "profile", "email"],
 
     // Token info
     token_endpoint_auth_methods_supported: ["none"], // Public clients use PKCE

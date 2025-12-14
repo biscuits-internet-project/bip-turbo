@@ -1,10 +1,23 @@
 import { AlertTriangle, Ghost } from "lucide-react";
-import { Link, useRouteError } from "react-router-dom";
+import { Link, useRouteError, isRouteErrorResponse } from "react-router-dom";
 import { Button } from "../ui/button";
+
+function getErrorMessage(error: unknown): string {
+  if (isRouteErrorResponse(error)) {
+    return error.data || error.statusText || `Error ${error.status}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return "An unexpected error occurred";
+}
 
 export function ServerError() {
   const error = useRouteError();
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = getErrorMessage(error);
 
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center text-center">
