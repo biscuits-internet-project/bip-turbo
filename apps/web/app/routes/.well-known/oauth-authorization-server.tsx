@@ -10,8 +10,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const metadata = {
     // Supabase is the authorization server, we just handle registration
     issuer: env.SUPABASE_URL,
-    authorization_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/authorize`,
-    token_endpoint: `${env.SUPABASE_URL}/oauth/v2.1/token`,
+    authorization_endpoint: `${env.SUPABASE_URL}/auth/v1/oauth/authorize`,
+    token_endpoint: `${env.SUPABASE_URL}/auth/v1/oauth/token`,
     registration_endpoint: `${baseUrl}/oauth/register`,
 
     // Supported features
