@@ -5,7 +5,8 @@ import { env } from "~/server/env";
 // This endpoint tells MCP clients how to authenticate with this resource server
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const baseUrl = `${url.protocol}//${url.host}`;
+  // Always use https in production (request may come through proxy as http)
+  const baseUrl = `https://${url.host}`;
 
   const metadata = {
     // This resource server
