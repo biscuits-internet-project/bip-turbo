@@ -12,8 +12,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // This resource server
     resource: `${baseUrl}/mcp`,
 
-    // Where to find the authorization server metadata
-    authorization_servers: [env.SUPABASE_URL],
+    // Where to find the authorization server metadata (points to our endpoint which has Supabase URLs)
+    authorization_servers: [baseUrl],
 
     // Scopes needed to access this resource
     scopes_supported: ["openid", "email"],
