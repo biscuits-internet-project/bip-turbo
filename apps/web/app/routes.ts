@@ -10,6 +10,7 @@ export default [
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),
   route("community", "routes/community.tsx"),
+  route("mcp-info", "routes/mcp-info.tsx"),
 
   // Venues routes with layout
   layout("routes/venues/_layout.tsx", [
@@ -114,24 +115,8 @@ export default [
     route("cron/:action", "routes/api/cron/$action.tsx"),
   ]),
 
-  // MCP endpoints
-  ...prefix("mcp", [
-    index("routes/mcp/index.tsx"),
-    route("search-shows", "routes/mcp/search-shows.tsx"),
-    route("search-songs", "routes/mcp/search-songs.tsx"),
-    route("search-venues", "routes/mcp/search-venues.tsx"),
-    route("search-segues", "routes/mcp/search-segues.tsx"),
-    route("search-by-date", "routes/mcp/search-by-date.tsx"),
-    route("get-shows", "routes/mcp/get-shows.tsx"),
-    route("get-songs", "routes/mcp/get-songs.tsx"),
-    route("get-venues", "routes/mcp/get-venues.tsx"),
-    route("get-setlists", "routes/mcp/get-setlists.tsx"),
-    route("get-song-performances", "routes/mcp/get-song-performances.tsx"),
-    route("get-trending-songs", "routes/mcp/get-trending-songs.tsx"),
-    route("get-song-statistics", "routes/mcp/get-song-statistics.tsx"),
-    route("get-venue-history", "routes/mcp/get-venue-history.tsx"),
-    route("get-shows-by-year", "routes/mcp/get-shows-by-year.tsx"),
-  ]),
+  // MCP JSON-RPC endpoint (all tools exposed via JSON-RPC protocol)
+  route("mcp", "routes/mcp/index.tsx"),
 
   // Health check route
   route("healthcheck", "routes/healthcheck.tsx"),

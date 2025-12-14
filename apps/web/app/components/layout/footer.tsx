@@ -1,4 +1,4 @@
-import { Heart, Mail } from "lucide-react";
+import { Heart, Mail, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ContactDialog } from "~/components/contact/contact-dialog";
 
@@ -44,6 +44,16 @@ export function Footer() {
             className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200"
           >
             Privacy
+          </Link>
+          <Link
+            to="/mcp-info"
+            className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200 flex items-center gap-1.5"
+          >
+            <Sparkles className="h-4 w-4" />
+            MCP
+            <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-brand-secondary/20 text-brand-secondary rounded">
+              beta
+            </span>
           </Link>
         </div>
         <div className="mt-8 md:order-1 md:mt-0">
