@@ -5,6 +5,7 @@ import type {
   FileCreateWithBlogPostInput,
   ImageUploadResult,
   Logger,
+  ShowFile,
 } from "@bip/domain";
 import { CloudflareImagesClient } from "./cloudflare-images";
 import type { FileRepository } from "./file-repository";
@@ -91,5 +92,9 @@ export class FileService {
       });
     }
     this.logger.info("Completed file associations for blog post", { blogPostId, fileCount: files.length });
+  }
+
+  async findByShowId(showId: string): Promise<ShowFile[]> {
+    return this.repository.findByShowId(showId);
   }
 }

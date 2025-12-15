@@ -1,4 +1,4 @@
-import type { BlogPostFileAssociation, File, FileCreateInput, Logger } from "@bip/domain";
+import type { BlogPostFileAssociation, File, FileCreateInput, Logger, ShowFile } from "@bip/domain";
 import type { PrismaClient } from "@prisma/client";
 
 interface DbFile {
@@ -104,6 +104,41 @@ export class FileRepository {
       where: {
         blogPostId,
       },
+    });
+  }
+
+  async findByShowId(showId: string): Promise<ShowFile[]> {
+    this.logger.info("Finding files for show", { showId });
+
+    const showFiles = await this.db.showToFile.findMany({
+      where: { showId },
+      include: {
+        file: {
+          select: {
+            id: true,
+            variants: true,
+            metadata: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    this.logger.info("Found files for show", { showId, count: showFiles.length });
+
+    return showFiles.map((sf) => {
+      const variants = (sf.file.variants as Record<string, string>) || {};
+      const metadata = (sf.file.metadata as Record<string, unknown>) || {};
+
+      return {
+        id: sf.file.id,
+        url: variants.public || Object.values(variants)[0] || "",
+        thumbnailUrl: variants.thumbnail || variants.public || Object.values(variants)[0],
+        label: (metadata.label as string) || null,
+        source: (metadata.source as string) || null,
+      };
     });
   }
 

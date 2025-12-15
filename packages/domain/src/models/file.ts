@@ -63,3 +63,14 @@ export const imageUploadResultSchema = z.object({
 });
 
 export type ImageUploadResult = z.infer<typeof imageUploadResultSchema>;
+
+// Show photo type for displaying on show pages
+export const showFileSchema = z.object({
+  id: z.string().uuid(),
+  url: z.string().min(1),
+  thumbnailUrl: z.string().optional(),
+  label: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+});
+
+export type ShowFile = z.infer<typeof showFileSchema>;

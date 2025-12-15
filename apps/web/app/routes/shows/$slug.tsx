@@ -1,4 +1,4 @@
-import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist } from "@bip/domain";
+import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -9,6 +9,7 @@ import { ReviewsList } from "~/components/review";
 import { ReviewForm } from "~/components/review/review-form";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
+import { ShowPhotos } from "~/components/show/show-photos";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
@@ -32,6 +33,7 @@ interface ShowLoaderData {
   reviews: ReviewMinimal[];
   selectedRecordingId: string | null;
   userAttendance: Attendance | null;
+  photos: ShowFile[];
 }
 
 async function fetchUserAttendance(context: Context, showId: string): Promise<Attendance | null> {
@@ -70,8 +72,11 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     return setlist;
   });
 
-  // Load reviews fresh (not cached - infrequent access, simple query)
-  const reviews = await services.reviews.findByShowId(setlist.show.id);
+  // Load reviews and photos fresh (not cached - infrequent access, simple queries)
+  const [reviews, photos] = await Promise.all([
+    services.reviews.findByShowId(setlist.show.id),
+    services.files.findByShowId(setlist.show.id),
+  ]);
 
   // If user is authenticated, fetch their attendance data for search results
   const userAttendance = await fetchUserAttendance(context, setlist.show.id);
@@ -127,7 +132,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     // Continue without recordings if there's an error
   }
 
-  return { setlist, reviews, selectedRecordingId, userAttendance };
+  return { setlist, reviews, selectedRecordingId, userAttendance, photos };
 });
 
 export function meta({ data }: { data: ShowLoaderData }) {
@@ -140,6 +145,7 @@ export default function Show() {
     reviews: initialReviews,
     selectedRecordingId,
     userAttendance,
+    photos,
   } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const queryClient = useQueryClient();
@@ -355,6 +361,17 @@ export default function Show() {
           </div>
         </div>
       </div>
+
+      {/* Photos section at the bottom */}
+      {photos.length > 0 && (
+        <div className="mt-10 pt-8 border-t border-border/50">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-2xl font-bold text-content-text-primary">Photos</h2>
+            <span className="text-sm text-content-text-tertiary">{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
+          </div>
+          <ShowPhotos photos={photos} />
+        </div>
+      )}
     </div>
   );
 }
