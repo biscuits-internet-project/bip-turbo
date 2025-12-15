@@ -61,14 +61,17 @@ export class BlogPostRepository {
 
     const files = result.files || [];
     const coverFile = files.find((f: Record<string, unknown>) => f.isCover);
-    const coverImage = coverFile
-      ? `${process.env.SUPABASE_STORAGE_URL}/object/public/${(coverFile.file as Record<string, unknown>).path}`
-      : undefined;
 
-    const imageUrls = files.map(
-      (f: Record<string, unknown>) =>
-        `${process.env.SUPABASE_STORAGE_URL}/object/public/${(f.file as Record<string, unknown>).path}`,
-    );
+    const getCloudflareUrl = (file: Record<string, unknown>): string => {
+      const variants = file.variants as Record<string, string> | null;
+      return variants?.public || Object.values(variants || {})[0] || "";
+    };
+
+    const coverImage = coverFile ? getCloudflareUrl(coverFile.file as Record<string, unknown>) : undefined;
+
+    const imageUrls = files
+      .map((f: Record<string, unknown>) => getCloudflareUrl(f.file as Record<string, unknown>))
+      .filter(Boolean);
 
     return {
       ...mapBlogPostToDomainEntity(result),
@@ -91,28 +94,32 @@ export class BlogPostRepository {
       orderBy,
       skip,
       take,
-    });
-
-    const images = await this.db.activeStorageAttachment.findMany({
-      where: {
-        recordType: "BlogPost",
-        recordId: { in: blogPosts.map((blogPost) => blogPost.id) },
-      },
       include: {
-        blob: true,
+        files: {
+          include: {
+            file: true,
+          },
+        },
       },
     });
 
-    const domainBlogPosts = blogPosts.map((blogPost: DbBlogPost) => mapBlogPostToDomainEntity(blogPost));
+    const getCloudflareUrl = (file: Record<string, unknown>): string => {
+      const variants = file.variants as Record<string, string> | null;
+      return variants?.public || Object.values(variants || {})[0] || "";
+    };
 
-    for (const blogPost of domainBlogPosts) {
-      const imgUrls = images
-        .filter((image) => image.recordId === blogPost.id)
-        .map((image) => {
-          return `https://bip-prod.s3.us-east-1.amazonaws.com/${image.blob.key}`;
-        });
-      blogPost.imageUrls = imgUrls;
-    }
+    const domainBlogPosts = blogPosts.map((blogPost) => {
+      const files = (blogPost.files as Record<string, unknown>[]) || [];
+      const imageUrls = files
+        .map((f: Record<string, unknown>) => getCloudflareUrl(f.file as Record<string, unknown>))
+        .filter(Boolean);
+
+      return {
+        ...mapBlogPostToDomainEntity(blogPost),
+        imageUrls,
+      };
+    });
+
     return domainBlogPosts;
   }
 
@@ -148,14 +155,17 @@ export class BlogPostRepository {
     const domainBlogPosts = blogPosts.map((blogPost: Record<string, unknown>) => {
       const files = (blogPost.files as Record<string, unknown>[]) || [];
       const coverFile = files.find((f: Record<string, unknown>) => f.isCover);
-      const coverImage = coverFile
-        ? `${process.env.SUPABASE_STORAGE_URL}/object/public/${(coverFile.file as Record<string, unknown>).path}`
-        : undefined;
 
-      const imageUrls = files.map(
-        (f: Record<string, unknown>) =>
-          `${process.env.SUPABASE_STORAGE_URL}/object/public/${(f.file as Record<string, unknown>).path}`,
-      );
+      const getCloudflareUrl = (file: Record<string, unknown>): string => {
+        const variants = file.variants as Record<string, string> | null;
+        return variants?.public || Object.values(variants || {})[0] || "";
+      };
+
+      const coverImage = coverFile ? getCloudflareUrl(coverFile.file as Record<string, unknown>) : undefined;
+
+      const imageUrls = files
+        .map((f: Record<string, unknown>) => getCloudflareUrl(f.file as Record<string, unknown>))
+        .filter(Boolean);
 
       return {
         ...mapBlogPostToDomainEntity(blogPost as DbBlogPost),
