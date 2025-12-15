@@ -496,6 +496,9 @@ model User {
   confirmationSentAt  DateTime?    @map("confirmation_sent_at") @db.Timestamp(6)
   passwordDigest      String       @map("password_digest") @db.VarChar
   username            String?      @unique(map: "users_username_unique") @db.VarChar
+  avatarFileId        String?      @map("avatar_file_id") @db.Uuid
+  avatarFileUrl       String?      @map("avatar_file_url") @db.VarChar
+  avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   attendances         Attendance[]
   blogPosts           BlogPost[]
   comments            Comment[]
@@ -507,6 +510,7 @@ model User {
   files               File[]
   userRoles           UserRole[]
 
+  @@index([avatarFileId])
   @@map("users")
 }
 
@@ -555,18 +559,22 @@ model Youtube {
 }
 
 model File {
-  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  path      String           @db.VarChar
-  filename  String           @db.VarChar
-  size      Int
-  type      String           @db.VarChar
-  userId    String           @map("user_id") @db.Uuid
-  createdAt DateTime         @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime         @map("updated_at") @db.Timestamp(6)
-  user      User             @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_files_users_user_id")
-  blogPosts BlogPostToFile[]
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  path         String           @db.VarChar
+  filename     String           @db.VarChar
+  size         Int
+  type         String           @db.VarChar
+  userId       String           @map("user_id") @db.Uuid
+  createdAt    DateTime         @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime         @map("updated_at") @db.Timestamp(6)
+  cloudflareId String?          @map("cloudflare_id") @db.VarChar
+  variants     Json?            @default("{}")
+  user         User             @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_files_users_user_id")
+  avatarUsers  User[]           @relation("UserAvatar")
+  blogPosts    BlogPostToFile[]
 
   @@index([userId])
+  @@index([cloudflareId])
   @@map("files")
 }
 

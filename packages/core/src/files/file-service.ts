@@ -1,29 +1,35 @@
-import type { File, Logger } from "@bip/domain";
+import type {
+  BlogPostFile,
+  CloudflareImagesConfig,
+  File,
+  FileCreateWithBlogPostInput,
+  ImageUploadResult,
+  Logger,
+} from "@bip/domain";
+import { CloudflareImagesClient } from "./cloudflare-images";
 import type { FileRepository } from "./file-repository";
 
-interface FileCreateInput {
-  path: string;
+export interface ImageUploadInput {
+  file: Buffer | Blob;
   filename: string;
   type: string;
   size: number;
   userId: string;
-  blogPostId?: string;
-  isCover?: boolean;
-}
-
-interface BlogPostFile {
-  path: string;
-  url: string;
-  isCover?: boolean;
+  metadata?: Record<string, string>;
 }
 
 export class FileService {
+  private cloudflareClient: CloudflareImagesClient;
+
   constructor(
     protected readonly repository: FileRepository,
     protected readonly logger: Logger,
-  ) {}
+    cloudflareConfig: CloudflareImagesConfig,
+  ) {
+    this.cloudflareClient = new CloudflareImagesClient(cloudflareConfig, logger);
+  }
 
-  async create(input: FileCreateInput): Promise<File> {
+  async create(input: FileCreateWithBlogPostInput): Promise<File> {
     const file = await this.repository.create(input);
 
     if (input.blogPostId) {
@@ -35,6 +41,35 @@ export class FileService {
     }
 
     return file;
+  }
+
+  async uploadImage(input: ImageUploadInput): Promise<ImageUploadResult> {
+    this.logger.info("Uploading image to Cloudflare", { filename: input.filename, size: input.size });
+
+    // Upload to Cloudflare Images
+    const cloudflareResult = await this.cloudflareClient.upload({
+      file: input.file,
+      filename: input.filename,
+      metadata: input.metadata,
+    });
+
+    // Parse variant URLs into a map
+    const variants = this.cloudflareClient.parseVariants(cloudflareResult.variants);
+
+    // Create file record in database
+    const file = await this.repository.create({
+      path: cloudflareResult.id,
+      filename: input.filename,
+      type: input.type,
+      size: input.size,
+      userId: input.userId,
+      cloudflareId: cloudflareResult.id,
+      variants,
+    });
+
+    this.logger.info("Image uploaded successfully", { fileId: file.id, cloudflareId: cloudflareResult.id });
+
+    return { file, variants };
   }
 
   async findByBlogPostId(blogPostId: string): Promise<File[]> {

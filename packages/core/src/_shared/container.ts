@@ -20,6 +20,7 @@ import { RedisService } from "./redis";
 
 export interface ServiceContainer {
   db: DbClient;
+  env: Env;
   redis: RedisService;
   cache: CacheService;
   cacheInvalidation: CacheInvalidationService;
@@ -79,6 +80,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
 
   return {
     db,
+    env,
     redis,
     cache,
     cacheInvalidation,

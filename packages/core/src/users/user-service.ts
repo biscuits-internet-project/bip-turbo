@@ -35,6 +35,14 @@ export class UserService {
     return this.repository.update(id, data);
   }
 
+  async setAvatar(userId: string, fileId: string, avatarUrl: string): Promise<User | null> {
+    return this.repository.setAvatar(userId, fileId, avatarUrl);
+  }
+
+  async clearAvatar(userId: string): Promise<User | null> {
+    return this.repository.clearAvatar(userId);
+  }
+
   async getUserStats(userId?: string): Promise<UserStats[]> {
     this.logger.info("UserService.getUserStats called");
     try {

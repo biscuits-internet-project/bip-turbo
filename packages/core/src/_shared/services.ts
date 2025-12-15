@@ -62,7 +62,10 @@ export function createServices(container: ServiceContainer): Services {
       container.repositories.songs,
     ),
     tourDatesService: new TourDatesService(container.redis),
-    files: new FileService(container.repositories.files, container.logger),
+    files: new FileService(container.repositories.files, container.logger, {
+      accountId: container.env.CLOUDFLARE_ACCOUNT_ID,
+      apiToken: container.env.CLOUDFLARE_IMAGES_API_TOKEN,
+    }),
     postgresSearch: postgresSearchService,
     redis: container.redis,
     cache: container.cache,
