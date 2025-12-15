@@ -170,7 +170,7 @@ export function useImageUpload(options: UseImageUploadOptions = {}) {
         setIsUploading(false);
       }
     },
-    [validateFiles, onUploadComplete, onError],
+    [validateFiles, onUploadComplete, onError, endpoint],
   );
 
   const reset = useCallback(() => {
