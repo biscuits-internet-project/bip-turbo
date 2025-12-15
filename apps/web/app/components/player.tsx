@@ -518,11 +518,11 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (isLoading) {
     return (
-      <div className="bg-content-bg border border-content-bg-secondary rounded-lg p-6 text-center">
+      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 text-center">
         <div className="animate-pulse flex flex-col items-center">
-          <div className="h-4 bg-content-bg-secondary rounded w-3/4 mb-4" />
-          <div className="h-10 bg-content-bg-secondary rounded w-full mb-4" />
-          <div className="h-4 bg-content-bg-secondary rounded w-1/2" />
+          <div className="h-4 bg-white/10 rounded w-3/4 mb-4" />
+          <div className="h-10 bg-white/10 rounded w-full mb-4" />
+          <div className="h-4 bg-white/10 rounded w-1/2" />
         </div>
       </div>
     );
@@ -530,7 +530,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (error) {
     return (
-      <div className="bg-content-bg border border-warning rounded-lg p-6 text-warning">
+      <div className="bg-black/40 backdrop-blur-xl border border-warning rounded-lg p-6 text-warning">
         <p>Error loading audio: {error}</p>
       </div>
     );
@@ -538,7 +538,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (!metadata || audioFiles.length === 0) {
     return (
-      <div className="bg-content-bg border border-content-bg-secondary rounded-lg p-6 text-content-text-tertiary">
+      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 text-content-text-tertiary">
         <p>No audio files found for this Archive.org item</p>
       </div>
     );
@@ -550,7 +550,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   return (
     <div className={cn("archive-player", className)}>
-      <div className="player-container bg-content-bg border border-content-bg-secondary rounded-lg p-6 shadow-lg">
+      <div className="player-container bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 shadow-lg">
         {/* Hidden audio element */}
         <audio ref={audioRef} src={audioUrl} preload="metadata">
           <track kind="captions" src="" />
