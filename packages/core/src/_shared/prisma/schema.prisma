@@ -339,6 +339,7 @@ model Show {
   venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_venues_venue_id")
   tracks            Track[]
   segueRuns         SegueRun[]
+  files             ShowToFile[]
 
   @@index([likesCount])
   @@index([date])
@@ -509,6 +510,7 @@ model User {
   showPhotos          ShowPhoto[]
   files               File[]
   userRoles           UserRole[]
+  showFiles           ShowToFile[] @relation("ShowFileUploader")
 
   @@index([avatarFileId])
   @@map("users")
@@ -569,9 +571,11 @@ model File {
   updatedAt    DateTime         @map("updated_at") @db.Timestamp(6)
   cloudflareId String?          @map("cloudflare_id") @db.VarChar
   variants     Json?            @default("{}")
+  metadata     Json?            @default("{}")
   user         User             @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_files_users_user_id")
   avatarUsers  User[]           @relation("UserAvatar")
   blogPosts    BlogPostToFile[]
+  shows        ShowToFile[]
 
   @@index([userId])
   @@index([cloudflareId])
@@ -592,6 +596,25 @@ model BlogPostToFile {
   @@index([blogPostId])
   @@index([fileId])
   @@map("blog_post_files")
+}
+
+model ShowToFile {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showId    String   @map("show_id") @db.Uuid
+  fileId    String   @map("file_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
+
+  show Show @relation(fields: [showId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_files_show_id")
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_files_file_id")
+  user User @relation("ShowFileUploader", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_show_files_user_id")
+
+  @@unique([showId, fileId], map: "show_files_show_id_file_id_unique")
+  @@index([showId])
+  @@index([fileId])
+  @@index([userId])
+  @@map("show_files")
 }
 
 model SearchHistory {
