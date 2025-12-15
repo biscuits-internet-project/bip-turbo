@@ -111,8 +111,10 @@ export default [
     route("search", "routes/api/search.tsx"),
     route("search/feedback", "routes/api/search/feedback.tsx"),
     route("users", "routes/api/users.tsx"),
+    route("users/avatar", "routes/api/users/avatar.tsx"),
     route("contact", "routes/api/contact.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
+    route("images/upload", "routes/api/images/upload.tsx"),
   ]),
 
   // MCP JSON-RPC endpoint (all tools exposed via JSON-RPC protocol)

@@ -1,11 +1,12 @@
 import type { User } from "@bip/domain";
 import { ArrowLeft, Upload, User as UserIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MetaFunction } from "react-router-dom";
-import { Form, Link, useLoaderData, useNavigation } from "react-router-dom";
+import { Link, useLoaderData, useNavigation, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ImageUpload } from "~/components/ui/image-upload";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { useSession } from "~/hooks/use-session";
@@ -34,8 +35,20 @@ export default function ProfileEdit() {
   const { user } = data;
   const { supabase } = useSession();
   const navigation = useNavigation();
+  const revalidator = useRevalidator();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatarUrl);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const localPreviewUrlRef = useRef<string | null>(null);
+
+  // Clean up local preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrlRef.current) {
+        URL.revokeObjectURL(localPreviewUrlRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -71,9 +84,53 @@ export default function ProfileEdit() {
     }
   };
 
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const url = event.target.value;
-    setAvatarPreview(url || null);
+  const handleAvatarUploadStart = (files: File[]) => {
+    if (files.length > 0) {
+      setIsUploadingAvatar(true);
+      // Clean up previous local preview URL if it exists
+      if (localPreviewUrlRef.current) {
+        URL.revokeObjectURL(localPreviewUrlRef.current);
+      }
+      // Show local preview immediately
+      const previewUrl = URL.createObjectURL(files[0]);
+      localPreviewUrlRef.current = previewUrl;
+      setAvatarPreview(previewUrl);
+    }
+  };
+
+  const handleAvatarUploadComplete = async (images: { id: string; filename: string; variants: Record<string, string> }[]) => {
+    setIsUploadingAvatar(false);
+    // Clean up local preview URL since we now have a remote URL
+    if (localPreviewUrlRef.current) {
+      URL.revokeObjectURL(localPreviewUrlRef.current);
+      localPreviewUrlRef.current = null;
+    }
+    if (images.length > 0) {
+      const avatarUrl = images[0].variants.avatar || images[0].variants.public;
+      setAvatarPreview(avatarUrl);
+      toast.success("Avatar updated!");
+      revalidator.revalidate();
+
+      // Refresh session to pick up updated avatar in Supabase metadata
+      if (supabase) {
+        try {
+          await supabase.auth.refreshSession();
+        } catch (error) {
+          console.warn("Failed to refresh session:", error);
+        }
+      }
+    }
+  };
+
+  const handleAvatarUploadError = (error: string) => {
+    setIsUploadingAvatar(false);
+    // Clean up local preview URL and revert to previous avatar
+    if (localPreviewUrlRef.current) {
+      URL.revokeObjectURL(localPreviewUrlRef.current);
+      localPreviewUrlRef.current = null;
+    }
+    setAvatarPreview(user.avatarUrl);
+    toast.error(error);
   };
 
   return (
@@ -100,17 +157,15 @@ export default function ProfileEdit() {
           <CardTitle className="text-content-text-primary">Profile Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <Form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {/* Avatar Section */}
             <div className="space-y-4">
-              <Label htmlFor="avatarUrl" className="text-content-text-primary font-medium">
-                Profile Picture
-              </Label>
+              <Label className="text-content-text-primary font-medium">Profile Picture</Label>
 
               <div className="flex items-start gap-6">
-                {/* Avatar Preview */}
+                {/* Current Avatar Preview */}
                 <div className="flex-shrink-0">
-                  <div className="w-24 h-24 rounded-full overflow-hidden bg-glass-bg border-2 border-glass-border flex items-center justify-center">
+                  <div className="relative w-24 h-24 rounded-full overflow-hidden bg-glass-bg border-2 border-glass-border flex items-center justify-center">
                     {avatarPreview ? (
                       <img
                         src={avatarPreview}
@@ -121,23 +176,26 @@ export default function ProfileEdit() {
                     ) : (
                       <UserIcon className="w-8 h-8 text-content-text-tertiary" />
                     )}
+                    {/* Uploading overlay */}
+                    {isUploadingAvatar && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                        <Upload className="w-6 h-6 text-white animate-pulse" />
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Avatar URL Input */}
-                <div className="flex-1 space-y-2">
-                  <Input
-                    id="avatarUrl"
-                    name="avatarUrl"
-                    type="url"
-                    placeholder="https://example.com/avatar.jpg"
-                    defaultValue={user.avatarUrl || ""}
-                    onChange={handleAvatarChange}
-                    className="bg-glass-bg border-glass-border text-content-text-primary placeholder:text-content-text-tertiary"
+                {/* Avatar Upload */}
+                <div className="flex-1">
+                  <ImageUpload
+                    endpoint="/api/users/avatar"
+                    onUploadStart={handleAvatarUploadStart}
+                    onUploadComplete={handleAvatarUploadComplete}
+                    onError={handleAvatarUploadError}
+                    multiple={false}
+                    maxFileSize={5 * 1024 * 1024}
+                    showPreviews={false}
                   />
-                  <p className="text-sm text-content-text-tertiary">
-                    Enter a URL to an image file. Leave blank to use default avatar.
-                  </p>
                 </div>
               </div>
             </div>
@@ -203,7 +261,7 @@ export default function ProfileEdit() {
                 )}
               </Button>
             </div>
-          </Form>
+          </form>
         </CardContent>
       </Card>
     </div>

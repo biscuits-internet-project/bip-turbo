@@ -6,6 +6,7 @@ export const userSchema = z.object({
   updatedAt: z.date(),
   email: z.string().email(),
   username: z.string(),
+  avatarFileId: z.string().uuid().nullable(),
   avatarUrl: z.string().url().nullable(),
 });
 

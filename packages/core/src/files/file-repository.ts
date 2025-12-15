@@ -1,19 +1,5 @@
-import type { File, Logger } from "@bip/domain";
+import type { BlogPostFileAssociation, File, FileCreateInput, Logger } from "@bip/domain";
 import type { PrismaClient } from "@prisma/client";
-
-interface FileCreateInput {
-  path: string;
-  filename: string;
-  type: string;
-  size: number;
-  userId: string;
-}
-
-interface BlogPostFileAssociation {
-  path: string;
-  blogPostId: string;
-  isCover: boolean;
-}
 
 interface DbFile {
   id: string;
@@ -24,6 +10,8 @@ interface DbFile {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  cloudflareId?: string | null;
+  variants?: Record<string, string> | null;
   blogPosts?: Array<{ isCover: boolean }>;
 }
 
@@ -43,12 +31,17 @@ export class FileRepository {
         type: data.type,
         size: data.size,
         userId: data.userId,
+        cloudflareId: data.cloudflareId,
+        variants: data.variants ?? {},
         createdAt: now,
         updatedAt: now,
       },
     });
     this.logger.info("Created file record", { file });
-    return this.mapToDomainEntity(file);
+    return this.mapToDomainEntity({
+      ...file,
+      variants: file.variants as Record<string, string> | null,
+    });
   }
 
   async findByBlogPostId(blogPostId: string): Promise<File[]> {
@@ -124,6 +117,8 @@ export class FileRepository {
       userId: file.userId,
       createdAt: file.createdAt,
       updatedAt: file.updatedAt,
+      cloudflareId: file.cloudflareId ?? undefined,
+      variants: file.variants ?? undefined,
     };
   }
 

@@ -4,6 +4,7 @@ export * from "./models/attendance";
 export * from "./models/band";
 export * from "./models/blog-post";
 export * from "./models/file";
+export * from "./models/cloudflare-images";
 export * from "./models/logger";
 export * from "./models/rating";
 export * from "./models/review";

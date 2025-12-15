@@ -13,6 +13,8 @@ export const envSchema = z.object({
   CONTACT_EMAIL: z.string().email(),
   HONEYBADGER_API_KEY: z.string(),
   APP_ENV: z.enum(["development", "staging", "production"]),
+  CLOUDFLARE_ACCOUNT_ID: z.string(),
+  CLOUDFLARE_IMAGES_API_TOKEN: z.string(),
 });
 
 export const env = envSchema.parse(process.env);

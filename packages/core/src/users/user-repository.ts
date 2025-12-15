@@ -27,21 +27,24 @@ export function mapUserToDomainEntity(dbUser: DbUser): User {
     id: dbUser.id,
     username: dbUser.username ?? "",
     email: dbUser.email ?? "",
-    avatarUrl: null, // TODO: Implement avatar storage
+    avatarFileId: dbUser.avatarFileId ?? null,
+    avatarUrl: dbUser.avatarFileUrl ?? null,
     createdAt: dbUser.createdAt,
     updatedAt: dbUser.updatedAt,
   };
 }
 
 export function mapUserToDbModel(entity: Partial<User>): Partial<DbUser> {
-  return entity as Partial<DbUser>;
+  // Exclude avatar fields - use setAvatar/clearAvatar instead
+  const { avatarFileId: _, avatarUrl: __, ...rest } = entity;
+  return rest as Partial<DbUser>;
 }
 
 export function mapToUserMinimal(dbUser: DbUser): UserMinimal {
   return {
     id: dbUser.id,
     username: dbUser.username ?? "",
-    avatarUrl: null, // TODO: Implement avatar storage
+    avatarUrl: dbUser.avatarFileUrl ?? null,
   };
 }
 
@@ -223,6 +226,36 @@ export class UserRepository {
       const result = await this.db.user.update({
         where: { id },
         data: dbData,
+      });
+      return mapUserToDomainEntity(result);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async setAvatar(userId: string, fileId: string, avatarUrl: string): Promise<User | null> {
+    try {
+      const result = await this.db.user.update({
+        where: { id: userId },
+        data: {
+          avatarFile: { connect: { id: fileId } },
+          avatarFileUrl: avatarUrl,
+        },
+      });
+      return mapUserToDomainEntity(result);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async clearAvatar(userId: string): Promise<User | null> {
+    try {
+      const result = await this.db.user.update({
+        where: { id: userId },
+        data: {
+          avatarFile: { disconnect: true },
+          avatarFileUrl: null,
+        },
       });
       return mapUserToDomainEntity(result);
     } catch (_error) {
