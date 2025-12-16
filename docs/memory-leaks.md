@@ -2,10 +2,11 @@
 
 ## Summary
 
-Two primary server-side memory leaks were identified:
+Three primary server-side memory leaks were identified and fixed:
 
 1. **QueryClient singleton** in `apps/web/app/root.tsx` - accumulated state across all SSR requests (FIXED)
 2. **setTimeout closure leak** in `apps/web/app/entry.server.tsx` - held entire React tree in memory until timeout fired (FIXED)
+3. **Logger event listener leak** in `apps/web/app/server/logger.ts` - potential duplicate process event listeners (FIXED)
 
 ## Root Cause #1: entry.server.tsx setTimeout Closure
 
@@ -65,22 +66,31 @@ Replace the module-level singleton with a per-request QueryClient using React's 
 ```typescript
 import { useState } from "react";
 
-// Remove the module-level queryClient
+const makeQueryClient = () => {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchOnWindowFocus: false,
+        // Prevent cache accumulation on server
+        gcTime: typeof window === "undefined" ? 0 : 1000 * 60 * 5, // No cache on server, 5 min on client
+      },
+    },
+  });
+};
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  // Create a new QueryClient for each request/render
-  // useState ensures it's created once per component lifecycle
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 1000 * 60 * 5, // 5 minutes
-            refetchOnWindowFocus: false,
-          },
-        },
-      })
-  );
+  // Use useState to ensure QueryClient is created once per component lifecycle
+  // On server: creates a new QueryClient for each SSR request (component lifecycle = request)
+  // On client: creates QueryClient once and reuses it across navigations
+  const [queryClient] = useState(() => {
+    if (typeof window === "undefined") {
+      // Server: always make a new query client for each request
+      return makeQueryClient();
+    }
+    // Browser: reuse the same query client
+    return getBrowserQueryClient();
+  });
 
   const data = useLoaderData() as RootData | undefined;
   const env = data?.env;
@@ -92,9 +102,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 ```
 
 This ensures:
+
 - Each SSR request gets a fresh QueryClient
 - The QueryClient is properly garbage collected after the response is sent
 - Client-side navigation reuses the same QueryClient (no change in behavior)
+- Server-side QueryClient has `gcTime: 0` to prevent cache accumulation
 
 ## Secondary Issues (Client-Side)
 
@@ -136,9 +148,45 @@ The `setTimeout` in `playTrack` callback has no cleanup. If component unmounts b
 
 Same issue - `setTimeout` without cleanup in click handler.
 
+## Root Cause #3: Logger Event Listener Leak (FIXED)
+
+**File:** `apps/web/app/server/logger.ts`
+
+The `createLogger` function adds process event listeners (`SIGTERM`, `SIGINT`) every time it's called. While it's only called once in production, if it were called multiple times (e.g., in tests or edge cases), it would accumulate duplicate listeners, causing a memory leak.
+
+### Fix Applied
+
+Added a flag to track if shutdown handlers have been registered:
+
+```typescript
+// Track if shutdown handlers have been registered to prevent duplicate listeners
+let shutdownHandlersRegistered = false;
+
+export const createLogger = (options?: winston.LoggerOptions): Logger => {
+  const logger = winston.createLogger({
+    // ... logger config
+  });
+
+  // Graceful shutdown for Fly.io containerized environment
+  // Only register handlers once to prevent memory leaks from duplicate listeners
+  if (!shutdownHandlersRegistered) {
+    const gracefulShutdown = () => {
+      logger.end();
+    };
+
+    process.on("SIGTERM", gracefulShutdown);
+    process.on("SIGINT", gracefulShutdown);
+    shutdownHandlersRegistered = true;
+  }
+
+  return logger as unknown as Logger;
+};
+```
+
 ## Verification
 
 After deploying the fix, monitor Fly.io memory metrics:
+
 - Memory should stabilize rather than grow continuously
 - Expect memory to fluctuate with traffic but return to baseline
 

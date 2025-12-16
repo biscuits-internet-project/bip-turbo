@@ -7,17 +7,20 @@ const isProduction = NODE_ENV === "production";
 const defaultLevel = isProduction ? "warn" : "info";
 
 const productionFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
   winston.format.errors({ stack: true }),
-  winston.format.json()
+  winston.format.json(),
 );
 
 const developmentFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
   winston.format.errors({ stack: true }),
   winston.format.colorize(),
-  winston.format.simple()
+  winston.format.simple(),
 );
+
+// Track if shutdown handlers have been registered to prevent duplicate listeners
+let shutdownHandlersRegistered = false;
 
 export const createLogger = (options?: winston.LoggerOptions): Logger => {
   const logger = winston.createLogger({
@@ -25,10 +28,10 @@ export const createLogger = (options?: winston.LoggerOptions): Logger => {
     format: isProduction ? productionFormat : developmentFormat,
     transports: [
       new winston.transports.Console({
-        stderrLevels: ['error'],
+        stderrLevels: ["error"],
         handleExceptions: true,
-        handleRejections: true
-      })
+        handleRejections: true,
+      }),
     ],
     handleExceptions: true,
     handleRejections: true,
@@ -37,12 +40,16 @@ export const createLogger = (options?: winston.LoggerOptions): Logger => {
   });
 
   // Graceful shutdown for Fly.io containerized environment
-  const gracefulShutdown = () => {
-    logger.end();
-  };
+  // Only register handlers once to prevent memory leaks from duplicate listeners
+  if (!shutdownHandlersRegistered) {
+    const gracefulShutdown = () => {
+      logger.end();
+    };
 
-  process.on('SIGTERM', gracefulShutdown);
-  process.on('SIGINT', gracefulShutdown);
+    process.on("SIGTERM", gracefulShutdown);
+    process.on("SIGINT", gracefulShutdown);
+    shutdownHandlersRegistered = true;
+  }
 
   return logger as unknown as Logger;
 };

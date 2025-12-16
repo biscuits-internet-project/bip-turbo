@@ -1,6 +1,7 @@
 import type { Route } from ".react-router/types/app/+types/root";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { useState } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -27,6 +28,8 @@ const makeQueryClient = () => {
       queries: {
         staleTime: 1000 * 60 * 5, // 5 minutes
         refetchOnWindowFocus: false,
+        // Prevent cache accumulation on server
+        gcTime: typeof window === "undefined" ? 0 : 1000 * 60 * 5, // No cache on server, 5 min on client
       },
     },
   });
@@ -34,11 +37,7 @@ const makeQueryClient = () => {
 
 let browserQueryClient: QueryClient | undefined;
 
-function getQueryClient() {
-  if (typeof window === "undefined") {
-    // Server: always make a new query client
-    return makeQueryClient();
-  }
+function getBrowserQueryClient() {
   // Browser: reuse the same query client
   if (!browserQueryClient) browserQueryClient = makeQueryClient();
   return browserQueryClient;
@@ -71,7 +70,17 @@ export async function loader(): Promise<RootData> {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const queryClient = getQueryClient();
+  // Use useState to ensure QueryClient is created once per component lifecycle
+  // On server: creates a new QueryClient for each SSR request (component lifecycle = request)
+  // On client: creates QueryClient once and reuses it across navigations
+  const [queryClient] = useState(() => {
+    if (typeof window === "undefined") {
+      // Server: always make a new query client for each request
+      return makeQueryClient();
+    }
+    // Browser: reuse the same query client
+    return getBrowserQueryClient();
+  });
 
   const data = useLoaderData() as RootData | undefined;
   const env = data?.env;
