@@ -6,6 +6,8 @@ import { renderToPipeableStream } from "react-dom/server";
 import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import honeybadger from "~/lib/honeybadger";
+import { logger } from "~/server/logger";
+import { logMemoryUsage } from "./server/memory-monitor";
 
 export const streamTimeout = 5_000;
 
@@ -16,6 +18,11 @@ export default function handleRequest(
   routerContext: EntryContext,
   _loadContext: AppLoadContext,
 ) {
+  // Log memory before request processing
+  if (process.env.ENABLE_MEMORY_MONITORING === "true") {
+    logMemoryUsage(`[BEFORE] ${request.method} ${request.url}`);
+  }
+
   return new Promise((resolve, reject) => {
     let shellRendered = false;
     let timeoutId: NodeJS.Timeout | null = null;
@@ -42,6 +49,13 @@ export default function handleRequest(
             if (timeoutId) {
               clearTimeout(timeoutId);
               timeoutId = null;
+            }
+            // Log memory after request completes
+            if (process.env.ENABLE_MEMORY_MONITORING === "true") {
+              // Use setImmediate to ensure memory is logged after cleanup
+              setImmediate(() => {
+                logMemoryUsage(`[AFTER] ${request.method} ${request.url}`);
+              });
             }
             callback();
           },
@@ -76,7 +90,7 @@ export default function handleRequest(
         // reject and get logged in handleDocumentRequest.
         if (shellRendered) {
           honeybadger.notify(error as Error);
-          console.error(error);
+          logger.error("Streaming rendering error", { error });
         }
       },
     });

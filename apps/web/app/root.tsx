@@ -23,13 +23,23 @@ import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
 
 const makeQueryClient = () => {
+  const isServer = typeof window === "undefined";
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: isServer ? 0 : 1000 * 60 * 5, // 5 minutes on client, 0 on server
         refetchOnWindowFocus: false,
-        // Prevent cache accumulation on server
-        gcTime: typeof window === "undefined" ? 0 : 1000 * 60 * 5, // No cache on server, 5 min on client
+        // Prevent cache accumulation on server - immediately garbage collect
+        gcTime: isServer ? 0 : 1000 * 60 * 5, // No cache on server, 5 min on client
+        // Disable retries on server to prevent state accumulation
+        retry: isServer ? false : 3,
+        // Disable refetching on server
+        refetchOnMount: !isServer,
+        refetchOnReconnect: !isServer,
+      },
+      mutations: {
+        // Disable retries on server
+        retry: isServer ? false : 1,
       },
     },
   });
@@ -75,7 +85,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // On client: creates QueryClient once and reuses it across navigations
   const [queryClient] = useState(() => {
     if (typeof window === "undefined") {
-      // Server: always make a new query client for each request
+      // Server: always make a new query client for each request with aggressive cleanup
       return makeQueryClient();
     }
     // Browser: reuse the same query client
@@ -103,7 +113,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </SearchProvider>
             </GlobalSearchProvider>
           </SupabaseProvider>
-          <ReactQueryDevtools initialIsOpen={false} />
+          {typeof window !== "undefined" && <ReactQueryDevtools initialIsOpen={false} />}
           <Toaster position="top-right" theme="dark" />
           <ScrollRestoration />
           <Scripts />

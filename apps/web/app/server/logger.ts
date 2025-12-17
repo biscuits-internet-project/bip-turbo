@@ -29,12 +29,18 @@ export const createLogger = (options?: winston.LoggerOptions): Logger => {
     transports: [
       new winston.transports.Console({
         stderrLevels: ["error"],
-        handleExceptions: true,
-        handleRejections: true,
+        // CRITICAL: Disable exception/rejection handling to prevent memory leaks
+        // These handlers can accumulate error objects with closures holding request data
+        // React Router and Node.js handle unhandled exceptions at a higher level
+        handleExceptions: false,
+        handleRejections: false,
       }),
     ],
-    handleExceptions: true,
-    handleRejections: true,
+    // CRITICAL: Disable global exception/rejection handling to prevent memory accumulation
+    // Winston's exception handlers can accumulate error objects that hold onto closures
+    // with references to request data, React rendering context, etc.
+    handleExceptions: false,
+    handleRejections: false,
     exitOnError: false,
     ...options,
   });
