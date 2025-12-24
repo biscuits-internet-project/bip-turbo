@@ -1,9 +1,7 @@
 import { type Attendance, CacheKeys, type Setlist } from "@bip/domain";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, type LoaderFunctionArgs } from "react-router-dom";
-import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Button } from "~/components/ui/button";
@@ -122,68 +120,11 @@ export function meta({ data }: { data: LoaderData }) {
 export default function ShowsByYear() {
   const { setlists, year, searchQuery, userAttendances } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const queryClient = useQueryClient();
 
   // Create a map for quick attendance lookup by showId
   const attendanceMap = useMemo(
     () => new Map(userAttendances.map((attendance) => [attendance.showId, attendance])),
     [userAttendances],
-  );
-
-  const rateMutation = useMutation({
-    mutationFn: async ({ showId, rating }: { showId: string; rating: number }) => {
-      const response = await fetch("/api/ratings", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rateableId: showId,
-          rateableType: "Show",
-          value: rating,
-        }),
-      });
-
-      if (response.status === 401) {
-        window.location.href = "/auth/login";
-        throw new Error("Unauthorized");
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to rate show");
-      }
-
-      const data = await response.json();
-      return data;
-    },
-    onSuccess: (data, variables) => {
-      toast.success("Rating submitted successfully");
-      // Update the setlist in the cache with the new rating
-      queryClient.setQueryData(["setlists"], (old: Setlist[] = []) => {
-        return old.map((setlist) => {
-          if (setlist.show.id === variables.showId) {
-            return {
-              ...setlist,
-              show: {
-                ...setlist.show,
-                userRating: variables.rating,
-                averageRating: data.averageRating,
-              },
-            };
-          }
-          return setlist;
-        });
-      });
-    },
-    onError: (error) => {
-      console.error("rateMutation.onError called with:", error);
-      toast.error("Failed to submit rating. Please try again.");
-    },
-  });
-
-  // Create a stable reference to the mutation function
-  const _stableRateMutation = useCallback(
-    (showId: string, rating: number) => rateMutation.mutateAsync({ showId, rating }),
-    [rateMutation.mutateAsync],
   );
 
   // Group setlists by month - memoize to prevent unnecessary recalculation

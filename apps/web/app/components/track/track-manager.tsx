@@ -10,7 +10,6 @@ import {
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useMutation } from "@tanstack/react-query";
 import { Check, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -65,6 +64,9 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [deleteTrackId, setDeleteTrackId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState<TrackFormData>({
     songId: "none",
     set: "S1",
@@ -97,9 +99,24 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     }
   }, [initialTracks.length, loadTracks]);
 
-  // Create track mutation
-  const createTrackMutation = useMutation({
-    mutationFn: async (data: TrackFormData) => {
+  // Helper function to sort sets properly (S1, S2, S3, E1, E2, E3)
+  const sortSets = (a: string, b: string) => {
+    const setOrder = { S: 0, E: 1 };
+    const aType = a.charAt(0) as "S" | "E";
+    const bType = b.charAt(0) as "S" | "E";
+    const aNum = parseInt(a.slice(1));
+    const bNum = parseInt(b.slice(1));
+
+    if (aType !== bType) {
+      return setOrder[aType] - setOrder[bType];
+    }
+    return aNum - bNum;
+  };
+
+  // Create track
+  const createTrack = async (data: TrackFormData) => {
+    setIsCreating(true);
+    try {
       const response = await fetch("/api/tracks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,16 +129,15 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         }),
       });
       if (!response.ok) throw new Error("Failed to create track");
-      return response.json();
-    },
-    onSuccess: async (newTrack) => {
+      const newTrack = await response.json();
+
       // Fetch song information for the newly created track
       let trackWithSong = newTrack;
       if (newTrack.songId && !newTrack.song) {
         try {
-          const response = await fetch(`/api/songs/${newTrack.songId}`);
-          if (response.ok) {
-            const song = await response.json();
+          const songResponse = await fetch(`/api/songs/${newTrack.songId}`);
+          if (songResponse.ok) {
+            const song = await songResponse.json();
             trackWithSong = { ...newTrack, song };
           }
         } catch (error) {
@@ -138,13 +154,17 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       setIsAddingNew(false);
       resetForm();
       toast.success("Track added successfully");
-    },
-    onError: () => toast.error("Failed to add track"),
-  });
+    } catch {
+      toast.error("Failed to add track");
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
-  // Update track mutation
-  const updateTrackMutation = useMutation({
-    mutationFn: async ({ id, ...data }: TrackFormData & { id: string }) => {
+  // Update track
+  const updateTrack = async ({ id, ...data }: TrackFormData & { id: string }) => {
+    setIsUpdating(true);
+    try {
       const response = await fetch(`/api/tracks/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -156,9 +176,8 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         }),
       });
       if (!response.ok) throw new Error("Failed to update track");
-      return response.json();
-    },
-    onSuccess: (updatedTrack) => {
+      const updatedTrack = await response.json();
+
       setTracks((prev) =>
         prev
           .map((track) => (track.id === updatedTrack.id ? updatedTrack : track))
@@ -170,37 +189,41 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       setEditingId(null);
       resetForm();
       toast.success("Track updated successfully");
-    },
-    onError: () => toast.error("Failed to update track"),
-  });
+    } catch {
+      toast.error("Failed to update track");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
-  // Delete track mutation
-  const deleteTrackMutation = useMutation({
-    mutationFn: async (id: string) => {
+  // Delete track
+  const deleteTrack = async (id: string) => {
+    setIsDeleting(true);
+    try {
       const response = await fetch(`/api/tracks/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete track");
-    },
-    onSuccess: (_, deletedId) => {
-      setTracks((prev) => prev.filter((track) => track.id !== deletedId));
+      setTracks((prev) => prev.filter((track) => track.id !== id));
       toast.success("Track deleted successfully");
-    },
-    onError: () => toast.error("Failed to delete track"),
-  });
+    } catch {
+      toast.error("Failed to delete track");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-  // Reorder tracks mutation
-  const reorderTracksMutation = useMutation({
-    mutationFn: async (updates: { id: string; position: number; set: string }[]) => {
+  // Reorder tracks
+  const reorderTracks = async (updates: { id: string; position: number; set: string }[]) => {
+    try {
       const response = await fetch("/api/tracks/reorder", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updates }),
       });
       if (!response.ok) throw new Error("Failed to reorder tracks");
-      return response.json();
-    },
-    onSuccess: (updatedTracks) => {
+      const updatedTracks = await response.json();
+
       // Update local state with new positions, preserving song data
       setTracks((prev) =>
         prev.map((track) => {
@@ -213,22 +236,9 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         }),
       );
       toast.success("Track order updated");
-    },
-    onError: () => toast.error("Failed to reorder tracks"),
-  });
-
-  // Helper function to sort sets properly (S1, S2, S3, E1, E2, E3)
-  const sortSets = (a: string, b: string) => {
-    const setOrder = { S: 0, E: 1 };
-    const aType = a.charAt(0) as "S" | "E";
-    const bType = b.charAt(0) as "S" | "E";
-    const aNum = parseInt(a.slice(1));
-    const bNum = parseInt(b.slice(1));
-
-    if (aType !== bType) {
-      return setOrder[aType] - setOrder[bType];
+    } catch {
+      toast.error("Failed to reorder tracks");
     }
-    return aNum - bNum;
   };
 
   const resetForm = () => {
@@ -281,9 +291,9 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     };
 
     if (editingId) {
-      updateTrackMutation.mutate({ ...submitData, id: editingId });
+      updateTrack({ ...submitData, id: editingId });
     } else {
-      createTrackMutation.mutate(submitData);
+      createTrack(submitData);
     }
   };
 
@@ -293,7 +303,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
 
   const confirmDelete = () => {
     if (deleteTrackId) {
-      deleteTrackMutation.mutate(deleteTrackId);
+      deleteTrack(deleteTrackId);
       setDeleteTrackId(null);
     }
   };
@@ -342,7 +352,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       setTracks(updatedTracks);
 
       // Send updates to server
-      reorderTracksMutation.mutate(updates);
+      reorderTracks(updates);
     }
   };
 
@@ -437,7 +447,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         <div className="flex items-end gap-2">
           <Button
             onClick={() => handleSubmit(nextPosition)}
-            disabled={createTrackMutation.isPending || updateTrackMutation.isPending}
+            disabled={isCreating || isUpdating}
             className="bg-brand-primary hover:bg-hover-accent"
           >
             <Check className="h-4 w-4 mr-1" />
@@ -508,7 +518,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
                                 track={track}
                                 onEdit={startEditing}
                                 onDelete={handleDelete}
-                                isDeleting={deleteTrackMutation.isPending}
+                                isDeleting={isDeleting}
                               />
                             )}
                           </div>

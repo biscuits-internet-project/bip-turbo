@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
@@ -21,26 +21,6 @@ interface RatingResponse {
   averageRating: number | null;
 }
 
-interface ShowData {
-  show: {
-    id: string;
-    averageRating: number | null;
-    // Add other known show properties here
-    [key: string]: string | number | null | undefined;
-  };
-  // Add other known properties here
-  [key: string]: unknown;
-}
-
-interface SetlistData {
-  show: {
-    id: string;
-    averageRating: number | null;
-    [key: string]: string | number | null | undefined;
-  };
-  [key: string]: unknown;
-}
-
 export function StarRating({
   className,
   disabled,
@@ -52,9 +32,14 @@ export function StarRating({
 }: StarRatingProps) {
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rating, setRating] = useState<RatingResponse | null>(
+    initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null
+  );
   const { user, loading: isSessionLoading } = useSession();
+  const revalidator = useRevalidator();
   const isMountedRef = useRef<boolean>(true);
+  const hasFetchedRef = useRef<boolean>(false);
 
   // Track mounted state for cleanup
   useEffect(() => {
@@ -64,30 +49,39 @@ export function StarRating({
     };
   }, []);
 
-  // Query for rating
-  const { data: rating } = useQuery({
-    queryKey: ["ratings", rateableId, rateableType],
-    queryFn: async () => {
-      const response = await fetch(`/api/ratings?rateableId=${rateableId}&rateableType=${rateableType}`, {
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error("Failed to fetch rating");
-      }
-      const data = await response.json();
-      return data as RatingResponse;
-    },
-    enabled: !!user && !isSessionLoading && initialRating === undefined,
-    initialData: initialRating !== undefined ? { userRating: initialRating, averageRating: null } : undefined,
-  });
+  // Fetch rating if needed (only when user is logged in and no initial rating provided)
+  useEffect(() => {
+    if (!user || isSessionLoading || initialRating !== undefined || hasFetchedRef.current) {
+      return;
+    }
 
-  // Mutation for submitting ratings
-  const submitRatingMutation = useMutation({
-    mutationFn: async (value: number) => {
+    hasFetchedRef.current = true;
+
+    const fetchRating = async () => {
+      try {
+        const response = await fetch(`/api/ratings?rateableId=${rateableId}&rateableType=${rateableType}`, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+          if (response.status === 404) return;
+          throw new Error("Failed to fetch rating");
+        }
+        const data = await response.json();
+        if (isMountedRef.current) {
+          setRating(data as RatingResponse);
+        }
+      } catch {
+        // Silently fail - rating will just not be displayed
+      }
+    };
+
+    fetchRating();
+  }, [user, isSessionLoading, initialRating, rateableId, rateableType]);
+
+  const submitRating = async (value: number) => {
+    setIsSubmitting(true);
+    try {
       const response = await fetch("/api/ratings", {
         method: "POST",
         credentials: "include",
@@ -102,73 +96,36 @@ export function StarRating({
 
       if (response.status === 401) {
         window.location.href = "/auth/login";
-        throw new Error("Unauthorized");
+        return;
       }
 
       if (!response.ok) throw new Error("Failed to rate show");
 
-      const data = await response.json();
-      return data as RatingResponse;
-    },
-    onSuccess: (data) => {
-      toast.success("Rating submitted successfully");
+      const data = (await response.json()) as RatingResponse;
 
-      // Call the optional callback
+      toast.success("Rating submitted successfully");
+      setRating(data);
+
       if (onRatingChange) {
         onRatingChange(data.userRating ?? 0);
       }
 
-      // Update the individual rating query
-      queryClient.setQueryData(["ratings", rateableId, rateableType], data);
-
-      // Update any queries that contain this show's rating
-      queryClient.setQueriesData({ type: "active" }, (old: unknown) => {
-        if (!old || typeof old !== "object") return old;
-
-        // Handle root loader data
-        if ("recentShows" in old) {
-          const shows = (old as { recentShows: SetlistData[] }).recentShows;
-          return {
-            ...old,
-            recentShows: shows.map((setlist) => {
-              if (setlist.show.id === rateableId) {
-                return {
-                  ...setlist,
-                  show: {
-                    ...setlist.show,
-                    averageRating: data.averageRating,
-                  },
-                };
-              }
-              return setlist;
-            }),
-          };
-        }
-
-        // Handle show data
-        if ("show" in old && (old as ShowData).show.id === rateableId) {
-          return {
-            ...old,
-            show: {
-              ...(old as ShowData).show,
-              averageRating: data.averageRating,
-            },
-          };
-        }
-
-        return old;
-      });
-    },
-    onError: () => {
+      // Revalidate to update any cached data
+      revalidator.revalidate();
+    } catch {
       toast.error("Failed to submit rating. Please try again.");
-    },
-  });
+    } finally {
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
+    }
+  };
 
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement>, star: number) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (disabled) return;
+    if (disabled || isSubmitting) return;
 
     const button = e.currentTarget;
     const rect = button.getBoundingClientRect();
@@ -179,7 +136,7 @@ export function StarRating({
 
     setIsAnimating(true);
 
-    await submitRatingMutation.mutateAsync(ratingValue);
+    await submitRating(ratingValue);
 
     // Reset animation after it completes
     setTimeout(() => {

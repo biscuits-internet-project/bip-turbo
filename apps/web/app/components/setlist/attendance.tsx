@@ -1,14 +1,9 @@
 import type { Attendance } from "@bip/domain";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-
-interface AttendanceData {
-  attendances: Attendance[];
-}
 
 interface Props {
   showId: string;
@@ -18,7 +13,7 @@ interface Props {
 export function AttendanceToggle({ showId, initialAttendance }: Props) {
   const [isAttending, setIsAttending] = useState(!!initialAttendance);
   const [currentAttendance, setCurrentAttendance] = useState<Attendance | null>(initialAttendance);
-  const queryClient = useQueryClient();
+  const [isLoading, setIsLoading] = useState(false);
   const revalidator = useRevalidator();
 
   // Keep currentAttendance and isAttending in sync with initialAttendance
@@ -27,13 +22,19 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
     setIsAttending(!!initialAttendance);
   }, [initialAttendance]);
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
+  const createAttendance = async () => {
+    const previousAttendance = currentAttendance;
+    const wasAttending = isAttending;
+
+    // Optimistically update
+    setIsAttending(true);
+    setIsLoading(true);
+    toast.loading("Marking attendance...");
+
+    try {
       const response = await fetch("/api/attendances", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ showId }),
       });
 
@@ -42,48 +43,40 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
         throw new Error(error.error || "Failed to create attendance");
       }
 
-      return response.json();
-    },
-    onMutate: () => {
-      // Optimistically update
-      setIsAttending(true);
-      toast.loading("Marking attendance...");
-    },
-    onSuccess: (data) => {
+      const data = await response.json();
       toast.dismiss();
-      toast.success("Attendance marked! 🎵");
+      toast.success("Attendance marked!");
       setCurrentAttendance(data.attendance);
       setIsAttending(true);
-      queryClient.setQueryData(["attendances", showId], (old: AttendanceData | undefined) => {
-        const oldAttendances = old?.attendances || [];
-        return {
-          attendances: [...oldAttendances, data.attendance],
-        };
-      });
-      // Also invalidate any queries that might be loading this data
-      queryClient.invalidateQueries({ queryKey: ["shows"] });
-      // Force a revalidation of the current route data
       revalidator.revalidate();
-    },
-    onError: (error) => {
+    } catch (error) {
       toast.dismiss();
-      toast.error(`Failed to mark attendance: ${error.message}`);
-      setIsAttending(false);
-      setCurrentAttendance(null);
-    },
-  });
+      toast.error(`Failed to mark attendance: ${error instanceof Error ? error.message : "Unknown error"}`);
+      // Revert optimistic update
+      setIsAttending(wasAttending);
+      setCurrentAttendance(previousAttendance);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const deleteMutation = useMutation({
-    mutationFn: async (attendanceId: string) => {
-      if (!attendanceId) {
-        throw new Error("No attendance ID for deletion");
-      }
+  const deleteAttendance = async (attendanceId: string) => {
+    if (!attendanceId) {
+      return;
+    }
 
+    const previousAttendance = currentAttendance;
+
+    // Optimistically update
+    setIsAttending(false);
+    setCurrentAttendance(null);
+    setIsLoading(true);
+    toast.loading("Removing attendance...");
+
+    try {
       const response = await fetch("/api/attendances", {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: attendanceId }),
       });
 
@@ -92,48 +85,29 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
         throw new Error(error.error || "Failed to delete attendance");
       }
 
-      return { deletedId: attendanceId };
-    },
-    onMutate: (_attendanceId) => {
-      const previousAttendance = currentAttendance;
-      // Optimistically update
-      setIsAttending(false);
-      setCurrentAttendance(null);
-      toast.loading("Removing attendance...");
-      return { previousAttendance };
-    },
-    onError: (error, _variables, context) => {
-      toast.dismiss();
-      toast.error(`Failed to remove attendance: ${error.message}`);
-      // Revert optimistic update
-      if (context?.previousAttendance) {
-        setCurrentAttendance(context.previousAttendance);
-        setIsAttending(true);
-      }
-    },
-    onSuccess: (result) => {
       toast.dismiss();
       toast.success("Attendance removed");
       setIsAttending(false);
       setCurrentAttendance(null);
-      queryClient.setQueryData(["attendances", showId], (old: AttendanceData | undefined) => {
-        const oldAttendances = old?.attendances || [];
-        return {
-          attendances: oldAttendances.filter((a) => a.id !== result.deletedId),
-        };
-      });
-      // Also invalidate any queries that might be loading this data
-      queryClient.invalidateQueries({ queryKey: ["shows"] });
-      // Force a revalidation of the current route data
       revalidator.revalidate();
-    },
-  });
+    } catch (error) {
+      toast.dismiss();
+      toast.error(`Failed to remove attendance: ${error instanceof Error ? error.message : "Unknown error"}`);
+      // Revert optimistic update
+      if (previousAttendance) {
+        setCurrentAttendance(previousAttendance);
+        setIsAttending(true);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleToggle = (checked: boolean) => {
     if (checked) {
-      createMutation.mutate();
+      createAttendance();
     } else if (currentAttendance?.id) {
-      deleteMutation.mutate(currentAttendance.id);
+      deleteAttendance(currentAttendance.id);
     } else {
       setIsAttending(false);
       setCurrentAttendance(null);
@@ -148,7 +122,7 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
         id={switchId}
         checked={isAttending}
         onCheckedChange={handleToggle}
-        disabled={createMutation.isPending || deleteMutation.isPending}
+        disabled={isLoading}
         className={cn(
           "h-5 w-9",
           "data-[state=checked]:bg-brand",

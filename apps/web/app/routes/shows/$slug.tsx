@@ -1,7 +1,6 @@
 import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useFetcher, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import ArchiveMusicPlayer from "~/components/player";
@@ -142,32 +141,19 @@ export function meta({ data }: { data: ShowLoaderData }) {
 export default function Show() {
   const {
     setlist,
-    reviews: initialReviews,
+    reviews,
     selectedRecordingId,
     userAttendance,
     photos,
   } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
-  const queryClient = useQueryClient();
+  const revalidator = useRevalidator();
 
   // Get the internal user ID from Supabase metadata
   const internalUserId = user?.user_metadata?.internal_user_id;
 
-  // Query for reviews
-  const { data: reviews = [] } = useQuery({
-    queryKey: ["reviews", setlist.show.id],
-    queryFn: async () => {
-      const response = await fetch(`/api/reviews?showId=${setlist.show.id}`);
-      if (!response.ok) throw new Error("Failed to fetch reviews");
-      const data = await response.json();
-      return data.reviews;
-    },
-    initialData: initialReviews,
-  });
-
-  // Mutation for creating reviews
-  const createReviewMutation = useMutation({
-    mutationFn: async (data: { content: string }) => {
+  const handleReviewSubmit = async (data: { content: string }) => {
+    try {
       const response = await fetch("/api/reviews", {
         method: "POST",
         credentials: "include",
@@ -180,43 +166,25 @@ export default function Show() {
 
       if (response.status === 401) {
         window.location.href = "/auth/login";
-        throw new Error("Unauthorized");
+        return;
       }
 
       if (!response.ok) {
         throw new Error("Failed to create review");
       }
 
-      const result = await response.json();
-
-      if (!result.review) {
-        throw new Error("Invalid response format from server: missing review");
-      }
-
-      return result.review;
-    },
-    onSuccess: async (review) => {
       toast.success("Review submitted successfully");
-      queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) => [...old, review]);
-
-      // Refresh the average rating for the show
-      queryClient.invalidateQueries({ queryKey: ["ratings", setlist.show.id, "Show"] });
-    },
-    onError: () => {
+      revalidator.revalidate();
+    } catch {
       toast.error("Failed to submit review. Please try again.");
-    },
-  });
+    }
+  };
 
-  // Mutation for deleting reviews
-  const deleteReviewMutation = useMutation({
-    mutationFn: async (id: string) => {
+  const handleReviewDelete = async (id: string) => {
+    try {
       const response = await fetch("/api/reviews", {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
         method: "DELETE",
         credentials: "include",
       });
@@ -224,21 +192,16 @@ export default function Show() {
       if (!response.ok) {
         throw new Error("Failed to delete review");
       }
-    },
-    onSuccess: (_, id) => {
-      toast.success("Review deleted successfully");
-      queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) =>
-        old.filter((review) => review.id !== id),
-      );
-    },
-    onError: () => {
-      toast.error("Failed to delete review. Please try again.");
-    },
-  });
 
-  // Mutation for updating reviews
-  const updateReviewMutation = useMutation({
-    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      toast.success("Review deleted successfully");
+      revalidator.revalidate();
+    } catch {
+      toast.error("Failed to delete review. Please try again.");
+    }
+  };
+
+  const handleReviewUpdate = async (id: string, content: string) => {
+    try {
       const response = await fetch("/api/reviews", {
         method: "PATCH",
         credentials: "include",
@@ -250,32 +213,11 @@ export default function Show() {
         throw new Error("Failed to update review");
       }
 
-      const data = await response.json();
-      console.log("Review updated successfully:", data);
-      return data.review;
-    },
-    onSuccess: (review) => {
-      console.log("Review updated successfully:", review);
       toast.success("Review updated successfully");
-      queryClient.setQueryData(["reviews", setlist.show.id], (old: ReviewMinimal[] = []) =>
-        old.map((r) => (r.id === review.id ? review : r)),
-      );
-    },
-    onError: () => {
+      revalidator.revalidate();
+    } catch {
       toast.error("Failed to update review. Please try again.");
-    },
-  });
-
-  const handleReviewSubmit = async (data: { content: string }) => {
-    await createReviewMutation.mutateAsync(data);
-  };
-
-  const handleReviewDelete = async (id: string) => {
-    await deleteReviewMutation.mutateAsync(id);
-  };
-
-  const handleReviewUpdate = async (id: string, content: string) => {
-    await updateReviewMutation.mutateAsync({ id, content });
+    }
   };
 
   return (

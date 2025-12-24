@@ -1,7 +1,4 @@
 import type { Route } from ".react-router/types/app/+types/root";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useState } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -21,51 +18,6 @@ import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
-
-// Track QueryClient instances for server-side cleanup
-const serverQueryClients = new WeakMap<QueryClient, boolean>();
-
-const makeQueryClient = () => {
-  const isServer = typeof window === "undefined";
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: isServer ? 0 : 1000 * 60 * 5, // 5 minutes on client, 0 on server
-        refetchOnWindowFocus: false,
-        // Prevent cache accumulation on server - immediately garbage collect
-        gcTime: isServer ? 0 : 1000 * 60 * 5, // No cache on server, 5 min on client
-        // Disable retries on server to prevent state accumulation
-        retry: isServer ? false : 3,
-        // Disable refetching on server
-        refetchOnMount: !isServer,
-        refetchOnReconnect: !isServer,
-        // CRITICAL: Disable queries entirely on server to prevent React Query from creating
-        // any internal subscriptions, observers, or state structures
-        // initialData will still work - React Query uses it even when enabled: false
-        enabled: !isServer,
-      },
-      mutations: {
-        // Disable retries on server
-        retry: isServer ? false : 1,
-      },
-    },
-  });
-
-  // Mark server-side QueryClients for tracking
-  if (isServer) {
-    serverQueryClients.set(queryClient, true);
-  }
-
-  return queryClient;
-};
-
-let browserQueryClient: QueryClient | undefined;
-
-function getBrowserQueryClient() {
-  // Browser: reuse the same query client
-  if (!browserQueryClient) browserQueryClient = makeQueryClient();
-  return browserQueryClient;
-}
 
 export type RootData = {
   env: ClientSideEnv;
@@ -94,28 +46,6 @@ export async function loader(): Promise<RootData> {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  // Use useState to ensure QueryClient is created once per component lifecycle
-  // On server: creates a new QueryClient for each SSR request (component lifecycle = request)
-  // On client: creates QueryClient once and reuses it across navigations
-  const [queryClient] = useState(() => {
-    if (typeof window === "undefined") {
-      // Server: always make a new query client for each request with aggressive cleanup
-      const client = makeQueryClient();
-      // CRITICAL: Clear QueryClient immediately after render to prevent any accumulation
-      // Use setImmediate to ensure this runs after React finishes rendering
-      setImmediate(() => {
-        if (serverQueryClients.has(client)) {
-          client.clear();
-          // Remove from tracking to allow GC
-          serverQueryClients.delete(client);
-        }
-      });
-      return client;
-    }
-    // Browser: reuse the same query client
-    return getBrowserQueryClient();
-  });
-
   const data = useLoaderData() as RootData | undefined;
   const env = data?.env;
 
@@ -129,19 +59,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body className="min-h-screen font-sans antialiased">
         <ConcertLights />
-        <QueryClientProvider client={queryClient}>
-          <SupabaseProvider env={env}>
-            <GlobalSearchProvider>
-              <SearchProvider>
-                <HeaderLayout>{children}</HeaderLayout>
-              </SearchProvider>
-            </GlobalSearchProvider>
-          </SupabaseProvider>
-          {typeof window !== "undefined" && <ReactQueryDevtools initialIsOpen={false} />}
-          <Toaster position="top-right" theme="dark" />
-          <ScrollRestoration />
-          <Scripts />
-        </QueryClientProvider>
+        <SupabaseProvider env={env}>
+          <GlobalSearchProvider>
+            <SearchProvider>
+              <HeaderLayout>{children}</HeaderLayout>
+            </SearchProvider>
+          </GlobalSearchProvider>
+        </SupabaseProvider>
+        <Toaster position="top-right" theme="dark" />
+        <ScrollRestoration />
+        <Scripts />
       </body>
     </html>
   );

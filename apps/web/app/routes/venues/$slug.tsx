@@ -1,11 +1,9 @@
 import type { Attendance, Setlist, Venue } from "@bip/domain";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { format } from "date-fns";
 import { ArrowLeft, CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Button } from "~/components/ui/button";
@@ -124,71 +122,12 @@ export function meta({ data }: { data: LoaderData }) {
 
 export default function VenuePage() {
   const { venue, setlists, stats, userAttendances } = useSerializedLoaderData<LoaderData>();
-  const queryClient = useQueryClient();
 
   // Create a map for quick attendance lookup by showId
   const attendanceMap = useMemo(
     () => new Map(userAttendances.map((attendance) => [attendance.showId, attendance])),
     [userAttendances],
   );
-
-  // Mutation for rating
-  const _rateMutation = useMutation({
-    mutationFn: async ({ showId, rating }: { showId: string; rating: number }) => {
-      const response = await fetch("/api/ratings", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rateableId: showId,
-          rateableType: "Show",
-          value: rating,
-        }),
-      });
-
-      if (response.status === 401) {
-        window.location.href = "/auth/login";
-        throw new Error("Unauthorized");
-      }
-
-      if (!response.ok) {
-        throw new Error("Failed to rate show");
-      }
-
-      const data = await response.json();
-      return data;
-    },
-    onSuccess: (data, variables) => {
-      toast.success("Rating submitted successfully");
-      // Update the setlist in the cache with the new rating
-      queryClient.setQueryData(
-        ["venue", venue.id],
-        (old: { venue: Venue; setlists: Setlist[]; stats: VenueStats } | undefined) => {
-          if (!old?.setlists) return old;
-          return {
-            ...old,
-            setlists: old.setlists.map((setlist: Setlist) => {
-              if (setlist.show.id === variables.showId) {
-                return {
-                  ...setlist,
-                  show: {
-                    ...setlist.show,
-                    userRating: variables.rating,
-                    averageRating: data.averageRating,
-                  },
-                };
-              }
-              return setlist;
-            }),
-          };
-        },
-      );
-    },
-    onError: (error) => {
-      console.error("Error rating show:", error);
-      toast.error("Failed to submit rating. Please try again.");
-    },
-  });
 
   return (
     <div>
