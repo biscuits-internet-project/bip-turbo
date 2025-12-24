@@ -7,6 +7,7 @@ import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/server/logger";
+import { takeHeapSnapshot } from "./server/heap-profiler";
 import { logMemoryUsage } from "./server/memory-monitor";
 
 export const streamTimeout = 5_000;
@@ -20,7 +21,16 @@ export default function handleRequest(
 ) {
   // Log memory before request processing
   if (process.env.ENABLE_MEMORY_MONITORING === "true") {
-    logMemoryUsage(`[BEFORE] ${request.method} ${request.url}`);
+    logMemoryUsage(`[BEFORE] ${request.method} ${request.url}`, {
+      label: `before-${request.method}`,
+      requestMethod: request.method,
+      requestUrl: request.url,
+    });
+  }
+
+  // Take heap snapshot if requested (use sparingly - expensive!)
+  if (process.env.TAKE_HEAP_SNAPSHOT === "true") {
+    takeHeapSnapshot(`before-${request.method}-${request.url.replace(/[^a-zA-Z0-9]/g, "-")}`);
   }
 
   return new Promise((resolve, reject) => {
@@ -54,7 +64,18 @@ export default function handleRequest(
             if (process.env.ENABLE_MEMORY_MONITORING === "true") {
               // Use setImmediate to ensure memory is logged after cleanup
               setImmediate(() => {
-                logMemoryUsage(`[AFTER] ${request.method} ${request.url}`);
+                logMemoryUsage(`[AFTER] ${request.method} ${request.url}`, {
+                  label: `after-${request.method}`,
+                  requestMethod: request.method,
+                  requestUrl: request.url,
+                });
+              });
+            }
+
+            // Take heap snapshot after request if requested
+            if (process.env.TAKE_HEAP_SNAPSHOT === "true") {
+              setImmediate(() => {
+                takeHeapSnapshot(`after-${request.method}-${request.url.replace(/[^a-zA-Z0-9]/g, "-")}`);
               });
             }
             callback();

@@ -6,6 +6,7 @@
     "build": "react-router build",
     "dev": "doppler run -- react-router dev",
     "start": "react-router-serve ./build/server/index.js --port 8080",
+    "start:inspect": "node --inspect --expose-gc ./node_modules/.bin/react-router-serve ./build/server/index.js --port 8080",
     "gen-root": "bun scripts/gen-root.ts",
     "typecheck": "react-router typegen && bun run gen-root && tsc",
     "lint": "biome lint",

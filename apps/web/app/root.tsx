@@ -22,9 +22,12 @@ import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
 
+// Track QueryClient instances for server-side cleanup
+const serverQueryClients = new WeakMap<QueryClient, boolean>();
+
 const makeQueryClient = () => {
   const isServer = typeof window === "undefined";
-  return new QueryClient({
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: isServer ? 0 : 1000 * 60 * 5, // 5 minutes on client, 0 on server
@@ -36,6 +39,10 @@ const makeQueryClient = () => {
         // Disable refetching on server
         refetchOnMount: !isServer,
         refetchOnReconnect: !isServer,
+        // CRITICAL: Disable queries entirely on server to prevent React Query from creating
+        // any internal subscriptions, observers, or state structures
+        // initialData will still work - React Query uses it even when enabled: false
+        enabled: !isServer,
       },
       mutations: {
         // Disable retries on server
@@ -43,6 +50,13 @@ const makeQueryClient = () => {
       },
     },
   });
+
+  // Mark server-side QueryClients for tracking
+  if (isServer) {
+    serverQueryClients.set(queryClient, true);
+  }
+
+  return queryClient;
 };
 
 let browserQueryClient: QueryClient | undefined;
@@ -86,7 +100,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => {
     if (typeof window === "undefined") {
       // Server: always make a new query client for each request with aggressive cleanup
-      return makeQueryClient();
+      const client = makeQueryClient();
+      // CRITICAL: Clear QueryClient immediately after render to prevent any accumulation
+      // Use setImmediate to ensure this runs after React finishes rendering
+      setImmediate(() => {
+        if (serverQueryClients.has(client)) {
+          client.clear();
+          // Remove from tracking to allow GC
+          serverQueryClients.delete(client);
+        }
+      });
+      return client;
     }
     // Browser: reuse the same query client
     return getBrowserQueryClient();
