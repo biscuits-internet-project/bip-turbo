@@ -42,13 +42,16 @@ export function ShowPhotos({ photos, className }: ShowPhotosProps) {
     setSelectedIndex(index);
   };
 
-  const navigatePhoto = (direction: "prev" | "next") => {
-    const newIndex = direction === "prev" ? selectedIndex - 1 : selectedIndex + 1;
-    if (newIndex >= 0 && newIndex < photos.length) {
-      setSelectedIndex(newIndex);
-      setSelectedPhoto(photos[newIndex]);
-    }
-  };
+  const navigatePhoto = useCallback(
+    (direction: "prev" | "next") => {
+      const newIndex = direction === "prev" ? selectedIndex - 1 : selectedIndex + 1;
+      if (newIndex >= 0 && newIndex < photos.length) {
+        setSelectedIndex(newIndex);
+        setSelectedPhoto(photos[newIndex]);
+      }
+    },
+    [photos, selectedIndex],
+  );
 
   // Keyboard navigation for lightbox
   useEffect(() => {
@@ -66,7 +69,7 @@ export function ShowPhotos({ photos, className }: ShowPhotosProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedPhoto, selectedIndex, photos.length]);
+  }, [selectedPhoto, selectedIndex, photos.length, navigatePhoto]);
 
   if (photos.length === 0) {
     return null;

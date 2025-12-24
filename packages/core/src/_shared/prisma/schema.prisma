@@ -632,3 +632,29 @@ model SearchHistory {
   @@index([searchType], map: "idx_search_histories_type")
   @@map("search_histories")
 }
+
+model MemoryMetric {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label          String?  @db.VarChar
+  heapUsed       Int      @map("heap_used") // MB
+  heapTotal      Int      @map("heap_total") // MB
+  external       Int // MB
+  rss            Int // MB
+  requestMethod  String?  @map("request_method") @db.VarChar
+  requestUrl     String?  @map("request_url") @db.VarChar
+  // V8 heap statistics for deeper analysis
+  heapUsedBytes  BigInt?  @map("heap_used_bytes")
+  heapTotalBytes BigInt?  @map("heap_total_bytes")
+  // Track memory delta from previous measurement
+  memoryDelta    Int?     @map("memory_delta") // MB difference
+  // Track GC stats if available
+  gcCount        Int?     @map("gc_count")
+  gcDuration     Int?     @map("gc_duration") // ms
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@index([createdAt])
+  @@index([label])
+  @@index([requestUrl])
+  @@index([memoryDelta])
+  @@map("memory_metrics")
+}
