@@ -25,7 +25,7 @@ export class CloudflareImagesClient {
 
     // Handle both Buffer and Blob
     if (Buffer.isBuffer(file)) {
-      formData.append("file", new Blob([file]), filename);
+      formData.append("file", new Blob([new Uint8Array(file)]), filename);
     } else {
       formData.append("file", file, filename);
     }

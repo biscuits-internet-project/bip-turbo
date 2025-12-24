@@ -1,17 +1,18 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
   "files": {
     "includes": [
       "**",
-      "!**/.react-router/**",
-      "!**/build/**",
-      "!**/dist/**",
-      "!**/.turbo/**",
-      "!**/node_modules/**",
+      "!**/.react-router",
+      "!**/build",
+      "!**/dist",
+      "!**/.turbo",
+      "!**/node_modules",
       "!**/tailwind.config.js",
-      "!**/data-migrations/**",
+      "!**/data-migrations",
       "!**/*.css",
-      "!biome.json"
+      "!biome.json",
+      "!**/scripts"
     ]
   },
   "linter": {
