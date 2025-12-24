@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 // Prevent multiple instances of Prisma Client
 declare global {
@@ -19,16 +20,16 @@ function addConnectionPoolParams(url: string): string {
   return dbUrl.toString();
 }
 
+// Create adapter with connection string
+const connectionString = addConnectionPoolParams(process.env.DATABASE_URL || "");
+const adapter = new PrismaPg({ connectionString });
+
 // Create a singleton instance of the Prisma client with connection pooling for long-lived server
 export const prisma =
   global.__prisma ||
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-    datasources: {
-      db: {
-        url: addConnectionPoolParams(process.env.DATABASE_URL || ""),
-      },
-    },
+    adapter,
   });
 
 // ALWAYS attach the client to the global object to prevent multiple instances

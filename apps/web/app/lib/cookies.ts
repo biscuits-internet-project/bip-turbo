@@ -132,9 +132,11 @@ export async function clearAllCookies(): Promise<void> {
     if ("cookieStore" in window) {
       const cookies = await (window as WindowWithCookieStore).cookieStore.getAll();
       await Promise.all(
-        cookies.map((cookie: { name: string }) =>
-          (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name),
-        ),
+        cookies
+          .filter((cookie) => cookie.name)
+          .map((cookie) =>
+            (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name!),
+          ),
       );
       return;
     }
