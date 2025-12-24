@@ -1,6 +1,5 @@
 import type { Track } from "@bip/domain";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RatingComponent } from "~/components/rating";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "~/components/ui/hover-card";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -29,24 +28,43 @@ interface TrackDataResponse {
 export function TrackRatingOverlay({ track, children, className }: TrackRatingOverlayProps) {
   const { user } = useSession();
   const [isOpen, setIsOpen] = useState(false);
-  const queryClient = useQueryClient();
+  const [data, setData] = useState<TrackDataResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Fetch fresh track data when hover card opens
-  const { data, isLoading } = useQuery<TrackDataResponse>({
-    queryKey: ["track", track.id],
-    queryFn: async () => {
-      const response = await fetch(`/api/tracks/${track.id}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch track data");
-      const data = await response.json();
-      console.log("Fresh track data received:", data);
-      return data;
-    },
-    enabled: isOpen, // Only fetch when hover card is open
-    staleTime: 0, // Always fetch fresh
-    gcTime: 1000 * 60, // Cache for 1 minute in memory
-  });
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchTrackData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/tracks/${track.id}`, {
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error("Failed to fetch track data");
+        const responseData = await response.json();
+        if (isMountedRef.current) {
+          setData(responseData);
+        }
+      } catch {
+        // Silently fail - will fall back to initial track data
+      } finally {
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchTrackData();
+  }, [isOpen, track.id]);
 
   // Use fetched data if available, otherwise fall back to initial track data
   const displayRating = data?.track.averageRating ?? track.averageRating ?? 0;
@@ -98,8 +116,22 @@ export function TrackRatingOverlay({ track, children, className }: TrackRatingOv
                   className="scale-110 [&_fieldset]:border-0"
                   initialRating={userRating}
                   onRatingChange={() => {
-                    // Invalidate and refetch track data after rating
-                    queryClient.invalidateQueries({ queryKey: ["track", track.id] });
+                    // Refetch track data after rating
+                    setData(null);
+                    setIsLoading(true);
+                    fetch(`/api/tracks/${track.id}`, { credentials: "include" })
+                      .then((res) => res.json())
+                      .then((newData) => {
+                        if (isMountedRef.current) {
+                          setData(newData);
+                          setIsLoading(false);
+                        }
+                      })
+                      .catch(() => {
+                        if (isMountedRef.current) {
+                          setIsLoading(false);
+                        }
+                      });
                   }}
                 />
               </div>
