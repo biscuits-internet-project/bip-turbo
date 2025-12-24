@@ -90,7 +90,9 @@ export function ImageUpload({
   // Clean up preview URLs on unmount
   useEffect(() => {
     return () => {
-      previewsRef.current.forEach((p) => URL.revokeObjectURL(p.preview));
+      for (const p of previewsRef.current) {
+        URL.revokeObjectURL(p.preview);
+      }
     };
   }, []);
 
@@ -112,7 +114,9 @@ export function ImageUpload({
         setPreviews((prev) => [...prev, ...newPreviews]);
       } else {
         // Clean up old previews
-        previews.forEach((p) => URL.revokeObjectURL(p.preview));
+        for (const p of previews) {
+          URL.revokeObjectURL(p.preview);
+        }
         setPreviews(newPreviews);
       }
 

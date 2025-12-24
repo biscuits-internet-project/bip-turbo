@@ -1,4 +1,4 @@
-FROM oven/bun:1.2.4-alpine AS base
+FROM oven/bun:1.3.5-debian AS base
 
 # Build the app
 FROM base AS builder
@@ -46,7 +46,7 @@ COPY --from=builder /app/apps/web/package.json ./apps/web/
 
 # Install dependencies and generate Prisma client
 WORKDIR /app/packages/core
-RUN bun add prisma@6.4.1 && \
+RUN bun add prisma@7.2.0 @prisma/adapter-pg@7.2.0 && \
     bun prisma generate --schema=src/_shared/prisma/schema.prisma
 
 WORKDIR /app/apps/web
