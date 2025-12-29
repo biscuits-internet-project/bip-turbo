@@ -9,9 +9,18 @@ interface YearFilterNavProps {
   basePath: string;
   showAllButton?: boolean;
   additionalText?: string;
+  parameters?: string[];
+  currentURLParameters?: URLSearchParams;
 }
 
-export function YearFilterNav({ currentYear, basePath, showAllButton, additionalText }: YearFilterNavProps) {
+export function YearFilterNav({
+  currentYear,
+  basePath,
+  showAllButton,
+  additionalText,
+  parameters,
+  currentURLParameters,
+}: YearFilterNavProps) {
   return (
     <FilterNav
       title="Filter by Year"
@@ -21,6 +30,8 @@ export function YearFilterNav({ currentYear, basePath, showAllButton, additional
       showAllButton={showAllButton}
       subtitle={`${years.length} years`}
       additionalText={additionalText}
+      parameters={parameters}
+      currentURLParameters={currentURLParameters}
     />
   );
 }

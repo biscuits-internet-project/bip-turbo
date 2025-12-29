@@ -1,5 +1,5 @@
 import { CacheKeys, type SetlistLight } from "@bip/domain";
-import { ArrowUp, Plus } from "lucide-react";
+import { ArrowUp, Camera, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, type LoaderFunctionArgs } from "react-router-dom";
 import type { ClientLoaderFunctionArgs } from "react-router";
@@ -180,7 +180,13 @@ export default function ShowsByYear() {
         {/* Header Section */}
         <div className="relative">
           <h1 className="page-heading">SHOWS</h1>
-          <div className="absolute top-0 right-0">
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/shows/with-photos" className="flex items-center gap-1">
+                <Camera className="h-4 w-4" />
+                <span className="hidden sm:inline">Photos</span>
+              </Link>
+            </Button>
             <AdminOnly>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/shows/new" className="flex items-center gap-1">
@@ -204,22 +210,22 @@ export default function ShowsByYear() {
             <YearFilterNav currentYear={year} basePath="/shows/year/" />
             <div className="card-premium rounded-lg overflow-hidden">
               {/* Month navigation */}
-              <div className="p-6">
-                <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+              <div className="px-4 py-3">
+                <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                   Jump to Month
-                  <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-1 rounded-full">
+                  <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
                     {monthsWithShows.length} active
                   </span>
                 </h2>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+                <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
                   {months.map((month, index) => (
                     <a
                       key={month}
                       href={monthsWithShows.includes(index) ? `#month-${index}` : undefined}
                       className={cn(
-                        "px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 text-center",
+                        "px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
                         monthsWithShows.includes(index)
-                          ? "text-content-text-secondary bg-content-bg-secondary hover:bg-accent/20 hover:text-white cursor-pointer hover:scale-105"
+                          ? "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white cursor-pointer"
                           : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
                       )}
                     >

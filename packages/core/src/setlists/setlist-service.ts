@@ -5,6 +5,7 @@ import type { SetlistRepository } from "./setlist-repository";
 export type SetlistFilter = {
   year?: number;
   venueId?: string;
+  hasPhotos?: boolean;
 };
 
 export class SetlistService {

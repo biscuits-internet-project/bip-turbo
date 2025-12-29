@@ -253,6 +253,7 @@ export class SetlistRepository {
   }): Promise<Setlist[]> {
     const year = options?.filters?.year;
     const venueId = options?.filters?.venueId;
+    const hasPhotos = options?.filters?.hasPhotos;
 
     const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
     const skip =
@@ -270,6 +271,7 @@ export class SetlistRepository {
               lt: `${year + 1}-01-01`,
             }
           : undefined,
+        showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
       },
       orderBy,
       skip,
@@ -310,6 +312,7 @@ export class SetlistRepository {
   }): Promise<SetlistLight[]> {
     const year = options?.filters?.year;
     const venueId = options?.filters?.venueId;
+    const hasPhotos = options?.filters?.hasPhotos;
 
     const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
     const skip =
@@ -327,6 +330,7 @@ export class SetlistRepository {
               lt: `${year + 1}-01-01`,
             }
           : undefined,
+        showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
       },
       orderBy,
       skip,
