@@ -1,5 +1,5 @@
 import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
-import { Check, Flame, Star } from "lucide-react";
+import { Camera, Check, Flame, Star } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating";
@@ -314,6 +314,15 @@ function SetlistCardComponent({
             </div>
           ) : (
             <div />
+          )}
+          {setlist.show.showPhotosCount > 0 && (
+            <Link
+              to={`/shows/${setlist.show.slug}#photos`}
+              className="flex items-center gap-1.5 text-content-text-tertiary hover:text-content-text-secondary transition-colors"
+            >
+              <Camera className="h-5 w-5" />
+              <span className="text-sm">{setlist.show.showPhotosCount}</span>
+            </Link>
           )}
         </div>
       </CardContent>

@@ -78,6 +78,7 @@ export default [
     ...prefix("shows", [
       index("routes/shows/_index.tsx"),
       route("year/:year", "routes/shows/year/$year.tsx"),
+      route("with-photos", "routes/shows/with-photos.tsx"),
       route(":slug", "routes/shows/$slug.tsx"),
       route("top-rated", "routes/shows/top-rated.tsx"),
       route("top-rated/:year", "routes/shows/top-rated/$year.tsx"),
