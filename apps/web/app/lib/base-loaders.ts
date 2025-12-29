@@ -158,15 +158,17 @@ async function getUser(
     };
   }
 
+  // Use getUser() instead of getSession() to properly verify the JWT
+  // getSession() just reads from cookies without verification
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (session) {
-    const isAdmin = session.user.app_metadata?.isAdmin === true;
+  if (user) {
+    const isAdmin = user.app_metadata?.isAdmin === true;
     return {
-      id: session.user.id,
-      email: session.user.email || "",
+      id: user.id,
+      email: user.email || "",
       isAdmin,
     };
   }

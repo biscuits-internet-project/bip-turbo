@@ -124,6 +124,33 @@ export class RatingRepository {
     return result._avg.value;
   }
 
+  async getAveragesForRateables(
+    rateableIds: string[],
+    rateableType: string,
+  ): Promise<Record<string, { average: number; count: number }>> {
+    if (rateableIds.length === 0) return {};
+
+    const results = await this.db.rating.groupBy({
+      by: ["rateableId"],
+      where: {
+        rateableId: { in: rateableIds },
+        rateableType,
+      },
+      _avg: { value: true },
+      _count: { id: true },
+    });
+
+    const averages: Record<string, { average: number; count: number }> = {};
+    for (const result of results) {
+      averages[result.rateableId] = {
+        average: result._avg.value ?? 0,
+        count: result._count.id,
+      };
+    }
+
+    return averages;
+  }
+
   async getByRateableIdAndUserId(rateableId: string, rateableType: string, userId: string): Promise<Rating | null> {
     const result = await this.db.rating.findUnique({
       where: {

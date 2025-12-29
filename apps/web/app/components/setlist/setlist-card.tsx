@@ -1,27 +1,52 @@
-import type { Attendance, Rating, Setlist } from "@bip/domain";
-import { Flame } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
+import { Check, Flame, Star } from "lucide-react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { StarRating } from "~/components/ui/star-rating";
 import { useSession } from "~/hooks/use-session";
+import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn, formatDateShort } from "~/lib/utils";
-import { AttendanceToggle } from "./attendance";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
 interface SetlistCardProps {
-  setlist: Setlist;
+  setlist: Setlist | SetlistLight;
   className?: string;
   userAttendance: Attendance | null;
-  userRating: Rating | null;
+  userRating: Rating | number | null;
   showRating: number | null;
 }
 
-function SetlistCardComponent({ setlist, className, userAttendance, userRating, showRating }: SetlistCardProps) {
+function SetlistCardComponent({
+  setlist,
+  className,
+  userAttendance,
+  userRating,
+  showRating,
+}: SetlistCardProps) {
   const { user } = useSession();
   const formattedDate = formatDateShort(setlist.show.date);
   const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
+  const [displayedCount, setDisplayedCount] = useState<number>(setlist.show.ratingsCount ?? 0);
+  const [isRatingAnimating, setIsRatingAnimating] = useState(false);
+  const [isRatingExpanded, setIsRatingExpanded] = useState(false);
+  const [isAttendanceAnimating, setIsAttendanceAnimating] = useState(false);
+  const [localAttendance, setLocalAttendance] = useState<Attendance | null>(userAttendance);
+  const [localHasRated, setLocalHasRated] = useState(userRating !== null && userRating !== undefined);
+
+  const attendanceMutation = useAttendanceMutation();
+  const ratingAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attendanceAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (ratingAnimationTimeoutRef.current) clearTimeout(ratingAnimationTimeoutRef.current);
+      if (attendanceAnimationTimeoutRef.current) clearTimeout(attendanceAnimationTimeoutRef.current);
+    };
+  }, []);
 
   // Update displayed rating when props change
   useEffect(() => {
@@ -34,6 +59,61 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
       };
     }
   }, [showRating, setlist.show.averageRating, displayedRating]);
+
+  // Sync attendance state with props
+  useEffect(() => {
+    setLocalAttendance(userAttendance);
+  }, [userAttendance]);
+
+  // Sync rating state with props
+  useEffect(() => {
+    setLocalHasRated(userRating !== null && userRating !== undefined);
+  }, [userRating]);
+
+  // Derived state for whether user is attending
+  const isAttending = !!localAttendance;
+
+  // Callback to update rating display when user submits a rating
+  const handleAverageRatingChange = (average: number, count: number) => {
+    setIsRatingAnimating(true);
+    setDisplayedRating(average);
+    setDisplayedCount(count);
+    setLocalHasRated(true); // Mark as rated
+    // Collapse the rating picker and reset animation
+    setIsRatingExpanded(false);
+    // Clear any existing timeout and set new one
+    if (ratingAnimationTimeoutRef.current) clearTimeout(ratingAnimationTimeoutRef.current);
+    ratingAnimationTimeoutRef.current = setTimeout(() => setIsRatingAnimating(false), 600);
+  };
+
+  // Toggle attendance using mutation
+  const toggleAttendance = () => {
+    if (attendanceMutation.isPending) return;
+
+    const previousAttendance = localAttendance; // Capture BEFORE optimistic update
+
+    // Optimistically update local state
+    setLocalAttendance(previousAttendance ? null : ({ id: "optimistic", showId: setlist.show.id, userId: "" } as Attendance));
+
+    attendanceMutation.mutate(
+      { showId: setlist.show.id, currentAttendance: previousAttendance },
+      {
+        onSuccess: (result) => {
+          setLocalAttendance(result.attendance);
+          if (result.isAttending) {
+            setIsAttendanceAnimating(true);
+            // Clear any existing timeout and set new one
+            if (attendanceAnimationTimeoutRef.current) clearTimeout(attendanceAnimationTimeoutRef.current);
+            attendanceAnimationTimeoutRef.current = setTimeout(() => setIsAttendanceAnimating(false), 600);
+          }
+        },
+        onError: () => {
+          // Revert on error using captured previous value
+          setLocalAttendance(previousAttendance);
+        },
+      }
+    );
+  };
 
   // Create a map to store unique annotations by description
   const uniqueAnnotations = new Map<string, { index: number; desc: string }>();
@@ -103,9 +183,73 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
             </div>
           </div>
-          <div className="flex items-center gap-1 glass-secondary px-2 py-1 rounded-md">
-            <RatingComponent rating={displayedRating} ratingsCount={setlist.show.ratingsCount} />
-          </div>
+          {user && (
+            <div className="flex items-center gap-2">
+              {/* Attendance badge - clickable to toggle */}
+              <button
+                type="button"
+                onClick={toggleAttendance}
+                disabled={attendanceMutation.isPending}
+                className={cn(
+                  "flex items-center justify-center gap-1 px-3 h-8 rounded-md transition-all",
+                  "hover:brightness-110 cursor-pointer",
+                  isAttending
+                    ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"
+                    : "glass-secondary border border-dashed border-glass-border hover:border-green-500/30",
+                  isAttendanceAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+                  attendanceMutation.isPending && "opacity-50"
+                )}
+              >
+                <Check className={cn("h-4 w-4", isAttending ? "text-green-500" : "text-content-text-tertiary")} />
+                <span className={cn(
+                  "text-sm font-medium hidden sm:inline",
+                  isAttending ? "text-green-400" : "text-content-text-secondary"
+                )}>
+                  {isAttending ? "Saw it" : "Saw it?"}
+                </span>
+              </button>
+
+              {/* Rating badge - clickable to expand */}
+              <button
+                type="button"
+                onClick={() => setIsRatingExpanded(!isRatingExpanded)}
+                className={cn(
+                  "flex items-center justify-center gap-1 px-3 h-8 rounded-md transition-all",
+                  "hover:brightness-110 cursor-pointer",
+                  localHasRated
+                    ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+                    : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
+                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
+                )}
+              >
+                {isRatingExpanded ? (
+                  <StarRating
+                    rateableId={setlist.show.id}
+                    rateableType="Show"
+                    initialRating={typeof userRating === "number" ? userRating : (userRating?.value ?? null)}
+                    showSlug={setlist.show.slug}
+                    onAverageRatingChange={handleAverageRatingChange}
+                  />
+                ) : (
+                  <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
+                )}
+              </button>
+            </div>
+          )}
+          {!user && (
+            <LoginPromptPopover message="Sign in to rate">
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center justify-center gap-1 glass-secondary px-3 h-8 rounded-md",
+                  "cursor-pointer hover:brightness-110 border border-dashed border-glass-border hover:border-amber-500/30",
+                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
+                )}
+              >
+                <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
+              </button>
+            </LoginPromptPopover>
+          )}
         </div>
       </CardHeader>
 
@@ -172,18 +316,6 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
             <div />
           )}
         </div>
-        {user && (
-          <div className="flex items-center justify-end gap-4">
-            <StarRating
-              rateableId={setlist.show.id}
-              rateableType="Show"
-              className="hover:scale-105 transition-transform"
-              initialRating={userRating?.value}
-              showSlug={setlist.show.slug}
-            />
-            <AttendanceToggle showId={setlist.show.id} initialAttendance={userAttendance} />
-          </div>
-        )}
       </CardContent>
     </Card>
   );

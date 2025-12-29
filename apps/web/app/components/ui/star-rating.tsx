@@ -1,10 +1,12 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
+import type { ShowUserDataResponse } from "~/routes/api/shows/user-data";
 
 interface StarRatingProps {
   className?: string;
@@ -14,11 +16,14 @@ interface StarRatingProps {
   initialRating?: number | null;
   showSlug?: string;
   onRatingChange?: (rating: number) => void;
+  onAverageRatingChange?: (average: number, count: number) => void;
+  skipRevalidation?: boolean;
 }
 
 interface RatingResponse {
   userRating: number | null;
   averageRating: number | null;
+  ratingsCount?: number;
 }
 
 export function StarRating({
@@ -29,6 +34,8 @@ export function StarRating({
   initialRating,
   showSlug,
   onRatingChange,
+  onAverageRatingChange,
+  skipRevalidation = false,
 }: StarRatingProps) {
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -38,6 +45,7 @@ export function StarRating({
   );
   const { user, loading: isSessionLoading } = useSession();
   const revalidator = useRevalidator();
+  const queryClient = useQueryClient();
   const isMountedRef = useRef<boolean>(true);
   const hasFetchedRef = useRef<boolean>(false);
 
@@ -110,8 +118,38 @@ export function StarRating({
         onRatingChange(data.userRating ?? 0);
       }
 
-      // Revalidate to update any cached data
-      revalidator.revalidate();
+      // Notify parent of new average rating
+      if (onAverageRatingChange && data.averageRating !== null && data.ratingsCount !== undefined) {
+        onAverageRatingChange(data.averageRating, data.ratingsCount);
+      }
+
+      // Update React Query cache with new rating data for this specific show
+      if (rateableType === "Show") {
+        queryClient.setQueriesData<ShowUserDataResponse>(
+          { queryKey: ["shows", "user-data"] },
+          (oldData) => {
+            if (!oldData) return oldData;
+            return {
+              ...oldData,
+              userRatings: {
+                ...oldData.userRatings,
+                [rateableId]: data.userRating,
+              },
+              averageRatings: {
+                ...oldData.averageRatings,
+                [rateableId]: data.averageRating !== null && data.ratingsCount !== undefined
+                  ? { average: data.averageRating, count: data.ratingsCount }
+                  : oldData.averageRatings[rateableId],
+              },
+            };
+          }
+        );
+      }
+
+      // Revalidate to update any other cached data (skip for track ratings to avoid table re-render)
+      if (!skipRevalidation) {
+        revalidator.revalidate();
+      }
     } catch {
       toast.error("Failed to submit rating. Please try again.");
     } finally {

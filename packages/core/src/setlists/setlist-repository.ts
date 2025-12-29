@@ -1,4 +1,4 @@
-import type { Setlist, Show } from "@bip/domain";
+import type { Setlist, SetlistLight, Show, TrackLight } from "@bip/domain";
 import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
 import { buildOrderByClause } from "../_shared/database/query-utils";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
@@ -6,6 +6,22 @@ import { mapShowToDomainEntity } from "../shows/show-repository";
 import { mapAnnotationToDomainEntity, mapTrackToDomainEntity } from "../tracks/track-repository";
 import { mapVenueToDomainEntity } from "../venues/venue-repository";
 import type { SetlistFilter } from "./setlist-service";
+
+type DbTrackLight = {
+  id: string;
+  showId: string;
+  songId: string;
+  set: string;
+  position: number;
+  segue: string | null;
+  likesCount: number;
+  note: string | null;
+  allTimer: boolean | null;
+  averageRating: number | null;
+  ratingsCount: number;
+  song: { id: string; title: string; slug: string } | null;
+  annotations: DbAnnotation[];
+};
 
 function getSetSortOrder(setLabel: string): number {
   // Handle common set labels
@@ -61,6 +77,62 @@ function mapSetlistToDomainEntity(
   });
 
   // Sort sets by their sort order
+  sets.sort((a, b) => a.sort - b.sort);
+
+  return {
+    show: mapShowToDomainEntity(show),
+    venue: mapVenueToDomainEntity(show.venue),
+    sets,
+    annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
+  };
+}
+
+function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
+  return {
+    id: track.id,
+    showId: track.showId,
+    songId: track.songId,
+    set: track.set,
+    position: track.position,
+    segue: track.segue,
+    likesCount: track.likesCount,
+    note: track.note,
+    allTimer: track.allTimer,
+    averageRating: track.averageRating,
+    ratingsCount: track.ratingsCount,
+    song: track.song ?? undefined,
+  };
+}
+
+function mapSetlistLightToDomainEntity(
+  show: DbShow & {
+    tracks: DbTrackLight[];
+    venue: DbVenue;
+  },
+): SetlistLight {
+  const tracks = show.tracks ?? [];
+  const setGroups = new Map<string, DbTrackLight[]>();
+
+  for (const track of tracks) {
+    const setTracks = setGroups.get(track.set) ?? [];
+    setTracks.push(track);
+    setGroups.set(track.set, setTracks);
+  }
+
+  const sets = Array.from(setGroups.entries()).map(([label, setTracks]) => {
+    const sortedTracks = [...setTracks].sort((a, b) => {
+      const posA = Number(a.position);
+      const posB = Number(b.position);
+      return posA - posB;
+    });
+
+    return {
+      label,
+      sort: getSetSortOrder(label),
+      tracks: sortedTracks.map((t) => mapTrackLightToDomainEntity(t)),
+    };
+  });
+
   sets.sort((a, b) => a.sort - b.sort);
 
   return {
@@ -217,6 +289,80 @@ export class SetlistRepository {
       .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
       .map((show) =>
         mapSetlistToDomainEntity({
+          ...show,
+          venue: show.venue,
+          tracks: show.tracks.map((track) => ({
+            ...track,
+            annotations: track.annotations || [],
+          })),
+        }),
+      );
+  }
+
+  /**
+   * Find setlists with minimal song data (id, title, slug only).
+   * Use this for list views where full song objects (lyrics, history) aren't needed.
+   */
+  async findManyLight(options?: {
+    pagination?: PaginationOptions;
+    sort?: SortOptions<Show>[];
+    filters?: SetlistFilter;
+  }): Promise<SetlistLight[]> {
+    const year = options?.filters?.year;
+    const venueId = options?.filters?.venueId;
+
+    const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
+    const skip =
+      options?.pagination?.page && options?.pagination?.limit
+        ? (options.pagination.page - 1) * options.pagination.limit
+        : undefined;
+    const take = options?.pagination?.limit;
+
+    const results = await this.db.show.findMany({
+      where: {
+        venueId,
+        date: year
+          ? {
+              gte: `${year}-01-01`,
+              lt: `${year + 1}-01-01`,
+            }
+          : undefined,
+      },
+      orderBy,
+      skip,
+      take,
+      include: {
+        tracks: {
+          select: {
+            id: true,
+            showId: true,
+            songId: true,
+            set: true,
+            position: true,
+            segue: true,
+            likesCount: true,
+            note: true,
+            allTimer: true,
+            averageRating: true,
+            ratingsCount: true,
+            song: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+              },
+            },
+            annotations: true,
+          },
+        },
+        venue: true,
+      },
+    });
+
+    return results
+      .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
+      .map((show) =>
+        mapSetlistLightToDomainEntity({
           ...show,
           venue: show.venue,
           tracks: show.tracks.map((track) => ({

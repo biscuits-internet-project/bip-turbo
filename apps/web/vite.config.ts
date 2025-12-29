@@ -13,6 +13,8 @@ export default defineConfig({
     hmr: {
       port: 24678,
     },
+    // Allow cloudflare tunnel for CDN testing
+    allowedHosts: [".trycloudflare.com"],
   },
   build: {
     commonjsOptions: {

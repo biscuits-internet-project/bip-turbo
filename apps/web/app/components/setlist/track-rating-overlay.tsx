@@ -1,4 +1,4 @@
-import type { Track } from "@bip/domain";
+import type { Track, TrackLight } from "@bip/domain";
 import { useEffect, useRef, useState } from "react";
 import { RatingComponent } from "~/components/rating";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "~/components/ui/hover-card";
@@ -8,7 +8,7 @@ import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
 
 interface TrackRatingOverlayProps {
-  track: Track;
+  track: Track | TrackLight;
   children: React.ReactNode;
   className?: string;
 }

@@ -16,6 +16,7 @@ import { HeaderLayout } from "~/components/layout/header-layout";
 import { SearchProvider } from "~/components/search/search-provider";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
+import { QueryProvider } from "~/providers/query-provider";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
 
@@ -60,11 +61,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <body className="min-h-screen font-sans antialiased">
         <ConcertLights />
         <SupabaseProvider env={env}>
-          <GlobalSearchProvider>
-            <SearchProvider>
-              <HeaderLayout>{children}</HeaderLayout>
-            </SearchProvider>
-          </GlobalSearchProvider>
+          <QueryProvider>
+            <GlobalSearchProvider>
+              <SearchProvider>
+                <HeaderLayout>{children}</HeaderLayout>
+              </SearchProvider>
+            </GlobalSearchProvider>
+          </QueryProvider>
         </SupabaseProvider>
         <Toaster position="top-right" theme="dark" />
         <ScrollRestoration />
