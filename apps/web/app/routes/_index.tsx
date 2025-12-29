@@ -88,10 +88,10 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
       const showDate = new Date(setlist.show.date);
       return showDate <= oneDayFromNow;
     })
-    .slice(0, 2); // Take only the last 2 shows after filtering for mobile
+    .slice(0, 5); // Take only the last 5 shows after filtering for mobile
 
   // Desktop gets more shows without filtering
-  const desktopRecentShows = allRecentShows.slice(0, 6);
+  const desktopRecentShows = allRecentShows.slice(0, 5);
 
   // Get recent blog posts (last 5)
   const recentBlogPosts = await services.blogPosts.findManyWithUser({

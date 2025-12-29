@@ -191,7 +191,7 @@ function SetlistCardComponent({
                 onClick={toggleAttendance}
                 disabled={attendanceMutation.isPending}
                 className={cn(
-                  "flex items-center justify-center gap-1 px-3 h-8 rounded-md transition-all",
+                  "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
                   "hover:brightness-110 cursor-pointer",
                   isAttending
                     ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"
@@ -200,7 +200,7 @@ function SetlistCardComponent({
                   attendanceMutation.isPending && "opacity-50"
                 )}
               >
-                <Check className={cn("h-4 w-4", isAttending ? "text-green-500" : "text-content-text-tertiary")} />
+                <Check className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", isAttending ? "text-green-500" : "text-content-text-tertiary")} />
                 <span className={cn(
                   "text-sm font-medium hidden sm:inline",
                   isAttending ? "text-green-400" : "text-content-text-secondary"
@@ -214,7 +214,7 @@ function SetlistCardComponent({
                 type="button"
                 onClick={() => setIsRatingExpanded(!isRatingExpanded)}
                 className={cn(
-                  "flex items-center justify-center gap-1 px-3 h-8 rounded-md transition-all",
+                  "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
                   "hover:brightness-110 cursor-pointer",
                   localHasRated
                     ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
@@ -241,7 +241,7 @@ function SetlistCardComponent({
               <button
                 type="button"
                 className={cn(
-                  "flex items-center justify-center gap-1 glass-secondary px-3 h-8 rounded-md",
+                  "flex items-center justify-center gap-1 glass-secondary px-2 h-6 sm:px-3 sm:h-8 rounded-md",
                   "cursor-pointer hover:brightness-110 border border-dashed border-glass-border hover:border-amber-500/30",
                   isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
                 )}
@@ -264,14 +264,14 @@ function SetlistCardComponent({
         <div className="space-y-2 md:space-y-4">
           {setlist.sets.map((set, setIndex) => (
             <span key={setlist.show.id + set.label} className="inline-block w-full md:flex md:gap-4 md:items-baseline">
-              <span className="inline text-sm md:text-base font-medium text-content-text-tertiary">{set.label}</span>
+              <span className="inline text-base font-medium text-content-text-tertiary">{set.label}</span>
               <span className="inline ml-2 md:ml-0 md:flex-1">
                 {set.tracks.map((track, i) => (
                   <span key={track.id} className="inline">
                     <TrackRatingOverlay track={track}>
                       <span
                         className={cn(
-                          "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-sm md:text-base",
+                          "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
                           track.allTimer && "font-medium",
                         )}
                       >
@@ -291,7 +291,7 @@ function SetlistCardComponent({
                       </span>
                     </TrackRatingOverlay>
                     {i < set.tracks.length - 1 && (
-                      <span className="text-content-text-secondary mx-1 font-medium text-sm md:text-base">
+                      <span className="text-content-text-secondary mx-1 font-medium text-base">
                         {track.segue ? " > " : ", "}
                       </span>
                     )}

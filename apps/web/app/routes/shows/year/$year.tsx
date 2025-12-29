@@ -181,17 +181,17 @@ export default function ShowsByYear() {
         <div className="relative">
           <h1 className="page-heading">SHOWS</h1>
           <div className="absolute top-0 right-0 flex items-center gap-2">
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="hidden sm:flex">
               <Link to="/shows/with-photos" className="flex items-center gap-1">
                 <Camera className="h-4 w-4" />
-                <span className="hidden sm:inline">Photos</span>
+                <span>Photos</span>
               </Link>
             </Button>
             <AdminOnly>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/shows/new" className="flex items-center gap-1">
                   <Plus className="h-4 w-4" />
-                  <span>New Show</span>
+                  <span className="hidden sm:inline">New Show</span>
                 </Link>
               </Button>
             </AdminOnly>

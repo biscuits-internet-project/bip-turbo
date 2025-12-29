@@ -51,14 +51,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const env = data?.env;
 
   return (
-    <html lang="en" className="font-quicksand dark">
+    <html lang="en" className="font-quicksand dark overflow-x-hidden">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
       </head>
-      <body className="min-h-screen font-sans antialiased">
+      <body className="min-h-screen font-sans antialiased overflow-x-hidden">
         <ConcertLights />
         <SupabaseProvider env={env}>
           <QueryProvider>

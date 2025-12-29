@@ -8,7 +8,7 @@ export function Footer() {
   return (
     <footer className="bg-content-bg/50 border-t border-content-bg-secondary mt-auto">
       <div className="mx-auto max-w-7xl px-6 py-12 md:flex md:items-center md:justify-between lg:px-8">
-        <div className="flex justify-center space-x-6 md:order-2">
+        <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 md:order-2">
           <ContactDialog>
             <button
               type="button"

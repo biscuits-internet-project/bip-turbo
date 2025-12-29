@@ -2,6 +2,7 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
+  Camera,
   Disc,
   Edit,
   Eye,
@@ -13,7 +14,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { UserDropdown } from "~/components/layout/user-dropdown";
 import { SearchButton } from "~/components/search/search-button";
@@ -31,6 +32,7 @@ const navigation = [
   { name: "blog", href: "/blog", icon: FileText },
   { name: "top rated", href: "/shows/top-rated", icon: TrendingUp },
   { name: "tour dates", href: "/shows/tour-dates", icon: CalendarDays },
+  { name: "photos", href: "/shows/with-photos", icon: Camera, mobileOnly: true },
 ];
 
 export function Header() {
@@ -39,12 +41,24 @@ export function Header() {
   const { open: _openSearch } = useGlobalSearch();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
+
   const username = user?.user_metadata?.username ?? user?.email?.split("@")[0];
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/95 backdrop-blur-sm border-b border-border/10">
-        <div className="flex h-full items-center justify-between px-4 sm:px-6 lg:px-8">
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/95 backdrop-blur-sm border-b border-border/10 overflow-hidden">
+        <div className="flex h-full items-center justify-between px-4 sm:px-6 lg:px-8 max-w-full">
           {/* Logo */}
           <div className="flex items-center">
             <Link
@@ -75,7 +89,7 @@ export function Header() {
           </nav>
 
           {/* Search */}
-          <div className="flex-1 max-w-lg mx-2 md:mx-4">
+          <div className="flex-1 min-w-0 max-w-lg mx-2 md:mx-4">
             <SearchButton className="w-full max-w-md mx-auto" showShortcut={!isMobile} />
           </div>
 
@@ -118,7 +132,7 @@ export function Header() {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm block md:hidden">
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 right-4 z-[70]">
             <Button
               variant="ghost"
               size="icon"
@@ -128,7 +142,7 @@ export function Header() {
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <nav className="p-4 pt-20 space-y-1 h-full overflow-y-auto">
+          <nav className="p-4 pt-14 space-y-1 h-full overflow-y-auto">
             {navigation.map((item) => (
               <Link
                 key={item.href}
