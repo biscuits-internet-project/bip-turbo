@@ -29,16 +29,16 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     throw new Response("Username not provided", { status: 400 });
   }
 
-  // Get current session user
+  // Get current session user (use getUser() to verify JWT, not getSession())
   const { supabase } = getServerClient(request);
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const sessionUser = session?.user
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  const sessionUser = authUser
     ? {
-        id: session.user.id,
-        email: session.user.email,
-        role: session.user.user_metadata?.role,
+        id: authUser.id,
+        email: authUser.email,
+        role: authUser.user_metadata?.role,
       }
     : null;
 

@@ -1,23 +1,24 @@
-import { type Attendance, CacheKeys, type Setlist } from "@bip/domain";
+import { CacheKeys, type SetlistLight } from "@bip/domain";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, type LoaderFunctionArgs } from "react-router-dom";
+import type { ClientLoaderFunctionArgs } from "react-router";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Button } from "~/components/ui/button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import { type Context, publicLoader } from "~/lib/base-loaders";
+import { useShowUserData } from "~/hooks/use-show-user-data";
+import { publicLoader } from "~/lib/base-loaders";
 import { getShowsMeta } from "~/lib/seo";
 import { logger } from "~/lib/logger";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
 
 interface LoaderData {
-  setlists: Setlist[];
+  setlists: SetlistLight[];
   year: number;
   searchQuery?: string;
-  userAttendances: Attendance[];
 }
 
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -25,35 +26,46 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 // Minimum characters required to trigger search
 const MIN_SEARCH_CHARS = 4;
 
-async function fetchUserAttendances(context: Context, showIds: string[]): Promise<Attendance[]> {
-  if (!context.currentUser || showIds.length === 0) {
-    return [];
+// Cache headers for CDN edge caching - different TTLs for current vs past years
+export function headers({
+  loaderHeaders,
+  data,
+}: {
+  loaderHeaders: Headers;
+  data: LoaderData | undefined;
+}): Headers {
+  const headers = new Headers(loaderHeaders);
+  const loaderData = data;
+  const currentYear = new Date().getFullYear();
+  const isCurrentYear = loaderData?.year === currentYear;
+  const hasSearchQuery = !!loaderData?.searchQuery;
+
+  // Don't cache search results
+  if (hasSearchQuery) {
+    headers.set("Cache-Control", "private, no-cache");
+    return headers;
   }
 
-  try {
-    const user = await services.users.findByEmail(context.currentUser.email);
-    if (!user) {
-      logger.warn(`User not found with email ${context.currentUser.email}`);
-      return [];
-    }
-
-    const userAttendances = await services.attendances.findManyByUserIdAndShowIds(user.id, showIds);
-    logger.info(`Fetch ${userAttendances.length} user attendances from ${showIds.length} total shows`);
-    return userAttendances;
-  } catch (error) {
-    logger.warn("Failed to load user attendances", { error });
-    return [];
+  // Current year: shorter cache (5 min CDN) since new shows may be added
+  // Past years: longer cache (1 day CDN) since data is stable
+  if (isCurrentYear) {
+    headers.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+    headers.set("Cache-Tag", `year-${loaderData?.year}`);
+  } else {
+    headers.set("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600");
+    headers.set("Cache-Tag", `year-${loaderData?.year}`);
   }
-}
 
-export const loader = publicLoader(async ({ request, context, params }: LoaderFunctionArgs): Promise<LoaderData> => {
+  return headers;
+};
+
+export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
   const year = params.year || new Date().getFullYear();
   const yearInt = Number.parseInt(year as string);
   const searchQuery = url.searchParams.get("q") || undefined;
 
-  let setlists: Setlist[] = [];
-  let userAttendances: Attendance[] = [];
+  let setlists: SetlistLight[] = [];
 
   // If there's a search query with at least MIN_SEARCH_CHARS characters, use the search functionality
   if (searchQuery && searchQuery.length >= MIN_SEARCH_CHARS) {
@@ -67,16 +79,12 @@ export const loader = publicLoader(async ({ request, context, params }: LoaderFu
 
       // Fetch setlists for these shows
       setlists = await services.setlists.findManyByShowIds(showIds);
-
-      // If user is authenticated, fetch their attendance data for search results
-      userAttendances = await fetchUserAttendances(context, showIds);
     }
 
     return {
       setlists,
       year: yearInt,
       searchQuery,
-      userAttendances,
     };
   }
 
@@ -91,7 +99,7 @@ export const loader = publicLoader(async ({ request, context, params }: LoaderFu
 
   setlists = await services.cache.getOrSet(yearCacheKey, async () => {
     logger.info(`Loading shows from DB for year: ${yearInt}`);
-    return await services.setlists.findMany({
+    return await services.setlists.findManyLight({
       filters: {
         year: yearInt,
       },
@@ -99,17 +107,11 @@ export const loader = publicLoader(async ({ request, context, params }: LoaderFu
     });
   });
 
-  userAttendances = await fetchUserAttendances(
-    context,
-    setlists.map((setlist) => setlist.show.id),
-  );
-
   logger.info(`Year ${yearInt} shows loaded: ${setlists.length} shows`);
 
   return {
     setlists,
     year: yearInt,
-    userAttendances,
   };
 });
 
@@ -117,15 +119,21 @@ export function meta({ data }: { data: LoaderData }) {
   return getShowsMeta(data.year, data.searchQuery);
 }
 
+// Client loader enables hydration when page is served from CDN cache
+export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) => {
+  return serverLoader();
+};
+clientLoader.hydrate = true;
+
 export default function ShowsByYear() {
-  const { setlists, year, searchQuery, userAttendances } = useSerializedLoaderData<LoaderData>();
+  const { setlists, year, searchQuery } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  // Create a map for quick attendance lookup by showId
-  const attendanceMap = useMemo(
-    () => new Map(userAttendances.map((attendance) => [attendance.showId, attendance])),
-    [userAttendances],
-  );
+  // Extract show IDs for client-side data fetching
+  const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
+
+  // Fetch user-specific data client-side (attendances, user ratings, average ratings)
+  const { attendanceMap, userRatingMap, averageRatingMap, isLoading: isLoadingUserData } = useShowUserData(showIds);
 
   // Group setlists by month - memoize to prevent unnecessary recalculation
   const setlistsByMonth = useMemo(() => {
@@ -139,7 +147,7 @@ export default function ShowsByYear() {
         acc[month].push(setlist);
         return acc;
       },
-      {} as Record<number, Setlist[]>,
+      {} as Record<number, SetlistLight[]>,
     );
   }, [setlists]);
 
@@ -249,9 +257,9 @@ export default function ShowsByYear() {
                     <SetlistCard
                       key={setlist.show.id}
                       setlist={setlist}
-                      userAttendance={attendanceMap.get(setlist.show.id) || null}
-                      userRating={null}
-                      showRating={setlist.show.averageRating}
+                      userAttendance={attendanceMap.get(setlist.show.id) ?? null}
+                      userRating={userRatingMap.get(setlist.show.id) ?? null}
+                      showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
                       className="transition-all duration-300 transform hover:scale-[1.01]"
                     />
                   ))}
@@ -273,9 +281,9 @@ export default function ShowsByYear() {
                               {index === 0 && <div id={`month-${month}`} className="scroll-mt-20" />}
                               <SetlistCard
                                 setlist={setlist}
-                                userAttendance={attendanceMap.get(setlist.show.id) || null}
-                                userRating={null}
-                                showRating={setlist.show.averageRating}
+                                userAttendance={attendanceMap.get(setlist.show.id) ?? null}
+                                userRating={userRatingMap.get(setlist.show.id) ?? null}
+                                showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
                                 className="transition-all duration-300 transform hover:scale-[1.01]"
                               />
                             </div>

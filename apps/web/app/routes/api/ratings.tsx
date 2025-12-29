@@ -56,10 +56,15 @@ export const action = protectedAction(async ({ request, context }) => {
         showSlug,
       });
 
-      // Get the updated average rating for the show
-      const averageRating = await services.ratings.getAverageForRateable(rateableId, rateableType);
+      // Get the updated average rating and count for the show
+      const averages = await services.ratings.getAveragesForRateables([rateableId], rateableType);
+      const ratingData = averages[rateableId] ?? { average: updatedRating.value, count: 1 };
 
-      return { userRating: updatedRating.value, averageRating };
+      return {
+        userRating: updatedRating.value,
+        averageRating: ratingData.average,
+        ratingsCount: ratingData.count,
+      };
     } catch (error) {
       logger.error("Error rating rateable", { error });
       throw new Error(error instanceof Error ? error.message : "Failed to rate rateable");

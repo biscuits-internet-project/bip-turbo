@@ -1,4 +1,4 @@
-import type { Setlist, Show } from "@bip/domain";
+import type { Setlist, SetlistLight, Show } from "@bip/domain";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 import type { SetlistRepository } from "./setlist-repository";
 
@@ -40,5 +40,17 @@ export class SetlistService {
     filters?: SetlistFilter;
   }): Promise<Setlist[]> {
     return this.repository.findMany(options);
+  }
+
+  /**
+   * Find setlists with minimal song data (id, title, slug only).
+   * Use this for list views where full song objects (lyrics, history) aren't needed.
+   */
+  async findManyLight(options?: {
+    pagination?: PaginationOptions;
+    sort?: SortOptions<Show>[];
+    filters?: SetlistFilter;
+  }): Promise<SetlistLight[]> {
+    return this.repository.findManyLight(options);
   }
 }

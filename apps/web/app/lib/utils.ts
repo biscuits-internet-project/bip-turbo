@@ -5,6 +5,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Validates and sanitizes a redirect URL to prevent open redirect attacks.
+ * Only allows relative paths starting with "/".
+ * Returns "/" as fallback for invalid URLs.
+ */
+export function getSafeRedirectUrl(url: string | null): string {
+  if (!url) return "/";
+
+  // Only allow relative paths starting with /
+  // Reject absolute URLs, protocol-relative URLs (//), and other schemes
+  if (!url.startsWith("/") || url.startsWith("//")) {
+    return "/";
+  }
+
+  return url;
+}
+
 export function formatDateShort(date: string): string {
   const dateParts = date.split("T")[0].split("-");
   if (dateParts.length === 3) {

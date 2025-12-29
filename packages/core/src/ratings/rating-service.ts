@@ -22,6 +22,13 @@ export class RatingService {
     return this.repository.getAverageForRateable(rateableId, rateableType);
   }
 
+  async getAveragesForRateables(
+    rateableIds: string[],
+    rateableType: string,
+  ): Promise<Record<string, { average: number; count: number }>> {
+    return this.repository.getAveragesForRateables(rateableIds, rateableType);
+  }
+
   async getByRateableIdAndUserId(rateableId: string, rateableType: string, userId: string) {
     return this.repository.getByRateableIdAndUserId(rateableId, rateableType, userId);
   }

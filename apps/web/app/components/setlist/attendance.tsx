@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils";
 interface Props {
   showId: string;
   initialAttendance: Attendance | null;
+  onAttendanceChange?: (attending: boolean) => void;
 }
 
-export function AttendanceToggle({ showId, initialAttendance }: Props) {
+export function AttendanceToggle({ showId, initialAttendance, onAttendanceChange }: Props) {
   const [isAttending, setIsAttending] = useState(!!initialAttendance);
   const [currentAttendance, setCurrentAttendance] = useState<Attendance | null>(initialAttendance);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +49,7 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
       toast.success("Attendance marked!");
       setCurrentAttendance(data.attendance);
       setIsAttending(true);
+      onAttendanceChange?.(true);
       revalidator.revalidate();
     } catch (error) {
       toast.dismiss();
@@ -89,6 +91,7 @@ export function AttendanceToggle({ showId, initialAttendance }: Props) {
       toast.success("Attendance removed");
       setIsAttending(false);
       setCurrentAttendance(null);
+      onAttendanceChange?.(false);
       revalidator.revalidate();
     } catch (error) {
       toast.dismiss();

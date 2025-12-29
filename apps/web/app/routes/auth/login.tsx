@@ -1,19 +1,22 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
-import { redirect, useNavigate, useRouteLoaderData } from "react-router-dom";
+import { redirect, useNavigate, useRouteLoaderData, useSearchParams } from "react-router-dom";
 import { LoginForm } from "~/components/login-form";
+import { getSafeRedirectUrl } from "~/lib/utils";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabase, headers } = getServerClient(request);
+  const url = new URL(request.url);
+  const next = getSafeRedirectUrl(url.searchParams.get("next"));
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) return redirect("/", { headers });
+  if (user) return redirect(next, { headers });
 
   return;
 };
@@ -21,6 +24,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const next = getSafeRedirectUrl(searchParams.get("next"));
   const rootData = useRouteLoaderData("root") as RootData;
   const { SUPABASE_URL, SUPABASE_ANON_KEY, BASE_URL } = rootData.env;
 
@@ -53,10 +58,13 @@ export default function Login() {
         sameSite: "lax",
       },
     });
+    const callbackUrl = new URL(`${BASE_URL}/auth/callback`);
+    callbackUrl.searchParams.set("next", next);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${BASE_URL}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
       },
     });
 
@@ -87,7 +95,7 @@ export default function Login() {
       }
 
       console.log("Login successful:", data);
-      navigate("/");
+      navigate(next);
     } catch (err) {
       console.error("Unexpected error during login:", err);
       setError("An unexpected error occurred");

@@ -18,15 +18,18 @@ import {
   Pencil,
   StarIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { RatingComponent } from "~/components/rating";
 import { Button } from "~/components/ui/button";
+import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
+import { StarRating } from "~/components/ui/star-rating";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
@@ -57,6 +60,86 @@ function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
       </dd>
     </div>
   );
+}
+
+// Interactive track rating cell with expandable stars
+function TrackRatingCell({
+  trackId,
+  showSlug,
+  initialRating,
+  ratingsCount,
+}: {
+  trackId: string;
+  showSlug: string;
+  initialRating: number | null;
+  ratingsCount: number | null;
+}) {
+  const { user } = useSession();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [displayedRating, setDisplayedRating] = useState(initialRating ?? 0);
+  const [displayedCount, setDisplayedCount] = useState(ratingsCount ?? 0);
+  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (animationTimeoutRef.current) clearTimeout(animationTimeoutRef.current);
+    };
+  }, []);
+
+  const handleRatingChange = (average: number, count: number) => {
+    setIsAnimating(true);
+    setDisplayedRating(average);
+    setDisplayedCount(count);
+    setIsExpanded(false);
+    // Clear any existing timeout and set new one
+    if (animationTimeoutRef.current) clearTimeout(animationTimeoutRef.current);
+    animationTimeoutRef.current = setTimeout(() => setIsAnimating(false), 600);
+  };
+
+  const ratingButton = (
+    <button
+      type="button"
+      onClick={(e) => {
+        if (!user) return;
+        e.stopPropagation();
+        setIsExpanded(!isExpanded);
+      }}
+      className={cn(
+        "inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md",
+        "origin-center",
+        "glass-secondary border border-dashed border-glass-border",
+        user && "hover:brightness-110 cursor-pointer hover:border-amber-500/30",
+        !user && "cursor-pointer hover:border-amber-500/30",
+        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
+      )}
+    >
+      {isExpanded ? (
+        <StarRating
+          rateableId={trackId}
+          rateableType="Track"
+          showSlug={showSlug}
+          onAverageRatingChange={handleRatingChange}
+          skipRevalidation
+        />
+      ) : (
+        <RatingComponent rating={displayedRating || null} ratingsCount={displayedCount || null} />
+      )}
+    </button>
+  );
+
+  if (!user) {
+    return (
+      <div className="w-[140px]">
+        <LoginPromptPopover message="Sign in to rate">
+          {ratingButton}
+        </LoginPromptPopover>
+      </div>
+    );
+  }
+
+  return <div className="w-[140px]">{ratingButton}</div>;
 }
 
 function PerformanceTable({
@@ -282,13 +365,22 @@ function PerformanceTable({
     columnHelper.accessor((row) => row.rating ?? 0, {
       id: "rating",
       header: "Rating",
-      size: 64,
+      size: 180,
       enableSorting: true,
       sortingFn: "basic",
       cell: (info) => {
         const rating = info.getValue();
         const ratingsCount = info.row.original.ratingsCount;
-        return <RatingComponent rating={rating || null} ratingsCount={ratingsCount || null} />;
+        const trackId = info.row.original.trackId;
+        const showSlug = info.row.original.show.slug;
+        return (
+          <TrackRatingCell
+            trackId={trackId}
+            showSlug={showSlug}
+            initialRating={rating || null}
+            ratingsCount={ratingsCount || null}
+          />
+        );
       },
     }),
   ];

@@ -1,4 +1,5 @@
 import { type LoaderFunctionArgs, redirect } from "react-router";
+import { getSafeRedirectUrl } from "~/lib/utils";
 import { logger } from "~/server/logger";
 import { services } from "~/server/services";
 import { getServerClient, getServiceRoleClient } from "~/server/supabase";
@@ -7,7 +8,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const type = requestUrl.searchParams.get("type");
-  const next = requestUrl.searchParams.get("next") || "/";
+  const next = getSafeRedirectUrl(requestUrl.searchParams.get("next"));
 
   logger.info("Auth callback", { url: requestUrl.toString(), code: !!code, type });
 
