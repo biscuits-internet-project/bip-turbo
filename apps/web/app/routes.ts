@@ -135,4 +135,7 @@ export default [
   route(".well-known/oauth-authorization-server/mcp", "routes/.well-known/oauth-authorization-server-mcp.tsx"),
   route(".well-known/oauth-protected-resource", "routes/.well-known/oauth-protected-resource.tsx"),
   route(".well-known/oauth-protected-resource/mcp", "routes/.well-known/oauth-protected-resource-mcp.tsx"),
+
+  // Catch-all fallback to produce clean 404s for unmatched paths (e.g. stale asset URLs)
+  route("*", "routes/$.tsx"),
 ] satisfies RouteConfig;

@@ -14,6 +14,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     "/mstile-",
     "/browserconfig.xml",
     "/manifest.json",
+    "/assets/",
   ];
 
   const shouldBeSilent = silentPaths.some((path) => url.pathname.startsWith(path));
