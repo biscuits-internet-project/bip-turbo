@@ -8,6 +8,33 @@ const syncedUsers = new Set<string>();
 type SyncResult = { refreshedUser: User | null; internalUserId?: string };
 const inflightSyncs = new Map<string, Promise<SyncResult>>();
 
+function normalizeUser(user: User | null): User | null {
+  if (!user) {
+    return user;
+  }
+
+  const rawUsername = user.user_metadata?.username;
+  if (typeof rawUsername !== "string") {
+    return user;
+  }
+
+  const trimmedUsername = rawUsername.trim();
+  const shouldRemoveUsername = trimmedUsername.length === 0;
+  const shouldUpdateUsername = trimmedUsername !== rawUsername;
+
+  if (!shouldUpdateUsername && !shouldRemoveUsername) {
+    return user;
+  }
+
+  const { username: _ignored, ...restMetadata } = user.user_metadata ?? {};
+  const normalizedMetadata = shouldRemoveUsername ? restMetadata : { ...restMetadata, username: trimmedUsername };
+
+  return {
+    ...user,
+    user_metadata: normalizedMetadata,
+  };
+}
+
 async function requestSync(supabase: SupabaseClient): Promise<SyncResult> {
   const response = await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
   if (!response.ok) {
@@ -121,14 +148,14 @@ export function useSession() {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
+      setUser(normalizeUser(sessionUser));
       setLoading(false);
 
       // Fallback: ensure user is synced to PostgreSQL
       if (sessionUser) {
         ensureUserSynced(sessionUser, supabase).then((syncedUser) => {
           if (!isCancelled && syncedUser && syncedUser.id === sessionUser.id) {
-            setUser(syncedUser);
+            setUser(normalizeUser(syncedUser));
           }
         });
       }
@@ -139,14 +166,14 @@ export function useSession() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const sessionUser = session?.user ?? null;
-      setUser(sessionUser);
+      setUser(normalizeUser(sessionUser));
       setLoading(false);
 
       // Fallback: ensure user is synced to PostgreSQL on auth state change
       if (sessionUser) {
         ensureUserSynced(sessionUser, supabase).then((syncedUser) => {
           if (!isCancelled && syncedUser && syncedUser.id === sessionUser.id) {
-            setUser(syncedUser);
+            setUser(normalizeUser(syncedUser));
           }
         });
       }
