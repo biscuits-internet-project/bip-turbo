@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { Card } from "~/components/ui/card";
+import { DonationBanner } from "~/components/ui/donation-banner";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
@@ -184,6 +185,9 @@ export default function Index() {
           BISCUITS INTERNET PROJECT 3.0
         </h1>
       </div>
+
+      {/* Donation Banner */}
+      <DonationBanner className="mb-6" />
 
       {/* Recent Shows - Only on mobile */}
       <div className="md:hidden">
