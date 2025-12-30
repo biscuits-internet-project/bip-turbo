@@ -117,7 +117,11 @@ export default [
     route("contact", "routes/api/contact.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
     route("images/upload", "routes/api/images/upload.tsx"),
+    route("admin/cache", "routes/api/admin/cache.tsx"),
   ]),
+
+  // Admin routes
+  ...prefix("admin", [route("cache", "routes/admin/cache.tsx")]),
 
   // MCP JSON-RPC endpoint (all tools exposed via JSON-RPC protocol)
   route("mcp", "routes/mcp/index.tsx"),

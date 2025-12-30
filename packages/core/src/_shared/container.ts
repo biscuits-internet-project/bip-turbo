@@ -13,7 +13,7 @@ import { SongRepository } from "../songs/song-repository";
 import { TrackRepository } from "../tracks/track-repository";
 import { UserRepository } from "../users/user-repository";
 import { VenueRepository } from "../venues/venue-repository";
-import { CacheInvalidationService, CacheService } from "./cache";
+import { CacheInvalidationService, CacheService, CloudflareCacheService } from "./cache";
 import type { DbClient } from "./database/models";
 import type { Env } from "./env";
 import { RedisService } from "./redis";
@@ -23,6 +23,7 @@ export interface ServiceContainer {
   env: Env;
   redis: RedisService;
   cache: CacheService;
+  cloudflareCache: CloudflareCacheService;
   cacheInvalidation: CacheInvalidationService;
   logger: Logger;
   repositories: {
@@ -59,7 +60,14 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
 
   // Create cache services
   const cache = new CacheService(redis, logger);
-  const cacheInvalidation = new CacheInvalidationService(cache, logger);
+  const cloudflareCache = new CloudflareCacheService(
+    {
+      zoneId: env.CLOUDFLARE_ZONE_ID,
+      apiToken: env.CLOUDFLARE_CACHE_PURGE_TOKEN,
+    },
+    logger,
+  );
+  const cacheInvalidation = new CacheInvalidationService(cache, logger, cloudflareCache);
 
   // Create repositories
   const repositories = {
@@ -83,6 +91,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
     env,
     redis,
     cache,
+    cloudflareCache,
     cacheInvalidation,
     logger,
     repositories,

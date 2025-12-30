@@ -15,6 +15,8 @@ export const envSchema = z.object({
   APP_ENV: z.enum(["development", "staging", "production"]),
   CLOUDFLARE_ACCOUNT_ID: z.string(),
   CLOUDFLARE_IMAGES_API_TOKEN: z.string(),
+  CLOUDFLARE_ZONE_ID: z.string(),
+  CLOUDFLARE_CACHE_PURGE_TOKEN: z.string(),
 });
 
 export const env = envSchema.parse(process.env);

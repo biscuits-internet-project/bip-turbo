@@ -1,10 +1,12 @@
 import { CacheKeys, type Logger } from "@bip/domain";
 import type { CacheService } from "./cache-service";
+import type { CloudflareCacheService } from "./cloudflare-cache-service";
 
 export class CacheInvalidationService {
   constructor(
     private readonly cache: CacheService,
     private readonly logger: Logger,
+    private readonly cloudflareCache?: CloudflareCacheService,
   ) {}
 
   /**
@@ -48,6 +50,7 @@ export class CacheInvalidationService {
     await Promise.all([
       this.cache.delPattern(CacheKeys.shows.allLists()),
       this.cache.delPattern("home:*"), // Invalidate all home page caches
+      this.cloudflareCache?.purgeYearListings(),
     ]);
   }
 
