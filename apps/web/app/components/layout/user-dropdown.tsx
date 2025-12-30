@@ -1,5 +1,6 @@
-import { Edit, Eye, LogOut } from "lucide-react";
+import { Edit, Eye, LogOut, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AdminOnly } from "~/components/admin/admin-only";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -125,6 +126,28 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
             </div>
           </Link>
         </DropdownMenuItem>
+
+        <AdminOnly>
+          <DropdownMenuItem
+            asChild
+            className={cn(
+              "cursor-pointer rounded-lg p-3 transition-all duration-200",
+              "hover:bg-amber-500/10 hover:text-amber-400",
+              "focus:bg-amber-500/10 focus:text-amber-400",
+              "group",
+            )}
+          >
+            <Link to="/admin/cache" className="flex items-center space-x-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
+                <Settings className="h-4 w-4 text-amber-400" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">Admin</span>
+                <span className="text-xs text-content-text-secondary">Cache management</span>
+              </div>
+            </Link>
+          </DropdownMenuItem>
+        </AdminOnly>
 
         <DropdownMenuSeparator className="my-2 bg-brand-primary/20" />
 
