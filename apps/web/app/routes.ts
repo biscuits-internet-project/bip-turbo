@@ -99,6 +99,7 @@ export default [
   ]),
 
   ...prefix("api", [
+    route("auth/sync", "routes/api/auth/sync.tsx"),
     route("reviews", "routes/api/reviews.tsx"),
     route("ratings", "routes/api/ratings.tsx"),
     route("tracks/:trackId", "routes/api/tracks/$trackId.tsx"),

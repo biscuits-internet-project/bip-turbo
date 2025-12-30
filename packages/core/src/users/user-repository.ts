@@ -210,14 +210,23 @@ export class UserRepository {
   }
 
   async findOrCreate(data: { id?: string; email: string; username: string }): Promise<User> {
-    // First try to find by email
-    const existing = await this.findByEmail(data.email);
-    if (existing) {
-      return existing;
-    }
+    // Ensure username is unique before creating (noop if user already exists)
+    const uniqueUsername = await this.ensureUniqueUsername(data.username);
 
-    // If not found, create new user
-    return this.create(data);
+    const result = await this.db.user.upsert({
+      where: { email: data.email },
+      update: {},
+      create: {
+        id: data.id,
+        email: data.email,
+        username: uniqueUsername,
+        passwordDigest: "supabase_auth",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    return mapUserToDomainEntity(result);
   }
 
   async update(id: string, data: Partial<User>): Promise<User | null> {

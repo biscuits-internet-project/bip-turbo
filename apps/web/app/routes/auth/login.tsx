@@ -95,6 +95,17 @@ export default function Login() {
       }
 
       console.log("Login successful:", data);
+
+      // Sync user to PostgreSQL before redirecting
+      // This ensures the local user record exists for email/password logins
+      try {
+        await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
+        await supabase.auth.refreshSession();
+      } catch (syncError) {
+        console.error("Failed to sync user:", syncError);
+        // Continue anyway - user can still log in
+      }
+
       navigate(next);
     } catch (err) {
       console.error("Unexpected error during login:", err);

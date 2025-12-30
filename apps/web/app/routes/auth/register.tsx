@@ -48,6 +48,16 @@ export default function Register() {
     }
 
     if (data.session) {
+      // Sync user to PostgreSQL before redirecting
+      // This ensures the local user record exists even when email confirmation is disabled
+      try {
+        await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
+        await supabase.auth.refreshSession();
+      } catch (syncError) {
+        console.error("Failed to sync user:", syncError);
+        // Continue anyway - the callback route will handle sync on next login
+      }
+
       // Redirect to home page on successful registration
       navigate("/");
     }

@@ -1,6 +1,8 @@
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { redirect } from "react-router-dom";
 import { logger } from "~/lib/logger";
+import { services } from "~/server/services";
 import { getServerClient } from "~/server/supabase";
 
 interface User {
@@ -119,12 +121,11 @@ async function getUser(
   options: { requireAuth: boolean; requireAdmin?: boolean },
 ): Promise<User | null> {
   const { supabase } = getServerClient(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (options?.requireAuth) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) {
       const isJsonRequest = request.headers.get("Accept")?.includes("application/json");
       if (isJsonRequest) {
@@ -136,7 +137,9 @@ async function getUser(
       throw redirect("/auth/login");
     }
 
-    // Check for admin flag in app_metadata (server-controlled, secure)
+    // Ensure the PostgreSQL user exists for any authenticated request
+    await ensureLocalUserRecord(user);
+
     const isAdmin = user.app_metadata?.isAdmin === true;
 
     // Check admin access if required
@@ -158,12 +161,6 @@ async function getUser(
     };
   }
 
-  // Use getUser() instead of getSession() to properly verify the JWT
-  // getSession() just reads from cookies without verification
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   if (user) {
     const isAdmin = user.app_metadata?.isAdmin === true;
     return {
@@ -174,4 +171,22 @@ async function getUser(
   }
 
   return null;
+}
+
+async function ensureLocalUserRecord(authUser: SupabaseUser) {
+  if (!authUser.email) {
+    logger.error("Authenticated user missing email; cannot ensure local record", { authUserId: authUser.id });
+    return;
+  }
+
+  try {
+    await services.users.findOrCreate({
+      id: authUser.id,
+      email: authUser.email,
+      username: authUser.user_metadata?.username || authUser.email.split("@")[0],
+    });
+  } catch (error) {
+    logger.error("Failed to ensure local user record", { error, authUserId: authUser.id, email: authUser.email });
+    throw error;
+  }
 }
