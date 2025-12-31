@@ -8,6 +8,7 @@ on:
       - 'bun.lockb'
       - '.github/**'
       - '!README.md'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-web-app
