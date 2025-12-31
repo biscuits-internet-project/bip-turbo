@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
+import { AuthorSearch } from "~/components/author/author-search";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
@@ -131,18 +132,22 @@ export default function Songs() {
   const [searchParams] = useSearchParams();
   const eraParam = searchParams.get("era");
   const playedParam = searchParams.get("played");
-  // Open filter panel if there are filters in the URL
-  const [showFilters, setShowFilters] = useState(!!eraParam || !!playedParam);
+  const authorParam = searchParams.get("author");
+  const coverParam = searchParams.get("cover");
   // Default to "played" if not specified
   const [selectedEra, setSelectedEra] = useState<string>(eraParam || "all");
   const [playedFilter, setPlayedFilter] = useState<"played" | "notPlayed">(
     playedParam === "notPlayed" ? "notPlayed" : "played",
   );
+  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(authorParam || null);
+  const [coverFilter, setCoverFilter] = useState<"all" | "cover" | "original">(
+    coverParam === "cover" ? "cover" : coverParam === "original" ? "original" : "all",
+  );
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(songs);
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
 
   // Helper to update URL without React Router re-render
-  const updateUrl = (params: { era?: string; played?: "played" | "notPlayed" }) => {
+  const updateUrl = (params: { era?: string; played?: "played" | "notPlayed"; author?: string | null; cover?: "all" | "cover" | "original" }) => {
     const newParams = new URLSearchParams(window.location.search);
     if (params.era && params.era !== "all") {
       newParams.set("era", params.era);
@@ -154,15 +159,25 @@ export default function Songs() {
     } else {
       newParams.delete("played");
     }
+    if (params.author && params.author !== "none") {
+      newParams.set("author", params.author);
+    } else {
+      newParams.delete("author");
+    }
+    if (params.cover && params.cover !== "all") {
+      newParams.set("cover", params.cover);
+    } else {
+      newParams.delete("cover");
+    }
     const newUrl = newParams.toString()
       ? `${window.location.pathname}?${newParams.toString()}`
       : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
   };
 
-  // Fetch filtered songs when era or playedFilter changes
+  // Fetch filtered songs when era, playedFilter, author, or cover filter changes
   useEffect(() => {
-    if (selectedEra === "all") {
+    if (selectedEra === "all" && !selectedAuthor && coverFilter === "all") {
       setFilteredSongs(songs);
       setIsLoadingFiltered(false);
       return undefined;
@@ -175,9 +190,18 @@ export default function Songs() {
       setIsLoadingFiltered(true);
     }, 200);
 
-    const params = new URLSearchParams({ era: selectedEra });
+    const params = new URLSearchParams();
+    if (selectedEra !== "all") {
+      params.set("era", selectedEra);
+    }
     if (playedFilter === "notPlayed") {
       params.set("played", "notPlayed");
+    }
+    if (selectedAuthor && selectedAuthor !== "none") {
+      params.set("author", selectedAuthor);
+    }
+    if (coverFilter !== "all") {
+      params.set("cover", coverFilter);
     }
 
     fetch(`/api/songs?${params.toString()}`, { signal: controller.signal })
@@ -205,95 +229,137 @@ export default function Songs() {
       controller.abort();
       clearTimeout(loadingTimeout);
     };
-  }, [selectedEra, playedFilter, songs]);
-
-  const filterLink = (
-    <button
-      type="button"
-      onClick={() => setShowFilters(!showFilters)}
-      className="text-base font-medium text-brand-primary hover:text-brand-secondary transition-colors duration-200 whitespace-nowrap"
-    >
-      {showFilters ? "hide filters" : "show filters"}
-    </button>
-  );
+  }, [selectedEra, playedFilter, selectedAuthor, coverFilter, songs]);
 
   const filterPanel = (
-    <div
-      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-        showFilters ? "max-h-[1000px] opacity-100 mb-6" : "max-h-0 opacity-0 mb-0"
-      }`}
-    >
-      <div className="card-premium rounded-lg p-6">
-        <div className="flex items-center gap-4 flex-wrap">
-          <h2 className="text-base font-semibold text-white whitespace-nowrap pr-4">filters:</h2>
+    <>
+      <div className="flex flex-col">
+        <label htmlFor="author-search" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+          Author
+        </label>
+        <AuthorSearch
+          value={selectedAuthor}
+          onValueChange={(value) => {
+            const newAuthor = value === "none" ? null : value;
+            setSelectedAuthor(newAuthor);
+            updateUrl({ era: selectedEra, played: playedFilter, author: newAuthor, cover: coverFilter });
+          }}
+          placeholder="All Authors"
+          className="w-[250px] h-[42px]"
+        />
+      </div>
+      <div className="flex flex-col">
+        <label htmlFor="cover-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+          Original / Cover
+        </label>
+        <Select
+          value={coverFilter}
+          onValueChange={(value) => {
+            const newCoverFilter = value as "all" | "cover" | "original";
+            setCoverFilter(newCoverFilter);
+            updateUrl({ era: selectedEra, played: playedFilter, author: selectedAuthor, cover: newCoverFilter });
+          }}
+        >
+          <SelectTrigger
+            id="cover-filter"
+            className="w-[170px] h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
+          >
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
+            <SelectItem value="all" className="text-content-text-primary hover:bg-hover-glass">
+              All
+            </SelectItem>
+            <SelectItem value="original" className="text-content-text-primary hover:bg-hover-glass">
+              Original
+            </SelectItem>
+            <SelectItem value="cover" className="text-content-text-primary hover:bg-hover-glass">
+              Cover
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col">
+        <label htmlFor="era-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+          Era
+        </label>
+        <Select
+          value={selectedEra === "all" ? "" : selectedEra}
+          onValueChange={(value) => {
+            const newEra = value || "all";
+            setSelectedEra(newEra);
+            setPlayedFilter("played");
+            updateUrl({ era: newEra, played: "played", author: selectedAuthor, cover: coverFilter });
+          }}
+        >
+          <SelectTrigger
+            id="era-filter"
+            className="w-[200px] h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
+          >
+            <SelectValue placeholder="All Eras" />
+          </SelectTrigger>
+          <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
+            {ERA_OPTIONS.map((option) => (
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                className="text-content-text-primary hover:bg-hover-glass"
+              >
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {selectedEra !== "all" && (
+        <div className="flex flex-col">
+          <label htmlFor="played-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+            Status
+          </label>
           <Select
-            value={selectedEra === "all" ? "" : selectedEra}
+            value={playedFilter}
             onValueChange={(value) => {
-              const newEra = value || "all";
-              setSelectedEra(newEra);
-              setPlayedFilter("played");
-              updateUrl({ era: newEra, played: "played" });
+              const newPlayedFilter = value as "played" | "notPlayed";
+              setPlayedFilter(newPlayedFilter);
+              updateUrl({ era: selectedEra, played: newPlayedFilter, author: selectedAuthor, cover: coverFilter });
             }}
           >
             <SelectTrigger
-              id="era-filter"
-              className="w-[200px] bg-glass-bg border-glass-border text-content-text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              id="played-filter"
+              className="w-[150px] h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
             >
-              <SelectValue placeholder="Era" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
-              {ERA_OPTIONS.map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  className="text-content-text-primary hover:bg-hover-glass"
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="played" className="text-content-text-primary hover:bg-hover-glass">
+                Played
+              </SelectItem>
+              <SelectItem value="notPlayed" className="text-content-text-primary hover:bg-hover-glass">
+                Not Played
+              </SelectItem>
             </SelectContent>
           </Select>
-          {selectedEra !== "all" && (
-            <Select
-              value={playedFilter}
-              onValueChange={(value) => {
-                const newPlayedFilter = value as "played" | "notPlayed";
-                setPlayedFilter(newPlayedFilter);
-                updateUrl({ era: selectedEra, played: newPlayedFilter });
-              }}
-            >
-              <SelectTrigger
-                id="played-filter"
-                className="w-[150px] bg-glass-bg border-glass-border text-content-text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
-                <SelectItem value="played" className="text-content-text-primary hover:bg-hover-glass">
-                  Played
-                </SelectItem>
-                <SelectItem value="notPlayed" className="text-content-text-primary hover:bg-hover-glass">
-                  Not Played
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          {selectedEra !== "all" && (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedEra("all");
-                setPlayedFilter("played");
-                updateUrl({ era: "all", played: "played" });
-              }}
-              className="text-sm text-content-text-tertiary hover:text-content-text-secondary underline"
-            >
-              clear filters
-            </button>
-          )}
         </div>
-      </div>
-    </div>
+      )}
+      {(selectedEra !== "all" || selectedAuthor || coverFilter !== "all") && (
+        <div className="flex flex-col">
+          <div className="h-[18px] mb-1.5"></div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedEra("all");
+              setPlayedFilter("played");
+              setSelectedAuthor(null);
+              setCoverFilter("all");
+              updateUrl({ era: "all", played: "played", author: null, cover: "all" });
+            }}
+            className="text-sm text-content-text-tertiary hover:text-content-text-secondary underline h-[42px] flex items-center"
+          >
+            clear filters
+          </button>
+        </div>
+      )}
+    </>
   );
 
   return (
@@ -332,7 +398,6 @@ export default function Songs() {
         <SongsTable
           songs={filteredSongs}
           filterComponent={filterPanel}
-          searchActions={filterLink}
           isLoading={isLoadingFiltered}
         />
       </div>

@@ -95,8 +95,8 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-content-bg border-content-bg-secondary" align="start">
-        <Command className="bg-content-bg" shouldFilter={false}>
+      <PopoverContent className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border" align="start">
+        <Command className="bg-transparent" shouldFilter={false}>
           <CommandInput
             placeholder="Search venues..."
             value={searchQuery}

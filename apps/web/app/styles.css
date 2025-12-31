@@ -691,9 +691,12 @@
   }
 
   .search-input:focus {
-    border-color: hsl(var(--glass-border-accent));
-    outline: 2px solid hsl(var(--focus-ring));
-    outline-offset: 0;
+    outline: none;
+  }
+
+  .search-input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2);
   }
 
   /* Year/Month Navigation - Premium Style */

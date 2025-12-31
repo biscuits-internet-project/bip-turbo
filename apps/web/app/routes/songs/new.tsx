@@ -15,6 +15,7 @@ export const loader = adminLoader(async () => {
 export const action = adminAction(async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const title = formData.get("title") as string;
+  const authorId = formData.get("authorId") as string;
   const lyrics = formData.get("lyrics") as string;
   const tabs = formData.get("tabs") as string;
   const notes = formData.get("notes") as string;
@@ -25,6 +26,7 @@ export const action = adminAction(async ({ request }: ActionFunctionArgs) => {
 
   const song = await services.songs.create({
     title,
+    authorId: authorId || null,
     lyrics: lyrics || null,
     tabs: tabs || null,
     notes: notes || null,

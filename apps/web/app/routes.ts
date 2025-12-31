@@ -105,6 +105,8 @@ export default [
     route("tracks/:trackId", "routes/api/tracks/$trackId.tsx"),
     route("attendances", "routes/api/attendances.tsx"),
     route("shows/user-data", "routes/api/shows/user-data.tsx"),
+    route("authors", "routes/api/authors.tsx"),
+    route("authors/:id", "routes/api/authors/$id.tsx"),
     route("venues", "routes/api/venues.tsx"),
     route("venues/:id", "routes/api/venues/$id.tsx"),
     route("songs", "routes/api/songs.tsx"),
@@ -119,10 +121,18 @@ export default [
     route("cron/:action", "routes/api/cron/$action.tsx"),
     route("images/upload", "routes/api/images/upload.tsx"),
     route("admin/cache", "routes/api/admin/cache.tsx"),
+    route("admin/authors", "routes/api/admin/authors.tsx"),
   ]),
 
   // Admin routes
-  ...prefix("admin", [route("cache", "routes/admin/cache.tsx")]),
+  ...prefix("admin", [
+    index("routes/admin/index.tsx"),
+    ...prefix("authors", [
+      index("routes/admin/authors/index.tsx"),
+      route("new", "routes/admin/authors/new.tsx"),
+      route(":slug/edit", "routes/admin/authors/$slug.edit.tsx"),
+    ]),
+  ]),
 
   // MCP JSON-RPC endpoint (all tools exposed via JSON-RPC protocol)
   route("mcp", "routes/mcp/index.tsx"),
