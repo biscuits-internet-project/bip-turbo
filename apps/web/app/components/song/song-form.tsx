@@ -3,6 +3,7 @@ import type { ControllerRenderProps } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { useNavigate, useSubmit } from "react-router-dom";
 import { z } from "zod";
+import { AuthorSearch } from "~/components/author/author-search";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
@@ -12,6 +13,7 @@ import { Textarea } from "~/components/ui/textarea";
 // Create a schema for song form (omitting auto-generated fields)
 export const songFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  authorId: z.string().uuid().nullable(),
   lyrics: z.string().nullable(),
   tabs: z.string().nullable(),
   notes: z.string().nullable(),
@@ -37,6 +39,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
     resolver: zodResolver(songFormSchema),
     defaultValues: defaultValues || {
       title: "",
+      authorId: null,
       lyrics: null,
       tabs: null,
       notes: null,
@@ -75,6 +78,26 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   placeholder="Enter song title"
                   {...field}
                   className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="authorId"
+          render={({ field }: { field: ControllerRenderProps<SongFormValues, "authorId"> }) => (
+            <FormItem>
+              <FormLabel className="text-content-text-secondary">Author</FormLabel>
+              <FormControl>
+                <AuthorSearch
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  placeholder="Select or create author..."
+                  className="w-full"
+                  allowCreate
                 />
               </FormControl>
               <FormMessage />

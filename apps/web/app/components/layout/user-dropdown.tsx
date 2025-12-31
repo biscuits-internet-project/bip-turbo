@@ -137,13 +137,13 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
               "group",
             )}
           >
-            <Link to="/admin/cache" className="flex items-center space-x-3">
+            <Link to="/admin" className="flex items-center space-x-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
                 <Settings className="h-4 w-4 text-amber-400" />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-medium">Admin</span>
-                <span className="text-xs text-content-text-secondary">Cache management</span>
+                <span className="text-sm font-medium">Admin Dashboard</span>
+                <span className="text-xs text-content-text-secondary">Manage site content</span>
               </div>
             </Link>
           </DropdownMenuItem>

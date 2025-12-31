@@ -7,6 +7,8 @@ export interface SongFilter {
   legacyId?: number;
   startDate?: Date;
   endDate?: Date;
+  authorId?: string;
+  cover?: boolean;
 }
 
 export interface CreateSongInput {

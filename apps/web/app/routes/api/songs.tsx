@@ -4,6 +4,8 @@ import { logger } from "~/lib/logger";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const SONG_FILTERS = {
   sammy: { endDate: new Date("2005-08-27") },
   allen: { startDate: new Date("2005-12-28"), endDate: new Date("2025-09-07") },
@@ -16,10 +18,68 @@ export const loader = publicLoader(async ({ request }) => {
   const query = url.searchParams.get("q");
   const era = url.searchParams.get("era");
   const playedParam = url.searchParams.get("played");
+  const authorParam = url.searchParams.get("author");
+  const coverParam = url.searchParams.get("cover");
   // Default to "played" if not specified, or if "notPlayed" show only not played songs
   const showNotPlayed = playedParam === "notPlayed";
 
-  // Handle era filtering
+  // Convert cover filter to boolean or undefined
+  const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
+
+  // Validate author filter if provided
+  const authorId = authorParam ? (UUID_REGEX.test(authorParam) ? authorParam : null) : null;
+  if (authorParam && !authorId) {
+    logger.warn("Ignoring invalid author filter", { authorParam });
+  }
+
+  // Handle filtering (author, cover, or both with optional era)
+  if (authorId || coverFilter !== undefined) {
+    try {
+      let filteredSongs: Song[];
+
+      const filter: { authorId?: string; cover?: boolean; startDate?: Date; endDate?: Date } = {};
+      if (authorId) filter.authorId = authorId;
+      if (coverFilter !== undefined) filter.cover = coverFilter;
+
+      // If era is specified, combine with other filters
+      if (era && era in SONG_FILTERS) {
+        const eraFilter = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
+        filteredSongs = await services.songs.findManyInDateRange({ ...eraFilter, ...filter });
+      } else {
+        // Filter by author/cover only
+        filteredSongs = await services.songs.findMany(filter);
+      }
+
+      // Handle played/not played filtering
+      let filteredSongsByPlayStatus: Song[];
+      if (showNotPlayed) {
+        const notPlayedInEra = filteredSongs.filter((song) => song.timesPlayed === 0);
+        const songIds = notPlayedInEra.map((song) => song.id);
+        const allSongs = await services.songs.findMany({});
+        const songsWithOverallStats = allSongs.filter((song) => songIds.includes(song.id));
+
+        const overallTimesPlayedMap = new Map<string, number>(
+          songsWithOverallStats.map((song) => [song.id, song.timesPlayed]),
+        );
+
+        filteredSongsByPlayStatus = notPlayedInEra.sort((a, b) => {
+          const aOverall = overallTimesPlayedMap.get(a.id) || 0;
+          const bOverall = overallTimesPlayedMap.get(b.id) || 0;
+          return bOverall - aOverall;
+        });
+      } else {
+        filteredSongsByPlayStatus = filteredSongs.filter((song) => song.timesPlayed > 0);
+      }
+
+      const songsWithVenueInfo = await addVenueInfoToSongs(filteredSongsByPlayStatus);
+      return songsWithVenueInfo;
+    } catch (error) {
+      logger.error("Error fetching author filtered songs", { error });
+      return [];
+    }
+  }
+
+  // Handle era filtering (without author)
   if (era && era in SONG_FILTERS) {
     const eraFilter = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
     try {

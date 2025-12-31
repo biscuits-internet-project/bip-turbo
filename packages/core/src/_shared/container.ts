@@ -2,6 +2,7 @@ import type { Logger } from "@bip/domain";
 import type { RedisClientType } from "redis";
 import { AnnotationRepository } from "../annotations/annotation-repository";
 import { AttendanceRepository } from "../attendances/attendance-repository";
+import { AuthorRepository } from "../authors/author-repository";
 import { BlogPostRepository } from "../blog-posts/blog-post-repository";
 import { FileRepository } from "../files/file-repository";
 import { RatingRepository } from "../ratings/rating-repository";
@@ -28,6 +29,7 @@ export interface ServiceContainer {
   logger: Logger;
   repositories: {
     annotations: AnnotationRepository;
+    authors: AuthorRepository;
     setlists: SetlistRepository;
     shows: ShowRepository;
     songs: SongRepository;
@@ -72,6 +74,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
   // Create repositories
   const repositories = {
     annotations: new AnnotationRepository(db, cacheInvalidation, logger),
+    authors: new AuthorRepository(db),
     setlists: new SetlistRepository(db),
     shows: new ShowRepository(db, cacheInvalidation, logger),
     songs: new SongRepository(db),
