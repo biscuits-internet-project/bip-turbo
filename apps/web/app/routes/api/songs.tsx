@@ -4,6 +4,8 @@ import { logger } from "~/lib/logger";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const SONG_FILTERS = {
   sammy: { endDate: new Date("2005-08-27") },
   allen: { startDate: new Date("2005-12-28"), endDate: new Date("2025-09-07") },
@@ -16,13 +18,19 @@ export const loader = publicLoader(async ({ request }) => {
   const query = url.searchParams.get("q");
   const era = url.searchParams.get("era");
   const playedParam = url.searchParams.get("played");
-  const authorId = url.searchParams.get("author");
+  const authorParam = url.searchParams.get("author");
   const coverParam = url.searchParams.get("cover");
   // Default to "played" if not specified, or if "notPlayed" show only not played songs
   const showNotPlayed = playedParam === "notPlayed";
 
   // Convert cover filter to boolean or undefined
   const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
+
+  // Validate author filter if provided
+  const authorId = authorParam ? (UUID_REGEX.test(authorParam) ? authorParam : null) : null;
+  if (authorParam && !authorId) {
+    logger.warn("Ignoring invalid author filter", { authorParam });
+  }
 
   // Handle filtering (author, cover, or both with optional era)
   if (authorId || coverFilter !== undefined) {

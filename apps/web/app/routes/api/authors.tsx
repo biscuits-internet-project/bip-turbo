@@ -2,15 +2,28 @@ import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 50;
+const DEFAULT_TOP_LIMIT = 10;
+
+const parseBoundedPositiveInt = (value: string | null, fallback: number) => {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(parsed, MAX_LIMIT);
+};
+
 export const loader = publicLoader(async ({ request }) => {
   const url = new URL(request.url);
   const query = url.searchParams.get("q") || "";
-  const limit = Number.parseInt(url.searchParams.get("limit") || "10", 10);
-  const top = url.searchParams.get("top");
+  const limit = parseBoundedPositiveInt(url.searchParams.get("limit"), DEFAULT_LIMIT);
+  const topParam = url.searchParams.get("top");
 
   // If top parameter is present, return top authors by song count
-  if (top) {
-    const topLimit = Number.parseInt(top, 10);
+  if (topParam) {
+    const topLimit = parseBoundedPositiveInt(topParam, DEFAULT_TOP_LIMIT);
     try {
       const authors = await services.authors.findManyWithSongCount();
       const topAuthors = authors.slice(0, topLimit);

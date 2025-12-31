@@ -97,6 +97,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   onValueChange={field.onChange}
                   placeholder="Select or create author..."
                   className="w-full"
+                  allowCreate
                 />
               </FormControl>
               <FormMessage />

@@ -11,6 +11,7 @@ interface AuthorSearchProps {
   onValueChange: (value: string | null) => void;
   placeholder?: string;
   className?: string;
+  allowCreate?: boolean;
 }
 
 export function AuthorSearch({
@@ -18,6 +19,7 @@ export function AuthorSearch({
   onValueChange,
   placeholder = "Search authors...",
   className,
+  allowCreate = false,
 }: AuthorSearchProps) {
   const [open, setOpen] = useState(false);
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -40,11 +42,9 @@ export function AuthorSearch({
       if (response.ok) {
         const data = await response.json();
         setAuthors(data);
-      } else {
-        console.error("Author search failed with status:", response.status);
       }
-    } catch (error) {
-      console.error("Failed to search authors:", error);
+    } catch (_error) {
+      // Swallow errors for now; UI remains unchanged on failure.
     } finally {
       setLoading(false);
     }
@@ -60,8 +60,8 @@ export function AuthorSearch({
             const author = await response.json();
             setCurrentAuthor(author);
           }
-        } catch (error) {
-          console.error("Failed to load current author:", error);
+        } catch (_error) {
+          // Ignore errors when fetching the initial author; dropdown will just show placeholder.
         }
       } else if (!value) {
         setCurrentAuthor(null);
@@ -88,7 +88,7 @@ export function AuthorSearch({
   }, [searchQuery, searchAuthors]);
 
   const handleCreateAuthor = async () => {
-    if (!searchQuery.trim() || creating) return;
+    if (!allowCreate || !searchQuery.trim() || creating) return;
 
     setCreating(true);
     try {
@@ -106,17 +106,18 @@ export function AuthorSearch({
         onValueChange(newAuthor.id);
         setSearchQuery("");
         setOpen(false);
-      } else {
-        console.error("Failed to create author:", response.status);
       }
-    } catch (error) {
-      console.error("Failed to create author:", error);
+    } catch (_error) {
+      // Fail silently; the button remains available for another attempt.
     } finally {
       setCreating(false);
     }
   };
 
-  const showCreateOption = searchQuery.trim().length >= 2 && !authors.some((a) => a.name.toLowerCase() === searchQuery.toLowerCase());
+  const showCreateOption =
+    allowCreate &&
+    searchQuery.trim().length >= 2 &&
+    !authors.some((a) => a.name.toLowerCase() === searchQuery.toLowerCase());
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
