@@ -62,6 +62,7 @@ export type TrackLight = z.infer<typeof trackLightSchema>;
 
 export const trackUpdateSchema = trackSchema
   .pick({
+    songId: true,
     set: true,
     position: true,
     segue: true,
