@@ -16,7 +16,7 @@ export const action = adminAction(async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const name = formData.get("name") as string;
 
-  const author = await services.authors.create({ name });
+  const _author = await services.authors.create({ name });
 
   return redirect("/admin/authors");
 });

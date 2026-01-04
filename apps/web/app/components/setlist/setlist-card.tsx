@@ -1,5 +1,5 @@
 import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
-import { Camera, Check, Flame, Star } from "lucide-react";
+import { Camera, Check, Flame, } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating";

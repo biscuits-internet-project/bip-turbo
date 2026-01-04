@@ -987,7 +987,7 @@ export default function SongPage() {
                 <LineChart
                   data={Object.entries(song.yearlyPlayData || {})
                     .map(([year, count]) => ({
-                      year: parseInt(year),
+                      year: Number.parseInt(year, 10),
                       plays: count as number,
                     }))
                     .sort((a, b) => a.year - b.year)}

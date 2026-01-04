@@ -66,7 +66,7 @@ export default function AdminIndex() {
       } else {
         setResult({ success: false, message: data.error || "Failed to purge cache" });
       }
-    } catch (error) {
+    } catch (_error) {
       setResult({ success: false, message: "Network error occurred" });
     } finally {
       setIsLoading(false);

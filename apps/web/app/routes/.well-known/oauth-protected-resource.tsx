@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { env } from "~/server/env";
 
 // OAuth 2.0 Protected Resource Metadata (RFC 9728)
 // This endpoint tells MCP clients how to authenticate with this resource server

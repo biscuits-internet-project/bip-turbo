@@ -40,8 +40,7 @@ export default function Logout() {
 
         // Force a hard reload to clear any cached state
         window.location.replace("/auth/login");
-      } catch (error) {
-        console.error("Error during logout:", error);
+      } catch (_error) {
         window.location.replace("/auth/login");
       }
     }

@@ -75,19 +75,18 @@ export default function ResetPassword() {
 
       toast.success("Password updated successfully");
       navigate("/");
-    } catch (error: any) {
-      console.error("Error:", error);
-
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       // Provide more specific error messages based on the error type
-      if (error?.message?.includes("New password should be different")) {
+      if (errorMessage.includes("New password should be different")) {
         toast.error("Your new password must be different from your current password.");
-      } else if (error?.message?.includes("Password should be at least")) {
+      } else if (errorMessage.includes("Password should be at least")) {
         toast.error("Password must be at least 6 characters long.");
-      } else if (error?.message?.includes("Auth session missing")) {
+      } else if (errorMessage.includes("Auth session missing")) {
         toast.error("Your session has expired. Please request a new password reset link.");
         navigate("/auth/forgot-password");
         return;
-      } else if (error?.message?.includes("Invalid session")) {
+      } else if (errorMessage.includes("Invalid session")) {
         toast.error("Invalid reset session. Please request a new password reset link.");
         navigate("/auth/forgot-password");
         return;

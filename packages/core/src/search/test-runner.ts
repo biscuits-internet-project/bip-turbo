@@ -196,17 +196,17 @@ export class SearchTestRunner {
       if (match) {
         hasDate = true;
         if (pattern === datePatterns[0]) { // MM/DD/YY format
-          month = parseInt(match[1]);
-          day = parseInt(match[2]);
-          year = parseInt(match[3]);
+          month = Number.parseInt(match[1], 10);
+          day = Number.parseInt(match[2], 10);
+          year = Number.parseInt(match[3], 10);
           if (year < 100) year += year < 50 ? 2000 : 1900;
         } else if (pattern === datePatterns[1]) { // YYYY format
-          year = parseInt(match[1]);
+          year = Number.parseInt(match[1], 10);
         } else if (pattern === datePatterns[2]) { // Mon YYYY format
           const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
                              'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
           month = monthNames.indexOf(match[1].toLowerCase()) + 1;
-          year = parseInt(match[2]);
+          year = Number.parseInt(match[2], 10);
           if (year < 100) year += year < 50 ? 2000 : 1900;
         }
         break;

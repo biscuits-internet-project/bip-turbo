@@ -21,6 +21,8 @@ function setCookie(name: string, value: string, days: number): void {
   if (typeof document === "undefined") return;
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  // Using document.cookie for simple cookie setting (Cookie Store API not widely supported)
+  // biome-ignore lint/suspicious/noDocumentCookie: Simple cookie setting, Cookie Store API not widely supported
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 }
 

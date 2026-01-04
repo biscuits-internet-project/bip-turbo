@@ -21,7 +21,7 @@ export class SongPageComposer {
         FROM shows
         WHERE date::date > ${song.dateLastPlayed}::date
       `;
-      showsSinceLastPlayed = parseInt(showsAfterLastPlayed[0].count);
+      showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
     }
 
     // Get actual last performance date, venue, and show slug
@@ -99,7 +99,7 @@ export class SongPageComposer {
         FROM shows
         WHERE date::date > ${actualLastPlayedDate}::date
       `;
-      showsSinceLastPlayed = parseInt(showsAfterLastPlayed[0].count);
+      showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
     }
 
     const result = await this.db.$queryRaw<PerformanceDto[]>`

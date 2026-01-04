@@ -38,10 +38,8 @@ export function SongSearch({
       setLoading(true);
       try {
         const response = await fetch(`/api/songs?q=${encodeURIComponent(query)}`);
-        console.log("Song search response status:", response.status);
         if (response.ok) {
           const data = await response.json();
-          console.log("Song search response data:", data);
 
           // Ensure the initialSong is included if it's not in the search results
           const songsToSet = [...data];
@@ -51,10 +49,8 @@ export function SongSearch({
 
           setSongs(songsToSet);
         } else {
-          console.error("Song search failed with status:", response.status);
         }
-      } catch (error) {
-        console.error("Failed to search songs:", error);
+      } catch (_error) {
       } finally {
         setLoading(false);
       }
@@ -73,7 +69,6 @@ export function SongSearch({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        {/* biome-ignore lint/a11y/useSemanticElements: This is a custom searchable dropdown, not a simple select */}
         <Button
           variant="outline"
           role="combobox"

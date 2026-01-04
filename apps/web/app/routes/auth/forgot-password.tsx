@@ -59,17 +59,16 @@ export default function ForgotPassword() {
 
       toast.success("Check your email for the password reset link");
       navigate("/auth/login");
-    } catch (error: any) {
-      console.error("Error:", error);
-
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       // Provide more specific error messages based on the error type
-      if (error?.message?.includes("Email not confirmed")) {
+      if (errorMessage.includes("Email not confirmed")) {
         toast.error("Please check your email and confirm your account first before resetting your password.");
-      } else if (error?.message?.includes("Invalid email")) {
+      } else if (errorMessage.includes("Invalid email")) {
         toast.error("Please enter a valid email address.");
-      } else if (error?.message?.includes("Email rate limit exceeded")) {
+      } else if (errorMessage.includes("Email rate limit exceeded")) {
         toast.error("Too many requests. Please wait a few minutes before requesting another reset email.");
-      } else if (error?.message?.includes("User not found")) {
+      } else if (errorMessage.includes("User not found")) {
         // For security, we don't want to reveal if an email exists or not
         // So we show the same success message as if it worked
         toast.success("Check your email for the password reset link");

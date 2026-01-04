@@ -102,9 +102,8 @@ export default function EditShow() {
       } else {
         toast.error("Failed to update show. Please try again.", { id: loadingToast });
       }
-    } catch (error) {
+    } catch (_error) {
       toast.error("An error occurred while updating the show.", { id: loadingToast });
-      console.error("Show update error:", error);
     }
   };
 
