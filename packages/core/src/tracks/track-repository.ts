@@ -228,8 +228,8 @@ export class TrackRepository {
         const setOrder = { S: 0, E: 1 };
         const aType = a.set.charAt(0) as "S" | "E";
         const bType = b.set.charAt(0) as "S" | "E";
-        const aNum = parseInt(a.set.slice(1));
-        const bNum = parseInt(b.set.slice(1));
+        const aNum = Number.parseInt(a.set.slice(1), 10);
+        const bNum = Number.parseInt(b.set.slice(1), 10);
 
         if (aType !== bType) {
           return setOrder[aType] - setOrder[bType];

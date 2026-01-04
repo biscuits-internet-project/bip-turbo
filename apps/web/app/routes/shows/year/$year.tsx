@@ -62,7 +62,7 @@ export function headers({
 export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
   const year = params.year || new Date().getFullYear();
-  const yearInt = Number.parseInt(year as string);
+  const yearInt = Number.parseInt(year as string, 10);
   const searchQuery = url.searchParams.get("q") || undefined;
 
   let setlists: SetlistLight[] = [];
@@ -133,7 +133,7 @@ export default function ShowsByYear() {
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
 
   // Fetch user-specific data client-side (attendances, user ratings, average ratings)
-  const { attendanceMap, userRatingMap, averageRatingMap, isLoading: isLoadingUserData } = useShowUserData(showIds);
+  const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
 
   // Group setlists by month - memoize to prevent unnecessary recalculation
   const setlistsByMonth = useMemo(() => {

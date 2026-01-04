@@ -42,7 +42,6 @@ export default function Register() {
     });
 
     if (error) {
-      console.log(error);
       setError(error.message);
       return;
     }
@@ -53,8 +52,7 @@ export default function Register() {
       try {
         await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
         await supabase.auth.refreshSession();
-      } catch (syncError) {
-        console.error("Failed to sync user:", syncError);
+      } catch (_syncError) {
         // Continue anyway - the callback route will handle sync on next login
       }
 

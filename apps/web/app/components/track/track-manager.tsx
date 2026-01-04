@@ -86,8 +86,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         const data = await response.json();
         setTracks(data);
       }
-    } catch (error) {
-      console.error("Failed to load tracks:", error);
+    } catch (_error) {
       toast.error("Failed to load tracks");
     }
   }, [showId]);
@@ -104,8 +103,8 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     const setOrder = { S: 0, E: 1 };
     const aType = a.charAt(0) as "S" | "E";
     const bType = b.charAt(0) as "S" | "E";
-    const aNum = parseInt(a.slice(1));
-    const bNum = parseInt(b.slice(1));
+    const aNum = Number.parseInt(a.slice(1), 10);
+    const bNum = Number.parseInt(b.slice(1), 10);
 
     if (aType !== bType) {
       return setOrder[aType] - setOrder[bType];
@@ -140,8 +139,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
             const song = await songResponse.json();
             trackWithSong = { ...newTrack, song };
           }
-        } catch (error) {
-          console.error("Failed to fetch song:", error);
+        } catch (_error) {
         }
       }
 

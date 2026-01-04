@@ -69,7 +69,6 @@ export default function Login() {
     });
 
     if (error) {
-      console.error("Google auth error:", error);
       setError("An unexpected error occurred");
     }
   };
@@ -83,32 +82,27 @@ export default function Login() {
 
     try {
       const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        console.error("Login error:", error);
         setError(error.message);
         return;
       }
-
-      console.log("Login successful:", data);
 
       // Sync user to PostgreSQL before redirecting
       // This ensures the local user record exists for email/password logins
       try {
         await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
         await supabase.auth.refreshSession();
-      } catch (syncError) {
-        console.error("Failed to sync user:", syncError);
+      } catch (_syncError) {
         // Continue anyway - user can still log in
       }
 
       navigate(next);
-    } catch (err) {
-      console.error("Unexpected error during login:", err);
+    } catch (_err) {
       setError("An unexpected error occurred");
     }
   };

@@ -67,14 +67,12 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
   });
 
   const onSubmit = (data: BlogPostFormValues) => {
-    console.log("Blog form submitting with files:", uploadedFiles);
     const formData = new FormData();
     for (const [key, value] of Object.entries(data)) {
       if (value !== null) {
         if (key === "files") {
           // Add each file as a separate entry
           uploadedFiles.forEach((file, index) => {
-            console.log("Adding file to form data:", { index, file });
             formData.append(`files[${index}][path]`, file.path);
             formData.append(`files[${index}][url]`, file.url);
             if (file.isCover) {
@@ -90,7 +88,6 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
   };
 
   const handleFileUpload = (result: UploadedFile) => {
-    console.log("File upload completed:", result);
     // Prepend 'uploads/' to the path to match the bucket structure
     setUploadedFiles((prev) => [
       ...prev,
@@ -113,15 +110,13 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
   // Initialize uploaded files from default values
   useEffect(() => {
     if (defaultValues?.files) {
-      console.log("Initializing uploaded files from default values:", defaultValues.files);
       setUploadedFiles(defaultValues.files);
     }
   }, [defaultValues]);
 
   // Log whenever uploaded files change
   useEffect(() => {
-    console.log("Current uploaded files:", uploadedFiles);
-  }, [uploadedFiles]);
+  }, []);
 
   return (
     <Form {...form}>

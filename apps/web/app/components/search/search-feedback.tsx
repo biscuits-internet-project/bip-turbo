@@ -25,8 +25,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
       setShowFeedbackText(false);
       setShowThanks(true);
       setIsComplete(true);
-    } catch (error) {
-      console.error("Failed to submit positive feedback:", error);
+    } catch (_error) {
     } finally {
       setIsSubmitting(false);
     }
@@ -46,8 +45,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
       setShowFeedbackText(false);
       setShowThanks(true);
       setIsComplete(true);
-    } catch (error) {
-      console.error("Failed to submit negative feedback:", error);
+    } catch (_error) {
     } finally {
       setIsSubmitting(false);
     }

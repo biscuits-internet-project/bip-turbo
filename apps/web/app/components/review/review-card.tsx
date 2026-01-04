@@ -29,8 +29,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
     setIsLoading(true);
     try {
       await onDelete(review.id);
-    } catch (error) {
-      console.error("Error deleting review:", error);
+    } catch (_error) {
       toast.error("Failed to delete review. Please try again.");
     } finally {
       setIsLoading(false);
@@ -44,8 +43,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
     try {
       await onUpdate(review.id, editContent);
       setIsEditing(false);
-    } catch (error) {
-      console.error("Error updating review:", error);
+    } catch (_error) {
       toast.error("Failed to update review. Please try again.");
     } finally {
       setIsLoading(false);

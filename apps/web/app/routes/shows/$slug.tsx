@@ -1,6 +1,6 @@
 import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import { ArrowLeft, Edit } from "lucide-react";
-import { Link, useFetcher, useRevalidator } from "react-router-dom";
+import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
 import ArchiveMusicPlayer from "~/components/player";

@@ -31,16 +31,12 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
     setLoading(true);
     try {
       const response = await fetch(`/api/venues?q=${encodeURIComponent(query)}`);
-      console.log("Venue search response status:", response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log("Venue search response data:", data);
         setVenues(data);
       } else {
-        console.error("Venue search failed with status:", response.status);
       }
-    } catch (error) {
-      console.error("Failed to search venues:", error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -56,8 +52,7 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
             const venue = await response.json();
             setCurrentVenue(venue);
           }
-        } catch (error) {
-          console.error("Failed to load current venue:", error);
+        } catch (_error) {
         }
       } else if (!value || value === "none") {
         setCurrentVenue(null);

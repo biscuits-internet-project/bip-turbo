@@ -54,7 +54,7 @@ function validateFile(file: File, options: UploadOptions): ValidationError | nul
 }
 
 export function useFileUpload() {
-  const { client, isLoaded, supabaseStorageUrl } = useSupabaseContext();
+  const { client, isLoaded } = useSupabaseContext();
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,10 +62,7 @@ export function useFileUpload() {
     // Clear any previous errors
     setError(null);
 
-    console.log("Starting file upload with options:", { options, supabaseStorageUrl });
-
     if (!isLoaded || !client) {
-      console.error("Upload service not ready:", { isLoaded, hasClient: !!client });
       setError("Upload service is initializing. Please try again in a moment.");
       return null;
     }
@@ -73,7 +70,6 @@ export function useFileUpload() {
     // Validate file before attempting upload
     const validationError = validateFile(file, options);
     if (validationError) {
-      console.error("File validation error:", validationError);
       setError(validationError.message);
       return null;
     }
@@ -89,27 +85,20 @@ export function useFileUpload() {
       const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
       const path = `${folder}/${timestamp}-${sanitizedFileName}`;
 
-      console.log("Uploading file:", { bucket, path });
-
       // Upload the file to Supabase Storage
-      const { data, error: uploadError } = await client.storage.from(bucket).upload(path, file, {
+      const { error: uploadError } = await client.storage.from(bucket).upload(path, file, {
         cacheControl: "3600",
         upsert: false,
       });
 
       if (uploadError) {
-        console.error("Upload error:", uploadError);
         throw new Error(uploadError.message);
       }
-
-      console.log("File uploaded successfully:", { data });
 
       // Get the public URL - make sure we're using the correct bucket
       const {
         data: { publicUrl },
       } = client.storage.from(bucket).getPublicUrl(path);
-
-      console.log("Generated public URL:", { publicUrl, bucket });
 
       return {
         path,
@@ -117,7 +106,6 @@ export function useFileUpload() {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to upload file";
-      console.error("Upload failed:", err);
       setError(message);
       return null;
     } finally {

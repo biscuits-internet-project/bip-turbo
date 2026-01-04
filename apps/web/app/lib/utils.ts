@@ -26,7 +26,7 @@ export function formatDateShort(date: string): string {
   const dateParts = date.split("T")[0].split("-");
   if (dateParts.length === 3) {
     const [year, month, day] = dateParts;
-    return `${Number.parseInt(month)}/${Number.parseInt(day)}/${year}`;
+    return `${Number.parseInt(month, 10)}/${Number.parseInt(day, 10)}/${year}`;
   }
   return date;
 }

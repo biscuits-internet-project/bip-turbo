@@ -36,8 +36,7 @@ export async function setCookie(name: string, value: string, options: CookieOpti
       await (window as WindowWithCookieStore).cookieStore.set(name, value, cookieOptions);
       return;
     }
-  } catch (error) {
-    console.warn("Cookie Store API failed, falling back to document.cookie:", error);
+  } catch (_error) {
   }
 
   // Fallback to document.cookie
@@ -81,8 +80,7 @@ export async function getCookie(name: string): Promise<string | null> {
       const cookie = await (window as WindowWithCookieStore).cookieStore.get(name);
       return cookie?.value || null;
     }
-  } catch (error) {
-    console.warn("Cookie Store API failed, falling back to document.cookie:", error);
+  } catch (_error) {
   }
 
   // Fallback to document.cookie
@@ -112,8 +110,7 @@ export async function deleteCookie(name: string, options: Pick<CookieOptions, "p
       await (window as WindowWithCookieStore).cookieStore.delete(name);
       return;
     }
-  } catch (error) {
-    console.warn("Cookie Store API failed, falling back to document.cookie:", error);
+  } catch (_error) {
   }
 
   // Fallback to document.cookie - set expiry date in the past
@@ -133,15 +130,14 @@ export async function clearAllCookies(): Promise<void> {
       const cookies = await (window as WindowWithCookieStore).cookieStore.getAll();
       await Promise.all(
         cookies
-          .filter((cookie) => cookie.name)
+          .filter((cookie): cookie is { name: string } => Boolean(cookie.name))
           .map((cookie) =>
-            (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name!),
+            (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name),
           ),
       );
       return;
     }
-  } catch (error) {
-    console.warn("Cookie Store API failed, falling back to document.cookie:", error);
+  } catch (_error) {
   }
 
   // Fallback to document.cookie

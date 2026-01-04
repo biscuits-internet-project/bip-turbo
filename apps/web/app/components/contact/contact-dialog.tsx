@@ -85,8 +85,7 @@ export function ContactDialog({ children }: ContactDialogProps) {
         setOpen(false);
         setIsSubmitted(false);
       }, 3000);
-    } catch (error) {
-      console.error("Failed to submit contact form:", error);
+    } catch (_error) {
       toast.error("Failed to send message. Please try again later.");
     } finally {
       setIsSubmitting(false);

@@ -28,13 +28,6 @@ interface LoaderData {
   userAttendances: Attendance[];
 }
 
-interface VenueStats {
-  totalShows: number;
-  firstShow: Date | null;
-  lastShow: Date | null;
-  yearsPlayed: number[];
-}
-
 async function fetchUserAttendances(context: Context, showIds: string[]): Promise<Attendance[]> {
   if (!context.currentUser || showIds.length === 0) {
     return [];

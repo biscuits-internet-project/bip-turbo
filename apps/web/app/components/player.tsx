@@ -84,8 +84,7 @@ export const convertToArchiveDate = (dateString: string): string => {
 
     // If all else fails, return original string
     return dateString;
-  } catch (error) {
-    console.error("Error converting date:", error);
+  } catch (_error) {
     return dateString;
   }
 };
@@ -130,19 +129,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         const data: ArchiveMetadata = await response.json();
         setMetadata(data);
 
-        console.log("Metadata for identifier:", identifier);
-        console.log(JSON.stringify(data, null, 2));
-
-        // Log specific metadata fields that might be useful for prioritization
-        console.log("=== METADATA FIELDS ===");
-        console.log("Metadata fields:", Object.keys(data.metadata));
-        if (data.metadata.reviews) console.log("Reviews:", data.metadata.reviews);
-        if (data.metadata.rating) console.log("Rating:", data.metadata.rating);
-        if (data.metadata.stars) console.log("Stars:", data.metadata.stars);
-        if (data.metadata.downloads) console.log("Downloads:", data.metadata.downloads);
-        if (data.metadata.num_reviews) console.log("Number of reviews:", data.metadata.num_reviews);
-        if (data.metadata.avg_rating) console.log("Average rating:", data.metadata.avg_rating);
-
         // Filter for MP3 files only to avoid duplicates
         const files = data.files.filter(
           (file) =>
@@ -166,8 +152,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         // Select the best file for each track
         const selectedFiles: ArchiveFile[] = [];
 
-        for (const [trackNum, trackFiles] of trackGroups.entries()) {
-          console.log(`Selecting best file for track ${trackNum} from ${trackFiles.length} options`);
+        for (const [_trackNum, trackFiles] of trackGroups.entries()) {
 
           // Score each file based on multiple factors
           const scoredFiles = trackFiles.map((file) => {
@@ -200,8 +185,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             // Factor 5: Prefer files with titles
             if (file.title) score += 500;
 
-            console.log(`File: ${file.name}, Length: ${file.length}, Size: ${file.size}, Score: ${score}`);
-
             return { file, score };
           });
 
@@ -210,39 +193,28 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
           // Select the highest scoring file
           if (scoredFiles.length > 0) {
-            console.log(`Selected for track ${trackNum}: ${scoredFiles[0].file.name} (Score: ${scoredFiles[0].score})`);
             selectedFiles.push(scoredFiles[0].file);
           }
         }
 
         // Add files without track numbers if we don't have enough tracks
         if (selectedFiles.length === 0) {
-          console.log("No files with track numbers found, using all files");
           selectedFiles.push(...files);
         }
 
         // Sort files by track number
         const sortedFiles = selectedFiles.sort((a, b) => {
           if (a.track && b.track) {
-            return Number.parseInt(a.track) - Number.parseInt(b.track);
+            return Number.parseInt(a.track, 10) - Number.parseInt(b.track, 10);
           }
           return a.name.localeCompare(b.name);
         });
-
-        console.log("=== FINAL SELECTED FILES ===");
-        for (const file of sortedFiles) {
-          console.log(`${file.track || "N/A"}: ${file.name}`);
-          console.log(`  Title: ${file.title || "N/A"}`);
-          console.log(`  Length: ${file.length || "N/A"}`);
-          console.log(`  Format: ${file.format || "N/A"}`);
-          console.log(`  Size: ${file.size || "N/A"}`);
-          console.log(`  Source: ${file.source || "N/A"}`);
+        for (const _file of sortedFiles) {
         }
 
         setAudioFiles(sortedFiles);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred");
-        console.error("Error fetching Archive.org data:", err);
       } finally {
         setIsLoading(false);
       }
@@ -280,7 +252,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               .then(() => {
                 if (isMountedRef.current) setIsPlaying(true);
               })
-              .catch((err) => console.error("Playback failed:", err));
+              .catch((_err) => {});
           }
         }, 100);
       }
@@ -408,7 +380,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         const trackMatch = trackPart.match(/\d+t(\d+)/);
         if (trackMatch) {
           const trackNum = trackMatch[1];
-          console.log(`Detected mastered pattern. Track number: ${trackNum}`);
           return `Track ${Number.parseInt(trackNum, 10)}`;
         }
       }
@@ -421,8 +392,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
     if (name.length < 3 && file.track) {
       return `Track ${file.track}`;
     }
-
-    console.log(`Final name: ${name}`);
     return name;
   };
 

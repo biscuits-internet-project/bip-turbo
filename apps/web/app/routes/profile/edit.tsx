@@ -69,8 +69,7 @@ export default function ProfileEdit() {
         if (supabase) {
           try {
             await supabase.auth.refreshSession();
-          } catch (error) {
-            console.warn("Failed to refresh session:", error);
+          } catch (_error) {
           }
         }
       } else {
@@ -115,8 +114,7 @@ export default function ProfileEdit() {
       if (supabase) {
         try {
           await supabase.auth.refreshSession();
-        } catch (error) {
-          console.warn("Failed to refresh session:", error);
+        } catch (_error) {
         }
       }
     }

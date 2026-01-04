@@ -1,4 +1,4 @@
-import { type SetlistLight } from "@bip/domain";
+import type { SetlistLight } from "@bip/domain";
 import { ArrowUp, Camera } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";

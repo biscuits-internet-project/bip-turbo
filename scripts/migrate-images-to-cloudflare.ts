@@ -26,7 +26,7 @@ import type { Logger } from "@bip/domain";
 // Configuration
 const DRY_RUN = process.env.DRY_RUN === "true";
 const IMAGES_PATH = process.env.IMAGES_PATH || "../s3-images";
-const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || "50", 10);
+const BATCH_SIZE = Number.parseInt(process.env.BATCH_SIZE || "50", 10);
 const SKIP_EXISTING = process.env.SKIP_EXISTING !== "false";
 const RECORD_TYPE_FILTER = process.env.RECORD_TYPE || null;
 

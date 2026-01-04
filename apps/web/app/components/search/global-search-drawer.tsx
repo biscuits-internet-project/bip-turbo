@@ -169,7 +169,6 @@ export function GlobalSearchDrawer({ open, onOpenChange }: GlobalSearchDrawerPro
 
   const handleFeedback = useCallback(
     async (searchId: string, sentiment: "positive" | "negative", feedback?: string) => {
-      try {
         const response = await fetch("/api/search/feedback", {
           method: "POST",
           headers: {
@@ -185,10 +184,6 @@ export function GlobalSearchDrawer({ open, onOpenChange }: GlobalSearchDrawerPro
         if (!response.ok) {
           throw new Error("Failed to submit feedback");
         }
-      } catch (error) {
-        console.error("Failed to submit search feedback:", error);
-        throw error;
-      }
     },
     [],
   );

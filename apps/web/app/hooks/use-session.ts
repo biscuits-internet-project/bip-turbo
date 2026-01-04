@@ -52,13 +52,11 @@ async function requestSync(supabase: SupabaseClient): Promise<SyncResult> {
   try {
     const { data, error } = await supabase.auth.refreshSession();
     if (error) {
-      console.error("Failed to refresh Supabase session after sync:", error);
       return { refreshedUser: null, internalUserId };
     }
 
     return { refreshedUser: data?.session?.user ?? null, internalUserId };
-  } catch (refreshError) {
-    console.error("Unexpected error refreshing Supabase session:", refreshError);
+  } catch (_refreshError) {
     return { refreshedUser: null, internalUserId };
   }
 }
@@ -84,8 +82,7 @@ async function ensureUserSynced(user: User, supabase: SupabaseClient | null): Pr
   let inflightSync = inflightSyncs.get(user.id);
   if (!inflightSync) {
     inflightSync = requestSync(supabase)
-      .catch((error) => {
-        console.error("Error syncing user to PostgreSQL:", error);
+      .catch((_error) => {
         return { refreshedUser: null, internalUserId: undefined };
       })
       .finally(() => {
