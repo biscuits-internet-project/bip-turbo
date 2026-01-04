@@ -25,9 +25,7 @@ export const getServerClient = (request: Request) => {
       getAll: () => {
         // If Bearer token is present, create a fake cookie for Supabase auth
         if (bearerToken) {
-          return [
-            { name: "sb-access-token", value: bearerToken },
-          ];
+          return [{ name: "sb-access-token", value: bearerToken }];
         }
 
         const cookie = request.headers.get("Cookie") ?? "";

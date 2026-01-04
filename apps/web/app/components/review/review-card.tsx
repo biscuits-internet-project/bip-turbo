@@ -8,6 +8,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Textarea } from "~/components/ui/textarea";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 
 interface ReviewCardProps {
   review: ReviewMinimal;
@@ -28,8 +29,15 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
     if (!onDelete) return;
     setIsLoading(true);
     try {
+      trackClientSubmit("review:delete", { reviewId: review.id });
       await onDelete(review.id);
-    } catch (_error) {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "delete-review",
+          reviewId: review.id,
+        },
+      });
       toast.error("Failed to delete review. Please try again.");
     } finally {
       setIsLoading(false);
@@ -41,9 +49,16 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
     if (!onUpdate) return;
     setIsLoading(true);
     try {
+      trackClientSubmit("review:update", { reviewId: review.id });
       await onUpdate(review.id, editContent);
       setIsEditing(false);
-    } catch (_error) {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "update-review",
+          reviewId: review.id,
+        },
+      });
       toast.error("Failed to update review. Please try again.");
     } finally {
       setIsLoading(false);

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface SideProject {
   notes?: string;
@@ -21,6 +22,7 @@ export default function SideProjects(): ReactElement {
           setSideProjects(data);
         }
       } catch (_error) {
+        toast.error("Failed to load side projects.");
       }
     };
     fetchSideProjects();

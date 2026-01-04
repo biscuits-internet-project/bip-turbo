@@ -19,20 +19,17 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // Forward registration to Supabase (no auth required for dynamic registration)
-  const supabaseResponse = await fetch(
-    `${env.SUPABASE_URL}/auth/v1/oauth/clients/register`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        redirect_uris: body.redirect_uris || [],
-        grant_types: body.grant_types || ["authorization_code", "refresh_token"],
-        response_types: body.response_types || ["code"],
-        token_endpoint_auth_method: "none",
-        client_type: "public", // MCP clients use PKCE, no secret needed
-      }),
-    }
-  );
+  const supabaseResponse = await fetch(`${env.SUPABASE_URL}/auth/v1/oauth/clients/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      redirect_uris: body.redirect_uris || [],
+      grant_types: body.grant_types || ["authorization_code", "refresh_token"],
+      response_types: body.response_types || ["code"],
+      token_endpoint_auth_method: "none",
+      client_type: "public", // MCP clients use PKCE, no secret needed
+    }),
+  });
 
   const data = await supabaseResponse.json();
 

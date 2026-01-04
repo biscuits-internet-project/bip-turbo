@@ -1,12 +1,12 @@
 import { z } from "zod";
 
 export const userSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   createdAt: z.date(),
   updatedAt: z.date(),
   email: z.string().email(),
   username: z.string(),
-  avatarFileId: z.string().uuid().nullable(),
+  avatarFileId: z.uuid().nullable(),
   avatarUrl: z.string().url().nullable(),
 });
 

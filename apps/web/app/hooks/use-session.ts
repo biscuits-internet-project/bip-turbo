@@ -2,6 +2,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import { useRouteLoaderData } from "react-router";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import type { RootData } from "~/root";
 
 const syncedUsers = new Set<string>();
@@ -36,9 +37,24 @@ function normalizeUser(user: User | null): User | null {
 }
 
 async function requestSync(supabase: SupabaseClient): Promise<SyncResult> {
-  const response = await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
+  trackClientSubmit("session:sync");
+  let response: Response;
+  try {
+    response = await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
+  } catch (error) {
+    notifyClientError(error, { context: { action: "auth-sync" } });
+    throw error;
+  }
   if (!response.ok) {
-    throw new Error(await response.text());
+    const errorResponse = await response.text();
+    const error = new Error(errorResponse || "Failed to sync session");
+    notifyClientError(error, {
+      context: {
+        action: "auth-sync",
+        status: response.status,
+      },
+    });
+    throw error;
   }
 
   let internalUserId: string | undefined;
@@ -52,11 +68,21 @@ async function requestSync(supabase: SupabaseClient): Promise<SyncResult> {
   try {
     const { data, error } = await supabase.auth.refreshSession();
     if (error) {
+      notifyClientError(error, {
+        context: {
+          action: "refresh-session",
+        },
+      });
       return { refreshedUser: null, internalUserId };
     }
 
     return { refreshedUser: data?.session?.user ?? null, internalUserId };
-  } catch (_refreshError) {
+  } catch (refreshError) {
+    notifyClientError(refreshError, {
+      context: {
+        action: "refresh-session",
+      },
+    });
     return { refreshedUser: null, internalUserId };
   }
 }

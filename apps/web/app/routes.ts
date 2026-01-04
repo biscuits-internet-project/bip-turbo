@@ -52,16 +52,22 @@ export default [
   ]),
 
   // OAuth routes
-  ...prefix("oauth", [
-    route("consent", "routes/oauth/consent.tsx"),
-    route("register", "routes/oauth/register.tsx"),
-  ]),
+  ...prefix("oauth", [route("consent", "routes/oauth/consent.tsx"), route("register", "routes/oauth/register.tsx")]),
 
   // Profile routes
   ...prefix("profile", [route("edit", "routes/profile/edit.tsx")]),
 
   // User profile routes
   ...prefix("users", [route(":username", "routes/users/$username.tsx")]),
+
+  // Community feed routes
+  ...prefix("feed", [index("routes/feed/_index.tsx")]),
+
+  // Discussion board routes (Reddit-style)
+  ...prefix("board", [index("routes/board/_index.tsx"), route("submit", "routes/board/submit.tsx")]),
+
+  // Post thread routes
+  ...prefix("post", [route(":postId", "routes/post/$postId.tsx")]),
 
   // Blog routes with layout
   layout("routes/blog/_layout.tsx", [
@@ -120,6 +126,14 @@ export default [
     route("contact", "routes/api/contact.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
     route("images/upload", "routes/api/images/upload.tsx"),
+    route("posts", "routes/api/posts.tsx"),
+    route("posts/:postId", "routes/api/posts/$postId.tsx"),
+    route("votes", "routes/api/votes.tsx"),
+    route("notifications", "routes/api/notifications.tsx"),
+    route("moderation/flag", "routes/api/moderation/flag.tsx"),
+    route("moderation/flags", "routes/api/moderation/flags.tsx"),
+    route("moderation/flags/:id", "routes/api/moderation/flags/$id.tsx"),
+    route("moderation/restore/:postId", "routes/api/moderation/restore/$postId.tsx"),
     route("admin/cache", "routes/api/admin/cache.tsx"),
     route("admin/authors", "routes/api/admin/authors.tsx"),
   ]),

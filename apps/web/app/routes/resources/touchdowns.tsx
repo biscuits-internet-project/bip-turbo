@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { publicLoader } from "~/lib/base-loaders";
+import { toast } from "sonner";
 
 export const loader = publicLoader<void>(async () => {});
 
@@ -45,6 +46,7 @@ export default function Touchdowns() {
 
         setEpisodes(data.episodes || []);
       } catch (_error) {
+        toast.error("Failed to load podcast episodes.");
       }
     };
 

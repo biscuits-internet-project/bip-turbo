@@ -147,7 +147,12 @@ export default function Songs() {
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
 
   // Helper to update URL without React Router re-render
-  const updateUrl = (params: { era?: string; played?: "played" | "notPlayed"; author?: string | null; cover?: "all" | "cover" | "original" }) => {
+  const updateUrl = (params: {
+    era?: string;
+    played?: "played" | "notPlayed";
+    author?: string | null;
+    cover?: "all" | "cover" | "original";
+  }) => {
     const newParams = new URLSearchParams(window.location.search);
     if (params.era && params.era !== "all") {
       newParams.set("era", params.era);
@@ -234,7 +239,10 @@ export default function Songs() {
   const filterPanel = (
     <>
       <div className="flex flex-col">
-        <label htmlFor="author-search" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+        <label
+          htmlFor="author-search"
+          className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center"
+        >
           Author
         </label>
         <AuthorSearch
@@ -249,7 +257,10 @@ export default function Songs() {
         />
       </div>
       <div className="flex flex-col">
-        <label htmlFor="cover-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+        <label
+          htmlFor="cover-filter"
+          className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center"
+        >
           Original / Cover
         </label>
         <Select
@@ -280,7 +291,10 @@ export default function Songs() {
         </Select>
       </div>
       <div className="flex flex-col">
-        <label htmlFor="era-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+        <label
+          htmlFor="era-filter"
+          className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center"
+        >
           Era
         </label>
         <Select
@@ -313,7 +327,10 @@ export default function Songs() {
       </div>
       {selectedEra !== "all" && (
         <div className="flex flex-col">
-          <label htmlFor="played-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+          <label
+            htmlFor="played-filter"
+            className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center"
+          >
             Status
           </label>
           <Select
@@ -395,11 +412,7 @@ export default function Songs() {
           <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
         </div>
 
-        <SongsTable
-          songs={filteredSongs}
-          filterComponent={filterPanel}
-          isLoading={isLoadingFiltered}
-        />
+        <SongsTable songs={filteredSongs} filterComponent={filterPanel} isLoading={isLoadingFiltered} />
       </div>
     </div>
   );

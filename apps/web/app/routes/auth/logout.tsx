@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { useRouteLoaderData } from "react-router-dom";
 import { clearAllCookies } from "~/lib/cookies";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
@@ -20,6 +21,7 @@ export default function Logout() {
   useEffect(() => {
     async function handleLogout() {
       try {
+        trackClientSubmit("auth:logout");
         const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Sign out on the client side
@@ -40,7 +42,8 @@ export default function Logout() {
 
         // Force a hard reload to clear any cached state
         window.location.replace("/auth/login");
-      } catch (_error) {
+      } catch (error) {
+        notifyClientError(error, { context: { action: "logout" } });
         window.location.replace("/auth/login");
       }
     }

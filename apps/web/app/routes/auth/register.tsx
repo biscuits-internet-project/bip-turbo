@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { redirect, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { RegisterForm } from "~/components/register-form";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
@@ -30,34 +31,53 @@ export default function Register() {
     const formData = new FormData(event.currentTarget);
     const dataFields = Object.fromEntries(formData.entries());
 
-    const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const { data, error } = await supabase.auth.signUp({
-      email: dataFields.email as string,
-      password: dataFields.password as string,
-      options: {
-        data: {
-          username: dataFields.username as string,
+    try {
+      trackClientSubmit("auth:register", { username: dataFields.username as string });
+      const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data, error } = await supabase.auth.signUp({
+        email: dataFields.email as string,
+        password: dataFields.password as string,
+        options: {
+          data: {
+            username: dataFields.username as string,
+          },
         },
-      },
-    });
+      });
 
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    if (data.session) {
-      // Sync user to PostgreSQL before redirecting
-      // This ensures the local user record exists even when email confirmation is disabled
-      try {
-        await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
-        await supabase.auth.refreshSession();
-      } catch (_syncError) {
-        // Continue anyway - the callback route will handle sync on next login
+      if (error) {
+        notifyClientError(error, {
+          context: {
+            action: "register",
+            email: dataFields.email as string,
+          },
+        });
+        setError(error.message);
+        return;
       }
 
-      // Redirect to home page on successful registration
-      navigate("/");
+      if (data.session) {
+        try {
+          await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
+          await supabase.auth.refreshSession();
+        } catch (syncError) {
+          notifyClientError(syncError, {
+            context: {
+              action: "auth-sync",
+              stage: "register",
+            },
+          });
+          // Continue anyway - the callback route will handle sync on next login
+        }
+
+        navigate("/");
+      }
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "register",
+        },
+      });
+      setError("An unexpected error occurred");
     }
   };
 

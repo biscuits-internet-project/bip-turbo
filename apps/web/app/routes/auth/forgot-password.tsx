@@ -4,6 +4,7 @@ import { useNavigate, useRouteLoaderData, useSearchParams } from "react-router-d
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { ForgotPasswordForm } from "~/components/forgot-password-form";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
@@ -49,6 +50,7 @@ export default function ForgotPassword() {
     const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     try {
+      trackClientSubmit("auth:forgot-password", { email });
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
       });
@@ -59,16 +61,23 @@ export default function ForgotPassword() {
 
       toast.success("Check your email for the password reset link");
       navigate("/auth/login");
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "forgot-password",
+          email,
+        },
+      });
+      const message = error instanceof Error ? error.message : "";
+
       // Provide more specific error messages based on the error type
-      if (errorMessage.includes("Email not confirmed")) {
+      if (message.includes("Email not confirmed")) {
         toast.error("Please check your email and confirm your account first before resetting your password.");
-      } else if (errorMessage.includes("Invalid email")) {
+      } else if (message.includes("Invalid email")) {
         toast.error("Please enter a valid email address.");
-      } else if (errorMessage.includes("Email rate limit exceeded")) {
+      } else if (message.includes("Email rate limit exceeded")) {
         toast.error("Too many requests. Please wait a few minutes before requesting another reset email.");
-      } else if (errorMessage.includes("User not found")) {
+      } else if (message.includes("User not found")) {
         // For security, we don't want to reveal if an email exists or not
         // So we show the same success message as if it worked
         toast.success("Check your email for the password reset link");

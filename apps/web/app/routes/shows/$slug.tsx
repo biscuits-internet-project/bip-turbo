@@ -139,13 +139,7 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const {
-    setlist,
-    reviews,
-    selectedRecordingId,
-    userAttendance,
-    photos,
-  } = useSerializedLoaderData<ShowLoaderData>();
+  const { setlist, reviews, selectedRecordingId, userAttendance, photos } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
 
@@ -309,7 +303,9 @@ export default function Show() {
         <div className="mt-10 pt-8 border-t border-border/50">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-2xl font-bold text-content-text-primary">Photos</h2>
-            <span className="text-sm text-content-text-tertiary">{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
+            <span className="text-sm text-content-text-tertiary">
+              {photos.length} photo{photos.length !== 1 ? "s" : ""}
+            </span>
           </div>
           <ShowPhotos photos={photos} />
         </div>

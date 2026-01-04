@@ -9,7 +9,10 @@ export class RedisService {
   private client: RedisClientType;
   private logger?: Logger;
 
-  constructor(private readonly url: string, logger?: Logger) {
+  constructor(
+    private readonly url: string,
+    logger?: Logger,
+  ) {
     this.logger = logger;
     if (!url) {
       throw new Error("Redis URL is required");

@@ -27,12 +27,7 @@ function CopyButton({ text, className }: { text: string; className?: string }) {
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handleCopy}
-      className={className}
-    >
+    <Button variant="ghost" size="sm" onClick={handleCopy} className={className}>
       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
     </Button>
   );
@@ -44,10 +39,7 @@ function CodeBlock({ code, language = "json" }: { code: string; language?: strin
       <pre className="bg-black/50 rounded-lg p-4 overflow-x-auto text-sm">
         <code className={`language-${language} text-content-text-secondary`}>{code}</code>
       </pre>
-      <CopyButton
-        text={code}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-      />
+      <CopyButton text={code} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
     </div>
   );
 }
@@ -88,9 +80,7 @@ export default function McpInfo() {
             <CardTitle className="text-lg">Search Shows</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CardDescription>
-              Find shows by date, venue, city, or songs played.
-            </CardDescription>
+            <CardDescription>Find shows by date, venue, city, or songs played.</CardDescription>
           </CardContent>
         </Card>
         <Card className="glass-content">
@@ -99,9 +89,7 @@ export default function McpInfo() {
             <CardTitle className="text-lg">Get Setlists</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CardDescription>
-              Retrieve complete setlists with song transitions and notes.
-            </CardDescription>
+            <CardDescription>Retrieve complete setlists with song transitions and notes.</CardDescription>
           </CardContent>
         </Card>
         <Card className="glass-content">
@@ -110,9 +98,7 @@ export default function McpInfo() {
             <CardTitle className="text-lg">Song History</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <CardDescription>
-              Look up songs, lyrics, and performance history.
-            </CardDescription>
+            <CardDescription>Look up songs, lyrics, and performance history.</CardDescription>
           </CardContent>
         </Card>
       </div>
@@ -169,13 +155,8 @@ export default function McpInfo() {
             <TabsContent value="claude-code" className="space-y-4">
               <div className="prose prose-invert max-w-none space-y-4">
                 <h3 className="text-lg font-semibold text-content-text-primary">Claude Code (CLI)</h3>
-                <p className="text-content-text-secondary">
-                  Add the MCP server using the Claude Code CLI:
-                </p>
-                <CodeBlock
-                  code={`claude mcp add discobiscuits --transport http ${MCP_URL}`}
-                  language="bash"
-                />
+                <p className="text-content-text-secondary">Add the MCP server using the Claude Code CLI:</p>
+                <CodeBlock code={`claude mcp add discobiscuits --transport http ${MCP_URL}`} language="bash" />
                 <p className="text-content-text-secondary mt-4">
                   Or add it to your <code className="text-brand-secondary">~/.claude.json</code> configuration:
                 </p>
@@ -195,13 +176,13 @@ export default function McpInfo() {
             <TabsContent value="claude-desktop" className="space-y-4">
               <div className="prose prose-invert max-w-none space-y-4">
                 <h3 className="text-lg font-semibold text-content-text-primary">Claude Desktop App</h3>
-                <p className="text-content-text-secondary">
-                  Edit your Claude Desktop configuration file:
-                </p>
+                <p className="text-content-text-secondary">Edit your Claude Desktop configuration file:</p>
                 <ul className="text-content-text-secondary list-disc ml-6 space-y-2 my-4">
                   <li>
                     <strong>macOS:</strong>{" "}
-                    <code className="text-brand-secondary text-sm">~/Library/Application Support/Claude/claude_desktop_config.json</code>
+                    <code className="text-brand-secondary text-sm">
+                      ~/Library/Application Support/Claude/claude_desktop_config.json
+                    </code>
                   </li>
                   <li>
                     <strong>Windows:</strong>{" "}
@@ -264,9 +245,7 @@ export default function McpInfo() {
             <TabsContent value="other" className="space-y-4">
               <div className="prose prose-invert max-w-none space-y-4">
                 <h3 className="text-lg font-semibold text-content-text-primary">Other MCP Clients</h3>
-                <p className="text-content-text-secondary">
-                  The following clients also support MCP:
-                </p>
+                <p className="text-content-text-secondary">The following clients also support MCP:</p>
                 <ul className="space-y-3 text-content-text-secondary ml-4 my-4">
                   <li className="flex items-start gap-2">
                     <ExternalLink className="h-4 w-4 mt-1 text-brand-secondary flex-shrink-0" />
@@ -326,7 +305,8 @@ export default function McpInfo() {
                   </li>
                 </ul>
                 <p className="text-content-text-secondary mt-4">
-                  Most clients use a similar JSON configuration format. Refer to your client's documentation for specific setup instructions.
+                  Most clients use a similar JSON configuration format. Refer to your client's documentation for
+                  specific setup instructions.
                 </p>
               </div>
             </TabsContent>
@@ -348,7 +328,9 @@ export default function McpInfo() {
               <div className="space-y-3">
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">search_shows</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Search for shows by venue, date, city, or songs played</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Search for shows by venue, date, city, or songs played
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">search_songs</h5>
@@ -356,38 +338,54 @@ export default function McpInfo() {
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">search_venues</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Search for venues by name, city, state, or country</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Search for venues by name, city, state, or country
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">search_segues</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Search for song transitions (e.g., "Basis &gt; Helicopters")</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Search for song transitions (e.g., "Basis &gt; Helicopters")
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">search_by_date</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Search for shows by exact date, month, or year</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Search for shows by exact date, month, or year
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Single Item Getters */}
             <div>
-              <h4 className="text-xs font-semibold text-content-text-tertiary uppercase tracking-wide mb-3">Get Details</h4>
+              <h4 className="text-xs font-semibold text-content-text-tertiary uppercase tracking-wide mb-3">
+                Get Details
+              </h4>
               <div className="space-y-3">
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_setlist</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Get full setlist for a show with all sets, songs, and transitions</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Get full setlist for a show with all sets, songs, and transitions
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_song</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Get song details including lyrics and play history</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Get song details including lyrics and play history
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_song_statistics</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Get detailed stats: yearly play counts, gaps between plays</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Get detailed stats: yearly play counts, gaps between plays
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_song_performances</h5>
-                  <p className="text-content-text-secondary text-sm mt-1">Get all performances of a song with venue and rating info</p>
+                  <p className="text-content-text-secondary text-sm mt-1">
+                    Get all performances of a song with venue and rating info
+                  </p>
                 </div>
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_venue_history</h5>
@@ -406,7 +404,9 @@ export default function McpInfo() {
 
             {/* Batch Getters */}
             <div>
-              <h4 className="text-xs font-semibold text-content-text-tertiary uppercase tracking-wide mb-3">Batch Operations</h4>
+              <h4 className="text-xs font-semibold text-content-text-tertiary uppercase tracking-wide mb-3">
+                Batch Operations
+              </h4>
               <div className="space-y-3">
                 <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_setlists</h5>

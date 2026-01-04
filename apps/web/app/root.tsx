@@ -1,4 +1,5 @@
 import type { Route } from ".react-router/types/app/+types/root";
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -17,6 +18,7 @@ import { SearchProvider } from "~/components/search/search-provider";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { QueryProvider } from "~/providers/query-provider";
+import { initHoneybadgerClient } from "~/lib/honeybadger.client";
 import { env } from "~/server/env";
 import stylesheet from "./styles.css?url";
 
@@ -29,6 +31,8 @@ export type ClientSideEnv = {
   SUPABASE_ANON_KEY: string;
   SUPABASE_STORAGE_URL: string;
   BASE_URL: string;
+  HONEYBADGER_API_KEY?: string;
+  APP_ENV: string;
 };
 
 export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
@@ -39,6 +43,8 @@ export async function loader(): Promise<RootData> {
     SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY,
     SUPABASE_STORAGE_URL: env.SUPABASE_STORAGE_URL,
     BASE_URL: env.BASE_URL,
+    HONEYBADGER_API_KEY: env.HONEYBADGER_API_KEY,
+    APP_ENV: env.APP_ENV,
   };
 
   return {
@@ -49,6 +55,16 @@ export async function loader(): Promise<RootData> {
 export function Layout({ children }: { children: React.ReactNode }) {
   const data = useLoaderData() as RootData | undefined;
   const env = data?.env;
+
+  useEffect(() => {
+    if (!env?.HONEYBADGER_API_KEY) {
+      return;
+    }
+    initHoneybadgerClient({
+      apiKey: env.HONEYBADGER_API_KEY,
+      environment: env.APP_ENV,
+    });
+  }, [env?.HONEYBADGER_API_KEY, env?.APP_ENV]);
 
   return (
     <html lang="en" className="font-quicksand dark overflow-x-hidden">

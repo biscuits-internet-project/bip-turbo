@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSupabaseContext } from "~/context/supabase-provider";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB in bytes
 const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"] as const;
@@ -84,6 +85,12 @@ export function useFileUpload() {
       const timestamp = Date.now();
       const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-").toLowerCase();
       const path = `${folder}/${timestamp}-${sanitizedFileName}`;
+      trackClientSubmit("file:upload", {
+        bucket,
+        folder,
+        size: file.size,
+        name: sanitizedFileName,
+      });
 
       // Upload the file to Supabase Storage
       const { error: uploadError } = await client.storage.from(bucket).upload(path, file, {
@@ -106,6 +113,13 @@ export function useFileUpload() {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to upload file";
+      notifyClientError(err, {
+        context: {
+          action: "file-upload",
+          bucket: options.bucket,
+          folder: options.folder,
+        },
+      });
       setError(message);
       return null;
     } finally {

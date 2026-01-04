@@ -510,6 +510,13 @@ model User {
   files               File[]
   userRoles           UserRole[]
   showFiles           ShowToFile[] @relation("ShowFileUploader")
+  posts                 Post[]         @relation("PostAuthor")
+  moderatedPosts        Post[]         @relation("PostModerator")
+  votes                 Vote[]
+  notificationsReceived Notification[] @relation("NotificationReceiver")
+  notificationsSent     Notification[] @relation("NotificationActor")
+  contentFlagsReported  ContentFlag[]  @relation("ContentFlagReporter")
+  contentFlagsReviewed  ContentFlag[]  @relation("ContentFlagReviewer")
 
   @@index([avatarFileId])
   @@map("users")
@@ -656,4 +663,109 @@ model MemoryMetric {
   @@index([requestUrl])
   @@index([memoryDelta])
   @@map("memory_metrics")
+}
+
+model Post {
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String         @map("user_id") @db.Uuid
+  title                 String?        @db.VarChar(300)
+  content               String?        @db.Text
+  parentId              String?        @map("parent_id") @db.Uuid
+  quotedPostId          String?        @map("quoted_post_id") @db.Uuid
+  quotedContentSnapshot String?        @map("quoted_content_snapshot") @db.VarChar(1000)
+  mediaUrl              String?        @map("media_url") @db.VarChar
+  mediaType             String?        @map("media_type") @db.VarChar
+  isDeleted             Boolean        @default(false) @map("is_deleted")
+  editedAt              DateTime?      @map("edited_at") @db.Timestamp(6)
+  replyCount            Int            @default(0) @map("reply_count")
+  voteScore             Int            @default(0) @map("vote_score")
+  upvoteCount           Int            @default(0) @map("upvote_count")
+  downvoteCount         Int            @default(0) @map("downvote_count")
+  flagCount             Int            @default(0) @map("flag_count")
+  moderationStatus      String         @default("clean") @map("moderation_status") @db.VarChar
+  moderatedAt           DateTime?      @map("moderated_at") @db.Timestamp(6)
+  moderatedBy           String?        @map("moderated_by") @db.Uuid
+  createdAt             DateTime       @map("created_at") @db.Timestamp(6)
+  updatedAt             DateTime       @map("updated_at") @db.Timestamp(6)
+
+  user          User           @relation("PostAuthor", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_posts_users_user_id")
+  moderator     User?          @relation("PostModerator", fields: [moderatedBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_posts_users_moderated_by")
+  parent        Post?          @relation("PostReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_posts_posts_parent_id")
+  replies       Post[]         @relation("PostReplies")
+  quotedPost    Post?          @relation("QuotedPosts", fields: [quotedPostId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_posts_posts_quoted_post_id")
+  quotedBy      Post[]         @relation("QuotedPosts")
+  votes         Vote[]
+  notifications Notification[]
+  flags         ContentFlag[]
+
+  @@index([userId])
+  @@index([parentId])
+  @@index([quotedPostId])
+  @@index([createdAt])
+  @@index([voteScore])
+  @@index([replyCount])
+  @@index([isDeleted])
+  @@index([moderationStatus])
+  @@index([flagCount])
+  @@map("posts")
+}
+
+model Vote {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  voteType  String   @map("vote_type") @db.VarChar // 'upvote' or 'downvote'
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_votes_posts_post_id")
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_votes_users_user_id")
+
+  @@unique([postId, userId], map: "votes_post_id_user_id_unique")
+  @@index([postId])
+  @@index([userId])
+  @@index([voteType])
+  @@map("votes")
+}
+
+model Notification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  actorId   String   @map("actor_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  type      String   @db.VarChar
+  read      Boolean  @default(false)
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+
+  user  User @relation("NotificationReceiver", fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_users_user_id")
+  actor User @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_users_actor_id")
+  post  Post @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notifications_posts_post_id")
+
+  @@index([userId, read])
+  @@index([actorId])
+  @@index([postId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model ContentFlag {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId      String    @map("post_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  reason      String    @db.VarChar
+  description String?
+  status      String    @default("pending") @db.VarChar
+  reviewedBy  String?   @map("reviewed_by") @db.Uuid
+  reviewedAt  DateTime? @map("reviewed_at") @db.Timestamp(6)
+  createdAt   DateTime  @map("created_at") @db.Timestamp(6)
+
+  post     Post  @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_content_flags_posts_post_id")
+  user     User  @relation("ContentFlagReporter", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_content_flags_users_user_id")
+  reviewer User? @relation("ContentFlagReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_content_flags_users_reviewed_by")
+
+  @@unique([postId, userId], map: "content_flags_post_id_user_id_unique")
+  @@index([postId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("content_flags")
 }

@@ -21,7 +21,7 @@ interface SegueSequence {
 export class SegueRunGeneratorService {
   constructor(
     private readonly db: PrismaClient,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   /**
@@ -63,9 +63,9 @@ export class SegueRunGeneratorService {
 
     // Group tracks by set
     const tracksBySet = this.groupTracksBySet(show.tracks);
-    
+
     const sequences: SegueSequence[] = [];
-    
+
     for (const [set, tracks] of tracksBySet.entries()) {
       const setSequences = this.extractSegueSequences(show.id, set, tracks);
       sequences.push(...setSequences);
@@ -77,7 +77,7 @@ export class SegueRunGeneratorService {
 
     // Create SegueRuns in bulk
     await this.db.segueRun.createMany({
-      data: sequences.map(seq => ({
+      data: sequences.map((seq) => ({
         showId: seq.showId,
         set: seq.set,
         trackIds: seq.trackIds,
@@ -130,7 +130,7 @@ export class SegueRunGeneratorService {
    */
   private groupTracksBySet(tracks: TrackWithSong[]): Map<string, TrackWithSong[]> {
     const tracksBySet = new Map<string, TrackWithSong[]>();
-    
+
     for (const track of tracks) {
       if (!tracksBySet.has(track.set)) {
         tracksBySet.set(track.set, []);
@@ -140,7 +140,7 @@ export class SegueRunGeneratorService {
         tracks.push(track);
       }
     }
-    
+
     return tracksBySet;
   }
 
@@ -166,7 +166,7 @@ export class SegueRunGeneratorService {
             songTitles: [track.song.title],
           };
         }
-        
+
         // Add the next track if it exists
         if (i < tracks.length - 1) {
           const nextTrack = tracks[i + 1];

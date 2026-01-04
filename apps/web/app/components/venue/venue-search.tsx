@@ -5,6 +5,7 @@ import { Button } from "~/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "~/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { cn } from "~/lib/utils";
+import { toast } from "sonner";
 
 interface VenueSearchProps {
   value?: string;
@@ -35,8 +36,10 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
         const data = await response.json();
         setVenues(data);
       } else {
+        toast.error("Venue search failed. Please try again.");
       }
     } catch (_error) {
+      toast.error("Failed to search venues. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -53,6 +56,7 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
             setCurrentVenue(venue);
           }
         } catch (_error) {
+          toast.error("Failed to load venue details. Please try again.");
         }
       } else if (!value || value === "none") {
         setCurrentVenue(null);
@@ -90,7 +94,10 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border" align="start">
+      <PopoverContent
+        className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border"
+        align="start"
+      >
         <Command className="bg-transparent" shouldFilter={false}>
           <CommandInput
             placeholder="Search venues..."

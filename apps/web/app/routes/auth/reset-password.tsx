@@ -4,6 +4,7 @@ import { useNavigate, useRouteLoaderData } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
 import { ResetPasswordForm } from "~/components/reset-password-form";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
@@ -22,8 +23,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       status: 302,
       headers: {
         ...headers,
-        Location: "/auth/forgot-password?error=expired_link"
-      }
+        Location: "/auth/forgot-password?error=expired_link",
+      },
     });
   }
 
@@ -65,6 +66,7 @@ export default function ResetPassword() {
     const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     try {
+      trackClientSubmit("auth:reset-password");
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -75,18 +77,24 @@ export default function ResetPassword() {
 
       toast.success("Password updated successfully");
       navigate("/");
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "reset-password",
+        },
+      });
+      const message = error instanceof Error ? error.message : "";
+
       // Provide more specific error messages based on the error type
-      if (errorMessage.includes("New password should be different")) {
+      if (message.includes("New password should be different")) {
         toast.error("Your new password must be different from your current password.");
-      } else if (errorMessage.includes("Password should be at least")) {
+      } else if (message.includes("Password should be at least")) {
         toast.error("Password must be at least 6 characters long.");
-      } else if (errorMessage.includes("Auth session missing")) {
+      } else if (message.includes("Auth session missing")) {
         toast.error("Your session has expired. Please request a new password reset link.");
         navigate("/auth/forgot-password");
         return;
-      } else if (errorMessage.includes("Invalid session")) {
+      } else if (message.includes("Invalid session")) {
         toast.error("Invalid reset session. Please request a new password reset link.");
         navigate("/auth/forgot-password");
         return;

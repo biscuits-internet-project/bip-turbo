@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface Media {
   date: Date;
@@ -22,6 +23,7 @@ export default function MediaResources(): ReactElement {
           setMedia(data);
         }
       } catch (_error) {
+        toast.error("Failed to load media resources.");
       }
     };
     fetchMedia();

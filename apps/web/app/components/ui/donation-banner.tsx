@@ -17,12 +17,25 @@ function getCookie(name: string): string | null {
   return null;
 }
 
+type CookieStoreLike = {
+  set: (cookie: { name: string; value: string; expires?: Date; path?: string }) => Promise<void>;
+};
+
 function setCookie(name: string, value: string, days: number): void {
-  if (typeof document === "undefined") return;
+  if (typeof window === "undefined") return;
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-  // Using document.cookie for simple cookie setting (Cookie Store API not widely supported)
-  // biome-ignore lint/suspicious/noDocumentCookie: Simple cookie setting, Cookie Store API not widely supported
+  const cookieStore = (window as Window & { cookieStore?: CookieStoreLike }).cookieStore;
+  if (cookieStore) {
+    void cookieStore.set({
+      name,
+      value,
+      expires,
+      path: "/",
+    });
+    return;
+  }
+  // biome-ignore lint/suspicious/noDocumentCookie: Fallback for browsers without cookieStore support
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 }
 

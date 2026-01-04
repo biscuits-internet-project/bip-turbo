@@ -153,7 +153,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         const selectedFiles: ArchiveFile[] = [];
 
         for (const [_trackNum, trackFiles] of trackGroups.entries()) {
-
           // Score each file based on multiple factors
           const scoredFiles = trackFiles.map((file) => {
             let score = 0;
@@ -209,8 +208,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
           }
           return a.name.localeCompare(b.name);
         });
-        for (const _file of sortedFiles) {
-        }
 
         setAudioFiles(sortedFiles);
       } catch (err) {
@@ -252,7 +249,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               .then(() => {
                 if (isMountedRef.current) setIsPlaying(true);
               })
-              .catch((_err) => {});
+              .catch((_err) => setError("Unable to start playback. Please try again."));
           }
         }, 100);
       }
@@ -392,6 +389,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
     if (name.length < 3 && file.track) {
       return `Track ${file.track}`;
     }
+
     return name;
   };
 

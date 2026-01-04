@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "~/components/ui/sh
 import { useGlobalSearch } from "~/hooks/use-global-search";
 import { useVectorSearch } from "~/hooks/use-vector-search";
 import { formatDateShort } from "~/lib/utils";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import { SearchFeedback } from "./search-feedback";
 
 interface GlobalSearchDrawerProps {
@@ -31,7 +32,7 @@ function SearchResultItem({ result, onClose }: SearchResultItemProps) {
   const handleClick = () => {
     navigate(result.url);
     // Only close on mobile/touch devices
-    if (onClose && window.matchMedia('(max-width: 768px)').matches) {
+    if (onClose && window.matchMedia("(max-width: 768px)").matches) {
       onClose();
     }
   };
@@ -169,7 +170,13 @@ export function GlobalSearchDrawer({ open, onOpenChange }: GlobalSearchDrawerPro
 
   const handleFeedback = useCallback(
     async (searchId: string, sentiment: "positive" | "negative", feedback?: string) => {
-        const response = await fetch("/api/search/feedback", {
+      trackClientSubmit("search-feedback:api", {
+        searchId,
+        sentiment,
+      });
+      let response: Response;
+      try {
+        response = await fetch("/api/search/feedback", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -180,10 +187,29 @@ export function GlobalSearchDrawer({ open, onOpenChange }: GlobalSearchDrawerPro
             feedbackMessage: feedback,
           }),
         });
+      } catch (error) {
+        notifyClientError(error, {
+          context: {
+            action: "search-feedback-api",
+            searchId,
+            sentiment,
+          },
+        });
+        throw error;
+      }
 
-        if (!response.ok) {
-          throw new Error("Failed to submit feedback");
-        }
+      if (!response.ok) {
+        const error = new Error("Failed to submit feedback");
+        notifyClientError(error, {
+          context: {
+            action: "search-feedback-api",
+            searchId,
+            sentiment,
+            status: response.status,
+          },
+        });
+        throw error;
+      }
     },
     [],
   );

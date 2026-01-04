@@ -27,6 +27,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import { SortableTrackItem } from "./sortable-track-item";
 
 interface TrackManagerProps {
@@ -82,11 +83,18 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   const loadTracks = useCallback(async () => {
     try {
       const response = await fetch(`/api/tracks?showId=${showId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTracks(data);
+      if (!response.ok) {
+        throw new Error("Failed to load tracks");
       }
-    } catch (_error) {
+      const data = await response.json();
+      setTracks(data);
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "load-tracks",
+          showId,
+        },
+      });
       toast.error("Failed to load tracks");
     }
   }, [showId]);
@@ -115,6 +123,12 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   // Create track
   const createTrack = async (data: TrackFormData) => {
     setIsCreating(true);
+    trackClientSubmit("track:create", {
+      showId,
+      songId: data.songId,
+      set: data.set,
+    });
+    let lastStatus: number | undefined;
     try {
       const response = await fetch("/api/tracks", {
         method: "POST",
@@ -127,6 +141,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           annotationDesc: data.annotationDesc,
         }),
       });
+      lastStatus = response.status;
       if (!response.ok) throw new Error("Failed to create track");
       const newTrack = await response.json();
 
@@ -139,8 +154,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
             const song = await songResponse.json();
             trackWithSong = { ...newTrack, song };
           }
-        } catch (_error) {
-        }
+        } catch (_error) {}
       }
 
       setTracks((prev) =>
@@ -152,7 +166,15 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       setIsAddingNew(false);
       resetForm();
       toast.success("Track added successfully");
-    } catch {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "create-track",
+          showId,
+          songId: data.songId,
+          status: lastStatus,
+        },
+      });
       toast.error("Failed to add track");
     } finally {
       setIsCreating(false);
@@ -162,6 +184,12 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   // Update track
   const updateTrack = async ({ id, ...data }: TrackFormData & { id: string }) => {
     setIsUpdating(true);
+    trackClientSubmit("track:update", {
+      showId,
+      trackId: id,
+      set: data.set,
+    });
+    let lastStatus: number | undefined;
     try {
       const response = await fetch(`/api/tracks/${id}`, {
         method: "PUT",
@@ -173,6 +201,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           annotationDesc: data.annotationDesc,
         }),
       });
+      lastStatus = response.status;
       if (!response.ok) throw new Error("Failed to update track");
       const updatedTrack = await response.json();
 
@@ -187,7 +216,15 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       setEditingId(null);
       resetForm();
       toast.success("Track updated successfully");
-    } catch {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "update-track",
+          showId,
+          trackId: id,
+          status: lastStatus,
+        },
+      });
       toast.error("Failed to update track");
     } finally {
       setIsUpdating(false);
@@ -197,14 +234,25 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   // Delete track
   const deleteTrack = async (id: string) => {
     setIsDeleting(true);
+    trackClientSubmit("track:delete", { showId, trackId: id });
+    let lastStatus: number | undefined;
     try {
       const response = await fetch(`/api/tracks/${id}`, {
         method: "DELETE",
       });
+      lastStatus = response.status;
       if (!response.ok) throw new Error("Failed to delete track");
       setTracks((prev) => prev.filter((track) => track.id !== id));
       toast.success("Track deleted successfully");
-    } catch {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "delete-track",
+          showId,
+          trackId: id,
+          status: lastStatus,
+        },
+      });
       toast.error("Failed to delete track");
     } finally {
       setIsDeleting(false);
@@ -213,12 +261,15 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
 
   // Reorder tracks
   const reorderTracks = async (updates: { id: string; position: number; set: string }[]) => {
+    trackClientSubmit("track:reorder", { showId, updates: updates.length });
+    let lastStatus: number | undefined;
     try {
       const response = await fetch("/api/tracks/reorder", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updates }),
       });
+      lastStatus = response.status;
       if (!response.ok) throw new Error("Failed to reorder tracks");
       const updatedTracks = await response.json();
 
@@ -234,7 +285,15 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
         }),
       );
       toast.success("Track order updated");
-    } catch {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          action: "reorder-tracks",
+          showId,
+          status: lastStatus,
+          updates: updates.length,
+        },
+      });
       toast.error("Failed to reorder tracks");
     }
   };

@@ -10,11 +10,9 @@ export const createTestLogger = (): Logger => {
     format: winston.format.combine(
       winston.format.timestamp({ format: "HH:mm:ss" }),
       winston.format.colorize(),
-      winston.format.simple()
+      winston.format.simple(),
     ),
-    transports: [
-      new winston.transports.Console()
-    ]
+    transports: [new winston.transports.Console()],
   }) as unknown as Logger;
 };
 

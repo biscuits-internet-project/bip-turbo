@@ -13,6 +13,7 @@ import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
+import { trackClientSubmit } from "~/lib/honeybadger.client";
 
 const BlogPostState = {
   DRAFT: "draft",
@@ -67,6 +68,11 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
   });
 
   const onSubmit = (data: BlogPostFormValues) => {
+    trackClientSubmit("blog:submit", {
+      isEdit: Boolean(defaultValues),
+      hasFiles: uploadedFiles.length > 0,
+      state: data.state,
+    });
     const formData = new FormData();
     for (const [key, value] of Object.entries(data)) {
       if (value !== null) {
@@ -113,10 +119,6 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
       setUploadedFiles(defaultValues.files);
     }
   }, [defaultValues]);
-
-  // Log whenever uploaded files change
-  useEffect(() => {
-  }, []);
 
   return (
     <Form {...form}>

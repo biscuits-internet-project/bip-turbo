@@ -17,6 +17,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 
 const contactFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -59,6 +60,10 @@ export function ContactDialog({ children }: ContactDialogProps) {
   const onSubmit = async (data: ContactFormValues) => {
     setIsSubmitting(true);
     try {
+      trackClientSubmit("contact:submit", {
+        subject: data.subject,
+      });
+
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("email", data.email);
@@ -85,7 +90,14 @@ export function ContactDialog({ children }: ContactDialogProps) {
         setOpen(false);
         setIsSubmitted(false);
       }, 3000);
-    } catch (_error) {
+    } catch (error) {
+      notifyClientError(error, {
+        context: {
+          section: "contact-dialog",
+          subject: data.subject,
+          email: data.email,
+        },
+      });
       toast.error("Failed to send message. Please try again later.");
     } finally {
       setIsSubmitting(false);

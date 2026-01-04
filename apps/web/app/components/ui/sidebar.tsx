@@ -70,9 +70,7 @@ const SidebarProvider = React.forwardRef<
       setCookie(SIDEBAR_COOKIE_NAME, String(openState), {
         path: "/",
         maxAge: SIDEBAR_COOKIE_MAX_AGE,
-      }).catch(() => {
-        // Silently fail if cookie cannot be set
-      });
+      }).catch(() => undefined);
     },
     [setOpenProp, open],
   );

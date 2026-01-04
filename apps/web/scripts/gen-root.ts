@@ -13,4 +13,8 @@ async function main() {
   ]);
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  const message = error instanceof Error ? error.stack || error.message : String(error);
+  process.stderr.write(`gen-root failed: ${message}\n`);
+  process.exit(1);
+});

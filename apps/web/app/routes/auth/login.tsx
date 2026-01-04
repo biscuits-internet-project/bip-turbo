@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { redirect, useNavigate, useRouteLoaderData, useSearchParams } from "react-router-dom";
 import { LoginForm } from "~/components/login-form";
+import { notifyClientError, trackClientSubmit } from "~/lib/honeybadger.client";
 import { getSafeRedirectUrl } from "~/lib/utils";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
@@ -51,24 +52,35 @@ export default function Login() {
   }, []);
 
   const doGoogleAuth = async () => {
-    const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      cookieOptions: {
-        path: "/",
-        secure: true,
-        sameSite: "lax",
-      },
-    });
-    const callbackUrl = new URL(`${BASE_URL}/auth/callback`);
-    callbackUrl.searchParams.set("next", next);
+    trackClientSubmit("auth:google", { next });
+    try {
+      const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        cookieOptions: {
+          path: "/",
+          secure: true,
+          sameSite: "lax",
+        },
+      });
+      const callbackUrl = new URL(`${BASE_URL}/auth/callback`);
+      callbackUrl.searchParams.set("next", next);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl.toString(),
-      },
-    });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl.toString(),
+        },
+      });
 
-    if (error) {
+      if (error) {
+        notifyClientError(error, {
+          context: {
+            action: "google-login",
+          },
+        });
+        setError("An unexpected error occurred");
+      }
+    } catch (error) {
+      notifyClientError(error, { context: { action: "google-login" } });
       setError("An unexpected error occurred");
     }
   };
@@ -81,13 +93,20 @@ export default function Login() {
     const password = formData.get("password") as string;
 
     try {
+      trackClientSubmit("auth:login", { method: "password" });
       const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: _data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        notifyClientError(error, {
+          context: {
+            action: "password-login",
+            email,
+          },
+        });
         setError(error.message);
         return;
       }
@@ -97,12 +116,19 @@ export default function Login() {
       try {
         await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
         await supabase.auth.refreshSession();
-      } catch (_syncError) {
+      } catch (syncError) {
+        notifyClientError(syncError, {
+          context: {
+            action: "auth-sync",
+            stage: "login",
+          },
+        });
         // Continue anyway - user can still log in
       }
 
       navigate(next);
-    } catch (_err) {
+    } catch (error) {
+      notifyClientError(error, { context: { action: "password-login" } });
       setError("An unexpected error occurred");
     }
   };

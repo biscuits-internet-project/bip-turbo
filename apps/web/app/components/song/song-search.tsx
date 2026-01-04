@@ -1,6 +1,7 @@
 import type { Song } from "@bip/domain";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "~/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
@@ -49,8 +50,10 @@ export function SongSearch({
 
           setSongs(songsToSet);
         } else {
+          toast.error("Song search failed. Please try again.");
         }
       } catch (_error) {
+        toast.error("Failed to search songs. Please try again.");
       } finally {
         setLoading(false);
       }
