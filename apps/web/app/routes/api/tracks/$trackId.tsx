@@ -58,12 +58,29 @@ export const action = protectedAction(async ({ request, params }) => {
       // Parse and validate only allowed update fields
       const { annotationDesc, ...updateData } = trackUpdateSchema.parse(body);
 
+      // Get the current track to check if songId is changing
+      const currentTrack = await services.tracks.findById(trackId);
+      const oldSongId = currentTrack?.songId;
+      const newSongId = updateData.songId;
+
       // Update track with the validated data
       await services.tracks.update(trackId, updateData);
 
       // Handle multiple annotations if provided
       if (annotationDesc !== undefined) {
         await services.annotations.upsertMultipleForTrack(trackId, annotationDesc);
+      }
+
+      // Update song statistics if songId changed
+      if (oldSongId && newSongId && oldSongId !== newSongId) {
+        // Update stats for both old and new song
+        await Promise.all([
+          services.songs.updateSongStatistics(oldSongId),
+          services.songs.updateSongStatistics(newSongId),
+        ]);
+      } else if (newSongId) {
+        // Just update the current song's stats
+        await services.songs.updateSongStatistics(newSongId);
       }
 
       // Fetch the complete track with song relation
@@ -88,11 +105,21 @@ export const action = protectedAction(async ({ request, params }) => {
 
   if (request.method === "DELETE") {
     try {
+      // Get the track before deletion to retrieve songId for statistics update
+      const track = await services.tracks.findById(trackId);
+      const songId = track?.songId;
+
       // Delete all related data first
       await services.annotations.deleteByTrackId(trackId);
       await services.ratings.deleteByRateableId(trackId, "Track");
 
       await services.tracks.delete(trackId);
+
+      // Update song statistics after deleting a track
+      if (songId) {
+        await services.songs.updateSongStatistics(songId);
+      }
+
       return { success: true };
     } catch (error) {
       logger.error("Error deleting track", { error });

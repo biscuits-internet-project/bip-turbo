@@ -49,6 +49,11 @@ export const action = adminAction(async ({ request }) => {
       // Fetch the track with annotations
       const trackWithAnnotations = await services.tracks.findById(track.id);
 
+      // Update song statistics after adding a track
+      if (data.songId) {
+        await services.songs.updateSongStatistics(data.songId);
+      }
+
       logger.info("Created track", { trackId: track.id });
       return trackWithAnnotations;
     } catch (error) {
