@@ -1,6 +1,8 @@
 import type { Logger, Song, TrendingSong } from "@bip/domain";
+import type { DbClient, DbSong } from "../_shared/database/models";
+import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
-import type { SongRepository } from "./song-repository";
+import { slugify } from "../_shared/utils/slugify";
 
 export interface SongFilter {
   title?: string;
@@ -25,18 +27,60 @@ export interface CreateSongInput {
 
 export type UpdateSongInput = Partial<CreateSongInput>;
 
+// Mapper function
+function mapSongToDomainEntity(dbSong: DbSong): Song {
+  const { createdAt, updatedAt, dateLastPlayed, dateFirstPlayed, yearlyPlayData, longestGapsData, cover, ...rest } =
+    dbSong;
+
+  return {
+    ...rest,
+    createdAt: new Date(createdAt),
+    updatedAt: new Date(updatedAt),
+    dateLastPlayed: dateLastPlayed ? new Date(dateLastPlayed) : null,
+    dateFirstPlayed: dateFirstPlayed ? new Date(dateFirstPlayed) : null,
+    actualLastPlayedDate: null,
+    showsSinceLastPlayed: null,
+    lastVenue: null,
+    firstVenue: null,
+    firstShowSlug: null,
+    lastShowSlug: null,
+    yearlyPlayData: yearlyPlayData as Record<string, unknown>,
+    longestGapsData: longestGapsData as Record<string, unknown>,
+    cover: cover ?? false,
+  };
+}
+
 export class SongService {
   constructor(
-    protected repository: SongRepository,
-    protected logger: Logger,
+    protected readonly db: DbClient,
+    protected readonly logger: Logger,
   ) {}
 
   async findById(id: string): Promise<Song | null> {
-    return this.repository.findById(id);
+    const result = await this.db.song.findUnique({
+      where: { id },
+    });
+
+    if (!result) return null;
+    return mapSongToDomainEntity(result);
   }
 
   async findBySlug(slug: string): Promise<Song | null> {
-    return this.repository.findBySlug(slug);
+    const result = await this.db.song.findUnique({
+      where: { slug },
+      include: {
+        author: true,
+      },
+    });
+
+    if (!result) return null;
+
+    const song = mapSongToDomainEntity(result);
+    if (result.author) {
+      song.authorName = result.author.name;
+    }
+
+    return song;
   }
 
   async findMany(filter: SongFilter): Promise<Song[]> {
@@ -47,11 +91,28 @@ export class SongService {
         value,
       })) as FilterCondition<Song>[],
     };
-    return this.repository.findMany(queryOptions);
+
+    const where = queryOptions.filters ? buildWhereClause(queryOptions.filters) : {};
+    const orderBy = queryOptions.sort ? buildOrderByClause(queryOptions.sort) : [{ timesPlayed: "desc" }];
+    const skip =
+      queryOptions.pagination?.page && queryOptions.pagination?.limit
+        ? (queryOptions.pagination.page - 1) * queryOptions.pagination.limit
+        : undefined;
+    const take = queryOptions.pagination?.limit;
+
+    const results = await this.db.song.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+    });
+
+    return results.map((result: DbSong) => mapSongToDomainEntity(result));
   }
 
   async findManyInDateRange(filter: SongFilter): Promise<Song[]> {
     const { startDate, endDate, ...restFilter } = filter;
+
     const queryOptions: QueryOptions<Song> = {
       filters: Object.entries(restFilter).map(([field, value]) => ({
         field: field as keyof Song,
@@ -59,7 +120,63 @@ export class SongService {
         value,
       })) as FilterCondition<Song>[],
     };
-    return this.repository.findManyInDateRange(queryOptions, startDate, endDate);
+
+    const where = queryOptions.filters ? buildWhereClause(queryOptions.filters) : {};
+    const songs: DbSong[] = await this.db.song.findMany({
+      where,
+    });
+
+    // Get tracks in date range, unique by song per show
+    const tracks = await this.db.track.findMany({
+      where: {
+        show: {
+          date: {
+            ...(startDate ? { gte: startDate.toISOString().slice(0, 10) } : {}),
+            ...(endDate ? { lte: endDate.toISOString().slice(0, 10) } : {}),
+          },
+        },
+      },
+      include: {
+        song: true,
+        show: true,
+      },
+      distinct: ["songId", "showId"],
+    });
+
+    const songShowDates = new Map<string, Date[]>();
+    for (const track of tracks) {
+      const dbSong = (track as { song?: DbSong }).song;
+      if (!dbSong || !track.show?.date) continue;
+      const songId = dbSong.id;
+      const showDate = new Date(track.show.date);
+      if (!songShowDates.has(songId)) {
+        songShowDates.set(songId, []);
+      }
+      const dates = songShowDates.get(songId);
+      if (dates) {
+        dates.push(showDate);
+      }
+    }
+
+    // Map original songs, set timesPlayed, dateFirstPlayed, dateLastPlayed
+    const songsWithStatsForDateRange = songs.map((dbSong) => {
+      const showDates = songShowDates.get(dbSong.id) ?? [];
+      showDates.sort((a, b) => a.getTime() - b.getTime());
+      const timesPlayed = showDates.length;
+      const dateFirstPlayed = timesPlayed > 0 ? showDates[0] : null;
+      const dateLastPlayed = timesPlayed > 0 ? showDates[showDates.length - 1] : null;
+      return {
+        ...mapSongToDomainEntity(dbSong),
+        timesPlayed,
+        dateFirstPlayed,
+        dateLastPlayed,
+      };
+    });
+
+    // Sort by new timesPlayed descending
+    songsWithStatsForDateRange.sort((a, b) => b.timesPlayed - a.timesPlayed);
+
+    return songsWithStatsForDateRange;
   }
 
   async search(query: string, limit = 20): Promise<Song[]> {
@@ -83,30 +200,219 @@ export class SongService {
       ],
     };
 
-    return this.repository.findMany(queryOptions);
+    const where = queryOptions.filters ? buildWhereClause(queryOptions.filters) : {};
+    const orderBy = queryOptions.sort ? buildOrderByClause(queryOptions.sort) : [{ timesPlayed: "desc" }];
+    const skip =
+      queryOptions.pagination?.page && queryOptions.pagination?.limit
+        ? (queryOptions.pagination.page - 1) * queryOptions.pagination.limit
+        : undefined;
+    const take = queryOptions.pagination?.limit;
+
+    const results = await this.db.song.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+    });
+
+    return results.map((result: DbSong) => mapSongToDomainEntity(result));
   }
 
   async findTrendingLastXShows(lastXShows: number, limit: number): Promise<TrendingSong[]> {
-    return this.repository.findTrendingLastXShows(lastXShows, limit);
+    // Get the most recent shows
+    const recentShows = await this.db.show.findMany({
+      orderBy: { date: "desc" },
+      take: lastXShows,
+    });
+
+    if (recentShows.length === 0) return [];
+
+    // Get the show IDs
+    const showIds = recentShows.map((show) => show.id);
+
+    // Find tracks from these shows and count songs
+    const tracks = await this.db.track.findMany({
+      where: { showId: { in: showIds } },
+      include: { song: true },
+    });
+
+    // Count occurrences of each song
+    const songCounts = new Map<string, { song: DbSong; count: number }>();
+
+    for (const track of tracks) {
+      if (!track.song) continue;
+
+      const songId = track.song.id;
+      const existing = songCounts.get(songId);
+
+      if (existing) {
+        existing.count += 1;
+      } else {
+        songCounts.set(songId, { song: track.song, count: 1 });
+      }
+    }
+
+    // Convert to array, sort by count, and limit
+    const trendingSongs = Array.from(songCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+      .map(({ song, count }) => ({
+        ...mapSongToDomainEntity(song),
+        count,
+      }));
+
+    return trendingSongs;
   }
 
   async findTrendingLastYear(): Promise<TrendingSong[]> {
-    return this.repository.findTrendingLastYear();
+    // Calculate date range for the current calendar year
+    const currentYear = new Date().getFullYear();
+
+    // Find shows from the current calendar year
+    const shows = await this.db.show.findMany({
+      where: {
+        date: {
+          gte: `${currentYear}-01-01`,
+          lte: `${currentYear}-12-31`,
+        },
+      },
+    });
+
+    if (shows.length === 0) return [];
+
+    // Get the show IDs
+    const showIds = shows.map((show) => show.id);
+
+    // Find tracks from these shows and count songs
+    const tracks = await this.db.track.findMany({
+      where: { showId: { in: showIds } },
+      include: { song: true },
+    });
+
+    // Count unique shows for each song (not individual tracks)
+    const songCounts = new Map<string, { song: DbSong; showIds: Set<string> }>();
+
+    for (const track of tracks) {
+      if (!track.song) continue;
+
+      const songId = track.song.id;
+      const existing = songCounts.get(songId);
+
+      if (existing) {
+        existing.showIds.add(track.showId);
+      } else {
+        songCounts.set(songId, { song: track.song, showIds: new Set([track.showId]) });
+      }
+    }
+
+    // Convert to array, sort by count, and limit to top 10
+    const trendingSongs = Array.from(songCounts.values())
+      .sort((a, b) => b.showIds.size - a.showIds.size)
+      .slice(0, 10)
+      .map(({ song, showIds }) => ({
+        ...mapSongToDomainEntity(song),
+        count: showIds.size,
+      }));
+
+    return trendingSongs;
   }
 
   async create(input: CreateSongInput): Promise<Song> {
-    return this.repository.create(input);
+    const slug = slugify(input.title);
+    const now = new Date();
+    const result = await this.db.song.create({
+      data: {
+        ...input,
+        slug,
+        createdAt: now,
+        updatedAt: now,
+        yearlyPlayData: {},
+        longestGapsData: {},
+        timesPlayed: 0,
+      },
+    });
+
+    return mapSongToDomainEntity(result);
   }
 
   async update(slug: string, input: UpdateSongInput): Promise<Song> {
-    return this.repository.update(slug, input);
+    const now = new Date();
+    const result = await this.db.song.update({
+      where: { slug },
+      data: {
+        ...input,
+        updatedAt: now,
+        ...(input.title ? { slug: slugify(input.title) } : {}),
+      },
+    });
+
+    return mapSongToDomainEntity(result);
   }
 
   async delete(id: string): Promise<void> {
-    await this.repository.delete(id);
+    await this.db.song.delete({
+      where: { id },
+    });
   }
 
+  /**
+   * Recalculate and update statistics for a specific song based on its tracks
+   */
   async updateSongStatistics(songId: string): Promise<void> {
-    await this.repository.updateSongStatistics(songId);
+    // Get all unique shows for this song (count shows, not individual tracks)
+    const uniqueShows = await this.db.track.findMany({
+      where: { songId },
+      distinct: ["showId"],
+      include: {
+        show: {
+          select: { date: true },
+        },
+      },
+      orderBy: {
+        show: {
+          date: "asc",
+        },
+      },
+    });
+
+    if (uniqueShows.length === 0) {
+      // No tracks, reset statistics
+      await this.db.song.update({
+        where: { id: songId },
+        data: {
+          timesPlayed: 0,
+          dateFirstPlayed: null,
+          dateLastPlayed: null,
+          yearlyPlayData: {},
+        },
+      });
+      return;
+    }
+
+    // Calculate statistics based on unique shows
+    const timesPlayed = uniqueShows.length;
+    const firstShow = uniqueShows[0];
+    const lastShow = uniqueShows[uniqueShows.length - 1];
+
+    // Build yearly play data (count unique shows per year)
+    const yearlyPlayData: Record<string, number> = {};
+    uniqueShows.forEach((track) => {
+      if (track.show?.date) {
+        const year = new Date(track.show.date).getFullYear().toString();
+        yearlyPlayData[year] = (yearlyPlayData[year] || 0) + 1;
+      }
+    });
+
+    // Update the song
+    await this.db.song.update({
+      where: { id: songId },
+      data: {
+        timesPlayed,
+        dateFirstPlayed: firstShow.show?.date ? new Date(firstShow.show.date) : null,
+        dateLastPlayed: lastShow.show?.date ? new Date(lastShow.show.date) : null,
+        yearlyPlayData: yearlyPlayData,
+        updatedAt: new Date(),
+      },
+    });
   }
 }

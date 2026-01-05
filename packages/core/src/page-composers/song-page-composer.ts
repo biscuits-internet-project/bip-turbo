@@ -1,15 +1,15 @@
 import type { Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
+import type { SongService } from "../songs/song-service";
 import type { DbClient } from "../_shared/database/models";
-import type { SongRepository } from "../songs/song-repository";
 
 export class SongPageComposer {
   constructor(
     private db: DbClient,
-    private songRepository: SongRepository,
+    private songService: SongService,
   ) {}
 
   async build(songSlug: string): Promise<SongPageView> {
-    const song = await this.songRepository.findBySlug(songSlug);
+    const song = await this.songService.findBySlug(songSlug);
 
     if (!song) throw new Error("Song not found");
 
