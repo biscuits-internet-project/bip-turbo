@@ -10,7 +10,7 @@ import { SongPageComposer } from "../page-composers/song-page-composer";
 import { PostService } from "../posts/post-service";
 import { RatingService } from "../ratings/rating-service";
 import { ReviewService } from "../reviews/review-service";
-import { VoteRepository } from "../votes/vote-repository";
+import { VoteService } from "../votes/vote-service";
 import { PostgresSearchService } from "../search/postgres-search-service";
 import { SearchHistoryService } from "../search/search-history-service";
 import { SetlistService } from "../setlists/setlist-service";
@@ -41,9 +41,10 @@ export interface Services {
   tourDatesService: TourDatesService;
   files: FileService;
   postgresSearch: PostgresSearchService;
+  searchHistory: SearchHistoryService;
   posts: PostService;
   notifications: NotificationService;
-  votes: VoteRepository;
+  votes: VoteService;
   moderation: ModerationService;
   redis: RedisService;
   cache: CacheService;
@@ -53,41 +54,41 @@ export interface Services {
 
 export function createServices(container: ServiceContainer): Services {
   // Create search services
-  const searchHistoryService = new SearchHistoryService(container.repositories.searchHistories);
+  const searchHistoryService = new SearchHistoryService(container.db);
   const postgresSearchService = new PostgresSearchService(container.db, container.logger, searchHistoryService);
 
+  // Create core services
+  const songService = new SongService(container.db, container.logger);
+
   // Create notification and post services
-  const notificationService = new NotificationService(container.repositories.notifications);
-  const postService = new PostService(container.repositories.posts, notificationService);
-  const moderationService = new ModerationService(
-    container.repositories.contentFlags,
-    container.repositories.posts,
-    notificationService,
-  );
+  const notificationService = new NotificationService(container.db);
+  const postService = new PostService(container.db, notificationService);
+  const moderationService = new ModerationService(container.db, postService, notificationService);
 
   return {
-    annotations: new AnnotationService(container.repositories.annotations, container.logger),
-    authors: new AuthorService(container.repositories.authors, container.logger),
-    blogPosts: new BlogPostService(container.repositories.blogPosts, container.redis, container.logger),
-    shows: new ShowService(container.repositories.shows, container.logger),
-    songs: new SongService(container.repositories.songs, container.logger),
-    tracks: new TrackService(container.repositories.tracks, container.logger),
-    setlists: new SetlistService(container.repositories.setlists),
-    venues: new VenueService(container.repositories.venues, container.logger),
-    users: new UserService(container.repositories.users, container.logger),
-    reviews: new ReviewService(container.repositories.reviews, container.logger),
-    ratings: new RatingService(container.repositories.ratings),
-    attendances: new AttendanceService(container.repositories.attendances, container.logger),
-    songPageComposer: new SongPageComposer(container.db, container.repositories.songs),
+    annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
+    authors: new AuthorService(container.db, container.logger),
+    blogPosts: new BlogPostService(container.db, container.redis, container.logger),
+    shows: new ShowService(container.db, container.logger, container.cacheInvalidation),
+    songs: songService,
+    tracks: new TrackService(container.db, container.logger, container.cacheInvalidation),
+    setlists: new SetlistService(container.db),
+    venues: new VenueService(container.db, container.logger),
+    users: new UserService(container.db, container.logger),
+    reviews: new ReviewService(container.db, container.logger),
+    ratings: new RatingService(container.db, container.cacheInvalidation),
+    attendances: new AttendanceService(container.db, container.logger),
+    songPageComposer: new SongPageComposer(container.db, songService),
     tourDatesService: new TourDatesService(container.redis),
-    files: new FileService(container.repositories.files, container.logger, {
+    files: new FileService(container.db, container.logger, {
       accountId: container.env.CLOUDFLARE_ACCOUNT_ID,
       apiToken: container.env.CLOUDFLARE_IMAGES_API_TOKEN,
     }),
     postgresSearch: postgresSearchService,
+    searchHistory: searchHistoryService,
     posts: postService,
     notifications: notificationService,
-    votes: container.repositories.votes,
+    votes: new VoteService(container.db),
     moderation: moderationService,
     redis: container.redis,
     cache: container.cache,

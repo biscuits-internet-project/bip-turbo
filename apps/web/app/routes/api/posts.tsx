@@ -36,19 +36,26 @@ export const loader = publicLoader(async ({ request, context }) => {
     limit: url.searchParams.get("limit") || "20",
   };
 
+  logger.info("Posts feed request", { params, hasUser: !!context.currentUser });
+
   try {
     const validated = feedSchema.parse(params);
     let viewerId: string | undefined;
 
     if (context.currentUser) {
+      logger.info("Looking up user", { email: context.currentUser.email });
       const user = await services.users.findByEmail(context.currentUser.email);
       viewerId = user?.id;
+      logger.info("User found", { userId: viewerId });
     }
 
+    logger.info("Fetching posts feed", { validated, viewerId });
     const posts = await services.posts.getFeed({
       ...validated,
       userId: viewerId,
     });
+
+    logger.info("Posts fetched successfully", { count: posts.length });
 
     // Get next cursor from last post
     const nextCursor = posts.length > 0 ? posts[posts.length - 1].createdAt.toISOString() : undefined;
@@ -64,7 +71,12 @@ export const loader = publicLoader(async ({ request, context }) => {
       },
     );
   } catch (error) {
-    logger.error("Error fetching posts feed", { error });
+    logger.error("Error fetching posts feed", {
+      error,
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+      errorStack: error instanceof Error ? error.stack : undefined,
+      errorType: error?.constructor?.name,
+    });
     if (error instanceof z.ZodError) {
       return badRequest("Invalid query parameters");
     }

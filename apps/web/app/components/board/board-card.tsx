@@ -154,6 +154,7 @@ export function BoardCard({ post, currentUserId, variant = "stream" }: BoardCard
 
               {/* Award placeholder (can add later) */}
               <button
+                type="button"
                 className="flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-glass-content/50 text-content-text-secondary hover:text-brand-primary transition-colors text-sm"
                 onClick={(e) => {
                   e.preventDefault();
@@ -165,6 +166,7 @@ export function BoardCard({ post, currentUserId, variant = "stream" }: BoardCard
 
               {/* Share */}
               <button
+                type="button"
                 className="flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-glass-content/50 text-content-text-secondary hover:text-brand-primary transition-colors text-sm"
                 onClick={(e) => {
                   e.preventDefault();

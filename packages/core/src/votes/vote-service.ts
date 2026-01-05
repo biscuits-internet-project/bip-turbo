@@ -14,10 +14,10 @@ export function mapVoteToDomainEntity(dbVote: DbVote): Vote {
   };
 }
 
-export class VoteRepository {
+export class VoteService {
   constructor(private readonly db: DbClient) {}
 
-  async findByPostAndUser(postId: string, userId: string): Promise<Vote | null> {
+  private async findByPostAndUser(postId: string, userId: string): Promise<Vote | null> {
     const result = await this.db.vote.findUnique({
       where: {
         postId_userId: {
