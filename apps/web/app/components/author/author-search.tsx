@@ -34,9 +34,8 @@ export function AuthorSearch({
   const searchAuthors = useCallback(async (query: string) => {
     setLoading(true);
     try {
-      const url = query && query.length >= 2
-        ? `/api/authors?q=${encodeURIComponent(query)}&limit=20`
-        : '/api/authors?top=10';
+      const url =
+        query && query.length >= 2 ? `/api/authors?q=${encodeURIComponent(query)}&limit=20` : "/api/authors?top=10";
 
       const response = await fetch(url);
       if (response.ok) {
@@ -134,7 +133,10 @@ export function AuthorSearch({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border" align="start">
+      <PopoverContent
+        className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border"
+        align="start"
+      >
         <Command className="bg-transparent" shouldFilter={false}>
           <CommandInput
             placeholder="Search authors..."
@@ -143,9 +145,7 @@ export function AuthorSearch({
             className="text-white"
           />
           <CommandList className="max-h-[300px] overflow-auto">
-            <CommandEmpty>
-              {loading ? "Loading..." : creating ? "Creating..." : "No authors found."}
-            </CommandEmpty>
+            <CommandEmpty>{loading ? "Loading..." : creating ? "Creating..." : "No authors found."}</CommandEmpty>
             <CommandGroup>
               {/* Option to clear selection */}
               <CommandItem

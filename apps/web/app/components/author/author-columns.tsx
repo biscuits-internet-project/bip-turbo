@@ -64,11 +64,7 @@ export const authorColumns: ColumnDef<AuthorWithSongCount>[] = [
     },
     cell: ({ row }) => {
       const count = row.original.songCount ?? 0;
-      return (
-        <span className="text-content-text-primary font-semibold">
-          {count}
-        </span>
-      );
+      return <span className="text-content-text-primary font-semibold">{count}</span>;
     },
   },
   {

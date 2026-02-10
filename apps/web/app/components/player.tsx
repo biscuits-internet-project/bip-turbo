@@ -153,7 +153,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         const selectedFiles: ArchiveFile[] = [];
 
         for (const [_trackNum, trackFiles] of trackGroups.entries()) {
-
           // Score each file based on multiple factors
           const scoredFiles = trackFiles.map((file) => {
             let score = 0;

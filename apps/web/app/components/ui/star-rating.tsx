@@ -41,7 +41,7 @@ export function StarRating({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState<RatingResponse | null>(
-    initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null
+    initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null,
   );
   const { user, loading: isSessionLoading } = useSession();
   const revalidator = useRevalidator();
@@ -125,25 +125,23 @@ export function StarRating({
 
       // Update React Query cache with new rating data for this specific show
       if (rateableType === "Show") {
-        queryClient.setQueriesData<ShowUserDataResponse>(
-          { queryKey: ["shows", "user-data"] },
-          (oldData) => {
-            if (!oldData) return oldData;
-            return {
-              ...oldData,
-              userRatings: {
-                ...oldData.userRatings,
-                [rateableId]: data.userRating,
-              },
-              averageRatings: {
-                ...oldData.averageRatings,
-                [rateableId]: data.averageRating !== null && data.ratingsCount !== undefined
+        queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            userRatings: {
+              ...oldData.userRatings,
+              [rateableId]: data.userRating,
+            },
+            averageRatings: {
+              ...oldData.averageRatings,
+              [rateableId]:
+                data.averageRating !== null && data.ratingsCount !== undefined
                   ? { average: data.averageRating, count: data.ratingsCount }
                   : oldData.averageRatings[rateableId],
-              },
-            };
-          }
-        );
+            },
+          };
+        });
       }
 
       // Revalidate to update any other cached data (skip for track ratings to avoid table re-render)

@@ -55,7 +55,13 @@ export function ImageUpload({
     });
   }, []);
 
-  const { upload, isUploading, error, maxFileSize: defaultMaxSize, allowedTypes: defaultAllowedTypes } = useImageUpload({
+  const {
+    upload,
+    isUploading,
+    error,
+    maxFileSize: defaultMaxSize,
+    allowedTypes: defaultAllowedTypes,
+  } = useImageUpload({
     endpoint,
     maxFileSize,
     allowedTypes,

@@ -41,14 +41,8 @@ export function FilterNav({
     "text-xs font-normal text-content-text-tertiary",
     "bg-content-bg-secondary px-2 py-0.5 rounded-full",
   );
-  const itemCSS = cn(
-    "px-2 py-1.5 text-sm font-medium rounded-md",
-    "transition-all duration-200 text-center",
-  );
-  const highlightedItemCSS = cn(
-    "text-white bg-gradient-to-r from-brand-primary to-brand-secondary",
-    "font-semibold",
-  );
+  const itemCSS = cn("px-2 py-1.5 text-sm font-medium rounded-md", "transition-all duration-200 text-center");
+  const highlightedItemCSS = cn("text-white bg-gradient-to-r from-brand-primary to-brand-secondary", "font-semibold");
   const nonHighlightedItemCSS = cn(
     "text-content-text-secondary bg-content-bg-secondary",
     "hover:bg-content-bg-tertiary hover:text-white",
@@ -57,9 +51,7 @@ export function FilterNav({
     "px-3 py-1.5 text-sm font-medium rounded-md",
     "transition-all duration-200 flex items-center gap-2",
   );
-  const toggleActiveCSS = cn(
-    "text-white bg-content-bg-tertiary border border-brand-primary/50",
-  );
+  const toggleActiveCSS = cn("text-white bg-content-bg-tertiary border border-brand-primary/50");
   const toggleInactiveCSS = cn(
     "text-content-text-secondary bg-content-bg-secondary",
     "hover:bg-content-bg-tertiary hover:text-white",
@@ -160,10 +152,12 @@ export function FilterNav({
                     to={link}
                     className={cn(toggleCSS, hasParam ? toggleActiveCSS : toggleInactiveCSS)}
                   >
-                    <span className={cn(
-                      "w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[10px]",
-                      hasParam ? "bg-brand-primary border-brand-primary text-white" : "border-content-text-tertiary"
-                    )}>
+                    <span
+                      className={cn(
+                        "w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[10px]",
+                        hasParam ? "bg-brand-primary border-brand-primary text-white" : "border-content-text-tertiary",
+                      )}
+                    >
                       {hasParam && "✓"}
                     </span>
                     {parameter}

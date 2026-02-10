@@ -31,7 +31,7 @@ function SearchResultItem({ result, onClose }: SearchResultItemProps) {
   const handleClick = () => {
     navigate(result.url);
     // Only close on mobile/touch devices
-    if (onClose && window.matchMedia('(max-width: 768px)').matches) {
+    if (onClose && window.matchMedia("(max-width: 768px)").matches) {
       onClose();
     }
   };
@@ -169,21 +169,21 @@ export function GlobalSearchDrawer({ open, onOpenChange }: GlobalSearchDrawerPro
 
   const handleFeedback = useCallback(
     async (searchId: string, sentiment: "positive" | "negative", feedback?: string) => {
-        const response = await fetch("/api/search/feedback", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            searchHistoryId: searchId,
-            sentiment,
-            feedbackMessage: feedback,
-          }),
-        });
+      const response = await fetch("/api/search/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          searchHistoryId: searchId,
+          sentiment,
+          feedbackMessage: feedback,
+        }),
+      });
 
-        if (!response.ok) {
-          throw new Error("Failed to submit feedback");
-        }
+      if (!response.ok) {
+        throw new Error("Failed to submit feedback");
+      }
     },
     [],
   );

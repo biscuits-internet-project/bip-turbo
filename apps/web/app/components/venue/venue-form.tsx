@@ -11,23 +11,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { COUNTRIES, US_STATES, CANADIAN_PROVINCES } from "@bip/core/venues/venue-constants";
 
 // Create a schema for venue form (omitting auto-generated fields)
-export const venueFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  city: z.string().min(1, "City is required").refine((city) => !city.includes(","), {
-    message: "City name should not contain commas",
-  }),
-  state: z.string().nullable(),
-  country: z.string().min(1, "Country is required"),
-}).refine((data) => {
-  // Custom validation: if country is US or Canada, state is required
-  if (data.country === "United States" || data.country === "Canada") {
-    return data.state && data.state.trim() !== "";
-  }
-  return true;
-}, {
-  message: "State/Province is required for United States and Canada",
-  path: ["state"],
-});
+export const venueFormSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    city: z
+      .string()
+      .min(1, "City is required")
+      .refine((city) => !city.includes(","), {
+        message: "City name should not contain commas",
+      }),
+    state: z.string().nullable(),
+    country: z.string().min(1, "Country is required"),
+  })
+  .refine(
+    (data) => {
+      // Custom validation: if country is US or Canada, state is required
+      if (data.country === "United States" || data.country === "Canada") {
+        return data.state && data.state.trim() !== "";
+      }
+      return true;
+    },
+    {
+      message: "State/Province is required for United States and Canada",
+      path: ["state"],
+    },
+  );
 
 export type VenueFormValues = z.infer<typeof venueFormSchema>;
 
@@ -128,14 +136,17 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           name="state"
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "state"> }) => {
             const isUSOrCanada = selectedCountry === "United States" || selectedCountry === "Canada";
-            const stateOptions = selectedCountry === "United States" ? US_STATES :
-                               selectedCountry === "Canada" ? CANADIAN_PROVINCES : [];
+            const stateOptions =
+              selectedCountry === "United States" ? US_STATES : selectedCountry === "Canada" ? CANADIAN_PROVINCES : [];
 
             return (
               <FormItem>
                 <FormLabel className="text-content-text-primary">
-                  {selectedCountry === "United States" ? "State" :
-                   selectedCountry === "Canada" ? "Province" : "State/Province"}
+                  {selectedCountry === "United States"
+                    ? "State"
+                    : selectedCountry === "Canada"
+                      ? "Province"
+                      : "State/Province"}
                   {isUSOrCanada && <span className="text-error">*</span>}
                 </FormLabel>
                 <FormControl>
@@ -146,7 +157,9 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                       key={selectedCountry}
                     >
                       <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
-                        <SelectValue placeholder={`Select ${selectedCountry === "United States" ? "state" : "province"}`} />
+                        <SelectValue
+                          placeholder={`Select ${selectedCountry === "United States" ? "state" : "province"}`}
+                        />
                       </SelectTrigger>
                       <SelectContent className="max-h-[200px] overflow-y-auto bg-dropdown border border-border">
                         {stateOptions.map((option) => (

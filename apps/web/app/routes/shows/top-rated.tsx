@@ -68,7 +68,7 @@ function RatingCell({ show, userRating }: { show: ShowWithRank; userRating?: num
         localHasRated
           ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
           : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
-        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
+        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
       )}
     >
       {isExpanded ? (
