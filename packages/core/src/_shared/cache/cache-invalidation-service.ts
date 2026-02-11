@@ -55,6 +55,17 @@ export class CacheInvalidationService {
   }
 
   /**
+   * Invalidate all song-related caches (index page and filtered results)
+   */
+  async invalidateSongCaches(): Promise<void> {
+    this.logger.info("Invalidating all song caches");
+    await Promise.all([
+      this.cache.del(CacheKeys.songs.index()),
+      this.cache.delPattern(CacheKeys.songs.allFiltered()),
+    ]);
+  }
+
+  /**
    * Comprehensive show invalidation - clears all caches related to a show
    */
   async invalidateShowComprehensive(showId?: string, slug?: string): Promise<void> {
@@ -64,6 +75,7 @@ export class CacheInvalidationService {
       slug ? this.invalidateShow(slug) : Promise.resolve(),
       showId ? this.invalidateShowReviews(showId) : Promise.resolve(),
       this.invalidateShowListings(),
+      this.invalidateSongCaches(),
     ]);
   }
 
