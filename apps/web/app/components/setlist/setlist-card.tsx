@@ -1,5 +1,5 @@
 import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
-import { Camera, Check, Flame } from "lucide-react";
+import { Camera, Check, Flame, } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating";
@@ -19,7 +19,13 @@ interface SetlistCardProps {
   showRating: number | null;
 }
 
-function SetlistCardComponent({ setlist, className, userAttendance, userRating, showRating }: SetlistCardProps) {
+function SetlistCardComponent({
+  setlist,
+  className,
+  userAttendance,
+  userRating,
+  showRating,
+}: SetlistCardProps) {
   const { user } = useSession();
   const formattedDate = formatDateShort(setlist.show.date);
   const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
@@ -87,9 +93,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
     const previousAttendance = localAttendance; // Capture BEFORE optimistic update
 
     // Optimistically update local state
-    setLocalAttendance(
-      previousAttendance ? null : ({ id: "optimistic", showId: setlist.show.id, userId: "" } as Attendance),
-    );
+    setLocalAttendance(previousAttendance ? null : ({ id: "optimistic", showId: setlist.show.id, userId: "" } as Attendance));
 
     attendanceMutation.mutate(
       { showId: setlist.show.id, currentAttendance: previousAttendance },
@@ -107,7 +111,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
           // Revert on error using captured previous value
           setLocalAttendance(previousAttendance);
         },
-      },
+      }
     );
   };
 
@@ -193,21 +197,14 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                     ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"
                     : "glass-secondary border border-dashed border-glass-border hover:border-green-500/30",
                   isAttendanceAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
-                  attendanceMutation.isPending && "opacity-50",
+                  attendanceMutation.isPending && "opacity-50"
                 )}
               >
-                <Check
-                  className={cn(
-                    "h-3.5 w-3.5 sm:h-4 sm:w-4",
-                    isAttending ? "text-green-500" : "text-content-text-tertiary",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-sm font-medium hidden sm:inline",
-                    isAttending ? "text-green-400" : "text-content-text-secondary",
-                  )}
-                >
+                <Check className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", isAttending ? "text-green-500" : "text-content-text-tertiary")} />
+                <span className={cn(
+                  "text-sm font-medium hidden sm:inline",
+                  isAttending ? "text-green-400" : "text-content-text-secondary"
+                )}>
                   {isAttending ? "Saw it" : "Saw it?"}
                 </span>
               </button>
@@ -222,7 +219,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                   localHasRated
                     ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
                     : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
-                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
                 )}
               >
                 {isRatingExpanded ? (
@@ -246,7 +243,7 @@ function SetlistCardComponent({ setlist, className, userAttendance, userRating, 
                 className={cn(
                   "flex items-center justify-center gap-1 glass-secondary px-2 h-6 sm:px-3 sm:h-8 rounded-md",
                   "cursor-pointer hover:brightness-110 border border-dashed border-glass-border hover:border-amber-500/30",
-                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
                 )}
               >
                 <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />

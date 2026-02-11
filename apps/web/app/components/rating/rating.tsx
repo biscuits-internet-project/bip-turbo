@@ -12,9 +12,7 @@ export const RatingComponent = ({ rating, ratingsCount }: RatingProps) => {
         <Star className="h-3 w-3 sm:h-4 sm:w-4 text-rating-gold mr-0.5 sm:mr-1" />
         <span className="font-medium text-xs sm:text-sm text-content-text-primary">{rating?.toFixed(2) || "—"}</span>
       </div>
-      {ratingsCount && ratingsCount > 0 && (
-        <span className="text-content-text-tertiary text-xs sm:text-sm">({ratingsCount})</span>
-      )}
+      {ratingsCount && ratingsCount > 0 && <span className="text-content-text-tertiary text-xs sm:text-sm">({ratingsCount})</span>}
     </div>
   ) : (
     <div className="text-xs sm:text-sm text-content-text-secondary">Rate</div>

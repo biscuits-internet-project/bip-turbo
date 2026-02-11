@@ -36,7 +36,8 @@ export async function setCookie(name: string, value: string, options: CookieOpti
       await (window as WindowWithCookieStore).cookieStore.set(name, value, cookieOptions);
       return;
     }
-  } catch (_error) {}
+  } catch (_error) {
+  }
 
   // Fallback to document.cookie
   let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
@@ -79,7 +80,8 @@ export async function getCookie(name: string): Promise<string | null> {
       const cookie = await (window as WindowWithCookieStore).cookieStore.get(name);
       return cookie?.value || null;
     }
-  } catch (_error) {}
+  } catch (_error) {
+  }
 
   // Fallback to document.cookie
   const cookies = document.cookie.split(";");
@@ -108,7 +110,8 @@ export async function deleteCookie(name: string, options: Pick<CookieOptions, "p
       await (window as WindowWithCookieStore).cookieStore.delete(name);
       return;
     }
-  } catch (_error) {}
+  } catch (_error) {
+  }
 
   // Fallback to document.cookie - set expiry date in the past
   await setCookie(name, "", {
@@ -128,11 +131,14 @@ export async function clearAllCookies(): Promise<void> {
       await Promise.all(
         cookies
           .filter((cookie): cookie is { name: string } => Boolean(cookie.name))
-          .map((cookie) => (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name)),
+          .map((cookie) =>
+            (window as unknown as WindowWithCookieStore).cookieStore.delete(cookie.name),
+          ),
       );
       return;
     }
-  } catch (_error) {}
+  } catch (_error) {
+  }
 
   // Fallback to document.cookie
   const cookies = document.cookie.split(";");

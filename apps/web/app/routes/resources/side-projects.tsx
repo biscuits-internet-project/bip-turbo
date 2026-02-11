@@ -20,7 +20,8 @@ export default function SideProjects(): ReactElement {
           const data = await response.json();
           setSideProjects(data);
         }
-      } catch (_error) {}
+      } catch (_error) {
+      }
     };
     fetchSideProjects();
   }, []);

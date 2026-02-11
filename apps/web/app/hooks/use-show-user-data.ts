@@ -131,17 +131,20 @@ export function useAttendanceMutation() {
       });
 
       // Optimistically update the cache
-      queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          attendances: {
-            ...oldData.attendances,
-            // Toggle: if currently attending, set to null; otherwise set a placeholder
-            [showId]: currentAttendance ? null : ({ id: "optimistic", showId, userId: "" } as Attendance),
-          },
-        };
-      });
+      queryClient.setQueriesData<ShowUserDataResponse>(
+        { queryKey: ["shows", "user-data"] },
+        (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            attendances: {
+              ...oldData.attendances,
+              // Toggle: if currently attending, set to null; otherwise set a placeholder
+              [showId]: currentAttendance ? null : ({ id: "optimistic", showId, userId: "" } as Attendance),
+            },
+          };
+        }
+      );
 
       return { previousData };
     },
@@ -155,16 +158,19 @@ export function useAttendanceMutation() {
     },
     onSuccess: (result, { showId }) => {
       // Update cache with actual result
-      queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          attendances: {
-            ...oldData.attendances,
-            [showId]: result.attendance,
-          },
-        };
-      });
+      queryClient.setQueriesData<ShowUserDataResponse>(
+        { queryKey: ["shows", "user-data"] },
+        (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            attendances: {
+              ...oldData.attendances,
+              [showId]: result.attendance,
+            },
+          };
+        }
+      );
     },
   });
 }

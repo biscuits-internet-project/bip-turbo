@@ -115,7 +115,8 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
   }, [defaultValues]);
 
   // Log whenever uploaded files change
-  useEffect(() => {}, []);
+  useEffect(() => {
+  }, []);
 
   return (
     <Form {...form}>

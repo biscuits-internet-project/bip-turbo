@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 export interface ParsedSegueQuery {
-  venues: string[]; // Venue IDs that matched
-  songs: string[]; // Individual song IDs (not in segue)
+  venues: string[];      // Venue IDs that matched
+  songs: string[];       // Individual song IDs (not in segue)
   segueSequence: string[]; // Ordered song IDs for segue search
   rawSegments: string[]; // Original text segments
 }
@@ -15,7 +15,9 @@ interface EntityMatch {
 }
 
 export class SegueQueryParser {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(
+    private readonly db: PrismaClient,
+  ) {}
 
   /**
    * Parse a search query that may contain segue sequences and/or venue names
@@ -24,28 +26,27 @@ export class SegueQueryParser {
   async parse(query: string): Promise<ParsedSegueQuery> {
     // Stage 1: Structural parsing - detect segue operator
     const hasSegue = query.includes(">");
-
+    
     if (!hasSegue) {
       // No segue - just do regular entity resolution
       return this.parseSimpleQuery(query);
     }
 
     // Split on > to get segments
-    const segments = query
-      .split(">")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-
+    const segments = query.split(">").map(s => s.trim()).filter(s => s.length > 0);
+    
     if (segments.length < 2) {
       // Not a valid segue query
       return this.parseSimpleQuery(query);
     }
 
     // Stage 2: Entity classification - each segment could be venue or song
-    const segmentMatches = await Promise.all(segments.map((segment) => this.findEntityMatches(segment)));
+    const segmentMatches = await Promise.all(
+      segments.map(segment => this.findEntityMatches(segment))
+    );
 
     // Stage 2.5: Also search the entire query for venue matches
-    const allQueryMatches = await this.findEntityMatches(query.replace(/>/g, " "));
+    const allQueryMatches = await this.findEntityMatches(query.replace(/>/g, ' '));
 
     // Stage 3: Disambiguation through scoring
     const bestParse = this.selectBestParse(segments, segmentMatches, allQueryMatches);
@@ -59,24 +60,24 @@ export class SegueQueryParser {
    */
   private async parseSimpleQuery(query: string): Promise<ParsedSegueQuery> {
     const matches = await this.findEntityMatches(query);
-
+    
     const venues = matches
-      .filter((m) => m.type === "venue")
+      .filter(m => m.type === "venue")
       .sort((a, b) => b.score - a.score)
       .slice(0, 1)
-      .map((m) => m.id);
-
+      .map(m => m.id);
+    
     const songs = matches
-      .filter((m) => m.type === "song")
+      .filter(m => m.type === "song")
       .sort((a, b) => b.score - a.score)
       .slice(0, 3)
-      .map((m) => m.id);
+      .map(m => m.id);
 
     return {
       venues,
       songs,
       segueSequence: [],
-      rawSegments: [query],
+      rawSegments: [query]
     };
   }
 
@@ -88,13 +89,11 @@ export class SegueQueryParser {
     const matches: EntityMatch[] = [];
 
     // Search for matching songs
-    const songs = await this.db.$queryRaw<
-      Array<{
-        id: string;
-        title: string;
-        score: number;
-      }>
-    >`
+    const songs = await this.db.$queryRaw<Array<{
+      id: string;
+      title: string;
+      score: number;
+    }>>`
       SELECT 
         id,
         title,
@@ -105,24 +104,20 @@ export class SegueQueryParser {
       LIMIT 5
     `;
 
-    matches.push(
-      ...songs.map((s) => ({
-        id: s.id,
-        name: s.title,
-        score: s.score,
-        type: "song" as const,
-      })),
-    );
+    matches.push(...songs.map(s => ({
+      id: s.id,
+      name: s.title,
+      score: s.score,
+      type: "song" as const
+    })));
 
     // Search for matching venues
-    const venues = await this.db.$queryRaw<
-      Array<{
-        id: string;
-        name: string;
-        city: string;
-        score: number;
-      }>
-    >`
+    const venues = await this.db.$queryRaw<Array<{
+      id: string;
+      name: string;
+      city: string;
+      score: number;
+    }>>`
       SELECT 
         id,
         name,
@@ -141,14 +136,12 @@ export class SegueQueryParser {
       LIMIT 5
     `;
 
-    matches.push(
-      ...venues.map((v) => ({
-        id: v.id,
-        name: `${v.city} - ${v.name}`,
-        score: v.score,
-        type: "venue" as const,
-      })),
-    );
+    matches.push(...venues.map(v => ({
+      id: v.id,
+      name: `${v.city} - ${v.name}`,
+      score: v.score,
+      type: "venue" as const
+    })));
 
     return matches;
   }
@@ -160,18 +153,18 @@ export class SegueQueryParser {
   private selectBestParse(
     segments: string[],
     segmentMatches: EntityMatch[][],
-    allQueryMatches?: EntityMatch[],
+    allQueryMatches?: EntityMatch[]
   ): ParsedSegueQuery {
     let venues: string[] = [];
 
     // First, check for venues across the entire query (handles "shimmy > basis state college")
     if (allQueryMatches) {
       const globalVenues = allQueryMatches
-        .filter((m) => m.type === "venue" && m.score > 30)
+        .filter(m => m.type === "venue" && m.score > 30)
         .sort((a, b) => b.score - a.score);
-
+      
       if (globalVenues.length > 0) {
-        venues = globalVenues.map((v) => v.id);
+        venues = globalVenues.map(v => v.id);
       }
     }
 
@@ -179,15 +172,15 @@ export class SegueQueryParser {
     if (venues.length === 0) {
       const firstSegmentText = segments[0];
       const firstMatches = segmentMatches[0];
-
+      
       // Check if first segment has a high-scoring venue match
-      const topVenue = firstMatches.find((m) => m.type === "venue" && m.score > 60);
-
+      const topVenue = firstMatches.find(m => m.type === "venue" && m.score > 60);
+      
       if (topVenue && segments.length > 1) {
         // We might have "venue song > song" pattern
         // Try to parse the first segment as venue + song
         const venueAndSong = this.tryParseVenueAndSong(firstSegmentText, firstMatches);
-
+        
         if (venueAndSong) {
           venues = [venueAndSong.venueId];
           // Replace first segment matches with just the song
@@ -198,12 +191,14 @@ export class SegueQueryParser {
 
     // Build segue sequence from all segments
     const segueSequence: string[] = [];
-
+    
     for (let i = 0; i < segments.length; i++) {
       const matches = segmentMatches[i];
       // Pick the best song match for each segment
-      const bestSong = matches.filter((m) => m.type === "song").sort((a, b) => b.score - a.score)[0];
-
+      const bestSong = matches
+        .filter(m => m.type === "song")
+        .sort((a, b) => b.score - a.score)[0];
+      
       if (bestSong) {
         segueSequence.push(bestSong.id);
       }
@@ -213,7 +208,7 @@ export class SegueQueryParser {
       venues,
       songs: [],
       segueSequence,
-      rawSegments: segments,
+      rawSegments: segments
     };
   }
 
@@ -221,10 +216,13 @@ export class SegueQueryParser {
    * Try to parse a segment as venue + song combination
    * Example: "new york little shimmy" -> venue: "New York", song: "Little Shimmy in a Conga Line"
    */
-  private tryParseVenueAndSong(text: string, matches: EntityMatch[]): { venueId: string; song: EntityMatch } | null {
-    const topVenue = matches.find((m) => m.type === "venue" && m.score > 60);
-    const topSong = matches.find((m) => m.type === "song" && m.score > 50);
-
+  private tryParseVenueAndSong(
+    text: string,
+    matches: EntityMatch[]
+  ): { venueId: string; song: EntityMatch } | null {
+    const topVenue = matches.find(m => m.type === "venue" && m.score > 60);
+    const topSong = matches.find(m => m.type === "song" && m.score > 50);
+    
     if (!topVenue || !topSong) {
       return null;
     }
@@ -234,26 +232,26 @@ export class SegueQueryParser {
     const words = text.toLowerCase().split(/\s+/);
     const venueWords = topVenue.name.toLowerCase().split(/\s+/);
     const songWords = topSong.name.toLowerCase().split(/\s+/);
-
+    
     let hasVenueMatch = false;
     let hasSongMatch = false;
-
+    
     for (const word of words) {
-      if (venueWords.some((vw) => vw.includes(word) || word.includes(vw))) {
+      if (venueWords.some(vw => vw.includes(word) || word.includes(vw))) {
         hasVenueMatch = true;
       }
-      if (songWords.some((sw) => sw.includes(word) || word.includes(sw))) {
+      if (songWords.some(sw => sw.includes(word) || word.includes(sw))) {
         hasSongMatch = true;
       }
     }
-
+    
     if (hasVenueMatch && hasSongMatch) {
       return {
         venueId: topVenue.id,
-        song: topSong,
+        song: topSong
       };
     }
-
+    
     return null;
   }
 
@@ -269,12 +267,12 @@ export class SegueQueryParser {
     // Build the sequence string to search for
     const songNames = await this.db.song.findMany({
       where: { id: { in: songIds } },
-      select: { id: true, title: true },
+      select: { id: true, title: true }
     });
 
-    const songMap = new Map(songNames.map((s) => [s.id, s.title]));
+    const songMap = new Map(songNames.map(s => [s.id, s.title]));
     const sequencePattern = songIds
-      .map((id) => songMap.get(id))
+      .map(id => songMap.get(id))
       .filter(Boolean)
       .join(" > ");
 
@@ -285,6 +283,6 @@ export class SegueQueryParser {
       LIMIT 100
     `;
 
-    return runs.map((r) => ({ showId: r.show_id, segueRunId: r.segue_run_id }));
+    return runs.map(r => ({ showId: r.show_id, segueRunId: r.segue_run_id }));
   }
 }

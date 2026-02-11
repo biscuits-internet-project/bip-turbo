@@ -38,7 +38,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
 
   const handleNegativeFeedbackSubmit = async () => {
     if (!feedback.trim()) return;
-
+    
     setIsSubmitting(true);
     try {
       await onFeedback(searchId, "negative", feedback);
@@ -72,9 +72,9 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
 
   if (showThanks) {
     return (
-      <div
-        className={`flex items-center gap-2 text-sm transition-all duration-1000 ease-out transform ${showThanks ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-2"} ${className}`}
-        style={{ color: "hsl(var(--success))" }}
+      <div 
+        className={`flex items-center gap-2 text-sm transition-all duration-1000 ease-out transform ${showThanks ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2'} ${className}`} 
+        style={{color: 'hsl(var(--success))'}}
       >
         <ThumbsUp size={16} className="fill-current" />
         <span>Thanks for your feedback!</span>
@@ -106,7 +106,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
             {isSubmitting ? "Submitting..." : "Submit Feedback"}
           </Button>
           <Button
-            size="sm"
+            size="sm" 
             variant="outline"
             onClick={() => {
               setShowFeedbackText(false);
@@ -121,27 +121,24 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
     );
   }
 
+
   return (
-    <div
-      className={`flex items-center gap-2 !text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-500 ${className}`}
-    >
-      <span className="text-sm !text-muted-foreground" style={{ color: "hsl(var(--muted-foreground)) !important" }}>
-        Was this helpful?
-      </span>
+    <div className={`flex items-center gap-2 !text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-500 ${className}`}>
+      <span className="text-sm !text-muted-foreground" style={{ color: 'hsl(var(--muted-foreground)) !important' }}>Was this helpful?</span>
       <div className="flex gap-1">
         <button
           type="button"
           onClick={handleThumbsUp}
           disabled={isSubmitting}
           className="p-2 h-8 w-8 cursor-pointer !text-muted-foreground rounded transition-colors"
-          style={{ color: "hsl(var(--muted-foreground)) !important" }}
+          style={{ color: 'hsl(var(--muted-foreground)) !important' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.2)";
-            e.currentTarget.style.color = "rgb(34, 197, 94)";
+            e.currentTarget.style.backgroundColor = 'rgba(34, 197, 94, 0.2)';
+            e.currentTarget.style.color = 'rgb(34, 197, 94)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "";
-            e.currentTarget.style.color = "hsl(var(--muted-foreground))";
+            e.currentTarget.style.backgroundColor = '';
+            e.currentTarget.style.color = 'hsl(var(--muted-foreground))';
           }}
         >
           <ThumbsUp size={14} />
@@ -151,14 +148,14 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
           onClick={handleThumbsDown}
           disabled={isSubmitting}
           className="p-2 h-8 w-8 cursor-pointer !text-muted-foreground rounded transition-colors"
-          style={{ color: "hsl(var(--muted-foreground)) !important" }}
+          style={{ color: 'hsl(var(--muted-foreground)) !important' }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
-            e.currentTarget.style.color = "rgb(239, 68, 68)";
+            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+            e.currentTarget.style.color = 'rgb(239, 68, 68)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "";
-            e.currentTarget.style.color = "hsl(var(--muted-foreground))";
+            e.currentTarget.style.backgroundColor = '';
+            e.currentTarget.style.color = 'hsl(var(--muted-foreground))';
           }}
         >
           <ThumbsDown size={14} />

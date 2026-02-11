@@ -22,8 +22,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       status: 302,
       headers: {
         ...headers,
-        Location: "/auth/forgot-password?error=expired_link",
-      },
+        Location: "/auth/forgot-password?error=expired_link"
+      }
     });
   }
 

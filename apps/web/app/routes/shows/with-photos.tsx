@@ -102,7 +102,9 @@ export default function ShowsWithPhotos() {
                   className="px-2 py-1.5 text-sm font-medium rounded-md text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white transition-all"
                 >
                   {year}
-                  <span className="ml-1 text-xs text-content-text-tertiary">({setlistsByYear[year].length})</span>
+                  <span className="ml-1 text-xs text-content-text-tertiary">
+                    ({setlistsByYear[year].length})
+                  </span>
                 </a>
               ))}
             </div>

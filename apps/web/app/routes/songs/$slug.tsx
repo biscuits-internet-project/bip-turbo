@@ -112,7 +112,7 @@ function TrackRatingCell({
         "glass-secondary border border-dashed border-glass-border",
         user && "hover:brightness-110 cursor-pointer hover:border-amber-500/30",
         !user && "cursor-pointer hover:border-amber-500/30",
-        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
       )}
     >
       {isExpanded ? (
@@ -132,7 +132,9 @@ function TrackRatingCell({
   if (!user) {
     return (
       <div className="w-[140px]">
-        <LoginPromptPopover message="Sign in to rate">{ratingButton}</LoginPromptPopover>
+        <LoginPromptPopover message="Sign in to rate">
+          {ratingButton}
+        </LoginPromptPopover>
       </div>
     );
   }

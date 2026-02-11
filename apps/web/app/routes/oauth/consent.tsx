@@ -19,9 +19,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase } = getServerClient(request);
 
   // Check if user is logged in
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     // Redirect to login, then back here
     const returnUrl = encodeURIComponent(request.url);
@@ -86,10 +84,11 @@ export default function OAuthConsent() {
               Authorize Application
             </CardTitle>
             <CardDescription className="text-base text-content-text-secondary">
-              <strong className="text-content-text-primary">{client?.name || "An application"}</strong> wants to access
-              your account
+              <strong className="text-content-text-primary">{client?.name || "An application"}</strong> wants to access your account
             </CardDescription>
-            <p className="text-sm text-content-text-tertiary">Signed in as {user.email}</p>
+            <p className="text-sm text-content-text-tertiary">
+              Signed in as {user.email}
+            </p>
           </CardHeader>
 
           <CardContent className="relative space-y-6">

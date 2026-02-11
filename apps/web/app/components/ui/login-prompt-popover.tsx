@@ -6,14 +6,20 @@ interface LoginPromptPopoverProps {
   message?: string;
 }
 
-export function LoginPromptPopover({ children, message = "Sign in to rate" }: LoginPromptPopoverProps) {
+export function LoginPromptPopover({
+  children,
+  message = "Sign in to rate",
+}: LoginPromptPopoverProps) {
   const location = useLocation();
   const returnTo = encodeURIComponent(location.pathname + location.search);
 
   return (
     <Popover>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-auto glass-content border-glass-border p-3" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent
+        className="w-auto glass-content border-glass-border p-3"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-3">
           <p className="text-sm text-content-text-secondary">{message}</p>
           <Link

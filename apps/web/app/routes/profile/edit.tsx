@@ -69,7 +69,8 @@ export default function ProfileEdit() {
         if (supabase) {
           try {
             await supabase.auth.refreshSession();
-          } catch (_error) {}
+          } catch (_error) {
+          }
         }
       } else {
         const error = await response.json();
@@ -96,9 +97,7 @@ export default function ProfileEdit() {
     }
   };
 
-  const handleAvatarUploadComplete = async (
-    images: { id: string; filename: string; variants: Record<string, string> }[],
-  ) => {
+  const handleAvatarUploadComplete = async (images: { id: string; filename: string; variants: Record<string, string> }[]) => {
     setIsUploadingAvatar(false);
     // Clean up local preview URL since we now have a remote URL
     if (localPreviewUrlRef.current) {
@@ -115,7 +114,8 @@ export default function ProfileEdit() {
       if (supabase) {
         try {
           await supabase.auth.refreshSession();
-        } catch (_error) {}
+        } catch (_error) {
+        }
       }
     }
   };

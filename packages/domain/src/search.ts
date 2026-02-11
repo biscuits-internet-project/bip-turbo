@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // Database row from search queries
 export const SearchRowResultSchema = z.object({
@@ -37,13 +37,13 @@ export const TrackMatchSchema = z.object({
 });
 
 export const TrackMatchDetailsSchema = z.object({
-  type: z.literal("trackMatches"),
+  type: z.literal('trackMatches'),
   tracks: z.array(TrackMatchSchema),
 });
 
 // Segue match details schema
 export const SegueMatchDetailsSchema = z.object({
-  type: z.literal("segue"),
+  type: z.literal('segue'),
   song1: z.string(),
   song2: z.string(),
   segueSymbol: z.string(),
@@ -56,7 +56,7 @@ export const SegueMatchDetailsSchema = z.object({
 
 // SegueRun match details schema
 export const SegueRunMatchDetailsSchema = z.object({
-  type: z.literal("segueMatch"),
+  type: z.literal('segueMatch'),
   segueRun: z.object({
     set: z.string(),
     sequence: z.string(),
@@ -65,7 +65,7 @@ export const SegueRunMatchDetailsSchema = z.object({
 });
 
 // Union of all match detail types
-export const MatchDetailsSchema = z.discriminatedUnion("type", [
+export const MatchDetailsSchema = z.discriminatedUnion('type', [
   TrackMatchDetailsSchema,
   SegueMatchDetailsSchema,
   SegueRunMatchDetailsSchema,
@@ -81,17 +81,15 @@ export type MatchDetails = z.infer<typeof MatchDetailsSchema>;
 // Search result schema
 export const SearchResultSchema = z.object({
   id: z.string(),
-  entityType: z.enum(["show", "track", "song", "venue"]),
+  entityType: z.enum(['show', 'track', 'song', 'venue']),
   entityId: z.string(),
   entitySlug: z.string(),
   displayText: z.string(),
   score: z.number(),
   url: z.string(),
-  metadata: z
-    .object({
-      matchDetails: z.string().optional(), // JSON string that can be parsed to MatchDetails
-    })
-    .optional(),
+  metadata: z.object({
+    matchDetails: z.string().optional(), // JSON string that can be parsed to MatchDetails
+  }).optional(),
   // Additional fields for rich display
   date: z.string().optional(),
   venueName: z.string().optional(),

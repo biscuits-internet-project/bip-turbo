@@ -397,9 +397,7 @@ export class UserService {
 
     if (metric === "blogPostCount") {
       this.logger.info("Top bloggers after filter", {
-        topBloggers: filteredStats
-          .slice(0, 3)
-          .map((s) => ({ username: s.user.username, blogPostCount: s.blogPostCount })),
+        topBloggers: filteredStats.slice(0, 3).map((s) => ({ username: s.user.username, blogPostCount: s.blogPostCount })),
       });
     }
 

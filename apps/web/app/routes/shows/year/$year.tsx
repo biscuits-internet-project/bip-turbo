@@ -27,7 +27,13 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const MIN_SEARCH_CHARS = 4;
 
 // Cache headers for CDN edge caching - different TTLs for current vs past years
-export function headers({ loaderHeaders, data }: { loaderHeaders: Headers; data: LoaderData | undefined }): Headers {
+export function headers({
+  loaderHeaders,
+  data,
+}: {
+  loaderHeaders: Headers;
+  data: LoaderData | undefined;
+}): Headers {
   const headers = new Headers(loaderHeaders);
   const loaderData = data;
   const currentYear = new Date().getFullYear();
@@ -51,7 +57,7 @@ export function headers({ loaderHeaders, data }: { loaderHeaders: Headers; data:
   }
 
   return headers;
-}
+};
 
 export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
@@ -283,9 +289,7 @@ export default function ShowsByYear() {
                                 setlist={setlist}
                                 userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                                 userRating={userRatingMap.get(setlist.show.id) ?? null}
-                                showRating={
-                                  averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating
-                                }
+                                showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
                                 className="transition-all duration-300 transform hover:scale-[1.01]"
                               />
                             </div>

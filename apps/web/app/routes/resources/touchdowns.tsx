@@ -44,7 +44,8 @@ export default function Touchdowns() {
         const data: AcastApiResponse = await response.json();
 
         setEpisodes(data.episodes || []);
-      } catch (_error) {}
+      } catch (_error) {
+      }
     };
 
     fetchEpisodes();
