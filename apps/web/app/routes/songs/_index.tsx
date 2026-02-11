@@ -9,6 +9,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
 import { ERA_OPTIONS, YEAR_OPTIONS } from "~/lib/song-filters";
@@ -131,12 +132,14 @@ const labelClass =
 
 export default function Songs() {
   const { songs, trendingSongs, yearlyTrendingSongs, recentShowsCount } = useSerializedLoaderData<LoaderData>();
+  const { user } = useSession();
   const [searchParams] = useSearchParams();
   const yearParam = searchParams.get("year");
   const eraParam = searchParams.get("era");
   const playedParam = searchParams.get("played");
   const authorParam = searchParams.get("author");
   const coverParam = searchParams.get("cover");
+  const attendedParam = searchParams.get("attended");
 
   const [selectedYear, setSelectedYear] = useState<string>(yearParam || "all");
   const [selectedEra, setSelectedEra] = useState<string>(eraParam || "all");
@@ -147,15 +150,18 @@ export default function Songs() {
   const [coverFilter, setCoverFilter] = useState<"all" | "cover" | "original">(
     coverParam === "cover" ? "cover" : coverParam === "original" ? "original" : "all",
   );
+  const [attendedFilter, setAttendedFilter] = useState<"all" | "attended">(
+    attendedParam === "attended" ? "attended" : "all",
+  );
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(songs);
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
 
   // Auto-expand if URL has advanced filter params
-  const hasAdvancedParams = yearParam || eraParam || playedParam === "notPlayed";
+  const hasAdvancedParams = yearParam || eraParam || playedParam === "notPlayed" || attendedParam === "attended";
   const [showMoreFilters, setShowMoreFilters] = useState(!!hasAdvancedParams);
 
   const hasDateRange = selectedYear !== "all" || selectedEra !== "all";
-  const hasAnyFilter = hasDateRange || selectedAuthor || coverFilter !== "all";
+  const hasAnyFilter = hasDateRange || selectedAuthor || coverFilter !== "all" || attendedFilter !== "all";
 
   // Helper to update URL without React Router re-render
   const updateUrl = (params: {
@@ -164,6 +170,7 @@ export default function Songs() {
     played?: "played" | "notPlayed";
     author?: string | null;
     cover?: "all" | "cover" | "original";
+    attended?: "all" | "attended";
   }) => {
     const newParams = new URLSearchParams(window.location.search);
     if (params.year && params.year !== "all") {
@@ -177,7 +184,8 @@ export default function Songs() {
       newParams.delete("era");
     }
     const hasDateRangeParam = (params.year && params.year !== "all") || (params.era && params.era !== "all");
-    if (hasDateRangeParam && params.played === "notPlayed") {
+    const hasAttendedParam = params.attended && params.attended !== "all";
+    if ((hasDateRangeParam || hasAttendedParam) && params.played === "notPlayed") {
       newParams.set("played", "notPlayed");
     } else {
       newParams.delete("played");
@@ -192,6 +200,11 @@ export default function Songs() {
     } else {
       newParams.delete("cover");
     }
+    if (params.attended && params.attended !== "all") {
+      newParams.set("attended", params.attended);
+    } else {
+      newParams.delete("attended");
+    }
     const newUrl = newParams.toString()
       ? `${window.location.pathname}?${newParams.toString()}`
       : window.location.pathname;
@@ -200,7 +213,13 @@ export default function Songs() {
 
   // Fetch filtered songs when any filter changes
   useEffect(() => {
-    if (selectedYear === "all" && selectedEra === "all" && !selectedAuthor && coverFilter === "all") {
+    if (
+      selectedYear === "all" &&
+      selectedEra === "all" &&
+      !selectedAuthor &&
+      coverFilter === "all" &&
+      attendedFilter === "all"
+    ) {
       setFilteredSongs(songs);
       setIsLoadingFiltered(false);
       return undefined;
@@ -220,7 +239,7 @@ export default function Songs() {
     if (selectedEra !== "all") {
       params.set("era", selectedEra);
     }
-    if ((selectedYear !== "all" || selectedEra !== "all") && playedFilter === "notPlayed") {
+    if ((selectedYear !== "all" || selectedEra !== "all" || attendedFilter !== "all") && playedFilter === "notPlayed") {
       params.set("played", "notPlayed");
     }
     if (selectedAuthor && selectedAuthor !== "none") {
@@ -228,6 +247,9 @@ export default function Songs() {
     }
     if (coverFilter !== "all") {
       params.set("cover", coverFilter);
+    }
+    if (attendedFilter !== "all") {
+      params.set("attended", attendedFilter);
     }
 
     fetch(`/api/songs?${params.toString()}`, { signal: controller.signal })
@@ -255,7 +277,7 @@ export default function Songs() {
       controller.abort();
       clearTimeout(loadingTimeout);
     };
-  }, [selectedYear, selectedEra, playedFilter, selectedAuthor, coverFilter, songs]);
+  }, [selectedYear, selectedEra, playedFilter, selectedAuthor, coverFilter, attendedFilter, songs]);
 
   const filterPanel = (
     <>
@@ -274,6 +296,7 @@ export default function Songs() {
               played: playedFilter,
               author: newAuthor,
               cover: coverFilter,
+              attended: attendedFilter,
             });
           }}
           placeholder="All Authors"
@@ -295,6 +318,7 @@ export default function Songs() {
               played: playedFilter,
               author: selectedAuthor,
               cover: newCoverFilter,
+              attended: attendedFilter,
             });
           }}
         >
@@ -352,6 +376,7 @@ export default function Songs() {
                 played: playedFilter,
                 author: selectedAuthor,
                 cover: coverFilter,
+                attended: attendedFilter,
               });
             }}
           >
@@ -388,6 +413,7 @@ export default function Songs() {
                 played: playedFilter,
                 author: selectedAuthor,
                 cover: coverFilter,
+                attended: attendedFilter,
               });
             }}
           >
@@ -406,7 +432,41 @@ export default function Songs() {
             </SelectContent>
           </Select>
         </div>
-        {hasDateRange && (
+        {user && (
+          <div className="flex flex-col">
+            <label htmlFor="attended-filter" className={labelClass}>
+              Attendance
+            </label>
+            <Select
+              value={attendedFilter}
+              onValueChange={(value) => {
+                const newAttendedFilter = value as "all" | "attended";
+                setAttendedFilter(newAttendedFilter);
+                updateUrl({
+                  year: selectedYear,
+                  era: selectedEra,
+                  played: playedFilter,
+                  author: selectedAuthor,
+                  cover: coverFilter,
+                  attended: newAttendedFilter,
+                });
+              }}
+            >
+              <SelectTrigger id="attended-filter" className={`w-[130px] ${selectTriggerClass}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={selectContentClass}>
+                <SelectItem value="all" className={selectItemClass}>
+                  All Shows
+                </SelectItem>
+                <SelectItem value="attended" className={selectItemClass}>
+                  Attended
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {(hasDateRange || attendedFilter !== "all") && (
           <div className="flex flex-col">
             <label htmlFor="played-filter" className={labelClass}>
               Played
@@ -422,6 +482,7 @@ export default function Songs() {
                   played: newPlayedFilter,
                   author: selectedAuthor,
                   cover: coverFilter,
+                  attended: attendedFilter,
                 });
               }}
             >
@@ -450,7 +511,8 @@ export default function Songs() {
                 setPlayedFilter("played");
                 setSelectedAuthor(null);
                 setCoverFilter("all");
-                updateUrl({ year: "all", era: "all", played: "played", author: null, cover: "all" });
+                setAttendedFilter("all");
+                updateUrl({ year: "all", era: "all", played: "played", author: null, cover: "all", attended: "all" });
               }}
               className="text-sm text-content-text-tertiary hover:text-content-text-secondary underline h-[42px] flex items-center"
             >

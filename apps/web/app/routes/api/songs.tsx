@@ -16,7 +16,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 async function splitByPlayStatus(
 	filteredSongs: Song[],
 	showNotPlayed: boolean,
-	baseFilter: { authorId?: string; cover?: boolean },
+	baseFilter: { authorId?: string; cover?: boolean; attendedUserId?: string },
 ): Promise<Song[]> {
 	const playedInFilter = filteredSongs.filter((song) => song.timesPlayed > 0);
 
@@ -24,8 +24,10 @@ async function splitByPlayStatus(
 		return playedInFilter;
 	}
 
-	// Get all songs matching the same author/cover filters, but without date range
-	const allSongs = await services.songs.findMany(baseFilter);
+	// Get all songs matching author/cover, but without date range or attended constraint.
+	// This ensures "not played" = played overall but not in the filtered view.
+	const { attendedUserId: _, ...baseFilterWithoutAttended } = baseFilter;
+	const allSongs = await services.songs.findMany(baseFilterWithoutAttended);
 	const allSongsPlayed = allSongs.filter((song) => song.timesPlayed > 0);
 
 	// Songs NOT played in this filter = matching played songs minus filter played
@@ -36,7 +38,7 @@ async function splitByPlayStatus(
 	return notPlayed.sort((a, b) => b.timesPlayed - a.timesPlayed);
 }
 
-export const loader = publicLoader(async ({ request }) => {
+export const loader = publicLoader(async ({ request, context }) => {
 	const url = new URL(request.url);
 	const query = url.searchParams.get("q");
 	const year = url.searchParams.get("year");
@@ -44,6 +46,7 @@ export const loader = publicLoader(async ({ request }) => {
 	const playedParam = url.searchParams.get("played");
 	const authorParam = url.searchParams.get("author");
 	const coverParam = url.searchParams.get("cover");
+	const attendedParam = url.searchParams.get("attended");
 	const showNotPlayed = playedParam === "notPlayed";
 
 	const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
@@ -53,12 +56,21 @@ export const loader = publicLoader(async ({ request }) => {
 		logger.warn("Ignoring invalid author filter", { authorParam });
 	}
 
+	// Resolve internal user ID for attended filter
+	let attendedUserId: string | undefined;
+	if (attendedParam === "attended" && context.currentUser) {
+		const localUser = await services.users.findByEmail(context.currentUser.email);
+		if (localUser) {
+			attendedUserId = localUser.id;
+		}
+	}
+
 	// Year and era both resolve to a date-range key in SONG_FILTERS (mutually exclusive)
 	const dateRangeKey = year || era;
 	const hasDateRange = dateRangeKey && dateRangeKey in SONG_FILTERS;
 
-	// Handle filtering by author, cover, date range, or any combination
-	if (authorId || coverFilter !== undefined || hasDateRange) {
+	// Handle filtering by author, cover, date range, attended, or any combination
+	if (authorId || coverFilter !== undefined || hasDateRange || attendedUserId) {
 		try {
 			const cacheKey = CacheKeys.songs.filtered({
 				year: year || null,
@@ -66,14 +78,22 @@ export const loader = publicLoader(async ({ request }) => {
 				played: playedParam || null,
 				author: authorId || null,
 				cover: coverParam || null,
+				attended: attendedUserId || null,
 			});
 
 			return await services.cache.getOrSet(
 				cacheKey,
 				async () => {
-					const filter: { authorId?: string; cover?: boolean; startDate?: Date; endDate?: Date } = {};
+					const filter: {
+						authorId?: string;
+						cover?: boolean;
+						startDate?: Date;
+						endDate?: Date;
+						attendedUserId?: string;
+					} = {};
 					if (authorId) filter.authorId = authorId;
 					if (coverFilter !== undefined) filter.cover = coverFilter;
+					if (attendedUserId) filter.attendedUserId = attendedUserId;
 
 					let songs: Song[];
 					if (hasDateRange) {
@@ -83,7 +103,7 @@ export const loader = publicLoader(async ({ request }) => {
 						songs = await services.songs.findMany(filter);
 					}
 
-					const filtered = await splitByPlayStatus(songs, showNotPlayed && !!hasDateRange, filter);
+					const filtered = await splitByPlayStatus(songs, showNotPlayed && (!!hasDateRange || !!attendedUserId), filter);
 					return addVenueInfoToSongs(filtered);
 				},
 				{ ttl: 3600 },
