@@ -1,4 +1,5 @@
 import type { Song, TrendingSong } from "@bip/domain";
+import { CacheKeys } from "@bip/domain/cache-keys";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
+import { ERA_OPTIONS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 import { SongsTable } from "../../components/song/songs-table";
@@ -22,7 +24,7 @@ interface LoaderData {
 }
 
 export const loader = publicLoader(async (): Promise<LoaderData> => {
-  const cacheKey = "songs:index:full";
+  const cacheKey = CacheKeys.songs.index();
   const cacheOptions = { ttl: 3600 }; // 1 hour
 
   return await services.cache.getOrSet(
@@ -119,13 +121,6 @@ function YearlyTrendingSongs() {
 export function meta() {
   return getSongsMeta();
 }
-
-const ERA_OPTIONS = [
-  { value: "sammy", label: "Sammy Era" },
-  { value: "allen", label: "Allen Era" },
-  { value: "marlon", label: "Marlon Era" },
-  { value: "triscuits", label: "Triscuits" },
-] as const;
 
 export default function Songs() {
   const { songs, trendingSongs, yearlyTrendingSongs, recentShowsCount } = useSerializedLoaderData<LoaderData>();

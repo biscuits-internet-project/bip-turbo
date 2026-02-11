@@ -1,37 +1,38 @@
 import type { Song } from "@bip/domain";
+import { CacheKeys } from "@bip/domain/cache-keys";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
+import { SONG_FILTERS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const SONG_FILTERS = {
-	sammy: { endDate: new Date("2005-08-27") },
-	allen: { startDate: new Date("2005-12-28"), endDate: new Date("2025-09-07") },
-	marlon: { startDate: new Date("2025-10-31") },
-	triscuits: { startDate: new Date("2000-03-11"), endDate: new Date("2000-07-12") },
-};
-
 /**
- * For "not played" songs in an era, sort by their overall times played (most popular first).
- * For "played" songs, just filter to those with timesPlayed > 0.
+ * For "not played" songs: returns songs that have been played overall
+ * but NOT in the filtered results, retaining their overall timesPlayed count.
+ * For "played" songs: filters to those with timesPlayed > 0 in the filtered results.
  */
-async function filterByPlayStatus(songs: Song[], showNotPlayed: boolean): Promise<Song[]> {
+async function splitByPlayStatus(
+	filteredSongs: Song[],
+	showNotPlayed: boolean,
+): Promise<Song[]> {
+	const playedInFilter = filteredSongs.filter((song) => song.timesPlayed > 0);
+
 	if (!showNotPlayed) {
-		return songs.filter((song) => song.timesPlayed > 0);
+		return playedInFilter;
 	}
 
-	const notPlayedInEra = songs.filter((song) => song.timesPlayed === 0);
-	const notPlayedIds = new Set(notPlayedInEra.map((song) => song.id));
+	// Get all songs with their overall stats
 	const allSongs = await services.songs.findMany({});
-	const overallTimesPlayedMap = new Map<string, number>(
-		allSongs.filter((song) => notPlayedIds.has(song.id)).map((song) => [song.id, song.timesPlayed]),
-	);
+	const allSongsPlayed = allSongs.filter((song) => song.timesPlayed > 0);
 
-	return notPlayedInEra.sort((a, b) => {
-		return (overallTimesPlayedMap.get(b.id) || 0) - (overallTimesPlayedMap.get(a.id) || 0);
-	});
+	// Songs NOT played in this filter = overall played minus filter played
+	const playedIds = new Set(playedInFilter.map((song) => song.id));
+	const notPlayed = allSongsPlayed.filter((song) => !playedIds.has(song.id));
+
+	// Sort by overall timesPlayed descending (most popular first)
+	return notPlayed.sort((a, b) => b.timesPlayed - a.timesPlayed);
 }
 
 export const loader = publicLoader(async ({ request }) => {
@@ -53,20 +54,33 @@ export const loader = publicLoader(async ({ request }) => {
 	// Handle filtering by author, cover, era, or any combination
 	if (authorId || coverFilter !== undefined || (era && era in SONG_FILTERS)) {
 		try {
-			const filter: { authorId?: string; cover?: boolean; startDate?: Date; endDate?: Date } = {};
-			if (authorId) filter.authorId = authorId;
-			if (coverFilter !== undefined) filter.cover = coverFilter;
+			const cacheKey = CacheKeys.songs.filtered({
+				era: era || null,
+				played: playedParam || null,
+				author: authorId || null,
+				cover: coverParam || null,
+			});
 
-			let songs: Song[];
-			if (era && era in SONG_FILTERS) {
-				const eraFilter = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
-				songs = await services.songs.findManyInDateRange({ ...eraFilter, ...filter });
-			} else {
-				songs = await services.songs.findMany(filter);
-			}
+			return await services.cache.getOrSet(
+				cacheKey,
+				async () => {
+					const filter: { authorId?: string; cover?: boolean; startDate?: Date; endDate?: Date } = {};
+					if (authorId) filter.authorId = authorId;
+					if (coverFilter !== undefined) filter.cover = coverFilter;
 
-			const filtered = await filterByPlayStatus(songs, showNotPlayed);
-			return addVenueInfoToSongs(filtered);
+					let songs: Song[];
+					if (era && era in SONG_FILTERS) {
+						const { startDate, endDate } = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
+						songs = await services.songs.findManyInDateRange({ startDate, endDate, ...filter });
+					} else {
+						songs = await services.songs.findMany(filter);
+					}
+
+					const filtered = await splitByPlayStatus(songs, showNotPlayed);
+					return addVenueInfoToSongs(filtered);
+				},
+				{ ttl: 3600 },
+			);
 		} catch (error) {
 			logger.error("Error fetching filtered songs", { error });
 			return [];
