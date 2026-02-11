@@ -9,13 +9,14 @@ import { services } from "~/server/services";
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * For "not played" songs: returns songs that have been played overall
- * but NOT in the filtered results, retaining their overall timesPlayed count.
+ * For "not played" songs: returns songs matching the base filters (author/cover)
+ * that have been played overall but NOT in the date-range results.
  * For "played" songs: filters to those with timesPlayed > 0 in the filtered results.
  */
 async function splitByPlayStatus(
 	filteredSongs: Song[],
 	showNotPlayed: boolean,
+	baseFilter: { authorId?: string; cover?: boolean },
 ): Promise<Song[]> {
 	const playedInFilter = filteredSongs.filter((song) => song.timesPlayed > 0);
 
@@ -23,11 +24,11 @@ async function splitByPlayStatus(
 		return playedInFilter;
 	}
 
-	// Get all songs with their overall stats
-	const allSongs = await services.songs.findMany({});
+	// Get all songs matching the same author/cover filters, but without date range
+	const allSongs = await services.songs.findMany(baseFilter);
 	const allSongsPlayed = allSongs.filter((song) => song.timesPlayed > 0);
 
-	// Songs NOT played in this filter = overall played minus filter played
+	// Songs NOT played in this filter = matching played songs minus filter played
 	const playedIds = new Set(playedInFilter.map((song) => song.id));
 	const notPlayed = allSongsPlayed.filter((song) => !playedIds.has(song.id));
 
@@ -82,7 +83,7 @@ export const loader = publicLoader(async ({ request }) => {
 						songs = await services.songs.findMany(filter);
 					}
 
-					const filtered = await splitByPlayStatus(songs, showNotPlayed);
+					const filtered = await splitByPlayStatus(songs, showNotPlayed && !!hasDateRange, filter);
 					return addVenueInfoToSongs(filtered);
 				},
 				{ ttl: 3600 },

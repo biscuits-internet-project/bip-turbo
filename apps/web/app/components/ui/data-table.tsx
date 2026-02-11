@@ -75,18 +75,18 @@ export function DataTable<TData, TValue>({
     <div className="space-y-6 w-full max-w-full overflow-hidden">
       {searchKey && !hideSearch && (
         <div className="flex flex-col gap-3">
-          <div className="flex items-end justify-between gap-6">
+          <div className="flex items-end flex-wrap gap-x-6 gap-y-3">
             <div className="flex items-end gap-4">
               <Input
                 placeholder={searchPlaceholder}
                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
                 onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
-                className="w-auto min-w-[400px] max-w-2xl pr-8 h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
+                className="w-auto min-w-[200px] sm:min-w-[350px] max-w-2xl pr-8 h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
               />
               {searchActions}
             </div>
             {filterComponent && <div className="flex items-end gap-4 flex-1">{filterComponent}</div>}
-            <div className="text-sm text-content-text-secondary whitespace-nowrap pb-2">
+            <div className="text-sm text-content-text-secondary whitespace-nowrap pb-2 ml-auto">
               {table.getFilteredRowModel().rows.length} of {data.length} results
             </div>
           </div>

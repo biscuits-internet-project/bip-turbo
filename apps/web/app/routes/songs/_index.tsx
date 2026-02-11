@@ -176,7 +176,8 @@ export default function Songs() {
     } else {
       newParams.delete("era");
     }
-    if (params.played === "notPlayed") {
+    const hasDateRangeParam = (params.year && params.year !== "all") || (params.era && params.era !== "all");
+    if (hasDateRangeParam && params.played === "notPlayed") {
       newParams.set("played", "notPlayed");
     } else {
       newParams.delete("played");
@@ -219,7 +220,7 @@ export default function Songs() {
     if (selectedEra !== "all") {
       params.set("era", selectedEra);
     }
-    if (playedFilter === "notPlayed") {
+    if ((selectedYear !== "all" || selectedEra !== "all") && playedFilter === "notPlayed") {
       params.set("played", "notPlayed");
     }
     if (selectedAuthor && selectedAuthor !== "none") {
@@ -276,7 +277,7 @@ export default function Songs() {
             });
           }}
           placeholder="All Authors"
-          className="w-[250px] h-[42px]"
+          className="w-[150px] sm:w-[200px] h-[42px]"
         />
       </div>
       <div className="flex flex-col">
@@ -297,7 +298,7 @@ export default function Songs() {
             });
           }}
         >
-          <SelectTrigger id="cover-filter" className={`w-[170px] ${selectTriggerClass}`}>
+          <SelectTrigger id="cover-filter" className={`w-[120px] ${selectTriggerClass}`}>
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent className={selectContentClass}>
@@ -332,7 +333,7 @@ export default function Songs() {
         showMoreFilters ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
       }`}
     >
-      <div className="flex items-end gap-4">
+      <div className="flex items-end flex-wrap gap-x-4 gap-y-3">
         <div className="flex flex-col">
           <label htmlFor="year-filter" className={labelClass}>
             Year
