@@ -1,8 +1,7 @@
 import { FilterNav } from "~/components/filter-nav";
+import { YEAR_OPTIONS } from "~/lib/song-filters";
 
-const startYear = 1996;
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => currentYear - i).reverse();
+const years = [...YEAR_OPTIONS].reverse().map((o) => o.value);
 
 interface YearFilterNavProps {
   currentYear?: number | null;

@@ -38,6 +38,7 @@ async function splitByPlayStatus(
 export const loader = publicLoader(async ({ request }) => {
 	const url = new URL(request.url);
 	const query = url.searchParams.get("q");
+	const year = url.searchParams.get("year");
 	const era = url.searchParams.get("era");
 	const playedParam = url.searchParams.get("played");
 	const authorParam = url.searchParams.get("author");
@@ -51,10 +52,15 @@ export const loader = publicLoader(async ({ request }) => {
 		logger.warn("Ignoring invalid author filter", { authorParam });
 	}
 
-	// Handle filtering by author, cover, era, or any combination
-	if (authorId || coverFilter !== undefined || (era && era in SONG_FILTERS)) {
+	// Year and era both resolve to a date-range key in SONG_FILTERS (mutually exclusive)
+	const dateRangeKey = year || era;
+	const hasDateRange = dateRangeKey && dateRangeKey in SONG_FILTERS;
+
+	// Handle filtering by author, cover, date range, or any combination
+	if (authorId || coverFilter !== undefined || hasDateRange) {
 		try {
 			const cacheKey = CacheKeys.songs.filtered({
+				year: year || null,
 				era: era || null,
 				played: playedParam || null,
 				author: authorId || null,
@@ -69,8 +75,8 @@ export const loader = publicLoader(async ({ request }) => {
 					if (coverFilter !== undefined) filter.cover = coverFilter;
 
 					let songs: Song[];
-					if (era && era in SONG_FILTERS) {
-						const { startDate, endDate } = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
+					if (hasDateRange) {
+						const { startDate, endDate } = SONG_FILTERS[dateRangeKey];
 						songs = await services.songs.findManyInDateRange({ startDate, endDate, ...filter });
 					} else {
 						songs = await services.songs.findMany(filter);

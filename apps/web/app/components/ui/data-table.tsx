@@ -27,6 +27,7 @@ interface DataTableProps<TData, TValue> {
   hidePagination?: boolean;
   searchActions?: ReactNode;
   filterComponent?: ReactNode;
+  secondaryFilterComponent?: ReactNode;
   isLoading?: boolean;
 }
 
@@ -41,6 +42,7 @@ export function DataTable<TData, TValue>({
   hidePagination = false,
   searchActions,
   filterComponent,
+  secondaryFilterComponent,
   isLoading = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -72,20 +74,23 @@ export function DataTable<TData, TValue>({
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
       {searchKey && !hideSearch && (
-        <div className="flex items-end justify-between gap-6">
-          <div className="flex items-end gap-4">
-            <Input
-              placeholder={searchPlaceholder}
-              value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
-              onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
-              className="w-auto min-w-[400px] max-w-2xl pr-8 h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
-            />
-            {searchActions}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-end justify-between gap-6">
+            <div className="flex items-end gap-4">
+              <Input
+                placeholder={searchPlaceholder}
+                value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
+                onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
+                className="w-auto min-w-[400px] max-w-2xl pr-8 h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
+              />
+              {searchActions}
+            </div>
+            {filterComponent && <div className="flex items-end gap-4 flex-1">{filterComponent}</div>}
+            <div className="text-sm text-content-text-secondary whitespace-nowrap pb-2">
+              {table.getFilteredRowModel().rows.length} of {data.length} results
+            </div>
           </div>
-          {filterComponent && <div className="flex items-end gap-4 flex-1">{filterComponent}</div>}
-          <div className="text-sm text-content-text-secondary whitespace-nowrap pb-2">
-            {table.getFilteredRowModel().rows.length} of {data.length} results
-          </div>
+          {secondaryFilterComponent}
         </div>
       )}
 
