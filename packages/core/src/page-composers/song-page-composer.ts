@@ -1,4 +1,4 @@
-import type { Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
+import type { AllTimersPageView, Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
 import type { SongService } from "../songs/song-service";
 import type { DbClient } from "../_shared/database/models";
 
@@ -189,6 +189,87 @@ export class SongPageComposer {
     };
   }
 
+  async buildAllTimers(): Promise<AllTimersPageView> {
+    const result = await this.db.$queryRaw<AllTimerPerformanceDto[]>`
+      SELECT
+        shows.id,
+        shows.date,
+        shows.venue_id,
+        shows.slug,
+        venues.id as venue_id,
+        venues.name as venue_name,
+        venues.city as venue_city,
+        venues.state as venue_state,
+        venues.country as venue_country,
+        venues.slug as venue_slug,
+        tracks.id as track_id,
+        tracks.song_id,
+        tracks.segue,
+        tracks.set,
+        tracks.position,
+        tracks.all_timer,
+        tracks.average_rating,
+        tracks.ratings_count,
+        tracks.note,
+        songs.title as song_title,
+        songs.slug as song_slug,
+        nextTracks.segue as next_track_segue,
+        prevTracks.segue as prev_track_segue,
+        nextSongs.id as next_song_id,
+        nextSongs.title as next_song_title,
+        nextSongs.slug as next_song_slug,
+        prevSongs.id as prev_song_id,
+        prevSongs.title as prev_song_title,
+        prevSongs.slug as prev_song_slug
+      FROM tracks
+      JOIN songs ON tracks.song_id = songs.id
+      JOIN shows ON tracks.show_id = shows.id
+      LEFT JOIN venues ON shows.venue_id = venues.id
+      LEFT JOIN tracks nextTracks ON tracks.show_id = nextTracks.show_id
+        AND nextTracks.position = tracks.position + 1
+        AND nextTracks.set = tracks.set
+      LEFT JOIN songs nextSongs ON nextTracks.song_id = nextSongs.id
+      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id
+        AND prevTracks.position = tracks.position - 1
+        AND prevTracks.set = tracks.set
+      LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
+      WHERE tracks.all_timer = true
+      ORDER BY shows.date DESC, tracks.set, tracks.position
+    `;
+
+    const performances = result.map((row) => this.transformToAllTimerView(row));
+
+    // Bulk fetch annotations for all tracks
+    const trackIds = performances.map((p) => p.trackId);
+    const annotations = await this.db.annotation.findMany({
+      where: { trackId: { in: trackIds } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const annotationsByTrackId = new Map<string, Annotation[]>();
+    for (const annotation of annotations) {
+      const trackAnnotations = annotationsByTrackId.get(annotation.trackId) || [];
+      trackAnnotations.push(annotation);
+      annotationsByTrackId.set(annotation.trackId, trackAnnotations);
+    }
+
+    performances.forEach((perf) => {
+      perf.annotations = annotationsByTrackId.get(perf.trackId) || [];
+    });
+
+    await this.computePerformanceTags(performances);
+
+    return { performances };
+  }
+
+  private transformToAllTimerView(row: AllTimerPerformanceDto): SongPagePerformance {
+    return {
+      ...this.transformToSongPagePerformanceView(row),
+      songTitle: row.song_title,
+      songSlug: row.song_slug,
+    };
+  }
+
   private async computePerformanceTags(performances: SongPagePerformance[]): Promise<void> {
     // For set opener/closer computation, we need to know the min/max positions for each set in each show
     const setPositionData = new Map<string, { min: number; max: number }>();
@@ -345,4 +426,9 @@ type PerformanceDto = {
   prev_song_id: string | null;
   prev_song_title: string | null;
   prev_song_slug: string | null;
+};
+
+type AllTimerPerformanceDto = PerformanceDto & {
+  song_title: string;
+  song_slug: string;
 };

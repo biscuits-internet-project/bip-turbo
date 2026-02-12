@@ -50,6 +50,16 @@ export const CacheKeys = {
   },
 
   /**
+   * Song-related cache keys
+   */
+  songs: {
+    /** Songs index page data */
+    index: () => "songs:index:full",
+    /** All-timers page data */
+    allTimers: () => "songs:all-timers",
+  },
+
+  /**
    * Home page cache keys
    */
   home: {

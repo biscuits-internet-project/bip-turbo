@@ -23,6 +23,8 @@ export type SongPagePerformance = {
   annotations?: Annotation[];
   set?: string;
   position?: number;
+  songTitle?: string;
+  songSlug?: string;
   tags?: {
     setOpener?: boolean;
     setCloser?: boolean;
@@ -33,4 +35,8 @@ export type SongPagePerformance = {
     segueIn?: boolean;
     segueOut?: boolean;
   };
+};
+
+export type AllTimersPageView = {
+  performances: SongPagePerformance[];
 };

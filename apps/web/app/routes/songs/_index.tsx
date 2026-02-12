@@ -1,5 +1,5 @@
-import type { Song, TrendingSong } from "@bip/domain";
-import { Plus } from "lucide-react";
+import { CacheKeys, type Song, type TrendingSong } from "@bip/domain";
+import { Flame, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -22,7 +22,7 @@ interface LoaderData {
 }
 
 export const loader = publicLoader(async (): Promise<LoaderData> => {
-  const cacheKey = "songs:index:full";
+  const cacheKey = CacheKeys.songs.index();
   const cacheOptions = { ttl: 3600 }; // 1 hour
 
   return await services.cache.getOrSet(
@@ -367,7 +367,14 @@ export default function Songs() {
       <div>
         <div className="relative">
           <h1 className="page-heading">SONGS</h1>
-          <div className="absolute top-0 right-0">
+          <div className="absolute top-0 right-0 flex items-center gap-3">
+            <Link
+              to="/songs/all-timers"
+              className="flex items-center gap-2 text-sm text-content-text-secondary hover:text-brand-primary transition-colors"
+            >
+              <Flame className="h-4 w-4 text-orange-500" />
+              All-Timers
+            </Link>
             <AdminOnly>
               <Button asChild className="btn-primary">
                 <Link to="/songs/new" className="flex items-center gap-2">
