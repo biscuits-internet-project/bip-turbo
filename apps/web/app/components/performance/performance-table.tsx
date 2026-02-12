@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpIcon, Flame } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useShowUserData } from "~/hooks/use-show-user-data";
 import { CombinedNotes } from "./combined-notes";
 import { TrackRatingCell } from "./track-rating-cell";
 
@@ -28,6 +29,13 @@ export function PerformanceTable({
 }: PerformanceTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+
+  // Fetch attendance data for all shows in the table
+  const showIds = useMemo(
+    () => [...new Set(initialPerformances.map((p) => p.show.id))],
+    [initialPerformances],
+  );
+  const { attendanceMap } = useShowUserData(showIds);
 
   const handleSortingChange = (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
     setSorting(updaterOrValue);
@@ -68,12 +76,14 @@ export function PerformanceTable({
             return perf.tags?.dyslexic;
           case "allTimer":
             return perf.allTimer;
+          case "attended":
+            return !!attendanceMap.get(perf.show.id);
           default:
             return false;
         }
       });
     });
-  }, [initialPerformances, activeFilters]);
+  }, [initialPerformances, activeFilters, attendanceMap]);
 
   const columnHelper = createColumnHelper<SongPagePerformance>();
 
@@ -111,7 +121,7 @@ export function PerformanceTable({
           size: 32,
           enableSorting: false,
           cell: (info) =>
-            info.getValue() ? <Flame className="h-3.5 w-3.5 text-orange-500" /> : null,
+            info.getValue() ? <Flame className="h-3.5 w-3.5 text-orange-500 ml-1" /> : null,
         }) as ColumnDef<SongPagePerformance, unknown>,
       );
     }
@@ -330,6 +340,7 @@ export function PerformanceTable({
     { key: "inverted", label: "Inverted" },
     { key: "dyslexic", label: "Dyslexic" },
     { key: "allTimer", label: "All-Timer" },
+    { key: "attended", label: "Attended" },
   ];
 
   return (
@@ -406,15 +417,18 @@ export function PerformanceTable({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-t border-glass-border/30 hover:bg-hover-glass">
+            {table.getRowModel().rows.map((row) => {
+              const isAttended = !!attendanceMap.get(row.original.show.id);
+              return (
+              <tr key={row.id} className={`border-t border-glass-border/30 hover:bg-hover-glass ${isAttended ? "border-l-2 border-l-green-500 bg-green-500/5" : ""}`}>
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className={cell.column.id === "allTimer" ? "p-0 w-6" : "p-3"}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
