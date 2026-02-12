@@ -1,6 +1,7 @@
 import type { AllTimersPageView, Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
-import type { SongService } from "../songs/song-service";
+import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
+import type { SongService } from "../songs/song-service";
 
 export class SongPageComposer {
   constructor(
@@ -102,78 +103,12 @@ export class SongPageComposer {
       showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
     }
 
-    const result = await this.db.$queryRaw<PerformanceDto[]>`
-      SELECT
-        shows.id,
-        shows.date,
-        shows.venue_id,
-        shows.slug,
-        venues.id as venue_id,
-        venues.name as venue_name,
-        venues.city as venue_city,
-        venues.state as venue_state,
-        venues.country as venue_country,
-        venues.slug as venue_slug,
-        tracks.id as track_id,
-        tracks.song_id,
-        tracks.segue,
-        tracks.set,
-        tracks.position,
-        tracks.all_timer,
-        tracks.average_rating,
-        tracks.ratings_count,
-        tracks.note,
-        nextTracks.segue as next_track_segue,
-        prevTracks.segue as prev_track_segue,
-        nextSongs.id as next_song_id,
-        nextSongs.title as next_song_title,
-        nextSongs.slug as next_song_slug,
-        prevSongs.id as prev_song_id,
-        prevSongs.title as prev_song_title,
-        prevSongs.slug as prev_song_slug
-      FROM tracks
-      JOIN shows on tracks.show_id = shows.id
-      LEFT JOIN venues ON shows.venue_id = venues.id
-      LEFT JOIN tracks nextTracks ON tracks.show_id = nextTracks.show_id
-        and nextTracks.position = tracks.position + 1
-        and nextTracks.set = tracks.set
-      LEFT JOIN songs nextSongs ON nextTracks.song_id = nextSongs.id
-      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id
-        and prevTracks.position = tracks.position - 1
-        and prevTracks.set = tracks.set
-      LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
-      WHERE tracks.song_id = ${song.id}::uuid
-      ORDER BY shows.date DESC, tracks.set, tracks.position
-    `;
-
-    const performances = result.map((row: PerformanceDto) => this.transformToSongPagePerformanceView(row));
-
-    // Bulk fetch annotations for all tracks
-    const trackIds = performances.map((p) => p.trackId);
-    const annotations = await this.db.annotation.findMany({
-      where: {
-        trackId: {
-          in: trackIds,
-        },
-      },
-      orderBy: { createdAt: "desc" },
+    const result = await this.queryPerformances({
+      whereClause: Prisma.sql`tracks.song_id = ${song.id}::uuid`,
     });
 
-    // Group annotations by trackId
-    const annotationsByTrackId = new Map<string, Annotation[]>();
-    for (const annotation of annotations) {
-      const trackAnnotations = annotationsByTrackId.get(annotation.trackId) || [];
-      trackAnnotations.push(annotation);
-      annotationsByTrackId.set(annotation.trackId, trackAnnotations);
-    }
-
-    // Map annotations to performances
-    performances.forEach((perf) => {
-      perf.annotations = annotationsByTrackId.get(perf.trackId) || [];
-    });
-
-    // Compute tags for each performance
-    await this.computePerformanceTags(performances);
+    const performances = result.map((row) => this.transformToSongPagePerformanceView(row));
+    await this.enrichPerformances(performances);
 
     return {
       song: {
@@ -190,7 +125,31 @@ export class SongPageComposer {
   }
 
   async buildAllTimers(): Promise<AllTimersPageView> {
-    const result = await this.db.$queryRaw<AllTimerPerformanceDto[]>`
+    const result = await this.queryPerformances({
+      whereClause: Prisma.sql`tracks.all_timer = true`,
+      includeSongInfo: true,
+    });
+
+    const performances = (result as AllTimerPerformanceDto[]).map((row) => ({
+      ...this.transformToSongPagePerformanceView(row),
+      songTitle: row.song_title,
+      songSlug: row.song_slug,
+    }));
+    await this.enrichPerformances(performances);
+
+    return { performances };
+  }
+
+  private async queryPerformances(options: {
+    whereClause: Prisma.Sql;
+    includeSongInfo?: boolean;
+  }): Promise<PerformanceDto[]> {
+    const songColumns = options.includeSongInfo
+      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug`
+      : Prisma.empty;
+    const songJoin = options.includeSongInfo ? Prisma.sql`JOIN songs ON tracks.song_id = songs.id` : Prisma.empty;
+
+    return this.db.$queryRaw<PerformanceDto[]>`
       SELECT
         shows.id,
         shows.date,
@@ -210,9 +169,8 @@ export class SongPageComposer {
         tracks.all_timer,
         tracks.average_rating,
         tracks.ratings_count,
-        tracks.note,
-        songs.title as song_title,
-        songs.slug as song_slug,
+        tracks.note
+        ${songColumns},
         nextTracks.segue as next_track_segue,
         prevTracks.segue as prev_track_segue,
         nextSongs.id as next_song_id,
@@ -222,7 +180,7 @@ export class SongPageComposer {
         prevSongs.title as prev_song_title,
         prevSongs.slug as prev_song_slug
       FROM tracks
-      JOIN songs ON tracks.song_id = songs.id
+      ${songJoin}
       JOIN shows ON tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
       LEFT JOIN tracks nextTracks ON tracks.show_id = nextTracks.show_id
@@ -233,13 +191,12 @@ export class SongPageComposer {
         AND prevTracks.position = tracks.position - 1
         AND prevTracks.set = tracks.set
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
-      WHERE tracks.all_timer = true
+      WHERE ${options.whereClause}
       ORDER BY shows.date DESC, tracks.set, tracks.position
     `;
+  }
 
-    const performances = result.map((row) => this.transformToAllTimerView(row));
-
-    // Bulk fetch annotations for all tracks
+  private async enrichPerformances(performances: SongPagePerformance[]): Promise<void> {
     const trackIds = performances.map((p) => p.trackId);
     const annotations = await this.db.annotation.findMany({
       where: { trackId: { in: trackIds } },
@@ -253,21 +210,11 @@ export class SongPageComposer {
       annotationsByTrackId.set(annotation.trackId, trackAnnotations);
     }
 
-    performances.forEach((perf) => {
+    for (const perf of performances) {
       perf.annotations = annotationsByTrackId.get(perf.trackId) || [];
-    });
+    }
 
     await this.computePerformanceTags(performances);
-
-    return { performances };
-  }
-
-  private transformToAllTimerView(row: AllTimerPerformanceDto): SongPagePerformance {
-    return {
-      ...this.transformToSongPagePerformanceView(row),
-      songTitle: row.song_title,
-      songSlug: row.song_slug,
-    };
   }
 
   private async computePerformanceTags(performances: SongPagePerformance[]): Promise<void> {

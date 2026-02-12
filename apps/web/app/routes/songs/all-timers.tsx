@@ -1,4 +1,4 @@
-import { CacheKeys, type AllTimersPageView } from "@bip/domain";
+import { type AllTimersPageView, CacheKeys } from "@bip/domain";
 import { ArrowLeft, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PerformanceTable } from "~/components/performance";
@@ -10,18 +10,11 @@ export const loader = publicLoader(async (): Promise<AllTimersPageView> => {
   const cacheKey = CacheKeys.songs.allTimers();
   const cacheOptions = { ttl: 3600 };
 
-  return await services.cache.getOrSet(
-    cacheKey,
-    async () => services.songPageComposer.buildAllTimers(),
-    cacheOptions,
-  );
+  return await services.cache.getOrSet(cacheKey, async () => services.songPageComposer.buildAllTimers(), cacheOptions);
 });
 
 export function meta() {
-  return [
-    { title: "All-Timers | Songs" },
-    { name: "description", content: "The best performances across all songs" },
-  ];
+  return [{ title: "All-Timers | Songs" }, { name: "description", content: "The best performances across all songs" }];
 }
 
 export default function AllTimersPage() {
