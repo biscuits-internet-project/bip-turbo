@@ -395,7 +395,7 @@ export default function SongPage() {
         <TabsContent value="performances" className="mt-6">
           <div className="glass-content rounded-lg p-4 md:p-6">
             <h3 className="text-lg font-semibold text-content-text-primary mb-4">All Performances</h3>
-            <PerformanceTable performances={performances} songTitle={song.title} />
+            <PerformanceTable performances={performances} songTitle={song.title} showAllTimerColumn />
           </div>
         </TabsContent>
 

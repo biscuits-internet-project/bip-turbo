@@ -8,7 +8,7 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, Flame } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CombinedNotes } from "./combined-notes";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -17,12 +17,14 @@ interface PerformanceTableProps {
   performances: SongPagePerformance[];
   songTitle?: string;
   showSongColumn?: boolean;
+  showAllTimerColumn?: boolean;
 }
 
 export function PerformanceTable({
   performances: initialPerformances,
   songTitle,
   showSongColumn = false,
+  showAllTimerColumn = false,
 }: PerformanceTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
@@ -64,6 +66,8 @@ export function PerformanceTable({
             return perf.tags?.inverted;
           case "dyslexic":
             return perf.tags?.dyslexic;
+          case "allTimer":
+            return perf.allTimer;
           default:
             return false;
         }
@@ -95,6 +99,19 @@ export function PerformanceTable({
               <span className="text-content-text-secondary">{title}</span>
             );
           },
+        }) as ColumnDef<SongPagePerformance, unknown>,
+      );
+    }
+
+    if (showAllTimerColumn) {
+      cols.push(
+        columnHelper.accessor((row) => row.allTimer ?? false, {
+          id: "allTimer",
+          header: "",
+          size: 32,
+          enableSorting: false,
+          cell: (info) =>
+            info.getValue() ? <Flame className="h-3.5 w-3.5 text-orange-500" /> : null,
         }) as ColumnDef<SongPagePerformance, unknown>,
       );
     }
@@ -288,7 +305,7 @@ export function PerformanceTable({
     );
 
     return cols;
-  }, [showSongColumn, songTitle, columnHelper]);
+  }, [showSongColumn, showAllTimerColumn, songTitle, columnHelper]);
 
   const table = useReactTable({
     data: filteredPerformances,
@@ -312,6 +329,7 @@ export function PerformanceTable({
     { key: "standalone", label: "Standalone" },
     { key: "inverted", label: "Inverted" },
     { key: "dyslexic", label: "Dyslexic" },
+    { key: "allTimer", label: "All-Timer" },
   ];
 
   return (
@@ -355,7 +373,7 @@ export function PerformanceTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="p-3" style={{ width: header.getSize() }}>
+                  <th key={header.id} className={header.id === "allTimer" ? "p-0 w-6" : "p-3"} style={{ width: header.getSize() }}>
                     {header.isPlaceholder ? null : (
                       <button
                         type="button"
@@ -391,7 +409,7 @@ export function PerformanceTable({
             {table.getRowModel().rows.map((row) => (
               <tr key={row.id} className="border-t border-glass-border/30 hover:bg-hover-glass">
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="p-3">
+                  <td key={cell.id} className={cell.column.id === "allTimer" ? "p-0 w-6" : "p-3"}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
