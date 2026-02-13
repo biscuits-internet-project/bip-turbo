@@ -28,6 +28,7 @@ interface DataTableProps<TData, TValue> {
   searchActions?: ReactNode;
   filterComponent?: ReactNode;
   isLoading?: boolean;
+  rowClassName?: (data: TData, index: number) => string | undefined;
 }
 
 export function DataTable<TData, TValue>({
@@ -42,6 +43,7 @@ export function DataTable<TData, TValue>({
   searchActions,
   filterComponent,
   isLoading = false,
+  rowClassName,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -136,7 +138,7 @@ export function DataTable<TData, TValue>({
                   data-state={row.getIsSelected() && "selected"}
                   className={`border-glass-border/30 transition-all duration-200 hover:bg-hover-glass/80 ${
                     index % 2 === 0 ? "bg-glass-bg/5" : "bg-glass-bg/15"
-                  }`}
+                  } ${rowClassName?.(row.original, index) ?? ""}`}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
