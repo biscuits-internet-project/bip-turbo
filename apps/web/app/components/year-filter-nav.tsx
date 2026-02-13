@@ -1,6 +1,6 @@
 import { FilterNav } from "~/components/filter-nav";
 
-const startYear = 1996;
+const startYear = 1995;
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => currentYear - i).reverse();
 

@@ -1,5 +1,6 @@
 import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
-import { ArrowLeft, Edit } from "lucide-react";
+import type { ShowNavItem } from "@bip/core";
+import { ArrowLeft, ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -33,6 +34,7 @@ interface ShowLoaderData {
   selectedRecordingId: string | null;
   userAttendance: Attendance | null;
   photos: ShowFile[];
+  adjacentShows: { previous: ShowNavItem | null; next: ShowNavItem | null };
 }
 
 async function fetchUserAttendance(context: Context, showId: string): Promise<Attendance | null> {
@@ -56,10 +58,22 @@ async function fetchUserAttendance(context: Context, showId: string): Promise<At
   }
 }
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export const loader = publicLoader(async ({ params, context }): Promise<ShowLoaderData> => {
   logger.info("shows.$slug loader", { slug: params.slug });
   const slug = params.slug;
   if (!slug) throw notFound();
+
+  // If the slug is a date, redirect to the first show on that date
+  if (DATE_PATTERN.test(slug)) {
+    const shows = await services.shows.findByDate(slug);
+    if (shows.length === 0) throw notFound();
+    throw new Response(null, {
+      status: 302,
+      headers: { Location: `/shows/${shows[0].slug}` },
+    });
+  }
 
   // Cache the setlist data (core show data that's expensive to compute)
   const cacheKey = CacheKeys.show.data(slug);
@@ -71,10 +85,11 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     return setlist;
   });
 
-  // Load reviews and photos fresh (not cached - infrequent access, simple queries)
-  const [reviews, photos] = await Promise.all([
+  // Load reviews, photos, and adjacent shows fresh (not cached - simple queries)
+  const [reviews, photos, adjacentShows] = await Promise.all([
     services.reviews.findByShowId(setlist.show.id),
     services.files.findByShowId(setlist.show.id),
+    services.shows.findAdjacentShows(setlist.show.date, setlist.show.slug),
   ]);
 
   // If user is authenticated, fetch their attendance data for search results
@@ -131,7 +146,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     // Continue without recordings if there's an error
   }
 
-  return { setlist, reviews, selectedRecordingId, userAttendance, photos };
+  return { setlist, reviews, selectedRecordingId, userAttendance, photos, adjacentShows };
 });
 
 export function meta({ data }: { data: ShowLoaderData }) {
@@ -145,6 +160,7 @@ export default function Show() {
     selectedRecordingId,
     userAttendance,
     photos,
+    adjacentShows,
   } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
@@ -244,15 +260,47 @@ export default function Show() {
         </AdminOnly>
       </div>
 
-      {/* Subtle back link */}
-      <div className="flex justify-start">
-        <Link
-          to="/shows"
-          className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-        >
-          <ArrowLeft className="h-3 w-3" />
-          <span>Back to shows</span>
-        </Link>
+      {/* Navigation */}
+      <div className="space-y-2">
+        <div className="flex justify-start">
+          <Link
+            to="/shows"
+            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back to shows</span>
+          </Link>
+        </div>
+        <div className="flex justify-between items-center">
+          {adjacentShows.previous ? (
+            <Link
+              to={`/shows/${adjacentShows.previous.slug}`}
+              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+            >
+              <ChevronLeft className="h-3 w-3" />
+              <span>
+                {formatDateLong(adjacentShows.previous.date)}
+                {adjacentShows.previous.venueName && ` · ${adjacentShows.previous.venueName}`}
+              </span>
+            </Link>
+          ) : (
+            <div />
+          )}
+          {adjacentShows.next ? (
+            <Link
+              to={`/shows/${adjacentShows.next.slug}`}
+              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+            >
+              <span>
+                {formatDateLong(adjacentShows.next.date)}
+                {adjacentShows.next.venueName && ` · ${adjacentShows.next.venueName}`}
+              </span>
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          ) : (
+            <div />
+          )}
+        </div>
       </div>
 
       {/* Main content area with responsive grid */}
