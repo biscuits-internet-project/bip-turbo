@@ -22,6 +22,8 @@ export function getSafeRedirectUrl(url: string | null): string {
   return url;
 }
 
+export const ATTENDED_ROW_CLASS = "border-l-2 border-l-green-500 bg-green-500/5";
+
 export function formatDateShort(date: string): string {
   const dateParts = date.split("T")[0].split("-");
   if (dateParts.length === 3) {

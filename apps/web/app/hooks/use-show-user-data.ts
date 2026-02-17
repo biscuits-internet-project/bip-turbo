@@ -11,7 +11,9 @@ interface UseShowUserDataResult {
   error: Error | null;
 }
 
-async function fetchShowUserData(showIds: string[]): Promise<ShowUserDataResponse> {
+const BATCH_SIZE = 200;
+
+async function fetchShowUserDataBatch(showIds: string[]): Promise<ShowUserDataResponse> {
   const response = await fetch("/api/shows/user-data", {
     method: "POST",
     credentials: "include",
@@ -24,6 +26,35 @@ async function fetchShowUserData(showIds: string[]): Promise<ShowUserDataRespons
   }
 
   return response.json();
+}
+
+async function fetchShowUserData(showIds: string[]): Promise<ShowUserDataResponse> {
+  if (showIds.length <= BATCH_SIZE) {
+    return fetchShowUserDataBatch(showIds);
+  }
+
+  // Split into batches and fetch in parallel
+  const batches: string[][] = [];
+  for (let i = 0; i < showIds.length; i += BATCH_SIZE) {
+    batches.push(showIds.slice(i, i + BATCH_SIZE));
+  }
+
+  const results = await Promise.all(batches.map(fetchShowUserDataBatch));
+
+  // Merge all batch results
+  const merged: ShowUserDataResponse = {
+    attendances: {},
+    userRatings: {},
+    averageRatings: {},
+  };
+
+  for (const result of results) {
+    Object.assign(merged.attendances, result.attendances);
+    Object.assign(merged.userRatings, result.userRatings);
+    Object.assign(merged.averageRatings, result.averageRatings);
+  }
+
+  return merged;
 }
 
 export function useShowUserData(showIds: string[]): UseShowUserDataResult {

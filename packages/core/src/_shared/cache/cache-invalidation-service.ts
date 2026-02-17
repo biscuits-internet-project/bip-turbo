@@ -80,6 +80,14 @@ export class CacheInvalidationService {
   }
 
   /**
+   * Invalidate the all-timers cache
+   */
+  async invalidateAllTimers(): Promise<void> {
+    this.logger.info("Invalidating all-timers cache");
+    await this.cache.del(CacheKeys.songs.allTimers());
+  }
+
+  /**
    * Bulk invalidation for multiple shows (useful for admin operations)
    */
   async invalidateShows(shows: Array<{ id: string; slug?: string }>): Promise<void> {

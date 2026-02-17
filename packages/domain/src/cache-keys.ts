@@ -55,6 +55,8 @@ export const CacheKeys = {
   songs: {
     /** Full songs index page data */
     index: () => "songs:index:full",
+    /** All-timers page data */
+    allTimers: () => "songs:all-timers",
     /** Filtered song results by era/author/cover */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);

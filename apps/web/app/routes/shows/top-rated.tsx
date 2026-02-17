@@ -10,7 +10,7 @@ import { useSession } from "~/hooks/use-session";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { cn, formatDateShort } from "~/lib/utils";
+import { ATTENDED_ROW_CLASS, cn, formatDateShort } from "~/lib/utils";
 import { getTopRatedShows, type ShowWithRank, type TopRatedShowsLoaderData } from "~/routes/shows/top-rated-shows";
 
 const MIN_SHOW_RATINGS = 10;
@@ -139,7 +139,7 @@ export default function TopRated() {
 
   // Fetch user data (ratings, attendance) for all shows
   const showIds = useMemo(() => shows.map((show) => show.id), [shows]);
-  const { userRatingMap } = useShowUserData(user ? showIds : []);
+  const { userRatingMap, attendanceMap } = useShowUserData(user ? showIds : []);
 
   // Create columns with user rating data
   const columns = useMemo(() => createColumns(userRatingMap), [userRatingMap]);
@@ -156,7 +156,13 @@ export default function TopRated() {
           showAllButton={true}
           additionalText={`min ${MIN_SHOW_RATINGS} ratings`}
         />
-        <DataTable columns={columns} data={showsWithRank} hideSearch={true} hidePaginationText={true} />
+        <DataTable
+          columns={columns}
+          data={showsWithRank}
+          hideSearch={true}
+          hidePaginationText={true}
+          rowClassName={(show) => attendanceMap.get(show.id) ? ATTENDED_ROW_CLASS : undefined}
+        />
       </div>
     </div>
   );

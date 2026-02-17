@@ -58,6 +58,11 @@ export class TrackService {
     }
   }
 
+  private async invalidateAllTimersCache(): Promise<void> {
+    if (!this.cacheInvalidation) return;
+    await this.cacheInvalidation.invalidateAllTimers();
+  }
+
   private async generateTrackSlug(
     showId: string,
     songId: string,
@@ -181,6 +186,11 @@ export class TrackService {
       await this.invalidateShowCaches(data.showId);
     }
 
+    // Invalidate all-timers cache if this track is an all-timer
+    if (data.allTimer) {
+      await this.invalidateAllTimersCache();
+    }
+
     return track;
   }
 
@@ -206,6 +216,11 @@ export class TrackService {
     // Invalidate show caches
     if (currentTrack?.showId) {
       await this.invalidateShowCaches(currentTrack.showId);
+    }
+
+    // Invalidate all-timers cache if allTimer field was changed
+    if (data.allTimer !== undefined) {
+      await this.invalidateAllTimersCache();
     }
 
     return track;
@@ -264,5 +279,8 @@ export class TrackService {
     if (track?.showId) {
       await this.invalidateShowCaches(track.showId);
     }
+
+    // Invalidate all-timers cache (deleted track may have been an all-timer)
+    await this.invalidateAllTimersCache();
   }
 }

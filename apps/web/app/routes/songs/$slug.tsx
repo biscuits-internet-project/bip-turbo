@@ -1,35 +1,15 @@
-import type { SongPagePerformance, SongPageView } from "@bip/domain";
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  type SortingState,
-  useReactTable,
-} from "@tanstack/react-table";
-import {
-  ArrowDownIcon,
-  ArrowLeft,
-  ArrowUpIcon,
-  BarChart3,
-  FileTextIcon,
-  GuitarIcon,
-  History,
-  Pencil,
-  StarIcon,
-} from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { SongPageView } from "@bip/domain";
+import { ArrowLeft, BarChart3, FileTextIcon, GuitarIcon, History, Pencil, StarIcon } from "lucide-react";
+import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
+import { PerformanceTable } from "~/components/performance";
 import { RatingComponent } from "~/components/rating";
 import { Button } from "~/components/ui/button";
-import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
-import { StarRating } from "~/components/ui/star-rating";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
@@ -62,526 +42,14 @@ function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
   );
 }
 
-// Interactive track rating cell with expandable stars
-function TrackRatingCell({
-  trackId,
-  showSlug,
-  initialRating,
-  ratingsCount,
-}: {
-  trackId: string;
-  showSlug: string;
-  initialRating: number | null;
-  ratingsCount: number | null;
-}) {
-  const { user } = useSession();
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [displayedRating, setDisplayedRating] = useState(initialRating ?? 0);
-  const [displayedCount, setDisplayedCount] = useState(ratingsCount ?? 0);
-  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (animationTimeoutRef.current) clearTimeout(animationTimeoutRef.current);
-    };
-  }, []);
-
-  const handleRatingChange = (average: number, count: number) => {
-    setIsAnimating(true);
-    setDisplayedRating(average);
-    setDisplayedCount(count);
-    setIsExpanded(false);
-    // Clear any existing timeout and set new one
-    if (animationTimeoutRef.current) clearTimeout(animationTimeoutRef.current);
-    animationTimeoutRef.current = setTimeout(() => setIsAnimating(false), 600);
-  };
-
-  const ratingButton = (
-    <button
-      type="button"
-      onClick={(e) => {
-        if (!user) return;
-        e.stopPropagation();
-        setIsExpanded(!isExpanded);
-      }}
-      className={cn(
-        "inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md",
-        "origin-center",
-        "glass-secondary border border-dashed border-glass-border",
-        user && "hover:brightness-110 cursor-pointer hover:border-amber-500/30",
-        !user && "cursor-pointer hover:border-amber-500/30",
-        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
-      )}
-    >
-      {isExpanded ? (
-        <StarRating
-          rateableId={trackId}
-          rateableType="Track"
-          showSlug={showSlug}
-          onAverageRatingChange={handleRatingChange}
-          skipRevalidation
-        />
-      ) : (
-        <RatingComponent rating={displayedRating || null} ratingsCount={displayedCount || null} />
-      )}
-    </button>
-  );
-
-  if (!user) {
-    return (
-      <div className="w-[140px]">
-        <LoginPromptPopover message="Sign in to rate">
-          {ratingButton}
-        </LoginPromptPopover>
-      </div>
-    );
-  }
-
-  return <div className="w-[140px]">{ratingButton}</div>;
-}
-
-function PerformanceTable({
-  performances: initialPerformances,
-  songTitle,
-}: {
-  performances: SongPagePerformance[];
-  songTitle: string;
-}) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
-
-  const handleSortingChange = (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
-    setSorting(updaterOrValue);
-  };
-
-  const toggleFilter = (filterKey: string) => {
-    const newFilters = new Set(activeFilters);
-    if (newFilters.has(filterKey)) {
-      newFilters.delete(filterKey);
-    } else {
-      newFilters.add(filterKey);
-    }
-    setActiveFilters(newFilters);
-  };
-
-  // Filter performances based on active filters
-  const filteredPerformances = useMemo(() => {
-    if (activeFilters.size === 0) return initialPerformances;
-
-    return initialPerformances.filter((perf) => {
-      return Array.from(activeFilters).some((filterKey) => {
-        switch (filterKey) {
-          case "setOpener":
-            return perf.tags?.setOpener;
-          case "setCloser":
-            return perf.tags?.setCloser;
-          case "encore":
-            return perf.tags?.encore;
-          case "segueIn":
-            return perf.tags?.segueIn;
-          case "segueOut":
-            return perf.tags?.segueOut;
-          case "standalone":
-            return perf.tags?.standalone;
-          case "inverted":
-            return perf.tags?.inverted;
-          case "dyslexic":
-            return perf.tags?.dyslexic;
-          default:
-            return false;
-        }
-      });
-    });
-  }, [initialPerformances, activeFilters]);
-
-  const columnHelper = createColumnHelper<SongPagePerformance>();
-  const columns = [
-    columnHelper.accessor("show.date", {
-      id: "date",
-      header: "Date",
-      size: 128,
-      enableSorting: true,
-      sortingFn: "datetime",
-      cell: (info) => (
-        <a href={`/shows/${info.row.original.show.slug}`} className="text-brand-primary hover:text-brand-secondary">
-          {info.getValue()}
-        </a>
-      ),
-    }),
-    columnHelper.accessor(
-      (row) => ({
-        name: row.venue?.name,
-        city: row.venue?.city,
-        state: row.venue?.state,
-        slug: row.show.slug,
-      }),
-      {
-        id: "venue",
-        header: "Venue",
-        enableSorting: false,
-        cell: (info) => {
-          const venue = info.getValue();
-          return venue.city ? (
-            <a href={`/shows/${venue.slug}`} className="text-brand-primary hover:text-brand-secondary">
-              {venue.name}
-              <br />
-              {venue.city}, {venue.state}
-            </a>
-          ) : null;
-        },
-      },
-    ),
-    columnHelper.accessor("set", {
-      header: "Set",
-      size: 64,
-      enableSorting: true,
-      cell: (info) => {
-        const set = info.getValue();
-        return set ? (
-          <span className="text-content-text-secondary">{set}</span>
-        ) : (
-          <span className="text-content-text-tertiary">—</span>
-        );
-      },
-    }),
-    columnHelper.accessor(
-      (row) => ({
-        before: row.songBefore,
-        after: row.songAfter,
-        currentSong: songTitle,
-      }),
-      {
-        id: "sequence",
-        header: "Sequence",
-        size: 384,
-        enableSorting: false,
-        cell: (info) => {
-          const { before, after, currentSong } = info.getValue();
-
-          const parts = [];
-
-          // Add song before
-          if (before?.songTitle) {
-            parts.push(
-              <a
-                key="before"
-                href={`/songs/${before.songSlug}`}
-                className="text-content-text-secondary hover:text-brand-primary"
-              >
-                {before.songTitle}
-              </a>,
-            );
-            if (before.segue) {
-              parts.push(
-                <span key="segue1" className="text-content-text-tertiary mx-1">
-                  {" "}
-                  &gt;{" "}
-                </span>,
-              );
-            } else {
-              parts.push(
-                <span key="sep1" className="text-content-text-tertiary">
-                  ,&nbsp;
-                </span>,
-              );
-            }
-          }
-
-          // Add current song
-          parts.push(
-            <span key="current" className="font-bold" style={{ color: "#DDD6FE" }}>
-              {currentSong}
-            </span>,
-          );
-
-          // Add song after
-          if (after?.songTitle) {
-            if (info.row.original.segue) {
-              parts.push(
-                <span key="segue2" className="text-content-text-tertiary mx-1">
-                  {" "}
-                  &gt;{" "}
-                </span>,
-              );
-            } else {
-              parts.push(
-                <span key="sep2" className="text-content-text-tertiary">
-                  ,&nbsp;
-                </span>,
-              );
-            }
-            parts.push(
-              <a
-                key="after"
-                href={`/songs/${after.songSlug}`}
-                className="text-content-text-secondary hover:text-brand-primary"
-              >
-                {after.songTitle}
-              </a>,
-            );
-          }
-
-          return parts.length > 0 ? <div className="flex items-center flex-wrap">{parts}</div> : null;
-        },
-      },
-    ),
-    columnHelper.accessor(
-      (row) => ({
-        annotations: row.annotations,
-        notes: row.notes,
-      }),
-      {
-        id: "notes",
-        header: "Notes",
-        size: 256,
-        enableSorting: false,
-        cell: (info) => {
-          const { annotations, notes } = info.getValue();
-
-          const items = [];
-
-          // Add annotations first
-          if (annotations && annotations.length > 0) {
-            annotations.forEach((annotation) => {
-              if (annotation.desc) {
-                items.push(annotation.desc);
-              }
-            });
-          }
-
-          // Add track notes
-          if (notes) {
-            items.push(notes);
-          }
-
-          if (items.length === 0) return null;
-
-          return <CombinedNotes items={items} />;
-        },
-      },
-    ),
-    columnHelper.accessor((row) => row.rating ?? 0, {
-      id: "rating",
-      header: "Rating",
-      size: 180,
-      enableSorting: true,
-      sortingFn: "basic",
-      cell: (info) => {
-        const rating = info.getValue();
-        const ratingsCount = info.row.original.ratingsCount;
-        const trackId = info.row.original.trackId;
-        const showSlug = info.row.original.show.slug;
-        return (
-          <TrackRatingCell
-            trackId={trackId}
-            showSlug={showSlug}
-            initialRating={rating || null}
-            ratingsCount={ratingsCount || null}
-          />
-        );
-      },
-    }),
-  ];
-
-  const table = useReactTable({
-    data: filteredPerformances,
-    columns,
-    state: {
-      sorting,
-    },
-    onSortingChange: handleSortingChange,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    enableSorting: true,
-    enableMultiSort: false,
-  });
-
-  const filterButtons = [
-    { key: "setOpener", label: "Set Opener" },
-    { key: "setCloser", label: "Set Closer" },
-    { key: "encore", label: "Encore" },
-    { key: "segueIn", label: "Segue In" },
-    { key: "segueOut", label: "Segue Out" },
-    { key: "standalone", label: "Standalone" },
-    { key: "inverted", label: "Inverted" },
-    { key: "dyslexic", label: "Dyslexic" },
-  ];
-
-  return (
-    <div className="space-y-4">
-      {/* Filter Controls */}
-      <div className="flex flex-wrap gap-2">
-        <span className="text-sm text-content-text-secondary mr-2 self-center">Filters:</span>
-        {filterButtons.map((filter) => (
-          <button
-            type="button"
-            key={filter.key}
-            onClick={() => toggleFilter(filter.key)}
-            className={`px-3 py-1 text-sm rounded-md border transition-colors ${
-              activeFilters.has(filter.key)
-                ? "bg-brand-primary border-brand-primary text-white"
-                : "bg-transparent border-glass-border text-content-text-secondary hover:border-brand-primary/60"
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
-        {activeFilters.size > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveFilters(new Set())}
-            className="px-3 py-1 text-sm rounded-md bg-transparent border border-glass-border text-content-text-tertiary hover:text-content-text-secondary"
-          >
-            Clear All
-          </button>
-        )}
-      </div>
-
-      {/* Performance count */}
-      <div className="text-sm text-content-text-tertiary">
-        Showing {filteredPerformances.length} of {initialPerformances.length} performances
-      </div>
-
-      <div className="relative overflow-x-auto">
-        <table className="w-full text-md">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="p-3" style={{ width: header.getSize() }}>
-                    {header.isPlaceholder ? null : (
-                      <button
-                        type="button"
-                        className={
-                          header.column.getCanSort()
-                            ? "cursor-pointer select-none hover:text-content-text-primary w-full text-left"
-                            : "w-full text-left"
-                        }
-                        onClick={(_e) => {
-                          header.column.toggleSorting();
-                        }}
-                      >
-                        <span className={header.column.getIsSorted() ? "text-content-text-primary font-semibold" : ""}>
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                        </span>
-                        {header.column.getIsSorted() && (
-                          <span className="text-brand-primary ml-1">
-                            {header.column.getIsSorted() === "asc" ? (
-                              <ArrowUpIcon className="h-4 w-4 inline" />
-                            ) : (
-                              <ArrowDownIcon className="h-4 w-4 inline" />
-                            )}
-                          </span>
-                        )}
-                      </button>
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-t border-glass-border/30 hover:bg-hover-glass">
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="p-3">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function CombinedNotes({ items }: { items: string[] }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  // Count total lines across all items
-  const allLines = items.flatMap((item) => item.split("\n"));
-  const shouldTruncate = allLines.length > 2;
-
-  const displayItems =
-    shouldTruncate && !isExpanded
-      ? // Show only first 2 lines total
-        (() => {
-          const result = [];
-          let lineCount = 0;
-          for (const item of items) {
-            const itemLines = item.split("\n");
-            const remainingLines = 2 - lineCount;
-            if (remainingLines <= 0) break;
-
-            if (itemLines.length <= remainingLines) {
-              result.push(item);
-              lineCount += itemLines.length;
-            } else {
-              result.push(itemLines.slice(0, remainingLines).join("\n"));
-              lineCount = 2;
-              break;
-            }
-          }
-          return result;
-        })()
-      : items;
-
-  const showBullets = items.length > 1;
-
-  return (
-    <div className="text-sm text-content-text-secondary">
-      <div className="leading-relaxed">
-        {displayItems.map((item) => (
-          <div key={item} className={showBullets ? "flex" : ""}>
-            {showBullets && <span className="mr-1">•</span>}
-            <span>{item}</span>
-          </div>
-        ))}
-        {shouldTruncate && !isExpanded && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsExpanded(true);
-            }}
-            className="text-brand-primary hover:text-brand-secondary ml-1 underline text-xs"
-          >
-            more
-          </button>
-        )}
-        {shouldTruncate && isExpanded && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsExpanded(false);
-            }}
-            className="text-brand-primary hover:text-brand-secondary ml-1 underline text-xs"
-          >
-            less
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function ReviewNote({ notes }: { notes: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Split by newlines to count lines, but also account for long lines that wrap
   const lines = notes.split("\n");
   const shouldTruncate = lines.length > 6;
 
   const displayText = isExpanded || !shouldTruncate ? notes : lines.slice(0, 6).join("\n");
 
-  // Only show read more if we're actually truncating content
   const isTruncated = shouldTruncate && !isExpanded && displayText.length < notes.length;
 
   return (
@@ -881,7 +349,7 @@ export default function SongPage() {
 
         {allTimers.length > 0 && (
           <TabsContent value="all-timers" className="mt-6 space-y-8">
-            {/* Featured Performances (with reviews) */}
+            {/* Featured cards for performances with notes */}
             {(() => {
               const withNotes = allTimers
                 .filter((p) => p.notes)
@@ -907,7 +375,7 @@ export default function SongPage() {
                               {p.venue.city}, {p.venue.state}
                             </div>
                           )}
-                          {p.notes && <ReviewNote key={p.trackId} notes={p.notes} />}
+                          {p.notes && <ReviewNote notes={p.notes} />}
                         </div>
                       </a>
                     ))}
@@ -916,66 +384,18 @@ export default function SongPage() {
               );
             })()}
 
-            {/* All Performances Table */}
-            {(() => {
-              const withoutNotes = allTimers
-                .filter((p) => !p.notes)
-                .sort((a, b) => new Date(b.show.date).getTime() - new Date(a.show.date).getTime());
-
-              return (
-                withoutNotes.length > 0 && (
-                  <div className="glass-content rounded-lg p-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-base">
-                        <thead>
-                          <tr className="text-left text-sm text-content-text-secondary border-b border-glass-border/30">
-                            <th className="p-3">Date</th>
-                            <th className="p-3">Venue</th>
-                            <th className="p-3">Location</th>
-                            <th className="p-3">Rating</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {withoutNotes.map((p) => (
-                            <tr key={p.trackId} className="border-t border-glass-border/20 hover:bg-hover-glass">
-                              <td className="p-3">
-                                <a
-                                  href={`/shows/${p.show.slug}`}
-                                  className="text-brand-primary hover:text-brand-secondary"
-                                >
-                                  {p.show.date}
-                                </a>
-                              </td>
-                              <td className="p-3">
-                                <a
-                                  href={`/shows/${p.show.slug}`}
-                                  className="text-content-text-primary hover:text-brand-primary"
-                                >
-                                  {p.venue?.name}
-                                </a>
-                              </td>
-                              <td className="p-3 text-content-text-secondary">
-                                {p.venue?.city && `${p.venue.city}, ${p.venue.state}`}
-                              </td>
-                              <td className="p-3 text-right">
-                                <RatingComponent rating={p.rating || null} ratingsCount={p.ratingsCount} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              );
-            })()}
+            {/* Full performance table for all all-timers */}
+            <div className="glass-content rounded-lg p-4 md:p-6">
+              <h3 className="text-lg font-semibold text-content-text-primary mb-4">All-Timer Performances</h3>
+              <PerformanceTable performances={allTimers} songTitle={song.title} />
+            </div>
           </TabsContent>
         )}
 
         <TabsContent value="performances" className="mt-6">
           <div className="glass-content rounded-lg p-4 md:p-6">
             <h3 className="text-lg font-semibold text-content-text-primary mb-4">All Performances</h3>
-            <PerformanceTable performances={performances} songTitle={song.title} />
+            <PerformanceTable performances={performances} songTitle={song.title} showAllTimerColumn />
           </div>
         </TabsContent>
 
