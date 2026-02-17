@@ -1,4 +1,5 @@
 import type { Song, TrendingSong } from "@bip/domain";
+import { CacheKeys } from "@bip/domain/cache-keys";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -8,8 +9,10 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
+import { ERA_OPTIONS, YEAR_OPTIONS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 import { SongsTable } from "../../components/song/songs-table";
@@ -22,7 +25,7 @@ interface LoaderData {
 }
 
 export const loader = publicLoader(async (): Promise<LoaderData> => {
-  const cacheKey = "songs:index:full";
+  const cacheKey = CacheKeys.songs.index();
   const cacheOptions = { ttl: 3600 }; // 1 hour
 
   return await services.cache.getOrSet(
@@ -120,21 +123,25 @@ export function meta() {
   return getSongsMeta();
 }
 
-const ERA_OPTIONS = [
-  { value: "sammy", label: "Sammy Era" },
-  { value: "allen", label: "Allen Era" },
-  { value: "marlon", label: "Marlon Era" },
-  { value: "triscuits", label: "Triscuits" },
-] as const;
+const selectTriggerClass =
+  "h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20";
+const selectContentClass = "bg-glass-bg border-glass-border backdrop-blur-md";
+const selectItemClass = "text-content-text-primary hover:bg-hover-glass";
+const labelClass =
+  "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 
 export default function Songs() {
   const { songs, trendingSongs, yearlyTrendingSongs, recentShowsCount } = useSerializedLoaderData<LoaderData>();
+  const { user } = useSession();
   const [searchParams] = useSearchParams();
+  const yearParam = searchParams.get("year");
   const eraParam = searchParams.get("era");
   const playedParam = searchParams.get("played");
   const authorParam = searchParams.get("author");
   const coverParam = searchParams.get("cover");
-  // Default to "played" if not specified
+  const attendedParam = searchParams.get("attended");
+
+  const [selectedYear, setSelectedYear] = useState<string>(yearParam || "all");
   const [selectedEra, setSelectedEra] = useState<string>(eraParam || "all");
   const [playedFilter, setPlayedFilter] = useState<"played" | "notPlayed">(
     playedParam === "notPlayed" ? "notPlayed" : "played",
@@ -143,18 +150,42 @@ export default function Songs() {
   const [coverFilter, setCoverFilter] = useState<"all" | "cover" | "original">(
     coverParam === "cover" ? "cover" : coverParam === "original" ? "original" : "all",
   );
+  const [attendedFilter, setAttendedFilter] = useState<"all" | "attended">(
+    attendedParam === "attended" ? "attended" : "all",
+  );
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(songs);
   const [isLoadingFiltered, setIsLoadingFiltered] = useState(false);
 
+  // Auto-expand if URL has advanced filter params
+  const hasAdvancedParams = yearParam || eraParam || playedParam === "notPlayed" || attendedParam === "attended";
+  const [showMoreFilters, setShowMoreFilters] = useState(!!hasAdvancedParams);
+
+  const hasDateRange = selectedYear !== "all" || selectedEra !== "all";
+  const hasAnyFilter = hasDateRange || selectedAuthor || coverFilter !== "all" || attendedFilter !== "all";
+
   // Helper to update URL without React Router re-render
-  const updateUrl = (params: { era?: string; played?: "played" | "notPlayed"; author?: string | null; cover?: "all" | "cover" | "original" }) => {
+  const updateUrl = (params: {
+    year?: string;
+    era?: string;
+    played?: "played" | "notPlayed";
+    author?: string | null;
+    cover?: "all" | "cover" | "original";
+    attended?: "all" | "attended";
+  }) => {
     const newParams = new URLSearchParams(window.location.search);
+    if (params.year && params.year !== "all") {
+      newParams.set("year", params.year);
+    } else {
+      newParams.delete("year");
+    }
     if (params.era && params.era !== "all") {
       newParams.set("era", params.era);
     } else {
       newParams.delete("era");
     }
-    if (params.played === "notPlayed") {
+    const hasDateRangeParam = (params.year && params.year !== "all") || (params.era && params.era !== "all");
+    const hasAttendedParam = params.attended && params.attended !== "all";
+    if ((hasDateRangeParam || hasAttendedParam) && params.played === "notPlayed") {
       newParams.set("played", "notPlayed");
     } else {
       newParams.delete("played");
@@ -169,15 +200,26 @@ export default function Songs() {
     } else {
       newParams.delete("cover");
     }
+    if (params.attended && params.attended !== "all") {
+      newParams.set("attended", params.attended);
+    } else {
+      newParams.delete("attended");
+    }
     const newUrl = newParams.toString()
       ? `${window.location.pathname}?${newParams.toString()}`
       : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
   };
 
-  // Fetch filtered songs when era, playedFilter, author, or cover filter changes
+  // Fetch filtered songs when any filter changes
   useEffect(() => {
-    if (selectedEra === "all" && !selectedAuthor && coverFilter === "all") {
+    if (
+      selectedYear === "all" &&
+      selectedEra === "all" &&
+      !selectedAuthor &&
+      coverFilter === "all" &&
+      attendedFilter === "all"
+    ) {
       setFilteredSongs(songs);
       setIsLoadingFiltered(false);
       return undefined;
@@ -191,10 +233,13 @@ export default function Songs() {
     }, 200);
 
     const params = new URLSearchParams();
+    if (selectedYear !== "all") {
+      params.set("year", selectedYear);
+    }
     if (selectedEra !== "all") {
       params.set("era", selectedEra);
     }
-    if (playedFilter === "notPlayed") {
+    if ((selectedYear !== "all" || selectedEra !== "all" || attendedFilter !== "all") && playedFilter === "notPlayed") {
       params.set("played", "notPlayed");
     }
     if (selectedAuthor && selectedAuthor !== "none") {
@@ -202,6 +247,9 @@ export default function Songs() {
     }
     if (coverFilter !== "all") {
       params.set("cover", coverFilter);
+    }
+    if (attendedFilter !== "all") {
+      params.set("attended", attendedFilter);
     }
 
     fetch(`/api/songs?${params.toString()}`, { signal: controller.signal })
@@ -229,12 +277,12 @@ export default function Songs() {
       controller.abort();
       clearTimeout(loadingTimeout);
     };
-  }, [selectedEra, playedFilter, selectedAuthor, coverFilter, songs]);
+  }, [selectedYear, selectedEra, playedFilter, selectedAuthor, coverFilter, attendedFilter, songs]);
 
   const filterPanel = (
     <>
       <div className="flex flex-col">
-        <label htmlFor="author-search" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+        <label htmlFor="author-search" className={labelClass}>
           Author
         </label>
         <AuthorSearch
@@ -242,14 +290,21 @@ export default function Songs() {
           onValueChange={(value) => {
             const newAuthor = value === "none" ? null : value;
             setSelectedAuthor(newAuthor);
-            updateUrl({ era: selectedEra, played: playedFilter, author: newAuthor, cover: coverFilter });
+            updateUrl({
+              year: selectedYear,
+              era: selectedEra,
+              played: playedFilter,
+              author: newAuthor,
+              cover: coverFilter,
+              attended: attendedFilter,
+            });
           }}
           placeholder="All Authors"
-          className="w-[250px] h-[42px]"
+          className="w-[150px] sm:w-[200px] h-[42px]"
         />
       </div>
       <div className="flex flex-col">
-        <label htmlFor="cover-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
+        <label htmlFor="cover-filter" className={labelClass}>
           Original / Cover
         </label>
         <Select
@@ -257,109 +312,216 @@ export default function Songs() {
           onValueChange={(value) => {
             const newCoverFilter = value as "all" | "cover" | "original";
             setCoverFilter(newCoverFilter);
-            updateUrl({ era: selectedEra, played: playedFilter, author: selectedAuthor, cover: newCoverFilter });
+            updateUrl({
+              year: selectedYear,
+              era: selectedEra,
+              played: playedFilter,
+              author: selectedAuthor,
+              cover: newCoverFilter,
+              attended: attendedFilter,
+            });
           }}
         >
-          <SelectTrigger
-            id="cover-filter"
-            className="w-[170px] h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
-          >
+          <SelectTrigger id="cover-filter" className={`w-[120px] ${selectTriggerClass}`}>
             <SelectValue placeholder="Type" />
           </SelectTrigger>
-          <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
-            <SelectItem value="all" className="text-content-text-primary hover:bg-hover-glass">
+          <SelectContent className={selectContentClass}>
+            <SelectItem value="all" className={selectItemClass}>
               All
             </SelectItem>
-            <SelectItem value="original" className="text-content-text-primary hover:bg-hover-glass">
+            <SelectItem value="original" className={selectItemClass}>
               Original
             </SelectItem>
-            <SelectItem value="cover" className="text-content-text-primary hover:bg-hover-glass">
+            <SelectItem value="cover" className={selectItemClass}>
               Cover
             </SelectItem>
           </SelectContent>
         </Select>
       </div>
       <div className="flex flex-col">
-        <label htmlFor="era-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
-          Era
-        </label>
-        <Select
-          value={selectedEra === "all" ? "" : selectedEra}
-          onValueChange={(value) => {
-            const newEra = value || "all";
-            setSelectedEra(newEra);
-            setPlayedFilter("played");
-            updateUrl({ era: newEra, played: "played", author: selectedAuthor, cover: coverFilter });
-          }}
+        <div className="h-[18px] mb-1.5" />
+        <button
+          type="button"
+          onClick={() => setShowMoreFilters((v) => !v)}
+          className="text-sm text-brand-primary hover:text-brand-secondary h-[42px] flex items-center whitespace-nowrap transition-colors"
         >
-          <SelectTrigger
-            id="era-filter"
-            className="w-[200px] h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
-          >
-            <SelectValue placeholder="All Eras" />
-          </SelectTrigger>
-          <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
-            {ERA_OPTIONS.map((option) => (
-              <SelectItem
-                key={option.value}
-                value={option.value}
-                className="text-content-text-primary hover:bg-hover-glass"
-              >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {showMoreFilters ? "Hide More Filters" : "Show More Filters"}
+        </button>
       </div>
-      {selectedEra !== "all" && (
+    </>
+  );
+
+  const secondaryFilterPanel = (
+    <div
+      className={`overflow-hidden transition-all duration-300 ${
+        showMoreFilters ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+      }`}
+    >
+      <div className="flex items-end flex-wrap gap-x-4 gap-y-3">
         <div className="flex flex-col">
-          <label htmlFor="played-filter" className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center">
-            Status
+          <label htmlFor="year-filter" className={labelClass}>
+            Year
           </label>
           <Select
-            value={playedFilter}
+            value={selectedYear}
             onValueChange={(value) => {
-              const newPlayedFilter = value as "played" | "notPlayed";
-              setPlayedFilter(newPlayedFilter);
-              updateUrl({ era: selectedEra, played: newPlayedFilter, author: selectedAuthor, cover: coverFilter });
+              const newYear = value;
+              setSelectedYear(newYear);
+              if (newYear !== "all") {
+                setSelectedEra("all");
+              }
+              updateUrl({
+                year: newYear,
+                era: newYear !== "all" ? "all" : selectedEra,
+                played: playedFilter,
+                author: selectedAuthor,
+                cover: coverFilter,
+                attended: attendedFilter,
+              });
             }}
           >
-            <SelectTrigger
-              id="played-filter"
-              className="w-[150px] h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
-            >
+            <SelectTrigger id="year-filter" className={`w-[130px] ${selectTriggerClass}`}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
-              <SelectItem value="played" className="text-content-text-primary hover:bg-hover-glass">
-                Played
+            <SelectContent className={selectContentClass}>
+              <SelectItem value="all" className={selectItemClass}>
+                All Years
               </SelectItem>
-              <SelectItem value="notPlayed" className="text-content-text-primary hover:bg-hover-glass">
-                Not Played
-              </SelectItem>
+              {YEAR_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} className={selectItemClass}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
-      )}
-      {(selectedEra !== "all" || selectedAuthor || coverFilter !== "all") && (
         <div className="flex flex-col">
-          <div className="h-[18px] mb-1.5"></div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedEra("all");
-              setPlayedFilter("played");
-              setSelectedAuthor(null);
-              setCoverFilter("all");
-              updateUrl({ era: "all", played: "played", author: null, cover: "all" });
+          <label htmlFor="era-filter" className={labelClass}>
+            Era
+          </label>
+          <Select
+            value={selectedEra}
+            onValueChange={(value) => {
+              const newEra = value;
+              setSelectedEra(newEra);
+              if (newEra !== "all") {
+                setSelectedYear("all");
+              }
+              updateUrl({
+                year: newEra !== "all" ? "all" : selectedYear,
+                era: newEra,
+                played: playedFilter,
+                author: selectedAuthor,
+                cover: coverFilter,
+                attended: attendedFilter,
+              });
             }}
-            className="text-sm text-content-text-tertiary hover:text-content-text-secondary underline h-[42px] flex items-center"
           >
-            clear filters
-          </button>
+            <SelectTrigger id="era-filter" className={`w-[170px] ${selectTriggerClass}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className={selectContentClass}>
+              <SelectItem value="all" className={selectItemClass}>
+                All Eras
+              </SelectItem>
+              {ERA_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} className={selectItemClass}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
-    </>
+        {user && (
+          <div className="flex flex-col">
+            <label htmlFor="attended-filter" className={labelClass}>
+              Attendance
+            </label>
+            <Select
+              value={attendedFilter}
+              onValueChange={(value) => {
+                const newAttendedFilter = value as "all" | "attended";
+                setAttendedFilter(newAttendedFilter);
+                updateUrl({
+                  year: selectedYear,
+                  era: selectedEra,
+                  played: playedFilter,
+                  author: selectedAuthor,
+                  cover: coverFilter,
+                  attended: newAttendedFilter,
+                });
+              }}
+            >
+              <SelectTrigger id="attended-filter" className={`w-[130px] ${selectTriggerClass}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={selectContentClass}>
+                <SelectItem value="all" className={selectItemClass}>
+                  All Shows
+                </SelectItem>
+                <SelectItem value="attended" className={selectItemClass}>
+                  Attended
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {(hasDateRange || attendedFilter !== "all") && (
+          <div className="flex flex-col">
+            <label htmlFor="played-filter" className={labelClass}>
+              Played
+            </label>
+            <Select
+              value={playedFilter}
+              onValueChange={(value) => {
+                const newPlayedFilter = value as "played" | "notPlayed";
+                setPlayedFilter(newPlayedFilter);
+                updateUrl({
+                  year: selectedYear,
+                  era: selectedEra,
+                  played: newPlayedFilter,
+                  author: selectedAuthor,
+                  cover: coverFilter,
+                  attended: attendedFilter,
+                });
+              }}
+            >
+              <SelectTrigger id="played-filter" className={`w-[150px] ${selectTriggerClass}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={selectContentClass}>
+                <SelectItem value="played" className={selectItemClass}>
+                  Played
+                </SelectItem>
+                <SelectItem value="notPlayed" className={selectItemClass}>
+                  Not Played
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {hasAnyFilter && (
+          <div className="flex flex-col">
+            <div className="h-[18px] mb-1.5" />
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedYear("all");
+                setSelectedEra("all");
+                setPlayedFilter("played");
+                setSelectedAuthor(null);
+                setCoverFilter("all");
+                setAttendedFilter("all");
+                updateUrl({ year: "all", era: "all", played: "played", author: null, cover: "all", attended: "all" });
+              }}
+              className="text-sm text-content-text-tertiary hover:text-content-text-secondary underline h-[42px] flex items-center"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 
   return (
@@ -395,11 +557,7 @@ export default function Songs() {
           <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
         </div>
 
-        <SongsTable
-          songs={filteredSongs}
-          filterComponent={filterPanel}
-          isLoading={isLoadingFiltered}
-        />
+        <SongsTable songs={filteredSongs} filterComponent={filterPanel} secondaryFilterComponent={secondaryFilterPanel} isLoading={isLoadingFiltered} />
       </div>
     </div>
   );

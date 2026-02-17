@@ -50,6 +50,21 @@ export const CacheKeys = {
   },
 
   /**
+   * Song-related cache keys
+   */
+  songs: {
+    /** Full songs index page data */
+    index: () => "songs:index:full",
+    /** Filtered song results by era/author/cover */
+    filtered: (filters: CacheFilters) => {
+      const filterHash = hashFilters(filters);
+      return `songs:filtered:${filterHash}`;
+    },
+    /** All filtered song caches (for pattern deletion) */
+    allFiltered: () => "songs:filtered:*",
+  },
+
+  /**
    * Home page cache keys
    */
   home: {
