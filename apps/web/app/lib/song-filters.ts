@@ -4,7 +4,7 @@ export interface SongFilterConfig {
 	endDate?: Date;
 }
 
-const START_YEAR = 1996;
+const START_YEAR = 1995;
 
 const yearFilters: Record<string, SongFilterConfig> = Object.fromEntries(
 	Array.from({ length: new Date().getFullYear() - START_YEAR + 1 }, (_, i) => {

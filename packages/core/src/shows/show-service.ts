@@ -11,6 +11,13 @@ export interface ShowFilter {
   songId?: string;
 }
 
+export interface ShowNavItem {
+  slug: string;
+  date: string;
+  venueName: string | null;
+  venueCity: string | null;
+}
+
 export interface ShowServiceCreateInput {
   date: string;
   venueId?: string;
@@ -152,6 +159,45 @@ export class ShowService {
       }
       return show;
     });
+  }
+
+  async findByDate(date: string): Promise<Show[]> {
+    return this.findManyByDates([date]);
+  }
+
+  async findAdjacentShows(
+    date: string,
+    slug: string,
+  ): Promise<{ previous: ShowNavItem | null; next: ShowNavItem | null }> {
+    const [previousResults, nextResults] = await Promise.all([
+      this.db.$queryRaw<Array<{ slug: string; date: string; venue_name: string | null; venue_city: string | null }>>`
+        SELECT s.slug, s.date, v.name as venue_name, v.city as venue_city
+        FROM shows s
+        LEFT JOIN venues v ON s.venue_id = v.id
+        WHERE (s.date < ${date} OR (s.date = ${date} AND s.slug < ${slug}))
+          AND s.slug IS NOT NULL
+        ORDER BY s.date DESC, s.slug DESC
+        LIMIT 1
+      `,
+      this.db.$queryRaw<Array<{ slug: string; date: string; venue_name: string | null; venue_city: string | null }>>`
+        SELECT s.slug, s.date, v.name as venue_name, v.city as venue_city
+        FROM shows s
+        LEFT JOIN venues v ON s.venue_id = v.id
+        WHERE (s.date > ${date} OR (s.date = ${date} AND s.slug > ${slug}))
+          AND s.slug IS NOT NULL
+        ORDER BY s.date ASC, s.slug ASC
+        LIMIT 1
+      `,
+    ]);
+
+    const previous = previousResults[0]
+      ? { slug: previousResults[0].slug, date: previousResults[0].date, venueName: previousResults[0].venue_name, venueCity: previousResults[0].venue_city }
+      : null;
+    const next = nextResults[0]
+      ? { slug: nextResults[0].slug, date: nextResults[0].date, venueName: nextResults[0].venue_name, venueCity: nextResults[0].venue_city }
+      : null;
+
+    return { previous, next };
   }
 
   /**
