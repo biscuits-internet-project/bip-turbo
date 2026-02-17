@@ -11,6 +11,7 @@ export interface SongFilter {
   endDate?: Date;
   authorId?: string;
   cover?: boolean;
+  attendedUserId?: string;
 }
 
 export interface CreateSongInput {
@@ -84,8 +85,14 @@ export class SongService {
   }
 
   async findMany(filter: SongFilter): Promise<Song[]> {
+    // When filtering by attended shows, we need to recalculate timesPlayed from tracks
+    if (filter.attendedUserId) {
+      return this.findManyInDateRange(filter);
+    }
+
+    const { attendedUserId: _, ...dbFilter } = filter;
     const queryOptions: QueryOptions<Song> = {
-      filters: Object.entries(filter).map(([field, value]) => ({
+      filters: Object.entries(dbFilter).map(([field, value]) => ({
         field: field as keyof Song,
         operator: "eq",
         value,
@@ -111,7 +118,7 @@ export class SongService {
   }
 
   async findManyInDateRange(filter: SongFilter): Promise<Song[]> {
-    const { startDate, endDate, ...restFilter } = filter;
+    const { startDate, endDate, attendedUserId, ...restFilter } = filter;
 
     const queryOptions: QueryOptions<Song> = {
       filters: Object.entries(restFilter).map(([field, value]) => ({
@@ -126,15 +133,19 @@ export class SongService {
       where,
     });
 
-    // Get tracks in date range, unique by song per show
+    // Build show filter for tracks query
+    const showFilter: Record<string, unknown> = {
+      date: {
+        ...(startDate ? { gte: startDate.toISOString().slice(0, 10) } : {}),
+        ...(endDate ? { lte: endDate.toISOString().slice(0, 10) } : {}),
+      },
+      ...(attendedUserId ? { attendances: { some: { userId: attendedUserId } } } : {}),
+    };
+
+    // Get tracks in date range (and optionally attended shows only), unique by song per show
     const tracks = await this.db.track.findMany({
       where: {
-        show: {
-          date: {
-            ...(startDate ? { gte: startDate.toISOString().slice(0, 10) } : {}),
-            ...(endDate ? { lte: endDate.toISOString().slice(0, 10) } : {}),
-          },
-        },
+        show: showFilter,
       },
       include: {
         song: true,

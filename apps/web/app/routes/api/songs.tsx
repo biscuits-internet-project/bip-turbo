@@ -1,142 +1,132 @@
 import type { Song } from "@bip/domain";
+import { CacheKeys } from "@bip/domain/cache-keys";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
+import { SONG_FILTERS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const SONG_FILTERS = {
-  sammy: { endDate: new Date("2005-08-27") },
-  allen: { startDate: new Date("2005-12-28"), endDate: new Date("2025-09-07") },
-  marlon: { startDate: new Date("2025-10-31") },
-  triscuits: { startDate: new Date("2000-03-11"), endDate: new Date("2000-07-12") },
-};
+/**
+ * For "not played" songs: returns songs matching the base filters (author/cover)
+ * that have been played overall but NOT in the date-range results.
+ * For "played" songs: filters to those with timesPlayed > 0 in the filtered results.
+ */
+async function splitByPlayStatus(
+	filteredSongs: Song[],
+	showNotPlayed: boolean,
+	baseFilter: { authorId?: string; cover?: boolean; attendedUserId?: string },
+): Promise<Song[]> {
+	const playedInFilter = filteredSongs.filter((song) => song.timesPlayed > 0);
 
-export const loader = publicLoader(async ({ request }) => {
-  const url = new URL(request.url);
-  const query = url.searchParams.get("q");
-  const era = url.searchParams.get("era");
-  const playedParam = url.searchParams.get("played");
-  const authorParam = url.searchParams.get("author");
-  const coverParam = url.searchParams.get("cover");
-  // Default to "played" if not specified, or if "notPlayed" show only not played songs
-  const showNotPlayed = playedParam === "notPlayed";
+	if (!showNotPlayed) {
+		return playedInFilter;
+	}
 
-  // Convert cover filter to boolean or undefined
-  const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
+	// Get all songs matching author/cover, but without date range or attended constraint.
+	// This ensures "not played" = played overall but not in the filtered view.
+	const { attendedUserId: _, ...baseFilterWithoutAttended } = baseFilter;
+	const allSongs = await services.songs.findMany(baseFilterWithoutAttended);
+	const allSongsPlayed = allSongs.filter((song) => song.timesPlayed > 0);
 
-  // Validate author filter if provided
-  const authorId = authorParam ? (UUID_REGEX.test(authorParam) ? authorParam : null) : null;
-  if (authorParam && !authorId) {
-    logger.warn("Ignoring invalid author filter", { authorParam });
-  }
+	// Songs NOT played in this filter = matching played songs minus filter played
+	const playedIds = new Set(playedInFilter.map((song) => song.id));
+	const notPlayed = allSongsPlayed.filter((song) => !playedIds.has(song.id));
 
-  // Handle filtering (author, cover, or both with optional era)
-  if (authorId || coverFilter !== undefined) {
-    try {
-      let filteredSongs: Song[];
+	// Sort by overall timesPlayed descending (most popular first)
+	return notPlayed.sort((a, b) => b.timesPlayed - a.timesPlayed);
+}
 
-      const filter: { authorId?: string; cover?: boolean; startDate?: Date; endDate?: Date } = {};
-      if (authorId) filter.authorId = authorId;
-      if (coverFilter !== undefined) filter.cover = coverFilter;
+export const loader = publicLoader(async ({ request, context }) => {
+	const url = new URL(request.url);
+	const query = url.searchParams.get("q");
+	const year = url.searchParams.get("year");
+	const era = url.searchParams.get("era");
+	const playedParam = url.searchParams.get("played");
+	const authorParam = url.searchParams.get("author");
+	const coverParam = url.searchParams.get("cover");
+	const attendedParam = url.searchParams.get("attended");
+	const showNotPlayed = playedParam === "notPlayed";
 
-      // If era is specified, combine with other filters
-      if (era && era in SONG_FILTERS) {
-        const eraFilter = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
-        filteredSongs = await services.songs.findManyInDateRange({ ...eraFilter, ...filter });
-      } else {
-        // Filter by author/cover only
-        filteredSongs = await services.songs.findMany(filter);
-      }
+	const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
 
-      // Handle played/not played filtering
-      let filteredSongsByPlayStatus: Song[];
-      if (showNotPlayed) {
-        const notPlayedInEra = filteredSongs.filter((song) => song.timesPlayed === 0);
-        const songIds = notPlayedInEra.map((song) => song.id);
-        const allSongs = await services.songs.findMany({});
-        const songsWithOverallStats = allSongs.filter((song) => songIds.includes(song.id));
+	const authorId = authorParam ? (UUID_REGEX.test(authorParam) ? authorParam : null) : null;
+	if (authorParam && !authorId) {
+		logger.warn("Ignoring invalid author filter", { authorParam });
+	}
 
-        const overallTimesPlayedMap = new Map<string, number>(
-          songsWithOverallStats.map((song) => [song.id, song.timesPlayed]),
-        );
+	// Resolve internal user ID for attended filter
+	let attendedUserId: string | undefined;
+	if (attendedParam === "attended" && context.currentUser) {
+		const localUser = await services.users.findByEmail(context.currentUser.email);
+		if (localUser) {
+			attendedUserId = localUser.id;
+		}
+	}
 
-        filteredSongsByPlayStatus = notPlayedInEra.sort((a, b) => {
-          const aOverall = overallTimesPlayedMap.get(a.id) || 0;
-          const bOverall = overallTimesPlayedMap.get(b.id) || 0;
-          return bOverall - aOverall;
-        });
-      } else {
-        filteredSongsByPlayStatus = filteredSongs.filter((song) => song.timesPlayed > 0);
-      }
+	// Year and era both resolve to a date-range key in SONG_FILTERS (mutually exclusive)
+	const dateRangeKey = year || era;
+	const hasDateRange = dateRangeKey && dateRangeKey in SONG_FILTERS;
 
-      const songsWithVenueInfo = await addVenueInfoToSongs(filteredSongsByPlayStatus);
-      return songsWithVenueInfo;
-    } catch (error) {
-      logger.error("Error fetching author filtered songs", { error });
-      return [];
-    }
-  }
+	// Handle filtering by author, cover, date range, attended, or any combination
+	if (authorId || coverFilter !== undefined || hasDateRange || attendedUserId) {
+		try {
+			const cacheKey = CacheKeys.songs.filtered({
+				year: year || null,
+				era: era || null,
+				played: playedParam || null,
+				author: authorId || null,
+				cover: coverParam || null,
+				attended: attendedUserId || null,
+			});
 
-  // Handle era filtering (without author)
-  if (era && era in SONG_FILTERS) {
-    const eraFilter = SONG_FILTERS[era as keyof typeof SONG_FILTERS];
-    try {
-      const filteredSongs = await services.songs.findManyInDateRange(eraFilter);
+			return await services.cache.getOrSet(
+				cacheKey,
+				async () => {
+					const filter: {
+						authorId?: string;
+						cover?: boolean;
+						startDate?: Date;
+						endDate?: Date;
+						attendedUserId?: string;
+					} = {};
+					if (authorId) filter.authorId = authorId;
+					if (coverFilter !== undefined) filter.cover = coverFilter;
+					if (attendedUserId) filter.attendedUserId = attendedUserId;
 
-      // For "not played" songs, we need to get their overall timesPlayed for sorting
-      // The findMany with date range recalculates timesPlayed for that era only
-      // So we need to fetch the original overall timesPlayed from the database
-      let filteredSongsByPlayStatus: Song[];
-      if (showNotPlayed) {
-        // Filter to only songs not played in this era
-        const notPlayedInEra = filteredSongs.filter((song) => song.timesPlayed === 0);
+					let songs: Song[];
+					if (hasDateRange) {
+						const { startDate, endDate } = SONG_FILTERS[dateRangeKey];
+						songs = await services.songs.findManyInDateRange({ startDate, endDate, ...filter });
+					} else {
+						songs = await services.songs.findMany(filter);
+					}
 
-        // Fetch overall timesPlayed for these songs to sort by popularity
-        const songIds = notPlayedInEra.map((song) => song.id);
-        const allSongs = await services.songs.findMany({});
-        const songsWithOverallStats = allSongs.filter((song) => songIds.includes(song.id));
+					const filtered = await splitByPlayStatus(songs, showNotPlayed && (!!hasDateRange || !!attendedUserId), filter);
+					return addVenueInfoToSongs(filtered);
+				},
+				{ ttl: 3600 },
+			);
+		} catch (error) {
+			logger.error("Error fetching filtered songs", { error });
+			return [];
+		}
+	}
 
-        // Create a map of overall timesPlayed
-        const overallTimesPlayedMap = new Map<string, number>(
-          songsWithOverallStats.map((song) => [song.id, song.timesPlayed]),
-        );
+	// Handle search query
+	if (!query || query.length < 2) {
+		return [];
+	}
 
-        // Sort by overall timesPlayed descending (most popular first)
-        filteredSongsByPlayStatus = notPlayedInEra.sort((a, b) => {
-          const aOverall = overallTimesPlayedMap.get(a.id) || 0;
-          const bOverall = overallTimesPlayedMap.get(b.id) || 0;
-          return bOverall - aOverall;
-        });
-      } else {
-        // Only played songs (default) - already sorted by timesPlayed in era
-        filteredSongsByPlayStatus = filteredSongs.filter((song) => song.timesPlayed > 0);
-      }
+	logger.info(`Song search for '${query}'`);
 
-      const songsWithVenueInfo = await addVenueInfoToSongs(filteredSongsByPlayStatus);
-      return songsWithVenueInfo;
-    } catch (error) {
-      logger.error("Error fetching filtered songs", { error });
-      return [];
-    }
-  }
-
-  // Handle search query
-  if (!query || query.length < 2) {
-    return [];
-  }
-
-  logger.info(`Song search for '${query}'`);
-
-  try {
-    // Search songs by title
-    const songs = await services.songs.search(query, 20);
-
-    logger.info(`Song search for '${query}' returned ${songs.length} results`);
-    return songs;
-  } catch (error) {
-    logger.error("Song search error", { error });
-    return [];
-  }
+	try {
+		const songs = await services.songs.search(query, 20);
+		logger.info(`Song search for '${query}' returned ${songs.length} results`);
+		return songs;
+	} catch (error) {
+		logger.error("Song search error", { error });
+		return [];
+	}
 });

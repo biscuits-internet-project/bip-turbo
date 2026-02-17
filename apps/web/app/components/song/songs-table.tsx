@@ -6,11 +6,18 @@ import { DataTable } from "~/components/ui/data-table";
 interface SongsTableProps {
   songs: Song[];
   filterComponent?: ReactNode;
+  secondaryFilterComponent?: ReactNode;
   searchActions?: ReactNode;
   isLoading?: boolean;
 }
 
-export function SongsTable({ songs, filterComponent, searchActions, isLoading = false }: SongsTableProps) {
+export function SongsTable({
+  songs,
+  filterComponent,
+  secondaryFilterComponent,
+  searchActions,
+  isLoading = false,
+}: SongsTableProps) {
   return (
     <div>
       <DataTable
@@ -20,6 +27,7 @@ export function SongsTable({ songs, filterComponent, searchActions, isLoading = 
         searchPlaceholder="Search songs..."
         hidePagination
         filterComponent={filterComponent}
+        secondaryFilterComponent={secondaryFilterComponent}
         searchActions={searchActions}
         isLoading={isLoading}
       />
