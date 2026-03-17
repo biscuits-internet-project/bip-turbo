@@ -52,9 +52,13 @@ RUN bun add prisma@7.2.0 @prisma/adapter-pg@7.2.0 && \
 WORKDIR /app/apps/web
 RUN bun install --production
 
+COPY apps/web/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 ENV NODE_ENV=production
 ENV PORT=8080
 
 EXPOSE 8080
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["bun", "run", "start"]

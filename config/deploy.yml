@@ -1,0 +1,60 @@
+service: bip-web
+image: doncote/bip-web
+
+servers:
+  web:
+    hosts:
+      - 5.161.124.129
+
+proxy:
+  ssl: true
+  host: discobiscuits.net
+  app_port: 8080
+  response_timeout: 30
+  healthcheck:
+    path: /healthcheck
+    interval: 10
+    timeout: 2
+
+registry:
+  username: doncote
+  password:
+    - DOCKER_PASSWORD
+
+env:
+  secret:
+    - BASE_URL
+    - REDIS_URL
+    - SUPABASE_URL
+    - SUPABASE_ANON_KEY
+    - SUPABASE_SERVICE_ROLE_KEY
+    - SUPABASE_STORAGE_URL
+    - OPENAI_API_KEY
+    - RESEND_API_KEY
+    - CONTACT_EMAIL
+    - HONEYBADGER_API_KEY
+    - CLOUDFLARE_ACCOUNT_ID
+    - CLOUDFLARE_IMAGES_API_TOKEN
+    - CLOUDFLARE_ZONE_ID
+    - CLOUDFLARE_CACHE_PURGE_TOKEN
+    - DATABASE_URL
+  clear:
+    APP_ENV: production
+    PORT: "8080"
+
+builder:
+  arch: amd64
+  remote: ssh://deploy@5.161.124.129
+  dockerfile: apps/web/Dockerfile
+
+ssh:
+  user: deploy
+
+accessories:
+  redis:
+    image: redis:7-alpine
+    host: 5.161.124.129
+    port: 6379
+    directories:
+      - bip-web-redis-data:/data
+    cmd: redis-server --appendonly yes
