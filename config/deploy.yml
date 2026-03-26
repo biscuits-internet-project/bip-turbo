@@ -44,7 +44,7 @@ env:
 
 builder:
   arch: amd64
-  remote: ssh://deploy@5.161.124.129
+  local: true
   dockerfile: apps/web/Dockerfile
 
 ssh:
