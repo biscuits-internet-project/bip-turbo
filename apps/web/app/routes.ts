@@ -54,7 +54,6 @@ export default [
   // OAuth routes
   ...prefix("oauth", [
     route("consent", "routes/oauth/consent.tsx"),
-    route("register", "routes/oauth/register.tsx"),
   ]),
 
   // Profile routes
@@ -140,12 +139,6 @@ export default [
 
   // Health check route
   route("healthcheck", "routes/healthcheck.tsx"),
-
-  // Well-known endpoints for OAuth discovery
-  route(".well-known/oauth-authorization-server", "routes/.well-known/oauth-authorization-server.tsx"),
-  route(".well-known/oauth-authorization-server/mcp", "routes/.well-known/oauth-authorization-server-mcp.tsx"),
-  route(".well-known/oauth-protected-resource", "routes/.well-known/oauth-protected-resource.tsx"),
-  route(".well-known/oauth-protected-resource/mcp", "routes/.well-known/oauth-protected-resource-mcp.tsx"),
 
   // Catch-all fallback to produce clean 404s for unmatched paths (e.g. stale asset URLs)
   route("*", "routes/$.tsx"),

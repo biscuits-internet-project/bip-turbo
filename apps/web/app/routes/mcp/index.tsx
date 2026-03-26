@@ -1,5 +1,4 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getServerClient } from "~/server/supabase";
 import { services } from "~/server/services";
 
 // MCP JSON-RPC Protocol Handler
@@ -613,21 +612,6 @@ function jsonRpcSuccess(id: string | number, result: unknown): JsonRpcResponse {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  // Return 401 for unauthenticated GET requests to trigger OAuth
-  const { supabase } = getServerClient(request);
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: {
-        "Content-Type": "application/json",
-        "WWW-Authenticate": 'Bearer realm="discobiscuits.net"',
-      },
-    });
-  }
-
-  // For authenticated GET, return server info
   return new Response(
     JSON.stringify({
       name: "discobiscuits",
@@ -643,20 +627,6 @@ export async function action({ request }: ActionFunctionArgs) {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // Check authentication
-  const { supabase } = getServerClient(request);
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: {
-        "Content-Type": "application/json",
-        "WWW-Authenticate": 'Bearer realm="discobiscuits.net"',
-      },
     });
   }
 
