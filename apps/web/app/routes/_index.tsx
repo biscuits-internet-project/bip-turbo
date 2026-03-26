@@ -360,6 +360,30 @@ export default function Index() {
               )}
             </div>
 
+            {/* Revolution in Motion */}
+            <div>
+              <Link to="/resources/revolution-in-motion" className="block group">
+                <div className="card-premium rounded-lg overflow-hidden">
+                  <div className="relative">
+                    <img
+                      src="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/revolution-in-motion.png"
+                      alt="Revolution in Motion"
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  </div>
+                  <div className="p-3">
+                    <p className="text-content-text-secondary text-sm leading-relaxed">
+                      A sci-fi concept album following an alien prince whose collision with The Disco Biscuits rewrites the fate of two worlds.
+                    </p>
+                    <span className="text-brand-primary text-sm font-medium mt-2 inline-block group-hover:text-brand-secondary transition-colors">
+                      Explore the story →
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            </div>
+
             {/* Recent Blog Posts */}
             <div>
               <div className="mb-4">

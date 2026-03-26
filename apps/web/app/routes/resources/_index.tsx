@@ -49,14 +49,6 @@ export default function Resources(): ReactElement {
           </div>
           <div className="h-full">
             <ResourceCard
-              title="Side Projects"
-              content="From Barber and the Laid Back Band to Younger Brother Live and everything in between. And we mean EVERYTHING."
-              image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/electron.jpg"
-              url="/resources/side-projects"
-            />
-          </div>
-          <div className="h-full">
-            <ResourceCard
               title="The Hot Air Balloon"
               content="The band's first full length rock opera, written by Jon Gutwillig and debuted at the band's 1998 New Year's Eve show at Silk City in Philadelphia."
               image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/hot-air-balloon.jpg"
@@ -69,6 +61,22 @@ export default function Resources(): ReactElement {
               content="The band's second full length rock opera, written by Marc Brownstein, and debuted Dec 30, 2000 at the Vanderbilt on Long Island."
               image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/cwb.jpg"
               url="/resources/chemical-warfare-brigade"
+            />
+          </div>
+          <div className="h-full">
+            <ResourceCard
+              title="Revolution in Motion"
+              content="The band's third rock opera, a sci-fi concept album created by Jon Gutwillig, Joey Friedman, and Aron Magner. Follow a blacksheep alien prince whose collision with humanity rewrites the fate of two worlds."
+              image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/revolution-in-motion.png"
+              url="/resources/revolution-in-motion"
+            />
+          </div>
+          <div className="h-full">
+            <ResourceCard
+              title="Side Projects"
+              content="From Barber and the Laid Back Band to Younger Brother Live and everything in between. And we mean EVERYTHING."
+              image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/electron.jpg"
+              url="/resources/side-projects"
             />
           </div>
           <div className="h-full">

@@ -34,6 +34,7 @@ export default [
       route("movie-scores", "routes/resources/movie-scores.tsx"),
       route("music", "routes/resources/music.tsx"),
       route("perfume", "routes/resources/perfume.tsx"),
+      route("revolution-in-motion", "routes/resources/revolution-in-motion.tsx"),
       route("side-projects", "routes/resources/side-projects.tsx"),
       route("think-tank", "routes/resources/think-tank.tsx"),
       route("tractorbeam", "routes/resources/tractorbeam.tsx"),
