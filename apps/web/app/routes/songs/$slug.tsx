@@ -2,7 +2,7 @@ import type { SongPageView } from "@bip/domain";
 import { ArrowLeft, BarChart3, FileTextIcon, GuitarIcon, History, Pencil, StarIcon } from "lucide-react";
 import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
@@ -100,6 +100,10 @@ export function meta({ data }: { data: SongPageView }) {
 export default function SongPage() {
   const { song, performances } = useSerializedLoaderData<SongPageView>();
   const allTimers = performances.filter((p) => p.allTimer);
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
+  const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -269,7 +273,7 @@ export default function SongPage() {
         </div>
       )}
 
-      <Tabs defaultValue="performances" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="w-full flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
           <TabsTrigger
             value="performances"

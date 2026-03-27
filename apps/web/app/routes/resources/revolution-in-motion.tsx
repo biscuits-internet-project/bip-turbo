@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type React from "react";
+import { Link } from "react-router-dom";
 import { publicLoader } from "~/lib/base-loaders";
 
 export const loader = publicLoader<void>(async () => {});
@@ -123,7 +124,7 @@ const storyParts = [
     title: "The Freeze",
     songs: ["Times Square", "Freeze"],
     content: [
-      "The next act unfolds simultaneously above and below Earth. \"Times Square\" and \"Freeze\" occur at the same moment — parallel hype anthems for two groups on the brink of collision: The Disco Biscuits performing underground in Manhattan, and the Polyfuzian crew preparing to unleash the Freeze from orbit.",
+      "The next act unfolds simultaneously above and below Earth. \"Times Square\" and \"Freeze\" occur at the same moment, parallel hype anthems for two groups on the brink of collision: The Disco Biscuits performing underground in Manhattan, and the Polyfuzian crew preparing to unleash the Freeze from orbit.",
       "Below ground, The Disco Biscuits are onstage at the Palladium Times Square, playing their annual New Year's Eve show. The gag draws inspiration from a sensational news story: a gang of teenage pickpockets calling themselves the Bellevue Wrecking Crew of NYC.",
       "High above, the Captain delivers precise, methodical commands as the crew prepares to fire the weapon. In contrast to \"Shocked,\" which depicts the Captain lost at the end of a purposeless bender, \"Freeze\" presents him as confident, sober, and determined.",
       "As both groups count down, the moment arrives. Below, fireworks erupt and confetti falls. Above, a massive pulse of blue-white energy streaks through the atmosphere. In an instant, New York City stands suspended, arms raised and smiles frozen, the world turned to stillness.",
@@ -134,7 +135,7 @@ const storyParts = [
     title: "The Tourists",
     songs: ["Tourists (Rocket Ship)", "Spaga's Last Stand"],
     content: [
-      "With the Freeze complete, the Captain dispatches a retrieval unit to the surface. \"Tourists (Rocket Ship)\" captures the irony of their mission — visitors wandering through a world preserved in stillness, collecting \"souvenirs.\" The retrieval team moves cautiously through Times Square, attaching transponders to select humans for transport.",
+      "With the Freeze complete, the Captain dispatches a retrieval unit to the surface. \"Tourists (Rocket Ship)\" captures the irony of their mission: visitors wandering through a world preserved in stillness, collecting \"souvenirs.\" The retrieval team moves cautiously through Times Square, attaching transponders to select humans for transport.",
       "Below ground at the Palladium, the power cuts out completely. The band huddles together backstage, realizing something far beyond a technical glitch has occurred. \"Spaga's Last Stand\" chronicles the band's decision to confront the unknown. Keyboardist Aron Magner (Spaga) senses that their music may be their only defense.",
       "The band ascends the venue's iconic escalators and bursts through the lobby doors into a frozen world. A burst of energy surges through the plaza as the band strikes a single note. Beams of light shoot from the transponders, enveloping the band and the tagged humans nearby. Within seconds, all are pulled upward in a cascade of blue light, vanishing into the JP-8000.",
     ],
@@ -144,9 +145,9 @@ const storyParts = [
     title: "The Deal",
     songs: ["Who's in Charge", "The Deal"],
     content: [
-      "The band awakens inside the JP-8000. Disoriented but defiant, they reach for their instruments and demand answers. \"Who's in Charge\" — its opening line functions both literally and metaphorically, a direct challenge to authority.",
-      "When the band begins to play, panels glow, lights flicker, and the polyfuzaline core vibrates in resonance with their rhythm. The vessel itself reacts to the sound. The Captain feels the music vibrate through the ship. He is b'gocked — the overwhelming moment when a piece of music permanently shifts how one hears everything that follows.",
-      "In \"The Deal,\" the Captain makes the band an offer they can't refuse. He promises to unfreeze Earth if the Biscuits accompany him to Polyfuzia to perform for the Queen. To survive the journey, they must undergo DNA transference — becoming biologically part Polyfuzian.",
+      "The band awakens inside the JP-8000. Disoriented but defiant, they reach for their instruments and demand answers. \"Who's in Charge,\" its opening line, functions both literally and metaphorically as a direct challenge to authority.",
+      "When the band begins to play, panels glow, lights flicker, and the polyfuzaline core vibrates in resonance with their rhythm. The vessel itself reacts to the sound. The Captain feels the music vibrate through the ship. He is b'gocked, the overwhelming moment when a piece of music permanently shifts how one hears everything that follows.",
+      "In \"The Deal,\" the Captain makes the band an offer they can't refuse. He promises to unfreeze Earth if the Biscuits accompany him to Polyfuzia to perform for the Queen. To survive the journey, they must undergo DNA transference, becoming biologically part Polyfuzian.",
       "Submerged in conductive water, the band endures an electrifying ritual that merges their biology with the Captain's. Back on Earth, time resumes. Fireworks complete their arc and the frozen awaken.",
     ],
   },
@@ -155,7 +156,7 @@ const storyParts = [
     title: "One Chance to Save the World",
     songs: ["Space Train", "One Chance to Save the World", "Why We Dance"],
     content: [
-      "The JP-8000 departs Earth's orbit in a blaze of light. \"Space Train\" begins as the ship accelerates toward the wormhole — part celebration and part reflection. For The Disco Biscuits, it becomes a moment of introspection. After thirty years of wild highs and devastating lows, they have jammed their way from small Earth venues to the far reaches of the galaxy.",
+      "The JP-8000 departs Earth's orbit in a blaze of light. \"Space Train\" begins as the ship accelerates toward the wormhole, part celebration and part reflection. For The Disco Biscuits, it becomes a moment of introspection. After thirty years of wild highs and devastating lows, they have jammed their way from small Earth venues to the far reaches of the galaxy.",
       "Safely through the wormhole, the planet Polyfuzia shines brilliantly in the distance. The band performs \"One Chance to Save the World\" as their introduction to Polyfuzia. As the performance grows, the band's irreverent humor breaks through. Their first question to the Queen, delivered mid-song: \"Unlock the secret if you answer one question, where you keepin' all the weed in this town?\"",
       "The court erupts in laughter. Even the Queen smiles. In \"Why We Dance,\" the chorus becomes an anthem for the entire planet. The Queen embraces her son and thanks The Disco Biscuits for giving him and their world new life. The Captain has fulfilled his mission not through conquest, but through the discovery of art.",
     ],
@@ -168,7 +169,7 @@ const storyParts = [
       "The celebration on Polyfuzia lasts for days. The Queen's son stands beside her, no longer the reckless Prince who vanished through a wormhole, but a ruler reborn through discovery.",
       "But even as joy fills the planet, tension brews beneath its surface. The Queen's Advisers watch the celebrations in silence. The polyfuzaline energy in the atmosphere begins to flicker and pulse in shades of red.",
       "When the festivities end, the Queen grants the band safe passage home aboard the JP-8000. Inside the ship, the band looks out the viewport in silence. They do not know whether they will survive the return trip through the wormhole, what year it will be when they reach Earth, or what will have become of their families.",
-      "\"To Be Continued...\" closes the opera in a tone of reflective wonder. As the music fades, the JP-8000 disappears towards the wormhole. Behind it, the red glow of Polyfuzia expands across the planet's surface — a world forever changed by discovery, love, and unintended revolution.",
+      "\"To Be Continued...\" closes the opera in a tone of reflective wonder. As the music fades, the JP-8000 disappears towards the wormhole. Behind it, the red glow of Polyfuzia expands across the planet's surface, a world forever changed by discovery, love, and unintended revolution.",
       "To be continued...",
     ],
   },
@@ -247,15 +248,37 @@ function YouTubeIcon({ className }: { className?: string }) {
   );
 }
 
+const songSlugs: Record<string, string> = {
+  "Shocked!": "shocked",
+  "The Wormhole": "wormhole",
+  "Twisted in the Road": "twisted-in-the-road",
+  "Another Plan of Attack": "another-plan-of-attack",
+  "Times Square": "times-square",
+  "Freeze": "freeze",
+  "Tourists (Rocket Ship)": "tourists-rocket-ship",
+  "Spaga's Last Stand": "spaga-s-last-stand",
+  "Who's in Charge": "who-s-in-charge",
+  "The Deal": "the-deal",
+  "Space Train": "space-train",
+  "One Chance to Save the World": "a-chance-to-save-the-world",
+  "Why We Dance": "why-we-dance",
+  "To Be Continued...": "to-be-continued",
+};
+
 // ─── Components ──────────────────────────────────────────────────────────────
 
 function SongBadge({ name }: { name: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-brand-tertiary/10 border border-brand-tertiary/25 px-2.5 py-1 text-sm text-brand-tertiary">
+  const slug = songSlugs[name];
+  const badge = (
+    <span className="inline-flex items-center gap-1 rounded-full bg-brand-tertiary/10 border border-brand-tertiary/25 px-2.5 py-1 text-sm text-brand-tertiary hover:bg-brand-tertiary/20 transition-colors">
       <span className="text-xs">&#9835;</span>
       {name}
     </span>
   );
+  if (slug) {
+    return <Link to={`/songs/${slug}?tab=lyrics`}>{badge}</Link>;
+  }
+  return badge;
 }
 
 function StoryCard({ part, index }: { part: (typeof storyParts)[number]; index: number }) {
@@ -533,8 +556,6 @@ const RevolutionInMotion: React.FC = () => {
             <p className="mb-3">
               All fourteen songs were written in eleven long weekends from March through December 2022 at
               Gutwillig's home studio outside of Philadelphia. The songs were not written in narrative order.
-              Aron Magner joined the writing process in April 2022, where his musical contributions were
-              critical to completing the first three songs.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-base">
               {[
