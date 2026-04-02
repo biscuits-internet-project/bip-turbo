@@ -397,8 +397,10 @@ function renderLyrics(lyrics: string) {
   if (!lyrics.trim()) return null;
   const stanzas = lyrics.split("\n\n");
   return stanzas.map((stanza, i) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: static lyrics
     <p key={i}>
       {stanza.split("\n").map((line, j, arr) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static lyrics
         <span key={j}>
           {line}
           {j < arr.length - 1 && <br />}
