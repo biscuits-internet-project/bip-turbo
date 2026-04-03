@@ -10,7 +10,9 @@ import {
 } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpIcon, Flame } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSession } from "~/hooks/use-session";
 import { useShowUserData } from "~/hooks/use-show-user-data";
+import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { ATTENDED_ROW_CLASS } from "~/lib/utils";
 import { CombinedNotes } from "./combined-notes";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -28,6 +30,8 @@ export function PerformanceTable({
   showSongColumn = false,
   showAllTimerColumn = false,
 }: PerformanceTableProps) {
+  const { user } = useSession();
+  const isAuthenticated = !!user;
   const [sorting, setSorting] = useState<SortingState>([{ id: "date", desc: true }]);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
 
@@ -37,6 +41,13 @@ export function PerformanceTable({
     [initialPerformances],
   );
   const { attendanceMap } = useShowUserData(showIds);
+
+  // Fetch user's track ratings for gold highlight
+  const trackIds = useMemo(
+    () => initialPerformances.map((p) => p.trackId),
+    [initialPerformances],
+  );
+  const { userRatingMap } = useTrackUserRatings(trackIds);
 
   const handleSortingChange = (updaterOrValue: SortingState | ((old: SortingState) => SortingState)) => {
     setSorting(updaterOrValue);
@@ -303,12 +314,15 @@ export function PerformanceTable({
           const ratingsCount = info.row.original.ratingsCount;
           const trackId = info.row.original.trackId;
           const showSlug = info.row.original.show.slug;
+          const userRating = userRatingMap.get(trackId) ?? null;
           return (
             <TrackRatingCell
               trackId={trackId}
               showSlug={showSlug}
               initialRating={rating || null}
               ratingsCount={ratingsCount || null}
+              userRating={userRating}
+              isAuthenticated={isAuthenticated}
             />
           );
         },
@@ -316,7 +330,7 @@ export function PerformanceTable({
     );
 
     return cols;
-  }, [showSongColumn, showAllTimerColumn, songTitle, columnHelper]);
+  }, [showSongColumn, showAllTimerColumn, songTitle, columnHelper, userRatingMap, isAuthenticated]);
 
   const table = useReactTable({
     data: filteredPerformances,

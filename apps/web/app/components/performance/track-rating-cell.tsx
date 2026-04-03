@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { RatingComponent } from "~/components/rating";
 import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { StarRating } from "~/components/ui/star-rating";
-import { useSession } from "~/hooks/use-session";
 import { cn } from "~/lib/utils";
 
 export function TrackRatingCell({
@@ -10,18 +9,27 @@ export function TrackRatingCell({
   showSlug,
   initialRating,
   ratingsCount,
+  userRating,
+  isAuthenticated,
 }: {
   trackId: string;
   showSlug: string;
   initialRating: number | null;
   ratingsCount: number | null;
+  userRating?: number | null;
+  isAuthenticated: boolean;
 }) {
-  const { user } = useSession();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [displayedRating, setDisplayedRating] = useState(initialRating ?? 0);
   const [displayedCount, setDisplayedCount] = useState(ratingsCount ?? 0);
+  const [localHasRated, setLocalHasRated] = useState(userRating != null);
   const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync localHasRated when userRating prop arrives from async fetch
+  useEffect(() => {
+    if (userRating != null) setLocalHasRated(true);
+  }, [userRating]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -32,6 +40,7 @@ export function TrackRatingCell({
 
   const handleRatingChange = (average: number, count: number) => {
     setIsAnimating(true);
+    setLocalHasRated(true);
     setDisplayedRating(average);
     setDisplayedCount(count);
     setIsExpanded(false);
@@ -44,16 +53,18 @@ export function TrackRatingCell({
     <button
       type="button"
       onClick={(e) => {
-        if (!user) return;
+        if (!isAuthenticated) return;
         e.stopPropagation();
         setIsExpanded(!isExpanded);
       }}
       className={cn(
         "inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md",
         "origin-center",
-        "glass-secondary border border-dashed border-glass-border",
-        user && "hover:brightness-110 cursor-pointer hover:border-amber-500/30",
-        !user && "cursor-pointer hover:border-amber-500/30",
+        localHasRated
+          ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+          : "glass-secondary border border-dashed border-glass-border",
+        isAuthenticated && "hover:brightness-110 cursor-pointer hover:border-amber-500/30",
+        !isAuthenticated && "cursor-pointer hover:border-amber-500/30",
         isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
       )}
     >
@@ -62,6 +73,7 @@ export function TrackRatingCell({
           rateableId={trackId}
           rateableType="Track"
           showSlug={showSlug}
+          initialRating={userRating}
           onAverageRatingChange={handleRatingChange}
           skipRevalidation
         />
@@ -71,7 +83,7 @@ export function TrackRatingCell({
     </button>
   );
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="w-[140px]">
         <LoginPromptPopover message="Sign in to rate">

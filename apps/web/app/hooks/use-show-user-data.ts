@@ -1,6 +1,7 @@
 import type { Attendance } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { batchedPostFetch } from "~/lib/batched-fetch";
 import type { ShowUserDataResponse } from "~/routes/api/shows/user-data";
 
 interface UseShowUserDataResult {
@@ -11,37 +12,7 @@ interface UseShowUserDataResult {
   error: Error | null;
 }
 
-const BATCH_SIZE = 200;
-
-async function fetchShowUserDataBatch(showIds: string[]): Promise<ShowUserDataResponse> {
-  const response = await fetch("/api/shows/user-data", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ showIds }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch show user data");
-  }
-
-  return response.json();
-}
-
-async function fetchShowUserData(showIds: string[]): Promise<ShowUserDataResponse> {
-  if (showIds.length <= BATCH_SIZE) {
-    return fetchShowUserDataBatch(showIds);
-  }
-
-  // Split into batches and fetch in parallel
-  const batches: string[][] = [];
-  for (let i = 0; i < showIds.length; i += BATCH_SIZE) {
-    batches.push(showIds.slice(i, i + BATCH_SIZE));
-  }
-
-  const results = await Promise.all(batches.map(fetchShowUserDataBatch));
-
-  // Merge all batch results
+function mergeShowUserData(results: ShowUserDataResponse[]): ShowUserDataResponse {
   const merged: ShowUserDataResponse = {
     attendances: {},
     userRatings: {},
@@ -63,7 +34,8 @@ export function useShowUserData(showIds: string[]): UseShowUserDataResult {
 
   const { data, isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => fetchShowUserData(showIds),
+    queryFn: () =>
+      batchedPostFetch<ShowUserDataResponse>("/api/shows/user-data", showIds, "showIds", 200, mergeShowUserData),
     enabled: showIds.length > 0,
     staleTime: 30_000, // 30 seconds
   });

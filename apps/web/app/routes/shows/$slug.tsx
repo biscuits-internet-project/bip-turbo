@@ -13,6 +13,7 @@ import { ShowPhotos } from "~/components/show/show-photos";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
+import { useShowUserData } from "~/hooks/use-show-user-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
@@ -164,6 +165,8 @@ export default function Show() {
   } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
+  const { userRatingMap } = useShowUserData([setlist.show.id]);
+  const userRating = userRatingMap.get(setlist.show.id) ?? null;
 
   // Get the internal user ID from Supabase metadata
   const internalUserId = user?.user_metadata?.internal_user_id;
@@ -311,7 +314,7 @@ export default function Show() {
             key={setlist.show.id}
             setlist={setlist}
             userAttendance={userAttendance}
-            userRating={null}
+            userRating={userRating}
             showRating={setlist.show.averageRating}
           />
 
