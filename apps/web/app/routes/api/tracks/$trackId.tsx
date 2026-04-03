@@ -33,17 +33,23 @@ export const loader = publicLoader(async ({ params, context }) => {
   const averageRating = track.averageRating || 0;
   const ratingsCount = track.ratingsCount || 0;
 
-  return {
-    track: {
-      id: track.id,
-      songTitle: track.song?.title || "",
-      averageRating,
-      ratingsCount,
-      likesCount: track.likesCount || 0,
-      note: track.note,
+  return new Response(
+    JSON.stringify({
+      track: {
+        id: track.id,
+        songTitle: track.song?.title || "",
+        averageRating,
+        ratingsCount,
+        likesCount: track.likesCount || 0,
+        note: track.note,
+      },
+      userRating: userRating?.value || null,
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
     },
-    userRating: userRating?.value || null,
-  };
+  );
 });
 
 export const action = protectedAction(async ({ request, params }) => {

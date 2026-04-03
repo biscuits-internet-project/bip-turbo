@@ -23,7 +23,10 @@ export const loader = publicLoader(async ({ request, context }) => {
   const userRating = rating?.value ?? null;
   const averageRating = await services.ratings.getAverageForRateable(rateableId, rateableType);
 
-  return { userRating, averageRating };
+  return new Response(JSON.stringify({ userRating, averageRating }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 });
 
 export const action = protectedAction(async ({ request, context }) => {

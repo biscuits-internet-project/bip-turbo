@@ -41,7 +41,7 @@ export function StarRating({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState<RatingResponse | null>(
-    initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null
+    initialRating != null ? { userRating: initialRating, averageRating: null } : null
   );
   const { user, loading: isSessionLoading } = useSession();
   const revalidator = useRevalidator();
@@ -59,7 +59,7 @@ export function StarRating({
 
   // Fetch rating if needed (only when user is logged in and no initial rating provided)
   useEffect(() => {
-    if (!user || isSessionLoading || initialRating !== undefined || hasFetchedRef.current) {
+    if (!user || isSessionLoading || initialRating != null || hasFetchedRef.current) {
       return;
     }
 

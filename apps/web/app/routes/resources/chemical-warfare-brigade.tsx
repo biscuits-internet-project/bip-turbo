@@ -537,8 +537,10 @@ function SongCard({ song, index }: { song: (typeof songs)[number]; index: number
           <blockquote className="border-l-4 border-purple-500/30 pl-4 italic text-content-text-secondary">
             {song.lyrics.map((line, i) =>
               line === "" ? (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static lyrics
                 <br key={i} />
               ) : (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static lyrics
                 <span key={i}>
                   {line}
                   <br />
