@@ -18,6 +18,8 @@ const basicColumns: ColumnDef<Row>[] = [
 ];
 
 describe("DataTable", () => {
+  // Baseline smoke test: given columns + data, the table renders header labels
+  // and one row per data item. If this fails, every other test is suspect.
   test("renders column headers and row cells", async () => {
     await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
 
@@ -28,6 +30,9 @@ describe("DataTable", () => {
     expect(screen.getByText("Gamma")).toBeInTheDocument();
   });
 
+  // The built-in search input (rendered when `searchKey` is set) filters the
+  // table on that column using TanStack's column filter. Verifies the
+  // input→filter wiring; pages like /songs and /admin/authors rely on it.
   test("search filter narrows visible rows by searchKey", async () => {
     const { user } = await setup(
       <DataTable columns={basicColumns} data={rows} searchKey="name" searchPlaceholder="Search..." />,
@@ -44,6 +49,10 @@ describe("DataTable", () => {
     expect(screen.queryByText("Gamma")).not.toBeInTheDocument();
   });
 
+  // The `rowClassName` callback lets callers style individual rows based on
+  // row data (e.g., attendance-row highlighting on top-rated shows). This test
+  // is the regression gate for Phase 2's `useAttendanceRowHighlight` hook and
+  // Phase 4's migration of PerformanceTable onto DataTable.
   test("rowClassName callback adds class to each row", async () => {
     await setup(
       <DataTable
@@ -64,12 +73,18 @@ describe("DataTable", () => {
     expect(betaRow?.className ?? "").not.toContain("big-count");
   });
 
+  // When `data` is empty, the table shows a friendly empty-state message
+  // instead of a bare table body. Matters for filtered views where the user's
+  // query yields zero rows.
   test("empty state renders 'No results found'", async () => {
     await setup(<DataTable columns={basicColumns} data={[]} hideSearch />);
 
     expect(screen.getByText("No results found")).toBeInTheDocument();
   });
 
+  // When `isLoading=true`, rows are hidden and a loading indicator appears in
+  // their place. Used by /songs during filter-refetch to avoid showing stale
+  // data while the new API response is in flight.
   test("isLoading state renders 'Loading...'", async () => {
     await setup(<DataTable columns={basicColumns} data={rows} hideSearch isLoading />);
 
@@ -78,6 +93,9 @@ describe("DataTable", () => {
     expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
   });
 
+  // Callers that render all rows at once (like /songs, which has <1000 songs
+  // total) pass `hidePagination` to suppress the paginator. Confirms that the
+  // Previous/Next buttons don't render in that mode.
   test("hidePagination removes Previous/Next buttons", async () => {
     await setup(<DataTable columns={basicColumns} data={rows} hideSearch hidePagination />);
 
@@ -85,6 +103,9 @@ describe("DataTable", () => {
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   });
 
+  // The default/non-hidePagination mode shows Previous and Next buttons.
+  // Complement to the previous test — together they pin pagination visibility
+  // to the `hidePagination` prop exactly.
   test("pagination buttons render when not hidden", async () => {
     await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
 
@@ -92,8 +113,12 @@ describe("DataTable", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
   });
 
-  // TODO(Phase 1): un-skip once DataTable reads meta.width from column defs
-  // instead of hardcoded column-ID widths. See project_songs_table_unification.md Phase 1.
+  // TDD gate for Phase 1 of the songs-table unification project. DataTable
+  // currently hardcodes column widths by ID (e.g. header.id === "title"),
+  // which is a leaky abstraction. Phase 1 replaces that with a `meta.width`
+  // field on column defs. Once that's done, un-skip this test — it verifies
+  // that a column's `meta.width` is applied as the header's CSS width.
+  // TODO(Phase 1): un-skip. See project_songs_table_unification.md Phase 1.
   test.skip("honors meta.width on column defs", async () => {
     const columnsWithWidths: ColumnDef<Row>[] = [
       { accessorKey: "name", header: "Name", meta: { width: "60%" } },
