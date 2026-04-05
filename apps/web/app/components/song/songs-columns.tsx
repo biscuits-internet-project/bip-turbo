@@ -28,6 +28,7 @@ const getSortIcon = (sortState: false | "asc" | "desc") => {
 export const songsColumns: ColumnDef<SongWithShows>[] = [
   {
     accessorKey: "title",
+    meta: { width: "30%" },
     header: ({ column }) => {
       return (
         <Button
@@ -51,6 +52,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "timesPlayed",
+    meta: { width: "10%" },
     header: ({ column }) => {
       return (
         <Button
@@ -74,6 +76,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "dateLastPlayed",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -121,6 +124,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "dateFirstPlayed",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -168,6 +172,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "yearlyPlayData",
+    meta: { width: "10%" },
     header: ({ column }) => {
       return (
         <Button

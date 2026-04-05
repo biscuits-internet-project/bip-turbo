@@ -1,6 +1,7 @@
 import {
   type ColumnDef,
   type ColumnFiltersState,
+  type RowData,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -10,6 +11,13 @@ import {
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
+
+declare module "@tanstack/react-table" {
+  // biome-ignore lint/correctness/noUnusedVariables: required by TanStack's module augmentation pattern
+  interface ColumnMeta<TData extends RowData, TValue> {
+    width?: string;
+  }
+}
 import { type ReactNode, useState } from "react";
 
 import { Button } from "~/components/ui/button";
@@ -107,14 +115,7 @@ export function DataTable<TData, TValue>({
                       key={header.id}
                       className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8"
                       style={{
-                        width:
-                          header.id === "title"
-                            ? "30%"
-                            : header.id === "timesPlayed"
-                              ? "10%"
-                              : header.id === "yearlyPlayData"
-                                ? "10%"
-                                : "25%",
+                        width: header.column.columnDef.meta?.width,
                       }}
                     >
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}

@@ -95,16 +95,19 @@ function RatingCell({ show, userRating }: { show: ShowWithRank; userRating?: num
 const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<ShowWithRank>[] => [
   {
     accessorKey: "rank",
+    meta: { width: "25%" },
     header: "#",
     cell: ({ row }) => <span className="font-medium text-content-text-primary">{row.original.rank}</span>,
   },
   {
     accessorKey: "averageRating",
+    meta: { width: "25%" },
     header: "Rating",
     cell: ({ row }) => <RatingCell show={row.original} userRating={userRatingMap.get(row.original.id)} />,
   },
   {
     accessorKey: "date",
+    meta: { width: "25%" },
     header: "Date",
     cell: ({ row }) => (
       <Link
@@ -117,6 +120,7 @@ const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<Sho
   },
   {
     accessorKey: "venue.name",
+    meta: { width: "25%" },
     header: "Venue",
     cell: ({ row }) => {
       const venue = row.original.venue;

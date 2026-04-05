@@ -116,7 +116,7 @@ describe("DataTable", () => {
   // desired behavior — a column's `meta.width` is applied as the header's
   // CSS width — and should be un-skipped once DataTable reads from
   // `column.columnDef.meta?.width` instead.
-  test.skip("honors meta.width on column defs", async () => {
+  test("honors meta.width on column defs", async () => {
     const columnsWithWidths: ColumnDef<Row>[] = [
       { accessorKey: "name", header: "Name", meta: { width: "60%" } },
       { accessorKey: "count", header: "Count", meta: { width: "40%" } },
