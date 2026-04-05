@@ -60,6 +60,16 @@ cd apps/web && bun run test:watch    # Watch mode
 
 Test files are colocated with source: `*.test.{ts,tsx}`. Shared test helpers live in `apps/web/test/test-utils.tsx` (import via `@test/*` alias, e.g. `import { setup } from "@test/test-utils"`).
 
+**Git Hooks:**
+Custom hooks live in `.githooks/`. Enable them once per clone:
+```bash
+git config core.hooksPath .githooks
+```
+- `pre-commit` runs `bun run lint`
+- `pre-push` runs `bun run typecheck:all && bun run test`
+
+Bypass a single hook with `--no-verify` (e.g. `git push --no-verify` for WIP branches).
+
 **Database Operations:**
 ```bash
 make migrate                         # Run Prisma migrations in dev
