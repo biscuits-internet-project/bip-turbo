@@ -51,6 +51,15 @@ make lint                            # Same as bun run lint
 make format                          # Same as bun run format
 ```
 
+**Testing:**
+```bash
+bun run test                         # Run all tests
+make test                            # Same as bun run test
+cd apps/web && bun run test:watch    # Watch mode
+```
+
+Test files are colocated with source: `*.test.{ts,tsx}`. Shared test helpers live in `apps/web/test/test-utils.tsx` (import via `@test/*` alias, e.g. `import { setup } from "@test/test-utils"`).
+
 **Database Operations:**
 ```bash
 make migrate                         # Run Prisma migrations in dev
