@@ -72,11 +72,7 @@ export const mockShallowComponent = (mockComponentName: string, props: object) =
       func();
     }
   });
-  return (
-    <div data-testid={`${mockComponentName}`}>
-      props: {JSON.stringify(props, Object.keys(props).sort())}
-    </div>
-  );
+  return <div data-testid={`${mockComponentName}`}>props: {JSON.stringify(props, Object.keys(props).sort())}</div>;
 };
 
 /**
@@ -96,16 +92,10 @@ export const mockShallowComponent = (mockComponentName: string, props: object) =
  *   // ...render parent with <MyChild onSelect={onSelect} label="Hello" />
  *   expectMockedShallowComponent("MyChild", { onSelect, label: "Hello" }, [onSelect]);
  */
-export const expectMockedShallowComponent = (
-  mockComponentName: string,
-  props: object,
-  functions: voidFunc[] = [],
-) => {
+export const expectMockedShallowComponent = (mockComponentName: string, props: object, functions: voidFunc[] = []) => {
   const component = screen.getByTestId(mockComponentName);
   expect(component).toBeInTheDocument();
-  expect(
-    within(component).getByText(`props: ${JSON.stringify(props, Object.keys(props).sort())}`),
-  ).toBeInTheDocument();
+  expect(within(component).getByText(`props: ${JSON.stringify(props, Object.keys(props).sort())}`)).toBeInTheDocument();
   // Verify that each function that should have been a prop was "called" one time by
   // mockShallowComponent
   functions.forEach((func) => {
@@ -140,9 +130,7 @@ export const expectAllMockedShallowComponent = (
   expect(components).toHaveLength(props.length);
   for (let i = 0; i < props.length; i++) {
     expect(
-      within(components[i]).getByText(
-        `props: ${JSON.stringify(props[i], Object.keys(props[i]).sort())}`,
-      ),
+      within(components[i]).getByText(`props: ${JSON.stringify(props[i], Object.keys(props[i]).sort())}`),
     ).toBeInTheDocument();
   }
   // Verify that each function that should have been a prop was "called" one time by

@@ -165,9 +165,7 @@ describe("songsColumns", () => {
       dateLastPlayed: new Date("2024-06-15"),
       lastPlayedShow: makeShow({ slug: "2024-06-15-the-cap" }),
     });
-    await setupWithRouter(
-      <DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />,
-    );
+    await setupWithRouter(<DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />);
 
     // Date text is formatted (not ISO). Regex avoids pinning exact locale format.
     expect(screen.getByText(/Jun 15, 2024/)).toBeInTheDocument();
@@ -184,9 +182,7 @@ describe("songsColumns", () => {
   // em-dash placeholder instead of crashing or showing "Invalid Date".
   test("Last Played cell renders em-dash when dateLastPlayed is null", async () => {
     const song = makeSong({ dateLastPlayed: null, lastPlayedShow: null });
-    await setupWithRouter(
-      <DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />,
-    );
+    await setupWithRouter(<DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />);
 
     // Both Last Played and First Played will be null → 2 em-dashes expected
     // (we null out dateFirstPlayed below to make the assertion precise).
@@ -202,9 +198,7 @@ describe("songsColumns", () => {
       dateLastPlayed: new Date("2024-06-15"),
       lastPlayedShow: null,
     });
-    await setupWithRouter(
-      <DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />,
-    );
+    await setupWithRouter(<DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />);
 
     expect(screen.getByText(/Jun 15, 2024/)).toBeInTheDocument();
     // No link wraps the date
@@ -220,9 +214,7 @@ describe("songsColumns", () => {
       dateFirstPlayed: new Date("1995-07-04"),
       firstPlayedShow: makeShow({ id: "show-first", slug: "1995-07-04-red-rocks" }),
     });
-    await setupWithRouter(
-      <DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />,
-    );
+    await setupWithRouter(<DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />);
 
     expect(screen.getByText(/Jul 4, 1995/)).toBeInTheDocument();
     const showLink = screen.getByRole("link", { name: /Jul 4, 1995/ });
@@ -233,9 +225,7 @@ describe("songsColumns", () => {
   // null dates gracefully with an em-dash.
   test("First Played cell renders em-dash when dateFirstPlayed is null", async () => {
     const song = makeSong({ dateFirstPlayed: null, firstPlayedShow: null });
-    await setupWithRouter(
-      <DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />,
-    );
+    await setupWithRouter(<DataTable columns={songsColumns} data={[song]} hideSearch hidePagination />);
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -248,9 +238,7 @@ describe("songsColumns", () => {
       makeSong({ id: "b", title: "Beta", slug: "beta", dateFirstPlayed: new Date("2020-01-01") }),
       makeSong({ id: "c", title: "Gamma", slug: "gamma", dateFirstPlayed: new Date("2010-06-15") }),
     ];
-    const { user } = await setupWithRouter(
-      <DataTable columns={songsColumns} data={songs} hideSearch hidePagination />,
-    );
+    const { user } = await setupWithRouter(<DataTable columns={songsColumns} data={songs} hideSearch hidePagination />);
 
     const sortHeader = screen.getByRole("button", { name: /^First Played/i });
     await user.click(sortHeader);
@@ -276,9 +264,7 @@ describe("songsColumns", () => {
       makeSong({ id: "b", title: "Beta", slug: "beta", timesPlayed: 10 }),
       makeSong({ id: "c", title: "Gamma", slug: "gamma", timesPlayed: 30 }),
     ];
-    const { user } = await setupWithRouter(
-      <DataTable columns={songsColumns} data={songs} hideSearch hidePagination />,
-    );
+    const { user } = await setupWithRouter(<DataTable columns={songsColumns} data={songs} hideSearch hidePagination />);
 
     const sortHeader = screen.getByRole("button", { name: /^Plays/i });
     await user.click(sortHeader);
@@ -304,9 +290,7 @@ describe("songsColumns", () => {
       makeSong({ id: "b", title: "Beta", slug: "beta", dateLastPlayed: new Date("2024-06-15") }),
       makeSong({ id: "c", title: "Gamma", slug: "gamma", dateLastPlayed: new Date("2022-03-10") }),
     ];
-    const { user } = await setupWithRouter(
-      <DataTable columns={songsColumns} data={songs} hideSearch hidePagination />,
-    );
+    const { user } = await setupWithRouter(<DataTable columns={songsColumns} data={songs} hideSearch hidePagination />);
 
     const sortHeader = screen.getByRole("button", { name: /^Last Played/i });
     await user.click(sortHeader);

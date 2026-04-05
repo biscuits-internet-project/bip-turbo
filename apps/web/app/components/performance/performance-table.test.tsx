@@ -364,10 +364,7 @@ describe("PerformanceTable", () => {
     // The Set cell renders the set label (e.g. "S1", "E1"), and falls back
     // to an em-dash if `set` is empty. Keeps the column aligned visually.
     test("Set cell shows the set label when present, em-dash otherwise", async () => {
-      const performances = [
-        makePerformance({ trackId: "t1", set: "S2" }),
-        makePerformance({ trackId: "t2", set: "" }),
-      ];
+      const performances = [makePerformance({ trackId: "t1", set: "S2" }), makePerformance({ trackId: "t2", set: "" })];
       await setup(<PerformanceTable performances={performances} />);
 
       expect(screen.getByText("S2")).toBeInTheDocument();
@@ -398,9 +395,7 @@ describe("PerformanceTable", () => {
           segue: ">",
         }),
       ];
-      await setup(
-        <PerformanceTable performances={performances} songTitle="Cassidy" />,
-      );
+      await setup(<PerformanceTable performances={performances} songTitle="Cassidy" />);
 
       // Both flanking songs are rendered as links
       const before = screen.getByRole("link", { name: "Tractorbeam" });
@@ -435,9 +430,7 @@ describe("PerformanceTable", () => {
           segue: null,
         }),
       ];
-      await setup(
-        <PerformanceTable performances={performances} songTitle="Cassidy" />,
-      );
+      await setup(<PerformanceTable performances={performances} songTitle="Cassidy" />);
 
       // Both flanking songs render but no ">" segue indicator should appear
       expect(screen.getByRole("link", { name: "Tractorbeam" })).toBeInTheDocument();
@@ -471,9 +464,7 @@ describe("PerformanceTable", () => {
     // when both `notes` and `annotations` are empty. Keeps the column from
     // leaking empty wrappers into the DOM.
     test("Notes cell renders nothing when notes and annotations are both empty", async () => {
-      const performances = [
-        makePerformance({ trackId: "t1", notes: undefined, annotations: [] }),
-      ];
+      const performances = [makePerformance({ trackId: "t1", notes: undefined, annotations: [] })];
       await setup(<PerformanceTable performances={performances} />);
 
       expect(screen.queryByTestId("CombinedNotes")).not.toBeInTheDocument();
@@ -487,9 +478,7 @@ describe("PerformanceTable", () => {
         makePerformance({ trackId: "t-yes", allTimer: true }),
         makePerformance({ trackId: "t-no", allTimer: false }),
       ];
-      const { container } = await setup(
-        <PerformanceTable performances={performances} showAllTimerColumn />,
-      );
+      const { container } = await setup(<PerformanceTable performances={performances} showAllTimerColumn />);
 
       // lucide-react Flame icon has class "lucide-flame" — one flame = one all-timer row
       const flames = container.querySelectorAll(".lucide-flame");
@@ -510,9 +499,7 @@ describe("PerformanceTable", () => {
     // performance has no songSlug. Edge case for incomplete data — the title
     // still appears, just isn't clickable.
     test("Song column renders plain span when songSlug is missing", async () => {
-      const performances = [
-        makePerformance({ songTitle: "UnknownSong", songSlug: undefined }),
-      ];
+      const performances = [makePerformance({ songTitle: "UnknownSong", songSlug: undefined })];
       await setup(<PerformanceTable performances={performances} showSongColumn />);
 
       // Title is not wrapped in a link (no songSlug → no href target)
