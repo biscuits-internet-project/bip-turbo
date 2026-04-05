@@ -210,8 +210,8 @@ export class SongPageComposer {
       annotationsByTrackId.set(annotation.trackId, trackAnnotations);
     }
 
-    for (const perf of performances) {
-      perf.annotations = annotationsByTrackId.get(perf.trackId) || [];
+    for (const performance of performances) {
+      performance.annotations = annotationsByTrackId.get(performance.trackId) || [];
     }
 
     await this.computePerformanceTags(performances);
@@ -219,8 +219,8 @@ export class SongPageComposer {
 
   private async computePerformanceTags(performances: SongPagePerformance[]): Promise<void> {
     const setPositionData = await this.fetchSetPositionData(performances);
-    for (const perf of performances) {
-      perf.tags = computeTagsForPerformance(perf, setPositionData);
+    for (const performance of performances) {
+      performance.tags = computeTagsForPerformance(performance, setPositionData);
     }
   }
 
@@ -273,33 +273,32 @@ export function buildSetPositionKey(showId: string, set: string): string {
 /**
  * Compute the performance tags (encore, opener/closer, segues, standalone,
  * inverted, dyslexic) for a single performance. Pure function — no DB,
- * no side effects. Phase 8's tag-count aggregation must use these same
- * definitions.
+ * no side effects.
  */
 export function computeTagsForPerformance(
-  perf: SongPagePerformance,
+  performance: SongPagePerformance,
   setPositionData: Map<string, { min: number; max: number }>,
-): SongPagePerformance["tags"] {
-  const tags: SongPagePerformance["tags"] = {};
+): NonNullable<SongPagePerformance["tags"]> {
+  const tags: NonNullable<SongPagePerformance["tags"]> = {};
 
   // Encore (sets that start with "E") - check this first
-  const isEncore = perf.set?.startsWith("E");
+  const isEncore = performance.set?.startsWith("E");
   if (isEncore) {
     tags.encore = true;
   }
 
   // Set opener/closer (only for non-encore sets)
-  if (perf.set && perf.position !== undefined && !isEncore) {
-    const setRange = setPositionData.get(buildSetPositionKey(perf.show.id, perf.set));
+  if (performance.set && performance.position !== undefined && !isEncore) {
+    const setRange = setPositionData.get(buildSetPositionKey(performance.show.id, performance.set));
     if (setRange) {
-      tags.setOpener = perf.position === setRange.min;
-      tags.setCloser = perf.position === setRange.max;
+      tags.setOpener = performance.position === setRange.min;
+      tags.setCloser = performance.position === setRange.max;
     }
   }
 
   // Segue in/out
-  const hasSegueIn = perf.songBefore?.segue;
-  const hasSegueOut = perf.segue;
+  const hasSegueIn = performance.songBefore?.segue;
+  const hasSegueOut = performance.segue;
   tags.segueIn = !!hasSegueIn;
   tags.segueOut = !!hasSegueOut;
 
@@ -307,8 +306,8 @@ export function computeTagsForPerformance(
   tags.standalone = !hasSegueIn && !hasSegueOut;
 
   // Inverted/Dyslexic from annotations
-  if (perf.annotations) {
-    const annotationText = perf.annotations.map((a) => a.desc?.toLowerCase() || "").join(" ");
+  if (performance.annotations) {
+    const annotationText = performance.annotations.map((a) => a.desc?.toLowerCase() || "").join(" ");
     tags.inverted = annotationText.includes("inverted");
     tags.dyslexic = annotationText.includes("dyslexic");
   }
@@ -318,7 +317,6 @@ export function computeTagsForPerformance(
 
 /**
  * Map a raw DB DTO row to a SongPagePerformance view. Pure function.
- * Phase 6 will extend this to add `cover` and `authorId` fields.
  */
 export function transformToSongPagePerformanceView(row: PerformanceDto): SongPagePerformance {
   return {
@@ -370,7 +368,7 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
   };
 }
 
-type PerformanceDto = {
+export type PerformanceDto = {
   // Show fields
   id: string;
   date: string;

@@ -8,7 +8,7 @@
     "format": "biome format . --write",
     "typecheck": "cd apps/web && bun react-router typegen && cd ../.. && bun tsc --noEmit",
     "typecheck:all": "bun run -F '*' typecheck",
-    "test": "cd apps/web && bun run test",
+    "test": "bun run -F '*' test",
     "migrate:users": "cd packages/core && bun run migrate:users",
     "truncate:auth:users": "cd packages/core && bun run truncate:auth:users",
     "index:songs": "doppler run -- bun ./packages/core/src/search/scripts/index-songs.ts",

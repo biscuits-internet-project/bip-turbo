@@ -198,9 +198,7 @@ describe("PerformanceTable", () => {
     ];
 
     // The core filter behavior: clicking a tag chip (like "Encore") reduces
-    // the visible rows to performances where that tag is true. Phase 4 will
-    // migrate this filter logic onto DataTable — this test is the regression
-    // gate for that migration.
+    // the visible rows to performances where that tag is true.
     test("clicking a filter chip narrows rows to matches", async () => {
       const { user } = await setup(<PerformanceTable performances={performances} />);
 
@@ -231,8 +229,6 @@ describe("PerformanceTable", () => {
     // The "Attended" filter is different from tag filters — it reads from
     // the attendance map returned by useShowUserData rather than from
     // performance.tags. Verifies that cross-source filter composition works.
-    // Phase 2's useAttendanceRowHighlight hook will share this attendance
-    // lookup; this test protects that integration.
     test("Attended filter uses attendanceMap from useShowUserData", async () => {
       vi.mocked(useShowUserData).mockReturnValue({
         attendanceMap: new Map([["s-attended", { id: "att-1" } as never]]),
@@ -288,8 +284,7 @@ describe("PerformanceTable", () => {
   describe("sorting", () => {
     // The table defaults to newest-first sorting by date. Critical for the
     // /songs/all-timers page where users scan the most recent all-timer
-    // performances first. Phase 4's migration onto DataTable must preserve
-    // this default, hence the regression gate.
+    // performances first.
     test("default sort is date descending", async () => {
       const performances = [
         makePerformance({ trackId: "old", show: { ...makePerformance().show, id: "s-old", date: "2020-01-01" } }),

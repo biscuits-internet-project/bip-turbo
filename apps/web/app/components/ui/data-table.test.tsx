@@ -50,9 +50,7 @@ describe("DataTable", () => {
   });
 
   // The `rowClassName` callback lets callers style individual rows based on
-  // row data (e.g., attendance-row highlighting on top-rated shows). This test
-  // is the regression gate for Phase 2's `useAttendanceRowHighlight` hook and
-  // Phase 4's migration of PerformanceTable onto DataTable.
+  // row data (e.g., attendance-row highlighting on top-rated shows).
   test("rowClassName callback adds class to each row", async () => {
     await setup(
       <DataTable
@@ -113,12 +111,11 @@ describe("DataTable", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
   });
 
-  // TDD gate for Phase 1 of the songs-table unification project. DataTable
-  // currently hardcodes column widths by ID (e.g. header.id === "title"),
-  // which is a leaky abstraction. Phase 1 replaces that with a `meta.width`
-  // field on column defs. Once that's done, un-skip this test — it verifies
-  // that a column's `meta.width` is applied as the header's CSS width.
-  // TODO(Phase 1): un-skip. See project_songs_table_unification.md Phase 1.
+  // Pending: DataTable currently hardcodes column widths by ID
+  // (header.id === "title" etc.), a leaky abstraction. This test pins the
+  // desired behavior — a column's `meta.width` is applied as the header's
+  // CSS width — and should be un-skipped once DataTable reads from
+  // `column.columnDef.meta?.width` instead.
   test.skip("honors meta.width on column defs", async () => {
     const columnsWithWidths: ColumnDef<Row>[] = [
       { accessorKey: "name", header: "Name", meta: { width: "60%" } },
