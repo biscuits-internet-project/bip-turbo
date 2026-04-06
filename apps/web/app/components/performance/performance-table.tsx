@@ -72,6 +72,7 @@ export function PerformanceTable({
     <DataTable
       columns={columns}
       data={filteredPerformances}
+      getRowId={(performance) => performance.trackId}
       hideSearch
       filterComponent={filterComponent}
       rowClassName={rowClassName}

@@ -1,5 +1,5 @@
 import type { SongPagePerformance } from "@bip/domain";
-import { type ColumnDef, type Column, createColumnHelper } from "@tanstack/react-table";
+import { type Column, type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame } from "lucide-react";
 import { CombinedNotes } from "./combined-notes";
 import { TrackRatingCell } from "./track-rating-cell";

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SelectFilter } from "~/components/ui/filters";
-import { ERA_OPTIONS, SONG_FILTERS, YEAR_OPTIONS, matchesDateRange } from "~/lib/song-filters";
+import { ERA_OPTIONS, matchesDateRange, SONG_FILTERS, YEAR_OPTIONS } from "~/lib/song-filters";
 
 /**
  * Manages Year/Era filter state with URL param sync and mutual exclusivity.
@@ -88,6 +88,8 @@ export function useYearEraFilter() {
   return {
     selectedYear,
     selectedEra,
+    handleYearChange,
+    handleEraChange,
     filterByDate,
     filterPerformancesByDate,
     yearEraFilterComponent,

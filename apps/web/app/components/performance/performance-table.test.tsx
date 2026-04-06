@@ -125,6 +125,49 @@ describe("PerformanceTable", () => {
     expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(1);
   });
 
+  // When a toggle filter narrows the visible rows, the remaining rows must
+  // still show their own rating data — not stale data from a row that was
+  // previously in the same position. This catches the bug where TanStack
+  // reuses row components by index, causing useState to retain the old
+  // row's initialRating.
+  test("rating data stays correct after toggling a filter", async () => {
+    const performances = [
+      makePerformance({
+        trackId: "t-encore",
+        rating: 4.5,
+        ratingsCount: 10,
+        tags: { ...makePerformance().tags, encore: true },
+      }),
+      makePerformance({
+        trackId: "t-opener",
+        rating: 3.0,
+        ratingsCount: 5,
+        tags: { ...makePerformance().tags, setOpener: true },
+      }),
+      makePerformance({
+        trackId: "t-neither",
+        rating: 2.0,
+        ratingsCount: 1,
+      }),
+    ];
+
+    const { user } = await setup(<PerformanceTable performances={performances} />);
+
+    // Before filtering: 3 rows, check that the first row has the right rating
+    const cellsBefore = screen.getAllByTestId("TrackRatingCell");
+    expect(cellsBefore).toHaveLength(3);
+    expect(cellsBefore[0].textContent).toContain('"initialRating":4.5');
+
+    // Click "Set Opener" to filter to just the opener row
+    await user.click(screen.getByRole("button", { name: "Set Opener" }));
+
+    const cellsAfter = screen.getAllByTestId("TrackRatingCell");
+    expect(cellsAfter).toHaveLength(1);
+    // The remaining row should have the OPENER's rating (3.0), not the
+    // encore's rating (4.5) which was previously in position 0.
+    expect(cellsAfter[0].textContent).toContain('"initialRating":3');
+  });
+
   // Clear All resets all active filters, restoring the full performance list.
   test("Clear All button resets filters", async () => {
     const performances = [

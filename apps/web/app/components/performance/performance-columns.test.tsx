@@ -1,6 +1,6 @@
 import type { SongPagePerformance } from "@bip/domain";
-import { screen } from "@testing-library/react";
 import { mockShallowComponent, setup } from "@test/test-utils";
+import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { DataTable } from "~/components/ui/data-table";
 import { createPerformanceColumns } from "./performance-columns";
@@ -84,6 +84,34 @@ describe("createPerformanceColumns", () => {
     const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     expect(container.querySelectorAll(".lucide-flame").length).toBe(1);
+  });
+
+  // TrackRatingCell receives initialRating from the performance's rating
+  // field, NOT from the userRatingMap. A performance with a community
+  // average rating should always pass that rating to the cell, regardless
+  // of whether the user has rated it or the userRatingMap is empty.
+  test("passes initialRating from performance.rating even when userRatingMap is empty", async () => {
+    const performances = [makePerformance({ trackId: "t1", rating: 3.5, ratingsCount: 2 })];
+    const columns = createPerformanceColumns({ ...defaultOptions, userRatingMap: new Map() });
+    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+
+    const cell = screen.getByTestId("TrackRatingCell");
+    // initialRating should be 3.5, not null
+    expect(cell.textContent).toContain('"initialRating":3.5');
+    expect(cell.textContent).toContain('"ratingsCount":2');
+  });
+
+  // A performance with rating=0 or rating=undefined should pass
+  // initialRating as null (not 0) so TrackRatingCell shows "Rate".
+  // This is correct — there's no community rating to display.
+  test("passes initialRating as null when performance.rating is undefined", async () => {
+    const performances = [makePerformance({ trackId: "t1", rating: undefined, ratingsCount: undefined })];
+    const columns = createPerformanceColumns(defaultOptions);
+    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+
+    const cell = screen.getByTestId("TrackRatingCell");
+    expect(cell.textContent).toContain('"initialRating":null');
+    expect(cell.textContent).toContain('"ratingsCount":null');
   });
 
   // Each Date cell links to the show's detail page so users can click
