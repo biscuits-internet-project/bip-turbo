@@ -105,9 +105,7 @@ describe("createPerformanceColumns", () => {
   // render plain text headers with no icon.
   test("sortable columns show sort indicator, non-sortable columns do not", async () => {
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(
-      <DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination variant="plain" />,
-    );
+    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     // Sortable columns render a <button> with an SVG icon inside
     const dateHeader = screen.getByText("Date").closest("button");

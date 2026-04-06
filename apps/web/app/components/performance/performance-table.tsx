@@ -69,7 +69,6 @@ export function PerformanceTable({
       hidePagination
       filterComponent={filterComponent}
       rowClassName={rowClassName}
-      variant="plain"
       initialSorting={[{ id: "date", desc: true }]}
     />
   );

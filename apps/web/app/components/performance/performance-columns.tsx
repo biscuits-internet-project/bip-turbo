@@ -51,7 +51,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
           const title = info.getValue() as string;
           const slug = info.row.original.songSlug;
           return slug ? (
-            <a href={`/songs/${slug}`} className="text-brand-primary hover:text-brand-secondary font-medium">
+            <a href={`/songs/${slug}`} className="text-base text-brand-primary hover:text-brand-secondary font-medium">
               {title}
             </a>
           ) : (
@@ -82,7 +82,10 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       enableSorting: true,
       sortingFn: "datetime",
       cell: (info) => (
-        <a href={`/shows/${info.row.original.show.slug}`} className="text-brand-primary hover:text-brand-secondary">
+        <a
+          href={`/shows/${info.row.original.show.slug}`}
+          className="text-base text-brand-primary hover:text-brand-secondary"
+        >
           {info.getValue()}
         </a>
       ),

@@ -107,7 +107,7 @@ const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<Sho
     cell: ({ row }) => (
       <Link
         to={`/shows/${row.original.slug}`}
-        className="text-brand-primary hover:text-brand-secondary hover:underline"
+        className="text-base text-brand-primary hover:text-brand-secondary hover:underline"
       >
         {formatDateShort(row.original.date)}
       </Link>

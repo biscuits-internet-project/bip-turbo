@@ -44,7 +44,10 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
     cell: ({ row }) => {
       const song = row.original;
       return (
-        <Link to={`/songs/${song.slug}`} className="text-brand-primary hover:text-brand-secondary font-medium">
+        <Link
+          to={`/songs/${song.slug}`}
+          className="text-base text-brand-primary hover:text-brand-secondary font-medium"
+        >
           {song.title}
         </Link>
       );
@@ -93,7 +96,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateLastPlayed;
       const show = row.original.lastPlayedShow;
       return date ? (
-        <div className="text-base">
+        <div>
           {show?.slug ? (
             <Link
               to={`/shows/${show.slug}`}
@@ -141,7 +144,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateFirstPlayed;
       const show = row.original.firstPlayedShow;
       return date ? (
-        <div className="text-base">
+        <div>
           {show?.slug ? (
             <Link
               to={`/shows/${show.slug}`}
