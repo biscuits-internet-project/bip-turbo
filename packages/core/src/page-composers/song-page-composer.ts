@@ -210,134 +210,165 @@ export class SongPageComposer {
       annotationsByTrackId.set(annotation.trackId, trackAnnotations);
     }
 
-    for (const perf of performances) {
-      perf.annotations = annotationsByTrackId.get(perf.trackId) || [];
+    for (const performance of performances) {
+      performance.annotations = annotationsByTrackId.get(performance.trackId) || [];
     }
 
     await this.computePerformanceTags(performances);
   }
 
   private async computePerformanceTags(performances: SongPagePerformance[]): Promise<void> {
-    // For set opener/closer computation, we need to know the min/max positions for each set in each show
-    const setPositionData = new Map<string, { min: number; max: number }>();
+    const setPositionData = await this.fetchSetPositionData(performances);
+    for (const performance of performances) {
+      performance.tags = computeTagsForPerformance(performance, setPositionData);
+    }
+  }
 
-    // Get all unique show IDs
+  /**
+   * Fetches the min/max track positions for each (show, set) pair touched by the
+   * given performances. Used to identify set openers and closers.
+   */
+  private async fetchSetPositionData(
+    performances: SongPagePerformance[],
+  ): Promise<Map<string, { min: number; max: number }>> {
+    const setPositionData = new Map<string, { min: number; max: number }>();
     const showIds = [...new Set(performances.map((p) => p.show.id))];
 
-    if (showIds.length > 0) {
-      // Get all set position ranges in a single query
-      const setRanges = await this.db.$queryRaw<
-        Array<{ show_id: string; set: string; min_position: number; max_position: number }>
-      >`
-        SELECT show_id, set, MIN(position) as min_position, MAX(position) as max_position
-        FROM tracks
-        WHERE show_id = ANY(${showIds}::uuid[])
-        GROUP BY show_id, set
-      `;
-
-      // Build the lookup map
-      for (const range of setRanges) {
-        const key = `${range.show_id}|||${range.set}`;
-        setPositionData.set(key, {
-          min: range.min_position,
-          max: range.max_position,
-        });
-      }
+    if (showIds.length === 0) {
+      return setPositionData;
     }
 
-    // Compute tags for each performance
-    performances.forEach((perf) => {
-      const tags: SongPagePerformance["tags"] = {};
+    const setRanges = await this.db.$queryRaw<
+      Array<{ show_id: string; set: string; min_position: number; max_position: number }>
+    >`
+      SELECT show_id, set, MIN(position) as min_position, MAX(position) as max_position
+      FROM tracks
+      WHERE show_id = ANY(${showIds}::uuid[])
+      GROUP BY show_id, set
+    `;
 
-      // Encore (sets that start with "E") - check this first
-      const isEncore = perf.set?.startsWith("E");
-      if (isEncore) {
-        tags.encore = true;
-      }
+    for (const range of setRanges) {
+      setPositionData.set(buildSetPositionKey(range.show_id, range.set), {
+        min: range.min_position,
+        max: range.max_position,
+      });
+    }
 
-      // Set opener/closer (only for non-encore sets)
-      if (perf.set && perf.position !== undefined && !isEncore) {
-        const showSetKey = `${perf.show.id}|||${perf.set}`;
-        const setRange = setPositionData.get(showSetKey);
-
-        if (setRange) {
-          tags.setOpener = perf.position === setRange.min;
-          tags.setCloser = perf.position === setRange.max;
-        }
-      }
-
-      // Segue in/out
-      const hasSegueIn = perf.songBefore?.segue;
-      const hasSegueOut = perf.segue;
-      tags.segueIn = !!hasSegueIn;
-      tags.segueOut = !!hasSegueOut;
-
-      // Standalone (no segue in or out)
-      tags.standalone = !hasSegueIn && !hasSegueOut;
-
-      // Inverted/Dyslexic from annotations
-      if (perf.annotations) {
-        const annotationText = perf.annotations.map((a) => a.desc?.toLowerCase() || "").join(" ");
-        tags.inverted = annotationText.includes("inverted");
-        tags.dyslexic = annotationText.includes("dyslexic");
-      }
-
-      perf.tags = tags;
-    });
+    return setPositionData;
   }
 
   private transformToSongPagePerformanceView(row: PerformanceDto): SongPagePerformance {
-    return {
-      trackId: row.track_id,
-      show: {
-        id: row.id,
-        slug: row.slug,
-        date: row.date,
-        venueId: row.venue_id,
-      },
-      venue:
-        row.venue_id && row.venue_slug && row.venue_name
-          ? {
-              id: row.venue_id,
-              slug: row.venue_slug,
-              name: row.venue_name,
-              city: row.venue_city || "",
-              state: row.venue_state,
-              country: row.venue_country || "",
-            }
-          : undefined,
-      songBefore:
-        row.prev_song_id && row.prev_song_slug && row.prev_song_title
-          ? {
-              id: row.prev_song_id,
-              songId: row.prev_song_id,
-              segue: row.prev_track_segue,
-              songSlug: row.prev_song_slug,
-              songTitle: row.prev_song_title,
-            }
-          : undefined,
-      songAfter:
-        row.next_song_id && row.next_song_slug && row.next_song_title
-          ? {
-              id: row.next_song_id,
-              songId: row.next_song_id,
-              segue: row.next_track_segue,
-              songSlug: row.next_song_slug,
-              songTitle: row.next_song_title,
-            }
-          : undefined,
-      rating: row.average_rating || undefined,
-      ratingsCount: row.ratings_count || undefined,
-      notes: row.note || undefined,
-      allTimer: row.all_timer,
-      segue: row.segue,
-      set: row.set,
-      position: row.position,
-    };
+    return transformToSongPagePerformanceView(row);
   }
 }
 
-type PerformanceDto = {
+/**
+ * Build the lookup key used for set-position data. The triple-pipe separator
+ * is unlikely to appear in show IDs or set labels.
+ */
+export function buildSetPositionKey(showId: string, set: string): string {
+  return `${showId}|||${set}`;
+}
+
+/**
+ * Compute the performance tags (encore, opener/closer, segues, standalone,
+ * inverted, dyslexic) for a single performance. Pure function — no DB,
+ * no side effects.
+ */
+export function computeTagsForPerformance(
+  performance: SongPagePerformance,
+  setPositionData: Map<string, { min: number; max: number }>,
+): NonNullable<SongPagePerformance["tags"]> {
+  const tags: NonNullable<SongPagePerformance["tags"]> = {};
+
+  // Encore (sets that start with "E") - check this first
+  const isEncore = performance.set?.startsWith("E");
+  if (isEncore) {
+    tags.encore = true;
+  }
+
+  // Set opener/closer (only for non-encore sets)
+  if (performance.set && performance.position !== undefined && !isEncore) {
+    const setRange = setPositionData.get(buildSetPositionKey(performance.show.id, performance.set));
+    if (setRange) {
+      tags.setOpener = performance.position === setRange.min;
+      tags.setCloser = performance.position === setRange.max;
+    }
+  }
+
+  // Segue in/out
+  const hasSegueIn = performance.songBefore?.segue;
+  const hasSegueOut = performance.segue;
+  tags.segueIn = !!hasSegueIn;
+  tags.segueOut = !!hasSegueOut;
+
+  // Standalone (no segue in or out)
+  tags.standalone = !hasSegueIn && !hasSegueOut;
+
+  // Inverted/Dyslexic from annotations
+  if (performance.annotations) {
+    const annotationText = performance.annotations.map((a) => a.desc?.toLowerCase() || "").join(" ");
+    tags.inverted = annotationText.includes("inverted");
+    tags.dyslexic = annotationText.includes("dyslexic");
+  }
+
+  return tags;
+}
+
+/**
+ * Map a raw DB DTO row to a SongPagePerformance view. Pure function.
+ */
+export function transformToSongPagePerformanceView(row: PerformanceDto): SongPagePerformance {
+  return {
+    trackId: row.track_id,
+    show: {
+      id: row.id,
+      slug: row.slug,
+      date: row.date,
+      venueId: row.venue_id,
+    },
+    venue:
+      row.venue_id && row.venue_slug && row.venue_name
+        ? {
+            id: row.venue_id,
+            slug: row.venue_slug,
+            name: row.venue_name,
+            city: row.venue_city || "",
+            state: row.venue_state,
+            country: row.venue_country || "",
+          }
+        : undefined,
+    songBefore:
+      row.prev_song_id && row.prev_song_slug && row.prev_song_title
+        ? {
+            id: row.prev_song_id,
+            songId: row.prev_song_id,
+            segue: row.prev_track_segue,
+            songSlug: row.prev_song_slug,
+            songTitle: row.prev_song_title,
+          }
+        : undefined,
+    songAfter:
+      row.next_song_id && row.next_song_slug && row.next_song_title
+        ? {
+            id: row.next_song_id,
+            songId: row.next_song_id,
+            segue: row.next_track_segue,
+            songSlug: row.next_song_slug,
+            songTitle: row.next_song_title,
+          }
+        : undefined,
+    rating: row.average_rating || undefined,
+    ratingsCount: row.ratings_count || undefined,
+    notes: row.note || undefined,
+    allTimer: row.all_timer,
+    segue: row.segue,
+    set: row.set,
+    position: row.position,
+  };
+}
+
+export type PerformanceDto = {
   // Show fields
   id: string;
   date: string;

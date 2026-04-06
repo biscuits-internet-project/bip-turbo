@@ -24,6 +24,7 @@ type AuthorWithSongCount = Author & { songCount?: number };
 export const authorColumns: ColumnDef<AuthorWithSongCount>[] = [
   {
     accessorKey: "name",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -50,6 +51,7 @@ export const authorColumns: ColumnDef<AuthorWithSongCount>[] = [
   },
   {
     accessorKey: "songCount",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -64,15 +66,12 @@ export const authorColumns: ColumnDef<AuthorWithSongCount>[] = [
     },
     cell: ({ row }) => {
       const count = row.original.songCount ?? 0;
-      return (
-        <span className="text-content-text-primary font-semibold">
-          {count}
-        </span>
-      );
+      return <span className="text-content-text-primary font-semibold">{count}</span>;
     },
   },
   {
     accessorKey: "slug",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -91,6 +90,7 @@ export const authorColumns: ColumnDef<AuthorWithSongCount>[] = [
   },
   {
     accessorKey: "createdAt",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button

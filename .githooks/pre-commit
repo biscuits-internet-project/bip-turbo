@@ -1,0 +1,3 @@
+#!/bin/bash
+# Before committing, ensure linting passes.
+bun run lint

@@ -7,7 +7,7 @@ import { AdminOnly } from "~/components/admin/admin-only";
 import { AuthorSearch } from "~/components/author/author-search";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { SelectFilter } from "~/components/ui/filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
@@ -122,13 +122,6 @@ function YearlyTrendingSongs() {
 export function meta() {
   return getSongsMeta();
 }
-
-const selectTriggerClass =
-  "h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20";
-const selectContentClass = "bg-glass-bg border-glass-border backdrop-blur-md";
-const selectItemClass = "text-content-text-primary hover:bg-hover-glass";
-const labelClass =
-  "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 
 export default function Songs() {
   const { songs, trendingSongs, yearlyTrendingSongs, recentShowsCount } = useSerializedLoaderData<LoaderData>();
@@ -282,7 +275,10 @@ export default function Songs() {
   const filterPanel = (
     <>
       <div className="flex flex-col">
-        <label htmlFor="author-search" className={labelClass}>
+        <label
+          htmlFor="author-search"
+          className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center"
+        >
           Author
         </label>
         <AuthorSearch
@@ -303,41 +299,29 @@ export default function Songs() {
           className="w-[150px] sm:w-[200px] h-[42px]"
         />
       </div>
-      <div className="flex flex-col">
-        <label htmlFor="cover-filter" className={labelClass}>
-          Original / Cover
-        </label>
-        <Select
-          value={coverFilter}
-          onValueChange={(value) => {
-            const newCoverFilter = value as "all" | "cover" | "original";
-            setCoverFilter(newCoverFilter);
-            updateUrl({
-              year: selectedYear,
-              era: selectedEra,
-              played: playedFilter,
-              author: selectedAuthor,
-              cover: newCoverFilter,
-              attended: attendedFilter,
-            });
-          }}
-        >
-          <SelectTrigger id="cover-filter" className={`w-[120px] ${selectTriggerClass}`}>
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent className={selectContentClass}>
-            <SelectItem value="all" className={selectItemClass}>
-              All
-            </SelectItem>
-            <SelectItem value="original" className={selectItemClass}>
-              Original
-            </SelectItem>
-            <SelectItem value="cover" className={selectItemClass}>
-              Cover
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <SelectFilter
+        id="cover-filter"
+        label="Original / Cover"
+        value={coverFilter}
+        onValueChange={(value) => {
+          setCoverFilter(value as "all" | "cover" | "original");
+          updateUrl({
+            year: selectedYear,
+            era: selectedEra,
+            played: playedFilter,
+            author: selectedAuthor,
+            cover: value as "all" | "cover" | "original",
+            attended: attendedFilter,
+          });
+        }}
+        options={[
+          { value: "all", label: "All" },
+          { value: "original", label: "Original" },
+          { value: "cover", label: "Cover" },
+        ]}
+        placeholder="Type"
+        width="w-[120px]"
+      />
       <div className="flex flex-col">
         <div className="h-[18px] mb-1.5" />
         <button
@@ -358,147 +342,93 @@ export default function Songs() {
       }`}
     >
       <div className="flex items-end flex-wrap gap-x-4 gap-y-3">
-        <div className="flex flex-col">
-          <label htmlFor="year-filter" className={labelClass}>
-            Year
-          </label>
-          <Select
-            value={selectedYear}
-            onValueChange={(value) => {
-              const newYear = value;
-              setSelectedYear(newYear);
-              if (newYear !== "all") {
-                setSelectedEra("all");
-              }
-              updateUrl({
-                year: newYear,
-                era: newYear !== "all" ? "all" : selectedEra,
-                played: playedFilter,
-                author: selectedAuthor,
-                cover: coverFilter,
-                attended: attendedFilter,
-              });
-            }}
-          >
-            <SelectTrigger id="year-filter" className={`w-[130px] ${selectTriggerClass}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className={selectContentClass}>
-              <SelectItem value="all" className={selectItemClass}>
-                All Years
-              </SelectItem>
-              {YEAR_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value} className={selectItemClass}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor="era-filter" className={labelClass}>
-            Era
-          </label>
-          <Select
-            value={selectedEra}
-            onValueChange={(value) => {
-              const newEra = value;
-              setSelectedEra(newEra);
-              if (newEra !== "all") {
-                setSelectedYear("all");
-              }
-              updateUrl({
-                year: newEra !== "all" ? "all" : selectedYear,
-                era: newEra,
-                played: playedFilter,
-                author: selectedAuthor,
-                cover: coverFilter,
-                attended: attendedFilter,
-              });
-            }}
-          >
-            <SelectTrigger id="era-filter" className={`w-[170px] ${selectTriggerClass}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className={selectContentClass}>
-              <SelectItem value="all" className={selectItemClass}>
-                All Eras
-              </SelectItem>
-              {ERA_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value} className={selectItemClass}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <SelectFilter
+          id="year-filter"
+          label="Year"
+          value={selectedYear}
+          onValueChange={(value) => {
+            setSelectedYear(value);
+            if (value !== "all") {
+              setSelectedEra("all");
+            }
+            updateUrl({
+              year: value,
+              era: value !== "all" ? "all" : selectedEra,
+              played: playedFilter,
+              author: selectedAuthor,
+              cover: coverFilter,
+              attended: attendedFilter,
+            });
+          }}
+          options={[{ value: "all", label: "All Years" }, ...YEAR_OPTIONS]}
+          width="w-[130px]"
+        />
+        <SelectFilter
+          id="era-filter"
+          label="Era"
+          value={selectedEra}
+          onValueChange={(value) => {
+            setSelectedEra(value);
+            if (value !== "all") {
+              setSelectedYear("all");
+            }
+            updateUrl({
+              year: value !== "all" ? "all" : selectedYear,
+              era: value,
+              played: playedFilter,
+              author: selectedAuthor,
+              cover: coverFilter,
+              attended: attendedFilter,
+            });
+          }}
+          options={[{ value: "all", label: "All Eras" }, ...ERA_OPTIONS]}
+          width="w-[170px]"
+        />
         {user && (
-          <div className="flex flex-col">
-            <label htmlFor="attended-filter" className={labelClass}>
-              Attendance
-            </label>
-            <Select
-              value={attendedFilter}
-              onValueChange={(value) => {
-                const newAttendedFilter = value as "all" | "attended";
-                setAttendedFilter(newAttendedFilter);
-                updateUrl({
-                  year: selectedYear,
-                  era: selectedEra,
-                  played: playedFilter,
-                  author: selectedAuthor,
-                  cover: coverFilter,
-                  attended: newAttendedFilter,
-                });
-              }}
-            >
-              <SelectTrigger id="attended-filter" className={`w-[130px] ${selectTriggerClass}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className={selectContentClass}>
-                <SelectItem value="all" className={selectItemClass}>
-                  All Shows
-                </SelectItem>
-                <SelectItem value="attended" className={selectItemClass}>
-                  Attended
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <SelectFilter
+            id="attended-filter"
+            label="Attendance"
+            value={attendedFilter}
+            onValueChange={(value) => {
+              setAttendedFilter(value as "all" | "attended");
+              updateUrl({
+                year: selectedYear,
+                era: selectedEra,
+                played: playedFilter,
+                author: selectedAuthor,
+                cover: coverFilter,
+                attended: value as "all" | "attended",
+              });
+            }}
+            options={[
+              { value: "all", label: "All Shows" },
+              { value: "attended", label: "Attended" },
+            ]}
+            width="w-[130px]"
+          />
         )}
         {(hasDateRange || attendedFilter !== "all") && (
-          <div className="flex flex-col">
-            <label htmlFor="played-filter" className={labelClass}>
-              Played
-            </label>
-            <Select
-              value={playedFilter}
-              onValueChange={(value) => {
-                const newPlayedFilter = value as "played" | "notPlayed";
-                setPlayedFilter(newPlayedFilter);
-                updateUrl({
-                  year: selectedYear,
-                  era: selectedEra,
-                  played: newPlayedFilter,
-                  author: selectedAuthor,
-                  cover: coverFilter,
-                  attended: attendedFilter,
-                });
-              }}
-            >
-              <SelectTrigger id="played-filter" className={`w-[150px] ${selectTriggerClass}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className={selectContentClass}>
-                <SelectItem value="played" className={selectItemClass}>
-                  Played
-                </SelectItem>
-                <SelectItem value="notPlayed" className={selectItemClass}>
-                  Not Played
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <SelectFilter
+            id="played-filter"
+            label="Played"
+            value={playedFilter}
+            onValueChange={(value) => {
+              setPlayedFilter(value as "played" | "notPlayed");
+              updateUrl({
+                year: selectedYear,
+                era: selectedEra,
+                played: value as "played" | "notPlayed",
+                author: selectedAuthor,
+                cover: coverFilter,
+                attended: attendedFilter,
+              });
+            }}
+            options={[
+              { value: "played", label: "Played" },
+              { value: "notPlayed", label: "Not Played" },
+            ]}
+            width="w-[150px]"
+          />
         )}
         {hasAnyFilter && (
           <div className="flex flex-col">
@@ -564,7 +494,12 @@ export default function Songs() {
           <div className="lg:col-span-1">{yearlyTrendingSongs.length > 0 && <YearlyTrendingSongs />}</div>
         </div>
 
-        <SongsTable songs={filteredSongs} filterComponent={filterPanel} secondaryFilterComponent={secondaryFilterPanel} isLoading={isLoadingFiltered} />
+        <SongsTable
+          songs={filteredSongs}
+          filterComponent={filterPanel}
+          secondaryFilterComponent={secondaryFilterPanel}
+          isLoading={isLoadingFiltered}
+        />
       </div>
     </div>
   );

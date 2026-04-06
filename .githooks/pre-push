@@ -1,0 +1,3 @@
+#!/bin/bash
+# Before pushing, run typecheck and unit tests.
+bun run typecheck:all && bun run test
