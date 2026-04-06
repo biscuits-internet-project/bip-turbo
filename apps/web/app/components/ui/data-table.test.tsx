@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { screen } from "@testing-library/react";
 import { setup } from "@test/test-utils";
+import { screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import { DataTable } from "./data-table";
 
@@ -71,6 +71,17 @@ describe("DataTable", () => {
     expect(betaRow?.className ?? "").not.toContain("big-count");
   });
 
+  // When there are zero results, pagination controls should not render at
+  // all — Previous/Next buttons and "Page X of Y" are meaningless with no
+  // data to page through.
+  test("hides pagination controls when data is empty", async () => {
+    await setup(<DataTable columns={basicColumns} data={[]} hideSearch />);
+
+    expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Page/)).not.toBeInTheDocument();
+  });
+
   // When `data` is empty, the table shows a friendly empty-state message
   // instead of a bare table body. Matters for filtered views where the user's
   // query yields zero rows.
@@ -101,14 +112,14 @@ describe("DataTable", () => {
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   });
 
-  // The default/non-hidePagination mode shows Previous and Next buttons.
-  // Complement to the previous test — together they pin pagination visibility
-  // to the `hidePagination` prop exactly.
+  // The default/non-hidePagination mode shows Previous and Next buttons
+  // above and below the table. Complement to the previous test — together
+  // they pin pagination visibility to the `hidePagination` prop exactly.
   test("pagination buttons render when not hidden", async () => {
     await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
 
-    expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Previous" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
   });
 
   // Pending: DataTable currently hardcodes column widths by ID

@@ -3,6 +3,7 @@ import { ArrowLeft, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PerformanceTable } from "~/components/performance";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useYearEraFilter } from "~/hooks/use-year-era-filter";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
@@ -19,6 +20,7 @@ export function meta() {
 
 export default function AllTimersPage() {
   const { performances } = useSerializedLoaderData<AllTimersPageView>();
+  const { filterPerformancesByDate, yearEraFilterComponent } = useYearEraFilter();
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -39,7 +41,12 @@ export default function AllTimersPage() {
         </Link>
       </div>
 
-      <PerformanceTable performances={performances} showSongColumn />
+      <PerformanceTable
+        performances={filterPerformancesByDate(performances)}
+        showSongColumn
+        headerContent={yearEraFilterComponent}
+        excludeFilters={["allTimer"]}
+      />
     </div>
   );
 }

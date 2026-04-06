@@ -84,6 +84,53 @@ export function DataTable<TData, TValue>({
     },
   });
 
+  const hasResults = table.getFilteredRowModel().rows.length > 0;
+
+  const paginationBlock = !hasResults ? null : (
+    <div className="flex items-center justify-between px-2">
+      {!hidePaginationText ? (
+        <div className="text-sm text-content-text-secondary font-medium">
+          {table.getFilteredRowModel().rows.length === 0
+            ? "0 results"
+            : `Showing ${table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to ${Math.min(
+                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                table.getFilteredRowModel().rows.length,
+              )} of ${table.getFilteredRowModel().rows.length} results`}
+        </div>
+      ) : (
+        <div />
+      )}
+      <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 text-sm text-content-text-secondary">
+          <span>Page</span>
+          <span className="font-semibold text-content-text-primary">
+            {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6 w-full max-w-full overflow-hidden">
       {searchKey && !hideSearch && (
@@ -107,6 +154,8 @@ export function DataTable<TData, TValue>({
         </div>
       )}
       {!searchKey && filterComponent && <div>{filterComponent}</div>}
+
+      {!hidePagination && paginationBlock}
 
       <div className="overflow-x-auto w-full">
         <Table className="w-full">
@@ -174,50 +223,7 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {!hidePagination && (
-        <div className="flex items-center justify-between px-2">
-          {!hidePaginationText ? (
-            <div className="text-sm text-content-text-secondary font-medium">
-              Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
-              {Math.min(
-                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-                table.getFilteredRowModel().rows.length,
-              )}{" "}
-              of {table.getFilteredRowModel().rows.length} results
-            </div>
-          ) : (
-            <div></div>
-          )}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 text-sm text-content-text-secondary">
-              <span>Page</span>
-              <span className="font-semibold text-content-text-primary">
-                {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {!hidePagination && paginationBlock}
     </div>
   );
 }

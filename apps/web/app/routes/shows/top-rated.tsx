@@ -6,9 +6,9 @@ import { DataTable } from "~/components/ui/data-table";
 import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { StarRating } from "~/components/ui/star-rating";
 import { YearFilterNav } from "~/components/year-filter-nav";
-import { useSession } from "~/hooks/use-session";
-import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useAttendanceRowHighlight } from "~/hooks/use-attendance-row-highlight";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
 import { cn, formatDateShort } from "~/lib/utils";
 import { getTopRatedShows, type ShowWithRank, type TopRatedShowsLoaderData } from "~/routes/shows/top-rated-shows";
@@ -155,13 +155,7 @@ export default function TopRated() {
           showAllButton={true}
           additionalText={`min ${MIN_SHOW_RATINGS} ratings`}
         />
-        <DataTable
-          columns={columns}
-          data={showsWithRank}
-          hideSearch={true}
-          hidePaginationText={true}
-          rowClassName={rowClassName}
-        />
+        <DataTable columns={columns} data={showsWithRank} hideSearch={true} rowClassName={rowClassName} />
       </div>
     </div>
   );

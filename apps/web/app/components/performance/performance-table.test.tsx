@@ -1,6 +1,6 @@
 import type { SongPagePerformance } from "@bip/domain";
-import { screen } from "@testing-library/react";
 import { mockShallowComponent, setup } from "@test/test-utils";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock hooks used internally by PerformanceTable.
@@ -106,19 +106,6 @@ describe("PerformanceTable", () => {
     expect(screen.queryByRole("link", { name: "Cassidy" })).not.toBeInTheDocument();
   });
 
-  // The "Showing N of M" count gives users feedback on how many
-  // performances match the current filters vs. the total.
-  test('shows "Showing N of M performances" count', async () => {
-    const performances = [
-      makePerformance({ trackId: "t1" }),
-      makePerformance({ trackId: "t2" }),
-      makePerformance({ trackId: "t3" }),
-    ];
-    await setup(<PerformanceTable performances={performances} />);
-
-    expect(screen.getByText("Showing 3 of 3 performances")).toBeInTheDocument();
-  });
-
   // Clicking a filter chip narrows visible rows. The filter logic is
   // handled by usePerformanceFilters internally; this test verifies the
   // end-to-end wiring from chip click → filtered data → rendered rows.
@@ -136,7 +123,6 @@ describe("PerformanceTable", () => {
     await user.click(screen.getByRole("button", { name: "Encore" }));
 
     expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(1);
-    expect(screen.getByText("Showing 1 of 3 performances")).toBeInTheDocument();
   });
 
   // Clear All resets all active filters, restoring the full performance list.
@@ -173,9 +159,20 @@ describe("PerformanceTable", () => {
     await setup(<PerformanceTable performances={performances} />);
 
     const rows = screen.getAllByRole("row");
-    // First data row (index 1, after header) should have the attended class
-    const attendedRow = rows.find((row) => row.className.includes("border-l-green"));
+    // Attended row should have both the green background tint and the left
+    // border highlight. The !border-l-green-500 class uses Tailwind's
+    // important modifier to avoid border conflicts with TableRow's border-b.
+    const attendedRow = rows.find((row) => row.className.includes("bg-green-500"));
     expect(attendedRow).toBeDefined();
+    expect(attendedRow?.className).toContain("!border-l-green-500");
+    expect(attendedRow?.className).toContain("!border-l-2");
+
+    // Non-attended rows should have neither class
+    const nonAttendedRow = rows.find(
+      (row) => row.className.includes("hover:bg-hover-glass") && !row.className.includes("bg-green-500"),
+    );
+    expect(nonAttendedRow).toBeDefined();
+    expect(nonAttendedRow?.className).not.toContain("!border-l-green-500");
   });
 
   // The isAuthenticated prop flows through to TrackRatingCell so it knows
@@ -191,5 +188,43 @@ describe("PerformanceTable", () => {
 
     const cell = screen.getByTestId("TrackRatingCell");
     expect(cell.textContent).toContain('"isAuthenticated":true');
+  });
+
+  // The headerContent prop lets callers inject additional filter UI (like
+  // Year/Era selects) above the toggle-chip row. The content renders inside
+  // the filter panel, before the toggle chips.
+  test("renders headerContent above the toggle chips when provided", async () => {
+    await setup(
+      <PerformanceTable
+        performances={[makePerformance()]}
+        headerContent={<div data-testid="year-era-filters">Year/Era filters here</div>}
+      />,
+    );
+
+    expect(screen.getByTestId("year-era-filters")).toBeInTheDocument();
+    expect(screen.getByText("Year/Era filters here")).toBeInTheDocument();
+    // Toggle chips should still render below
+    expect(screen.getByRole("button", { name: "Encore" })).toBeInTheDocument();
+  });
+
+  // PerformanceTable shows pagination controls (Previous/Next buttons) so
+  // users can navigate large performance lists without scrolling through
+  // hundreds of rows.
+  test("renders pagination controls above and below the table", async () => {
+    await setup(<PerformanceTable performances={[makePerformance()]} />);
+
+    expect(screen.getAllByRole("button", { name: "Previous" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
+  });
+
+  // Some filter chips are irrelevant in certain contexts — e.g., the
+  // "All-Timer" chip on /songs/all-timers where every row is already an
+  // all-timer. The excludeFilters prop removes specified chips from the UI.
+  test("excludeFilters hides specified filter chips", async () => {
+    await setup(<PerformanceTable performances={[makePerformance()]} excludeFilters={["allTimer"]} />);
+
+    expect(screen.queryByRole("button", { name: "All-Timer" })).not.toBeInTheDocument();
+    // Other chips still render
+    expect(screen.getByRole("button", { name: "Encore" })).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import type { SongPagePerformance } from "@bip/domain";
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { DataTable } from "~/components/ui/data-table";
 import { ToggleFilterGroup } from "~/components/ui/filters";
@@ -15,6 +16,8 @@ interface PerformanceTableProps {
   songTitle?: string;
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
+  headerContent?: ReactNode;
+  excludeFilters?: string[];
 }
 
 /**
@@ -28,6 +31,8 @@ export function PerformanceTable({
   songTitle,
   showSongColumn,
   showAllTimerColumn,
+  headerContent,
+  excludeFilters,
 }: PerformanceTableProps) {
   const { user } = useSession();
   const isAuthenticated = !!user;
@@ -49,15 +54,17 @@ export function PerformanceTable({
 
   const filterComponent = (
     <div className="space-y-4">
+      {headerContent}
       <ToggleFilterGroup
-        filters={filterDefinitions}
+        filters={
+          excludeFilters
+            ? filterDefinitions.filter((filter) => !excludeFilters.includes(filter.key))
+            : filterDefinitions
+        }
         activeFilters={activeFilters}
         onToggle={toggleFilter}
         onClearAll={clearFilters}
       />
-      <div className="text-sm text-content-text-tertiary">
-        Showing {filteredPerformances.length} of {performances.length} performances
-      </div>
     </div>
   );
 
@@ -66,7 +73,6 @@ export function PerformanceTable({
       columns={columns}
       data={filteredPerformances}
       hideSearch
-      hidePagination
       filterComponent={filterComponent}
       rowClassName={rowClassName}
       initialSorting={[{ id: "date", desc: true }]}
