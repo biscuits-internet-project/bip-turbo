@@ -25,6 +25,8 @@ export type SongPagePerformance = {
   position?: number;
   songTitle?: string;
   songSlug?: string;
+  cover?: boolean;
+  authorId?: string | null;
   tags?: {
     setOpener?: boolean;
     setCloser?: boolean;

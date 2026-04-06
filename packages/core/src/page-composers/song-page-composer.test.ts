@@ -272,6 +272,22 @@ describe("transformToSongPagePerformanceView", () => {
     expect(view.songAfter).toBeUndefined();
   });
 
+  // When the DTO includes song-level fields (from the songs table join in
+  // buildAllTimers), cover and authorId are mapped to the view.
+  test("maps song_cover and song_author_id to cover and authorId", () => {
+    const view = transformToSongPagePerformanceView(makeDto({ song_cover: true, song_author_id: "author-1" }));
+    expect(view.cover).toBe(true);
+    expect(view.authorId).toBe("author-1");
+  });
+
+  // When song-level fields are absent (build() path where songs isn't
+  // joined), cover and authorId default to undefined/null.
+  test("cover is undefined and authorId is null when song fields are absent", () => {
+    const view = transformToSongPagePerformanceView(makeDto());
+    expect(view.cover).toBeUndefined();
+    expect(view.authorId).toBeNull();
+  });
+
   // Null optional scalars map to `undefined` (via `|| undefined` in the
   // current impl). Documented quirk: `|| undefined` means `0` values also
   // become `undefined`, which is fine for rating/ratingsCount but worth

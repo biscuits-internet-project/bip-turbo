@@ -107,7 +107,11 @@ export class SongPageComposer {
       whereClause: Prisma.sql`tracks.song_id = ${song.id}::uuid`,
     });
 
-    const performances = result.map((row) => this.transformToSongPagePerformanceView(row));
+    const performances = result.map((row) => ({
+      ...this.transformToSongPagePerformanceView(row),
+      cover: song.cover ?? undefined,
+      authorId: song.authorId ?? null,
+    }));
     await this.enrichPerformances(performances);
 
     return {
@@ -145,7 +149,7 @@ export class SongPageComposer {
     includeSongInfo?: boolean;
   }): Promise<PerformanceDto[]> {
     const songColumns = options.includeSongInfo
-      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug`
+      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug, songs.cover as song_cover, songs.author_id as song_author_id`
       : Prisma.empty;
     const songJoin = options.includeSongInfo ? Prisma.sql`JOIN songs ON tracks.song_id = songs.id` : Prisma.empty;
 
@@ -365,6 +369,8 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     segue: row.segue,
     set: row.set,
     position: row.position,
+    cover: row.song_cover ?? undefined,
+    authorId: row.song_author_id ?? null,
   };
 }
 
@@ -404,9 +410,15 @@ export type PerformanceDto = {
   prev_song_id: string | null;
   prev_song_title: string | null;
   prev_song_slug: string | null;
+
+  // Song fields (present when songs table is joined)
+  song_cover?: boolean | null;
+  song_author_id?: string | null;
 };
 
 type AllTimerPerformanceDto = PerformanceDto & {
   song_title: string;
   song_slug: string;
+  song_cover: boolean | null;
+  song_author_id: string | null;
 };
