@@ -30,6 +30,7 @@ export function SongsTable({
         secondaryFilterComponent={secondaryFilterComponent}
         searchActions={searchActions}
         isLoading={isLoading}
+        initialSorting={[{ id: "timesPlayed", desc: true }]}
       />
     </div>
   );

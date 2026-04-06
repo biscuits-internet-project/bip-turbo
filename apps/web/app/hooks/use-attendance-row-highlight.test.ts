@@ -80,7 +80,7 @@ describe("useAttendanceRowHighlight", () => {
   });
 
   // isAttended is used by filter predicates (e.g., the "Attended" toggle
-  // chip on PerformanceTable) to narrow rows to attended shows.
+  // chip on performance tables) to narrow rows to attended shows.
   test("isAttended returns true for attended shows, false for others", () => {
     vi.mocked(useShowUserData).mockReturnValue({
       attendanceMap: new Map([["show-yes", { id: "att-1" } as never]]),

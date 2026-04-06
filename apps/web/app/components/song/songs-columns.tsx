@@ -20,8 +20,8 @@ const formatDate = (date: Date) => {
 };
 
 const getSortIcon = (sortState: false | "asc" | "desc") => {
-  if (sortState === "asc") return <ArrowUp className="ml-2 h-4 w-4" />;
-  if (sortState === "desc") return <ArrowDown className="ml-2 h-4 w-4" />;
+  if (sortState === "asc") return <ArrowUp className="ml-2 h-4 w-4 text-brand-primary" />;
+  if (sortState === "desc") return <ArrowDown className="ml-2 h-4 w-4 text-brand-primary" />;
   return <ArrowUpDown className="ml-2 h-4 w-4" />;
 };
 

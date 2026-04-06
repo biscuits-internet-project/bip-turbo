@@ -354,4 +354,23 @@ describe("songsColumns", () => {
       .filter((el) => ["Alpha", "Beta", "Gamma"].includes(el.textContent ?? ""));
     expect(titlesDesc.map((el) => el.textContent)).toEqual(["Beta", "Gamma", "Alpha"]);
   });
+
+  // The /songs page shows songs sorted by times played (most played first)
+  // by default. The Plays header should show a descending arrow on load so
+  // users know the active sort column and direction.
+  test("Plays header shows descending sort icon when initialSorting is timesPlayed desc", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={songsColumns}
+        data={[makeSong()]}
+        hideSearch
+        hidePagination
+        initialSorting={[{ id: "timesPlayed", desc: true }]}
+      />,
+    );
+
+    const playsButton = screen.getByRole("button", { name: /^Plays/i });
+    // The descending ArrowDown icon should be present (has class "lucide-arrow-down")
+    expect(playsButton.querySelector(".lucide-arrow-down")).not.toBeNull();
+  });
 });

@@ -39,9 +39,7 @@ export default function AllTimersPage() {
         </Link>
       </div>
 
-      <div className="glass-content rounded-lg p-4 md:p-6">
-        <PerformanceTable performances={performances} showSongColumn />
-      </div>
+      <PerformanceTable performances={performances} showSongColumn />
     </div>
   );
 }

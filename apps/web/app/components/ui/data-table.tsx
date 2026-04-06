@@ -1,12 +1,12 @@
 import {
   type ColumnDef,
   type ColumnFiltersState,
-  type RowData,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type RowData,
   type SortingState,
   useReactTable,
   type VisibilityState,
@@ -18,6 +18,7 @@ declare module "@tanstack/react-table" {
     width?: string;
   }
 }
+
 import { type ReactNode, useState } from "react";
 
 import { Button } from "~/components/ui/button";
@@ -38,6 +39,11 @@ interface DataTableProps<TData, TValue> {
   secondaryFilterComponent?: ReactNode;
   isLoading?: boolean;
   rowClassName?: (data: TData, index: number) => string | undefined;
+  /** "card" (default) wraps the table in a styled card with uppercase headers
+   *  and generous padding. "plain" renders a transparent table with compact
+   *  padding and normal-case headers. */
+  variant?: "card" | "plain";
+  initialSorting?: SortingState;
 }
 
 export function DataTable<TData, TValue>({
@@ -54,8 +60,11 @@ export function DataTable<TData, TValue>({
   secondaryFilterComponent,
   isLoading = false,
   rowClassName,
+  variant = "card",
+  initialSorting,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const isPlain = variant === "plain";
+  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
@@ -103,17 +112,29 @@ export function DataTable<TData, TValue>({
           {secondaryFilterComponent}
         </div>
       )}
+      {!searchKey && filterComponent && <div>{filterComponent}</div>}
 
-      <div className="card-premium rounded-lg shadow-lg overflow-hidden w-full">
+      <div className={isPlain ? "overflow-x-auto w-full" : "card-premium rounded-lg shadow-lg overflow-x-auto w-full"}>
         <Table className="w-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-glass-border/60 hover:bg-transparent bg-glass-bg/30">
+              <TableRow
+                key={headerGroup.id}
+                className={
+                  isPlain
+                    ? "text-left text-sm text-content-text-secondary"
+                    : "border-glass-border/60 hover:bg-transparent bg-glass-bg/30"
+                }
+              >
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8"
+                      className={
+                        isPlain
+                          ? "p-3 text-sm text-content-text-secondary"
+                          : "text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8"
+                      }
                       style={{
                         width: header.column.columnDef.meta?.width,
                       }}
@@ -125,7 +146,7 @@ export function DataTable<TData, TValue>({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody className="bg-glass-bg/10">
+          <TableBody className={isPlain ? "" : "bg-glass-bg/10"}>
             {isLoading ? (
               <TableRow>
                 <TableCell
@@ -142,14 +163,22 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={`border-glass-border/30 transition-all duration-200 hover:bg-hover-glass/80 ${
-                    index % 2 === 0 ? "bg-glass-bg/5" : "bg-glass-bg/15"
-                  } ${rowClassName?.(row.original, index) ?? ""}`}
+                  className={
+                    isPlain
+                      ? `border-t border-glass-border/30 hover:bg-hover-glass ${rowClassName?.(row.original, index) ?? ""}`
+                      : `border-glass-border/30 transition-all duration-200 hover:bg-hover-glass/80 ${
+                          index % 2 === 0 ? "bg-glass-bg/5" : "bg-glass-bg/15"
+                        } ${rowClassName?.(row.original, index) ?? ""}`
+                  }
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8 text-base"
+                      className={
+                        isPlain
+                          ? "p-3"
+                          : "py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8 text-base"
+                      }
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
