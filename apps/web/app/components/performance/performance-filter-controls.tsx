@@ -1,34 +1,34 @@
 import type { ReactNode } from "react";
 import { SelectFilter } from "~/components/ui/filters";
 import { ToggleFilterGroup } from "~/components/ui/filters/toggle-filter-group";
-import { ERA_OPTIONS, TAG_FILTER_DEFINITIONS, YEAR_OPTIONS } from "~/lib/song-filters";
+import { ERA_OPTIONS, TOGGLE_FILTER_DEFINITIONS, YEAR_OPTIONS } from "~/lib/song-filters";
 
-const ALL_TOGGLE_FILTERS = TAG_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
+const ALL_TOGGLE_FILTERS = TOGGLE_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
 
 const TOGGLE_FILTERS_WITHOUT_ALL_TIMER = ALL_TOGGLE_FILTERS.filter((filter) => filter.key !== "allTimer");
 
 interface PerformanceFilterControlsProps {
   selectedYear: string;
   selectedEra: string;
-  activeTagSet: Set<string>;
+  activeToggleSet: Set<string>;
   updateFilter: (updates: Record<string, string | null>) => void;
-  toggleTag: (key: string) => void;
-  clearTags: () => void;
+  toggleFilter: (key: string) => void;
+  clearFilters: () => void;
   extraSelectFilters?: ReactNode;
-  showAllTimerFilter?: boolean;
+  showAllTimerToggle?: boolean;
 }
 
 export function PerformanceFilterControls({
   selectedYear,
   selectedEra,
-  activeTagSet,
+  activeToggleSet,
   updateFilter,
-  toggleTag,
-  clearTags,
+  toggleFilter,
+  clearFilters,
   extraSelectFilters,
-  showAllTimerFilter = true,
+  showAllTimerToggle = true,
 }: PerformanceFilterControlsProps) {
-  const toggleFilters = showAllTimerFilter ? ALL_TOGGLE_FILTERS : TOGGLE_FILTERS_WITHOUT_ALL_TIMER;
+  const toggleFilters = showAllTimerToggle ? ALL_TOGGLE_FILTERS : TOGGLE_FILTERS_WITHOUT_ALL_TIMER;
 
   return (
     <div className="space-y-4">
@@ -53,9 +53,9 @@ export function PerformanceFilterControls({
       </div>
       <ToggleFilterGroup
         filters={toggleFilters}
-        activeFilters={activeTagSet}
-        onToggle={toggleTag}
-        onClearAll={clearTags}
+        activeFilters={activeToggleSet}
+        onToggle={toggleFilter}
+        onClearAll={clearFilters}
       />
     </div>
   );

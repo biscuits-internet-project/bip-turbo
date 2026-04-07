@@ -15,15 +15,15 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
   const selectedEra = searchParams.get("era") || "all";
   const coverFilter = (searchParams.get("cover") as "all" | "cover" | "original") || "all";
   const selectedAuthor = searchParams.get("author") || null;
-  const tagsParam = searchParams.get("tags") || "";
+  const filtersParam = searchParams.get("filters") || "";
   const attendedParam = searchParams.get("attended") || "";
 
-  const activeTags = useMemo(() => {
-    const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : [];
-    if (attendedParam) tags.push("attended");
-    return tags;
-  }, [tagsParam, attendedParam]);
-  const activeTagSet = new Set(activeTags);
+  const activeToggles = useMemo(() => {
+    const toggles = filtersParam ? filtersParam.split(",").filter(Boolean) : [];
+    if (attendedParam) toggles.push("attended");
+    return toggles;
+  }, [filtersParam, attendedParam]);
+  const activeToggleSet = new Set(activeToggles);
 
   const [performances, setPerformances] = useState<SongPagePerformance[]>(allPerformances);
 
@@ -32,7 +32,7 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
     selectedEra !== "all" ||
     coverFilter !== "all" ||
     !!selectedAuthor ||
-    tagsParam !== "" ||
+    filtersParam !== "" ||
     attendedParam !== "";
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
     if (selectedEra !== "all") params.set("era", selectedEra);
     if (coverFilter !== "all") params.set("cover", coverFilter);
     if (selectedAuthor) params.set("author", selectedAuthor);
-    if (tagsParam) params.set("tags", tagsParam);
+    if (filtersParam) params.set("filters", filtersParam);
     if (attendedParam) params.set("attended", attendedParam);
 
     if (extraParams) {
@@ -78,7 +78,7 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
     selectedEra,
     coverFilter,
     selectedAuthor,
-    tagsParam,
+    filtersParam,
     attendedParam,
     allPerformances,
     hasFilters,
@@ -106,27 +106,27 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
     [setSearchParams],
   );
 
-  const toggleTag = useCallback(
+  const toggleFilter = useCallback(
     (key: string) => {
       if (key === "attended") {
         updateFilter({ attended: attendedParam ? null : "attended" });
         return;
       }
 
-      const currentTags = tagsParam ? tagsParam.split(",").filter(Boolean) : [];
-      const tagSet = new Set(currentTags);
-      if (tagSet.has(key)) {
-        tagSet.delete(key);
+      const currentFilters = filtersParam ? filtersParam.split(",").filter(Boolean) : [];
+      const filterSet = new Set(currentFilters);
+      if (filterSet.has(key)) {
+        filterSet.delete(key);
       } else {
-        tagSet.add(key);
+        filterSet.add(key);
       }
-      updateFilter({ tags: [...tagSet].join(",") || null });
+      updateFilter({ filters: [...filterSet].join(",") || null });
     },
-    [tagsParam, attendedParam, updateFilter],
+    [filtersParam, attendedParam, updateFilter],
   );
 
-  const clearTags = useCallback(() => {
-    updateFilter({ tags: null, attended: null });
+  const clearFilters = useCallback(() => {
+    updateFilter({ filters: null, attended: null });
   }, [updateFilter]);
 
   return {
@@ -135,9 +135,9 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
     selectedEra,
     coverFilter,
     selectedAuthor,
-    activeTagSet,
+    activeToggleSet,
     updateFilter,
-    toggleTag,
-    clearTags,
+    toggleFilter,
+    clearFilters,
   };
 }

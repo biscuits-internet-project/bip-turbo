@@ -105,7 +105,7 @@ export default function SongPage() {
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
   const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
-  const { performances, selectedYear, selectedEra, activeTagSet, updateFilter, toggleTag, clearTags } =
+  const { performances, selectedYear, selectedEra, activeToggleSet, updateFilter, toggleFilter, clearFilters } =
     usePerformancePageFilters({
       allPerformances,
       apiUrl: "/api/songs/performances",
@@ -116,10 +116,10 @@ export default function SongPage() {
     <PerformanceFilterControls
       selectedYear={selectedYear}
       selectedEra={selectedEra}
-      activeTagSet={activeTagSet}
+      activeToggleSet={activeToggleSet}
       updateFilter={updateFilter}
-      toggleTag={toggleTag}
-      clearTags={clearTags}
+      toggleFilter={toggleFilter}
+      clearFilters={clearFilters}
     />
   );
 

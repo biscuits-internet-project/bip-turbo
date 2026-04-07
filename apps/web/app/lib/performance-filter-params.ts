@@ -51,7 +51,7 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
   const era = url.searchParams.get("era");
   const coverParam = url.searchParams.get("cover");
   const authorParam = url.searchParams.get("author");
-  const tagsParam = url.searchParams.get("tags");
+  const filtersParam = url.searchParams.get("filters");
   const attendedParam = url.searchParams.get("attended");
 
   const dateRangeKey = year || era;
@@ -68,8 +68,8 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
   const attendedUserId = await resolveAttendedUserId(attendedParam, context);
   if (attendedUserId) filters.attendedUserId = attendedUserId;
 
-  if (tagsParam) {
-    for (const key of tagsParam.split(",")) {
+  if (filtersParam) {
+    for (const key of filtersParam.split(",")) {
       if (VALID_FILTER_KEYS.has(key)) {
         (filters as Record<string, boolean>)[key] = true;
       }
@@ -87,7 +87,7 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
   const era = url.searchParams.get("era");
   const coverParam = url.searchParams.get("cover");
   const authorParam = url.searchParams.get("author");
-  const tagsParam = url.searchParams.get("tags");
+  const filtersParam = url.searchParams.get("filters");
 
   return CacheKeys.songs.filtered({
     scope,
@@ -95,7 +95,7 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
     era: era || null,
     cover: coverParam || null,
     author: authorParam || null,
-    tags: tagsParam || null,
+    filters: filtersParam || null,
     attended: attendedUserId || null,
   });
 }

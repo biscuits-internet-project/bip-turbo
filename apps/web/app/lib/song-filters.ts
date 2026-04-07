@@ -46,7 +46,7 @@ export const ERA_OPTIONS = Object.entries(eraFilters).map(([value, config]) => (
  * Used by PerformanceFilterControls for the toggle chip UI and by the
  * server-side API endpoints for filtering.
  */
-export const TAG_FILTER_DEFINITIONS = [
+export const TOGGLE_FILTER_DEFINITIONS = [
   { key: "setOpener", label: "Set Opener" },
   { key: "setCloser", label: "Set Closer" },
   { key: "encore", label: "Encore" },

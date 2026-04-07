@@ -30,10 +30,10 @@ export default function AllTimersPage() {
     selectedEra,
     coverFilter,
     selectedAuthor,
-    activeTagSet,
+    activeToggleSet,
     updateFilter,
-    toggleTag,
-    clearTags,
+    toggleFilter,
+    clearFilters,
   } = usePerformancePageFilters({
     allPerformances,
     apiUrl: "/api/all-timers",
@@ -94,12 +94,12 @@ export default function AllTimersPage() {
           <PerformanceFilterControls
             selectedYear={selectedYear}
             selectedEra={selectedEra}
-            activeTagSet={activeTagSet}
+            activeToggleSet={activeToggleSet}
             updateFilter={updateFilter}
-            toggleTag={toggleTag}
-            clearTags={clearTags}
+            toggleFilter={toggleFilter}
+            clearFilters={clearFilters}
             extraSelectFilters={extraSelectFilters}
-            showAllTimerFilter={false}
+            showAllTimerToggle={false}
           />
         }
       />
