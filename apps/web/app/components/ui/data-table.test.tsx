@@ -122,6 +122,77 @@ describe("DataTable", () => {
     expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
   });
 
+  // The page input shows "Page [input] of N" between Previous and Next.
+  test("renders page input with current page and total", async () => {
+    const manyRows = Array.from({ length: 10 }, (_, i) => ({
+      id: String(i),
+      name: `Row ${i}`,
+      count: i,
+    }));
+
+    await setup(<DataTable columns={basicColumns} data={manyRows} hideSearch pageSize={3} />);
+
+    // 10 rows / 3 per page = 4 pages
+    const pageInputs = screen.getAllByRole("spinbutton");
+    expect(pageInputs.length).toBeGreaterThanOrEqual(2); // top + bottom
+    expect(pageInputs[0]).toHaveValue(1);
+    expect(screen.getAllByText(/of 4/).length).toBeGreaterThanOrEqual(2);
+  });
+
+  // Typing a page number into the input navigates to that page.
+  test("typing a page number in the input navigates to that page", async () => {
+    const manyRows = Array.from({ length: 6 }, (_, i) => ({
+      id: String(i),
+      name: `Row ${i}`,
+      count: i,
+    }));
+
+    const { user } = await setup(<DataTable columns={basicColumns} data={manyRows} hideSearch pageSize={3} />);
+
+    expect(screen.getByText("Row 0")).toBeInTheDocument();
+
+    // Clear the input and type "2", then press Enter
+    const pageInputs = screen.getAllByRole("spinbutton");
+    await user.clear(pageInputs[0]);
+    await user.type(pageInputs[0], "2{Enter}");
+
+    expect(screen.getByText("Row 3")).toBeInTheDocument();
+    expect(screen.queryByText("Row 0")).not.toBeInTheDocument();
+  });
+
+  // Out-of-range values are clamped: below 1 goes to page 1, above max goes to last page.
+  test("page input clamps out-of-range values", async () => {
+    const manyRows = Array.from({ length: 6 }, (_, i) => ({
+      id: String(i),
+      name: `Row ${i}`,
+      count: i,
+    }));
+
+    const { user } = await setup(<DataTable columns={basicColumns} data={manyRows} hideSearch pageSize={3} />);
+
+    const pageInputs = screen.getAllByRole("spinbutton");
+
+    // Type a number higher than max pages (2) — should clamp to last page
+    await user.clear(pageInputs[0]);
+    await user.type(pageInputs[0], "99{Enter}");
+
+    expect(screen.getByText("Row 3")).toBeInTheDocument(); // page 2
+    expect(screen.queryByText("Row 0")).not.toBeInTheDocument();
+  });
+
+  // Page input should not render when hidePagination is true.
+  test("page input hidden when hidePagination is true", async () => {
+    const manyRows = Array.from({ length: 10 }, (_, i) => ({
+      id: String(i),
+      name: `Row ${i}`,
+      count: i,
+    }));
+
+    await setup(<DataTable columns={basicColumns} data={manyRows} hideSearch hidePagination />);
+
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  });
+
   // Pending: DataTable currently hardcodes column widths by ID
   // (header.id === "title" etc.), a leaky abstraction. This test pins the
   // desired behavior — a column's `meta.width` is applied as the header's

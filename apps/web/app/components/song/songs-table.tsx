@@ -25,7 +25,7 @@ export function SongsTable({
         data={songs}
         searchKey="title"
         searchPlaceholder="Search songs..."
-        hidePagination
+        pageSize={50}
         filterComponent={filterComponent}
         secondaryFilterComponent={secondaryFilterComponent}
         searchActions={searchActions}
