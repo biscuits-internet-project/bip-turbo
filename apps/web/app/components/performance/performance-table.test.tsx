@@ -106,84 +106,6 @@ describe("PerformanceTable", () => {
     expect(screen.queryByRole("link", { name: "Cassidy" })).not.toBeInTheDocument();
   });
 
-  // Clicking a filter chip narrows visible rows. The filter logic is
-  // handled by usePerformanceFilters internally; this test verifies the
-  // end-to-end wiring from chip click → filtered data → rendered rows.
-  test("clicking a filter chip narrows rows to matches", async () => {
-    const performances = [
-      makePerformance({ trackId: "t-encore", tags: { ...makePerformance().tags, encore: true } }),
-      makePerformance({ trackId: "t-opener", tags: { ...makePerformance().tags, setOpener: true } }),
-      makePerformance({ trackId: "t-neither" }),
-    ];
-
-    const { user } = await setup(<PerformanceTable performances={performances} />);
-
-    expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(3);
-
-    await user.click(screen.getByRole("button", { name: "Encore" }));
-
-    expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(1);
-  });
-
-  // When a toggle filter narrows the visible rows, the remaining rows must
-  // still show their own rating data — not stale data from a row that was
-  // previously in the same position. This catches the bug where TanStack
-  // reuses row components by index, causing useState to retain the old
-  // row's initialRating.
-  test("rating data stays correct after toggling a filter", async () => {
-    const performances = [
-      makePerformance({
-        trackId: "t-encore",
-        rating: 4.5,
-        ratingsCount: 10,
-        tags: { ...makePerformance().tags, encore: true },
-      }),
-      makePerformance({
-        trackId: "t-opener",
-        rating: 3.0,
-        ratingsCount: 5,
-        tags: { ...makePerformance().tags, setOpener: true },
-      }),
-      makePerformance({
-        trackId: "t-neither",
-        rating: 2.0,
-        ratingsCount: 1,
-      }),
-    ];
-
-    const { user } = await setup(<PerformanceTable performances={performances} />);
-
-    // Before filtering: 3 rows, check that the first row has the right rating
-    const cellsBefore = screen.getAllByTestId("TrackRatingCell");
-    expect(cellsBefore).toHaveLength(3);
-    expect(cellsBefore[0].textContent).toContain('"initialRating":4.5');
-
-    // Click "Set Opener" to filter to just the opener row
-    await user.click(screen.getByRole("button", { name: "Set Opener" }));
-
-    const cellsAfter = screen.getAllByTestId("TrackRatingCell");
-    expect(cellsAfter).toHaveLength(1);
-    // The remaining row should have the OPENER's rating (3.0), not the
-    // encore's rating (4.5) which was previously in position 0.
-    expect(cellsAfter[0].textContent).toContain('"initialRating":3');
-  });
-
-  // Clear All resets all active filters, restoring the full performance list.
-  test("Clear All button resets filters", async () => {
-    const performances = [
-      makePerformance({ trackId: "t-encore", tags: { ...makePerformance().tags, encore: true } }),
-      makePerformance({ trackId: "t-other" }),
-    ];
-
-    const { user } = await setup(<PerformanceTable performances={performances} />);
-
-    await user.click(screen.getByRole("button", { name: "Encore" }));
-    expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(1);
-
-    await user.click(screen.getByRole("button", { name: "Clear All" }));
-    expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(2);
-  });
-
   // Attended rows get a green left border via useAttendanceRowHighlight.
   // Verifies the hook→rowClassName→DataTable wiring is intact.
   test("attended rows get the attendance highlight class", async () => {
@@ -233,21 +155,19 @@ describe("PerformanceTable", () => {
     expect(cell.textContent).toContain('"isAuthenticated":true');
   });
 
-  // The headerContent prop lets callers inject additional filter UI (like
-  // Year/Era selects) above the toggle-chip row. The content renders inside
-  // the filter panel, before the toggle chips.
-  test("renders headerContent above the toggle chips when provided", async () => {
+  // The headerContent prop lets callers inject filter UI (Year/Era selects,
+  // toggle chips, etc.) above the table. PerformanceTable passes it through
+  // to DataTable's filterComponent slot.
+  test("renders headerContent when provided", async () => {
     await setup(
       <PerformanceTable
         performances={[makePerformance()]}
-        headerContent={<div data-testid="year-era-filters">Year/Era filters here</div>}
+        headerContent={<div data-testid="filter-controls">Filter controls here</div>}
       />,
     );
 
-    expect(screen.getByTestId("year-era-filters")).toBeInTheDocument();
-    expect(screen.getByText("Year/Era filters here")).toBeInTheDocument();
-    // Toggle chips should still render below
-    expect(screen.getByRole("button", { name: "Encore" })).toBeInTheDocument();
+    expect(screen.getByTestId("filter-controls")).toBeInTheDocument();
+    expect(screen.getByText("Filter controls here")).toBeInTheDocument();
   });
 
   // PerformanceTable shows pagination controls (Previous/Next buttons) so
@@ -258,16 +178,5 @@ describe("PerformanceTable", () => {
 
     expect(screen.getAllByRole("button", { name: "Previous" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
-  });
-
-  // Some filter chips are irrelevant in certain contexts — e.g., the
-  // "All-Timer" chip on /songs/all-timers where every row is already an
-  // all-timer. The excludeFilters prop removes specified chips from the UI.
-  test("excludeFilters hides specified filter chips", async () => {
-    await setup(<PerformanceTable performances={[makePerformance()]} excludeFilters={["allTimer"]} />);
-
-    expect(screen.queryByRole("button", { name: "All-Timer" })).not.toBeInTheDocument();
-    // Other chips still render
-    expect(screen.getByRole("button", { name: "Encore" })).toBeInTheDocument();
   });
 });

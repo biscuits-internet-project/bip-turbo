@@ -3,6 +3,28 @@ import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
 import type { SongService } from "../songs/song-service";
 
+/**
+ * Filters for querying performances. All fields are optional — only
+ * active filters produce SQL conditions. Used by buildAllTimers and
+ * buildSongPerformances to construct dynamic WHERE clauses.
+ */
+export interface PerformanceFilterOptions {
+  startDate?: Date;
+  endDate?: Date;
+  cover?: boolean;
+  authorId?: string;
+  attendedUserId?: string;
+  encore?: boolean;
+  setOpener?: boolean;
+  setCloser?: boolean;
+  segueIn?: boolean;
+  segueOut?: boolean;
+  standalone?: boolean;
+  inverted?: boolean;
+  dyslexic?: boolean;
+  allTimer?: boolean;
+}
+
 export class SongPageComposer {
   constructor(
     private db: DbClient,
@@ -128,10 +150,15 @@ export class SongPageComposer {
     };
   }
 
-  async buildAllTimers(): Promise<AllTimersPageView> {
+  /** Build the all-timers page view, optionally filtered by date range, cover, author, attendance, and performance tags. */
+  async buildAllTimers(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
+    const { conditions, extraJoins } = this.buildFilterQuery([Prisma.sql`tracks.all_timer = true`], options);
+
+    const whereClause = Prisma.join(conditions, " AND ");
     const result = await this.queryPerformances({
-      whereClause: Prisma.sql`tracks.all_timer = true`,
+      whereClause,
       includeSongInfo: true,
+      extraJoins,
     });
 
     const performances = (result as AllTimerPerformanceDto[]).map((row) => ({
@@ -144,14 +171,112 @@ export class SongPageComposer {
     return { performances };
   }
 
+  /** Build a filtered list of performances for a single song. */
+  async buildSongPerformances(songSlug: string, options?: PerformanceFilterOptions): Promise<SongPagePerformance[]> {
+    const song = await this.songService.findBySlug(songSlug);
+    if (!song) throw new Error("Song not found");
+
+    const { conditions, extraJoins } = this.buildFilterQuery([Prisma.sql`tracks.song_id = ${song.id}::uuid`], options);
+
+    const whereClause = Prisma.join(conditions, " AND ");
+    const result = await this.queryPerformances({ whereClause, extraJoins });
+
+    const performances = result.map((row) => ({
+      ...this.transformToSongPagePerformanceView(row),
+      cover: song.cover ?? undefined,
+      authorId: song.authorId ?? null,
+    }));
+    await this.enrichPerformances(performances);
+
+    return performances;
+  }
+
+  /**
+   * Maps each filter field to a function that returns its SQL condition
+   * (WHERE clause) or join. Returns null when the filter is inactive.
+   * Value-carrying filters (dates, IDs) interpolate their values into
+   * parameterized SQL. Boolean filters produce static SQL fragments.
+   */
+  private static readonly FILTER_BUILDERS: Record<
+    string,
+    (options: PerformanceFilterOptions) => { condition?: Prisma.Sql; join?: Prisma.Sql } | null
+  > = {
+    startDate: (o) =>
+      o.startDate ? { condition: Prisma.sql`shows.date >= ${o.startDate.toISOString().slice(0, 10)}` } : null,
+    endDate: (o) =>
+      o.endDate ? { condition: Prisma.sql`shows.date <= ${o.endDate.toISOString().slice(0, 10)}` } : null,
+    cover: (o) => (o.cover !== undefined ? { condition: Prisma.sql`songs.cover = ${o.cover}` } : null),
+    authorId: (o) => (o.authorId ? { condition: Prisma.sql`songs.author_id = ${o.authorId}::uuid` } : null),
+    attendedUserId: (o) =>
+      o.attendedUserId
+        ? {
+            join: Prisma.sql`JOIN attendances ON attendances.show_id = shows.id AND attendances.user_id = ${o.attendedUserId}::uuid`,
+          }
+        : null,
+    encore: (o) => (o.encore ? { condition: Prisma.sql`tracks.set LIKE 'E%'` } : null),
+    setOpener: (o) =>
+      o.setOpener
+        ? {
+            condition: Prisma.sql`tracks.position = (SELECT MIN(t2.position) FROM tracks t2 WHERE t2.show_id = tracks.show_id AND t2.set = tracks.set) AND tracks.set NOT LIKE 'E%'`,
+          }
+        : null,
+    setCloser: (o) =>
+      o.setCloser
+        ? {
+            condition: Prisma.sql`tracks.position = (SELECT MAX(t2.position) FROM tracks t2 WHERE t2.show_id = tracks.show_id AND t2.set = tracks.set) AND tracks.set NOT LIKE 'E%'`,
+          }
+        : null,
+    segueOut: (o) => (o.segueOut ? { condition: Prisma.sql`tracks.segue IS NOT NULL` } : null),
+    segueIn: (o) => (o.segueIn ? { condition: Prisma.sql`prevTracks.segue IS NOT NULL` } : null),
+    standalone: (o) =>
+      o.standalone ? { condition: Prisma.sql`tracks.segue IS NULL AND prevTracks.segue IS NULL` } : null,
+    allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
+    inverted: (o) =>
+      o.inverted
+        ? {
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM annotations WHERE annotations.track_id = tracks.id AND LOWER(annotations.desc) LIKE '%inverted%')`,
+          }
+        : null,
+    dyslexic: (o) =>
+      o.dyslexic
+        ? {
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM annotations WHERE annotations.track_id = tracks.id AND LOWER(annotations.desc) LIKE '%dyslexic%')`,
+          }
+        : null,
+  };
+
+  /** Combine base conditions with active filter conditions and joins. */
+  private buildFilterQuery(
+    baseConditions: Prisma.Sql[],
+    options?: PerformanceFilterOptions,
+  ): { conditions: Prisma.Sql[]; extraJoins: Prisma.Sql[] } {
+    const conditions = [...baseConditions];
+    const extraJoins: Prisma.Sql[] = [];
+
+    if (!options) return { conditions, extraJoins };
+
+    for (const builder of Object.values(SongPageComposer.FILTER_BUILDERS)) {
+      const result = builder(options);
+      if (result?.condition) conditions.push(result.condition);
+      if (result?.join) extraJoins.push(result.join);
+    }
+
+    return { conditions, extraJoins };
+  }
+
   private async queryPerformances(options: {
     whereClause: Prisma.Sql;
     includeSongInfo?: boolean;
+    extraJoins?: Prisma.Sql[];
   }): Promise<PerformanceDto[]> {
     const songColumns = options.includeSongInfo
       ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug, songs.cover as song_cover, songs.author_id as song_author_id`
       : Prisma.empty;
     const songJoin = options.includeSongInfo ? Prisma.sql`JOIN songs ON tracks.song_id = songs.id` : Prisma.empty;
+    const extraJoinsSql =
+      options.extraJoins && options.extraJoins.length > 0
+        ? Prisma.sql`${Prisma.join(options.extraJoins, "\n      ")}`
+        : Prisma.empty;
 
     return this.db.$queryRaw<PerformanceDto[]>`
       SELECT
@@ -187,6 +312,7 @@ export class SongPageComposer {
       ${songJoin}
       JOIN shows ON tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
+      ${extraJoinsSql}
       LEFT JOIN tracks nextTracks ON tracks.show_id = nextTracks.show_id
         AND nextTracks.position = tracks.position + 1
         AND nextTracks.set = tracks.set

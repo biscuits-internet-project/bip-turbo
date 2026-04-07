@@ -42,12 +42,19 @@ export const ERA_OPTIONS = Object.entries(eraFilters).map(([value, config]) => (
 }));
 
 /**
- * Returns true if the given date string falls within the filter's date range.
- * Handles open-ended ranges (missing startDate or endDate).
+ * Tag filters shared between /songs, /songs/all-timers, and /songs/$slug.
+ * Used by PerformanceFilterControls for the toggle chip UI and by the
+ * server-side API endpoints for filtering.
  */
-export function matchesDateRange(date: string, filter: SongFilterConfig): boolean {
-  const d = new Date(date);
-  if (filter.startDate && d < filter.startDate) return false;
-  if (filter.endDate && d > filter.endDate) return false;
-  return true;
-}
+export const TAG_FILTER_DEFINITIONS = [
+  { key: "setOpener", label: "Set Opener" },
+  { key: "setCloser", label: "Set Closer" },
+  { key: "encore", label: "Encore" },
+  { key: "segueIn", label: "Segue In" },
+  { key: "segueOut", label: "Segue Out" },
+  { key: "standalone", label: "Standalone" },
+  { key: "inverted", label: "Inverted" },
+  { key: "dyslexic", label: "Dyslexic" },
+  { key: "allTimer", label: "All-Timer" },
+  { key: "attended", label: "Attended" },
+] as const;

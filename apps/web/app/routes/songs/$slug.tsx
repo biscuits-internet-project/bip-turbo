@@ -1,14 +1,16 @@
 import type { SongPageView } from "@bip/domain";
 import { ArrowLeft, BarChart3, FileTextIcon, GuitarIcon, History, Pencil, StarIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
+import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
@@ -98,12 +100,28 @@ export function meta({ data }: { data: SongPageView }) {
 }
 
 export default function SongPage() {
-  const { song, performances } = useSerializedLoaderData<SongPageView>();
-  const allTimers = performances.filter((p) => p.allTimer);
+  const { song, performances: allPerformances } = useSerializedLoaderData<SongPageView>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
   const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
+  const { performances, selectedYear, selectedEra, activeTagSet, updateFilter, toggleTag, clearTags } =
+    usePerformancePageFilters({
+      allPerformances,
+      apiUrl: "/api/songs/performances",
+      extraParams: useMemo(() => ({ slug: song.slug }), [song.slug]),
+    });
+  const allTimers = useMemo(() => performances.filter((p) => p.allTimer), [performances]);
+  const filterContent = (
+    <PerformanceFilterControls
+      selectedYear={selectedYear}
+      selectedEra={selectedEra}
+      activeTagSet={activeTagSet}
+      updateFilter={updateFilter}
+      toggleTag={toggleTag}
+      clearTags={clearTags}
+    />
+  );
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -391,7 +409,7 @@ export default function SongPage() {
             {/* Full performance table for all all-timers */}
             <div className="glass-content rounded-lg p-4 md:p-6">
               <h3 className="text-lg font-semibold text-content-text-primary mb-4">All-Timer Performances</h3>
-              <PerformanceTable performances={allTimers} songTitle={song.title} excludeFilters={["allTimer"]} />
+              <PerformanceTable performances={allTimers} songTitle={song.title} headerContent={filterContent} />
             </div>
           </TabsContent>
         )}
@@ -399,7 +417,12 @@ export default function SongPage() {
         <TabsContent value="performances" className="mt-6">
           <div className="glass-content rounded-lg p-4 md:p-6">
             <h3 className="text-lg font-semibold text-content-text-primary mb-4">All Performances</h3>
-            <PerformanceTable performances={performances} songTitle={song.title} showAllTimerColumn />
+            <PerformanceTable
+              performances={performances}
+              songTitle={song.title}
+              showAllTimerColumn
+              headerContent={filterContent}
+            />
           </div>
         </TabsContent>
 

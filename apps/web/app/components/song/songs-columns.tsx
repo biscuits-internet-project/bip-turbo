@@ -1,12 +1,12 @@
-import type { Song, Show } from "@bip/domain";
+import type { Show, Song } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
-// Enhanced Song type that includes show relationships for the data table
 interface SongWithShows extends Song {
   firstPlayedShow?: Show | null;
   lastPlayedShow?: Show | null;
 }
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "~/components/ui/button";
 

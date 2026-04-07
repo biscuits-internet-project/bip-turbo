@@ -135,7 +135,7 @@ export function DataTable<TData, TValue>({
   );
 
   return (
-    <div className="space-y-6 w-full max-w-full overflow-hidden">
+    <div className="space-y-3 w-full max-w-full overflow-hidden">
       {searchKey && !hideSearch && (
         <div className="flex flex-col gap-3">
           <div className="flex items-end flex-wrap gap-x-6 gap-y-3">

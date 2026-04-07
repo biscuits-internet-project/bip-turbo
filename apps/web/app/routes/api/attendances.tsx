@@ -62,6 +62,8 @@ export const action = protectedAction(async ({ request, context }) => {
         showId,
       });
 
+      await services.cacheInvalidation.invalidateAttendanceCaches(user.id);
+
       return { attendance };
     } catch (error) {
       logger.error("Error creating attendance", { error });
@@ -88,6 +90,8 @@ export const action = protectedAction(async ({ request, context }) => {
       }
 
       await services.attendances.delete(id);
+      await services.cacheInvalidation.invalidateAttendanceCaches(user.id);
+
       return new Response(JSON.stringify({ deletedId: id }), {
         status: 200,
         headers: { "Content-Type": "application/json" },

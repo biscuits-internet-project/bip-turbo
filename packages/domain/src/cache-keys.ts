@@ -57,13 +57,19 @@ export const CacheKeys = {
     index: () => "songs:index:full",
     /** All-timers page data */
     allTimers: () => "songs:all-timers",
-    /** Filtered song results by era/author/cover */
+    /** Filtered song results by era/author/cover/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
+      const attendedUserId = filters.attended;
+      if (attendedUserId) {
+        return `songs:filtered:user:${attendedUserId}:${filterHash}`;
+      }
       return `songs:filtered:${filterHash}`;
     },
     /** All filtered song caches (for pattern deletion) */
     allFiltered: () => "songs:filtered:*",
+    /** Filtered caches for a specific user's attendance (for pattern deletion) */
+    allFilteredForUser: (userId: string) => `songs:filtered:user:${userId}:*`,
   },
 
   /**
