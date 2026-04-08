@@ -1,5 +1,5 @@
 import { CacheKeys, type SetlistLight, type SongPagePerformance } from "@bip/domain";
-import { Flame } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import { useMemo } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { Link, type LoaderFunctionArgs, redirect } from "react-router";
@@ -8,7 +8,7 @@ import { SetlistCard } from "~/components/setlist/setlist-card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { formatMonthDay, isValidMonthDay } from "~/lib/utils";
+import { addDaysYearAgnostic, formatMonthDay, isValidMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -16,6 +16,8 @@ interface LoaderData {
   performances: SongPagePerformance[];
   monthDay: string;
   displayLabel: string;
+  previousMonthDay: string;
+  nextMonthDay: string;
 }
 
 export function headers(): Headers {
@@ -54,8 +56,17 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
   ]);
 
   const displayLabel = formatMonthDay(monthDay);
+  const previousMonthDay = addDaysYearAgnostic(monthDay, -1);
+  const nextMonthDay = addDaysYearAgnostic(monthDay, 1);
 
-  return { setlists, performances: allTimersResult.performances, monthDay, displayLabel };
+  return {
+    setlists,
+    performances: allTimersResult.performances,
+    monthDay,
+    displayLabel,
+    previousMonthDay,
+    nextMonthDay,
+  };
 });
 
 export function meta({ data }: { data: LoaderData }) {
@@ -72,7 +83,8 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function OnThisDay() {
-  const { setlists, performances, displayLabel } = useSerializedLoaderData<LoaderData>();
+  const { setlists, performances, displayLabel, previousMonthDay, nextMonthDay } =
+    useSerializedLoaderData<LoaderData>();
 
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
   const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
@@ -82,8 +94,24 @@ export default function OnThisDay() {
       <div className="space-y-6 md:space-y-8">
         <div className="relative">
           <h1 className="page-heading">ON THIS DAY</h1>
-          <div className="flex justify-center -mt-4">
+          <div className="flex justify-between items-center -mt-4">
+            <Link
+              to={`/on-this-day/${previousMonthDay}`}
+              prefetch="intent"
+              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+            >
+              <ChevronLeft className="h-3 w-3" />
+              <span>{formatMonthDay(previousMonthDay)}</span>
+            </Link>
             <span className="text-content-text-secondary text-3xl font-medium">{displayLabel}</span>
+            <Link
+              to={`/on-this-day/${nextMonthDay}`}
+              prefetch="intent"
+              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+            >
+              <span>{formatMonthDay(nextMonthDay)}</span>
+              <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
         </div>
 

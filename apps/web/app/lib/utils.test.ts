@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatMonthDay, isValidMonthDay } from "./utils";
+import { addDaysYearAgnostic, formatMonthDay, isValidMonthDay } from "./utils";
 
 describe("formatMonthDay", () => {
   // Converts zero-padded MM-DD to human-readable "Month Day" format
@@ -103,5 +103,52 @@ describe("isValidMonthDay", () => {
   // Full date (includes year)
   test("rejects full date with year", () => {
     expect(isValidMonthDay("04-04-2024")).toBe(false);
+  });
+});
+
+describe("addDaysYearAgnostic", () => {
+  // Normal case: incrementing a mid-month day stays in the same month
+  test("increments a normal day", () => {
+    expect(addDaysYearAgnostic("04-08", 1)).toBe("04-09");
+  });
+
+  // Normal case: decrementing a mid-month day stays in the same month
+  test("decrements a normal day", () => {
+    expect(addDaysYearAgnostic("04-08", -1)).toBe("04-07");
+  });
+
+  // Dec 31 + 1 wraps to Jan 1 (year-end boundary)
+  test("wraps forward from December 31 to January 1", () => {
+    expect(addDaysYearAgnostic("12-31", 1)).toBe("01-01");
+  });
+
+  // Jan 1 - 1 wraps to Dec 31 (year-start boundary)
+  test("wraps backward from January 1 to December 31", () => {
+    expect(addDaysYearAgnostic("01-01", -1)).toBe("12-31");
+  });
+
+  // Uses leap year (2000) internally so Feb 29 is always reachable
+  test("Feb 28 + 1 = Feb 29", () => {
+    expect(addDaysYearAgnostic("02-28", 1)).toBe("02-29");
+  });
+
+  // Stepping past Feb 29 lands on Mar 1
+  test("Feb 29 + 1 = Mar 1", () => {
+    expect(addDaysYearAgnostic("02-29", 1)).toBe("03-01");
+  });
+
+  // Stepping back from Feb 29 lands on Feb 28
+  test("Feb 29 - 1 = Feb 28", () => {
+    expect(addDaysYearAgnostic("02-29", -1)).toBe("02-28");
+  });
+
+  // Stepping back from Mar 1 lands on Feb 29 (not Feb 28)
+  test("Mar 1 - 1 = Feb 29", () => {
+    expect(addDaysYearAgnostic("03-01", -1)).toBe("02-29");
+  });
+
+  // Output must always be zero-padded MM-DD
+  test("zero-pads single-digit months and days", () => {
+    expect(addDaysYearAgnostic("01-01", 1)).toBe("01-02");
   });
 });

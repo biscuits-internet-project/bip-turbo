@@ -170,13 +170,12 @@ describe("PerformanceTable", () => {
     expect(screen.getByText("Filter controls here")).toBeInTheDocument();
   });
 
-  // PerformanceTable shows pagination controls (Previous/Next buttons) so
-  // users can navigate large performance lists without scrolling through
-  // hundreds of rows.
-  test("renders pagination controls above and below the table", async () => {
+  // When all performances fit on a single page, pagination nav controls
+  // (Previous/Next) are hidden to avoid showing disabled "Page 1 of 1" UI.
+  test("hides pagination nav when data fits on one page", async () => {
     await setup(<PerformanceTable performances={[makePerformance()]} />);
 
-    expect(screen.getAllByRole("button", { name: "Previous" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   });
 });

@@ -56,6 +56,19 @@ export function formatMonthDay(monthDay: string): string {
   return `${monthName} ${dd}`;
 }
 
+/**
+ * Steps a year-agnostic "MM-DD" string forward or backward by `delta` days.
+ * Uses year 2000 (a leap year) so Feb 29 is always traversable.
+ */
+export function addDaysYearAgnostic(monthDay: string, delta: number): string {
+  const [mm, dd] = monthDay.split("-").map(Number);
+  const date = new Date(Date.UTC(2000, mm - 1, dd));
+  date.setUTCDate(date.getUTCDate() + delta);
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${m}-${d}`;
+}
+
 // this input will be in the format "2025-01-01"
 // this should output as "January 1, 2025"
 export function formatDateLong(date: string): string {
