@@ -10,7 +10,7 @@ import { PerformanceFilterControls } from "~/components/performance/performance-
 import { RatingComponent } from "~/components/rating";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
+import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
@@ -105,13 +105,25 @@ export default function SongPage() {
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
   const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
-  const { performances, selectedYear, selectedEra, activeToggleSet, updateFilter, toggleFilter, clearFilters } =
-    usePerformancePageFilters({
-      allPerformances,
-      apiUrl: "/api/songs/performances",
-      extraParams: useMemo(() => ({ slug: song.slug }), [song.slug]),
-    });
-  const allTimers = useMemo(() => performances.filter((p) => p.allTimer), [performances]);
+  const {
+    filteredPerformances,
+    selectedYear,
+    selectedEra,
+    activeToggleSet,
+    hasActiveFilters,
+    searchText,
+    setSearchText,
+    updateFilter,
+    toggleFilter,
+    clearFilters,
+  } = usePerformancePageFilters({
+    allPerformances,
+    apiUrl: "/api/songs/performances",
+    extraParams: useMemo(() => ({ slug: song.slug }), [song.slug]),
+    searchFilter: searchPerformance,
+  });
+
+  const allTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
   const filterContent = (
     <PerformanceFilterControls
       selectedYear={selectedYear}
@@ -120,6 +132,9 @@ export default function SongPage() {
       updateFilter={updateFilter}
       toggleFilter={toggleFilter}
       clearFilters={clearFilters}
+      searchValue={searchText}
+      onSearchChange={setSearchText}
+      hasActiveFilters={hasActiveFilters}
     />
   );
 
@@ -418,7 +433,7 @@ export default function SongPage() {
           <div className="glass-content rounded-lg p-4 md:p-6">
             <h3 className="text-lg font-semibold text-content-text-primary mb-4">All Performances</h3>
             <PerformanceTable
-              performances={performances}
+              performances={filteredPerformances}
               songTitle={song.title}
               showAllTimerColumn
               headerContent={filterContent}

@@ -5,7 +5,7 @@ import { AuthorSearch } from "~/components/author/author-search";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { SelectFilter } from "~/components/ui/filters";
-import { usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
+import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
@@ -23,20 +23,23 @@ export function meta() {
 
 export default function AllTimersPage() {
   const { performances: allPerformances } = useSerializedLoaderData<AllTimersPageView>();
-
   const {
-    performances,
+    filteredPerformances,
     selectedYear,
     selectedEra,
     coverFilter,
     selectedAuthor,
     activeToggleSet,
+    hasActiveFilters,
+    searchText,
+    setSearchText,
     updateFilter,
     toggleFilter,
     clearFilters,
   } = usePerformancePageFilters({
     allPerformances,
     apiUrl: "/api/all-timers",
+    searchFilter: searchPerformance,
   });
 
   const extraSelectFilters = (
@@ -88,7 +91,7 @@ export default function AllTimersPage() {
       </div>
 
       <PerformanceTable
-        performances={performances}
+        performances={filteredPerformances}
         showSongColumn
         headerContent={
           <PerformanceFilterControls
@@ -100,6 +103,9 @@ export default function AllTimersPage() {
             clearFilters={clearFilters}
             extraSelectFilters={extraSelectFilters}
             showAllTimerToggle={false}
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            hasActiveFilters={hasActiveFilters}
           />
         }
       />

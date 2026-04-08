@@ -2,13 +2,11 @@ interface ToggleFilterGroupProps {
   filters: Array<{ key: string; label: string }>;
   activeFilters: Set<string>;
   onToggle: (key: string) => void;
-  onClearAll: () => void;
 }
 
-export function ToggleFilterGroup({ filters, activeFilters, onToggle, onClearAll }: ToggleFilterGroupProps) {
+export function ToggleFilterGroup({ filters, activeFilters, onToggle }: ToggleFilterGroupProps) {
   return (
     <div className="flex flex-wrap gap-2">
-      <span className="text-sm text-content-text-secondary mr-2 self-center">Filters:</span>
       {filters.map((filter) => (
         <button
           type="button"
@@ -23,15 +21,6 @@ export function ToggleFilterGroup({ filters, activeFilters, onToggle, onClearAll
           {filter.label}
         </button>
       ))}
-      {activeFilters.size > 0 && (
-        <button
-          type="button"
-          onClick={onClearAll}
-          className="px-3 py-1 text-sm rounded-md bg-transparent border border-glass-border text-content-text-tertiary hover:text-content-text-secondary"
-        >
-          Clear All
-        </button>
-      )}
     </div>
   );
 }

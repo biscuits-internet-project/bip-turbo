@@ -2,13 +2,26 @@ import type { SongPagePerformance } from "@bip/domain";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+export const searchPerformance = (performance: SongPagePerformance, query: string) =>
+  performance.songTitle?.toLowerCase().includes(query) ||
+  performance.venue?.name?.toLowerCase().includes(query) ||
+  performance.venue?.city?.toLowerCase().includes(query) ||
+  performance.venue?.state?.toLowerCase().includes(query) ||
+  false;
+
 interface PerformancePageFiltersOptions {
   allPerformances: SongPagePerformance[];
   apiUrl: string;
   extraParams?: Record<string, string>;
+  searchFilter?: (performance: SongPagePerformance, query: string) => boolean;
 }
 
-export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams }: PerformancePageFiltersOptions) {
+export function usePerformancePageFilters({
+  allPerformances,
+  apiUrl,
+  extraParams,
+  searchFilter,
+}: PerformancePageFiltersOptions) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const selectedYear = searchParams.get("year") || "all";
@@ -125,17 +138,33 @@ export function usePerformancePageFilters({ allPerformances, apiUrl, extraParams
     [filtersParam, attendedParam, updateFilter],
   );
 
+  const [searchText, setSearchText] = useState("");
+
+  const filteredPerformances = useMemo(() => {
+    if (!searchText || !searchFilter) return performances;
+    const lower = searchText.toLowerCase();
+    return performances.filter((performance) => searchFilter(performance, lower));
+  }, [performances, searchText, searchFilter]);
+
+  const hasActiveFilters = hasFilters || searchText.length > 0;
+
   const clearFilters = useCallback(() => {
-    updateFilter({ filters: null, attended: null });
+    updateFilter({ year: null, era: null, cover: null, author: null, filters: null, attended: null });
+    setSearchText("");
   }, [updateFilter]);
 
   return {
     performances,
+    filteredPerformances,
     selectedYear,
     selectedEra,
     coverFilter,
     selectedAuthor,
     activeToggleSet,
+    hasFilters,
+    hasActiveFilters,
+    searchText,
+    setSearchText,
     updateFilter,
     toggleFilter,
     clearFilters,
