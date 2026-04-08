@@ -161,25 +161,23 @@ export default function SongPage() {
             </span>
           )}
         </div>
-        <AdminOnly>
-          <Button asChild variant="outline" className="btn-secondary">
-            <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Link>
-          </Button>
-        </AdminOnly>
-      </div>
-
-      {/* Subtle back link */}
-      <div className="flex justify-start">
-        <Link
-          to="/songs"
-          className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-        >
-          <ArrowLeft className="h-3 w-3" />
-          <span>Back to songs</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/songs"
+            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back to songs</span>
+          </Link>
+          <AdminOnly>
+            <Button asChild variant="outline" className="btn-secondary">
+              <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
+          </AdminOnly>
+        </div>
       </div>
 
       {/* Stats Grid */}
