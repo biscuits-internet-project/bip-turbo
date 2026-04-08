@@ -33,6 +33,29 @@ export function formatDateShort(date: string): string {
   return date;
 }
 
+const MAX_DAYS_PER_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/**
+ * Validates a zero-padded "MM-DD" string.
+ * Allows Feb 29 since shows can exist on leap days across years.
+ */
+export function isValidMonthDay(value: string): boolean {
+  if (!/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value)) {
+    return false;
+  }
+  const [mm, dd] = value.split("-").map(Number);
+  return dd <= MAX_DAYS_PER_MONTH[mm - 1];
+}
+
+/**
+ * Formats "MM-DD" as "Month Day" (e.g., "04-04" → "April 4").
+ */
+export function formatMonthDay(monthDay: string): string {
+  const [mm, dd] = monthDay.split("-").map(Number);
+  const monthName = new Date(2000, mm - 1, dd).toLocaleString("default", { month: "long" });
+  return `${monthName} ${dd}`;
+}
+
 // this input will be in the format "2025-01-01"
 // this should output as "January 1, 2025"
 export function formatDateLong(date: string): string {
