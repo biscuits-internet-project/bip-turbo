@@ -6,10 +6,19 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type RowData,
   type SortingState,
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
+
+declare module "@tanstack/react-table" {
+  // biome-ignore lint/correctness/noUnusedVariables: required by TanStack's module augmentation pattern
+  interface ColumnMeta<TData extends RowData, TValue> {
+    width?: string;
+  }
+}
+
 import { type ReactNode, useState } from "react";
 
 import { Button } from "~/components/ui/button";
@@ -30,6 +39,8 @@ interface DataTableProps<TData, TValue> {
   secondaryFilterComponent?: ReactNode;
   isLoading?: boolean;
   rowClassName?: (data: TData, index: number) => string | undefined;
+  initialSorting?: SortingState;
+  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -46,14 +57,17 @@ export function DataTable<TData, TValue>({
   secondaryFilterComponent,
   isLoading = false,
   rowClassName,
+  initialSorting,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   const table = useReactTable({
     data,
     columns,
+    ...(getRowId ? { getRowId } : {}),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
@@ -107,14 +121,7 @@ export function DataTable<TData, TValue>({
                       key={header.id}
                       className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8"
                       style={{
-                        width:
-                          header.id === "title"
-                            ? "30%"
-                            : header.id === "timesPlayed"
-                              ? "10%"
-                              : header.id === "yearlyPlayData"
-                                ? "10%"
-                                : "25%",
+                        width: header.column.columnDef.meta?.width,
                       }}
                     >
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
