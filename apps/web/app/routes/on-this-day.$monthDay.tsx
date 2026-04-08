@@ -133,7 +133,7 @@ export default function OnThisDay() {
               <p className="text-content-text-secondary text-lg">None on this date</p>
             </div>
           ) : (
-            <PerformanceTable performances={performances} showSongColumn />
+            <PerformanceTable performances={performances} showSongColumn pageSize={10} />
           )}
         </div>
 

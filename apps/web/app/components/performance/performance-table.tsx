@@ -16,6 +16,7 @@ interface PerformanceTableProps {
   showAllTimerColumn?: boolean;
   headerContent?: ReactNode;
   isLoading?: boolean;
+  pageSize?: number;
 }
 
 /**
@@ -30,6 +31,7 @@ export function PerformanceTable({
   showAllTimerColumn,
   headerContent,
   isLoading,
+  pageSize,
 }: PerformanceTableProps) {
   const { user } = useSession();
   const isAuthenticated = !!user;
@@ -54,6 +56,7 @@ export function PerformanceTable({
       filterComponent={headerContent}
       rowClassName={rowClassName}
       initialSorting={[{ id: "date", desc: true }]}
+      pageSize={pageSize}
     />
   );
 }
