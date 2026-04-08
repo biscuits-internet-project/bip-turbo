@@ -6,11 +6,11 @@ import { DataTable } from "~/components/ui/data-table";
 import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { StarRating } from "~/components/ui/star-rating";
 import { YearFilterNav } from "~/components/year-filter-nav";
+import { useAttendanceRowHighlight } from "~/hooks/use-attendance-row-highlight";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
-import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { ATTENDED_ROW_CLASS, cn, formatDateShort } from "~/lib/utils";
+import { cn, formatDateShort } from "~/lib/utils";
 import { getTopRatedShows, type ShowWithRank, type TopRatedShowsLoaderData } from "~/routes/shows/top-rated-shows";
 
 const MIN_SHOW_RATINGS = 10;
@@ -134,18 +134,13 @@ const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<Sho
 ];
 
 export default function TopRated() {
-  const { user } = useSession();
   const { shows = [] } = useSerializedLoaderData<TopRatedShowsLoaderData>();
   const showsWithRank: ShowWithRank[] = shows.map((show, index) => ({
     ...show,
     rank: index + 1,
   }));
 
-  // Fetch user data (ratings, attendance) for all shows
-  const showIds = useMemo(() => shows.map((show) => show.id), [shows]);
-  const { userRatingMap, attendanceMap } = useShowUserData(user ? showIds : []);
-
-  // Create columns with user rating data
+  const { userRatingMap, rowClassName } = useAttendanceRowHighlight(showsWithRank, (show) => show.id);
   const columns = useMemo(() => createColumns(userRatingMap), [userRatingMap]);
 
   return (
@@ -160,13 +155,7 @@ export default function TopRated() {
           showAllButton={true}
           additionalText={`min ${MIN_SHOW_RATINGS} ratings`}
         />
-        <DataTable
-          columns={columns}
-          data={showsWithRank}
-          hideSearch={true}
-          hidePaginationText={true}
-          rowClassName={(show) => (attendanceMap.get(show.id) ? ATTENDED_ROW_CLASS : undefined)}
-        />
+        <DataTable columns={columns} data={showsWithRank} hideSearch={true} rowClassName={rowClassName} />
       </div>
     </div>
   );
