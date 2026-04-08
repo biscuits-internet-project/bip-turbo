@@ -87,19 +87,23 @@ describe("createPerformanceColumns", () => {
   });
 
   // TrackRatingCell receives initialRating from the performance's rating
-  // field, NOT from the userRatingMap.
+  // field, NOT from the userRatingMap. A performance with a community
+  // average rating should always pass that rating to the cell, regardless
+  // of whether the user has rated it or the userRatingMap is empty.
   test("passes initialRating from performance.rating even when userRatingMap is empty", async () => {
     const performances = [makePerformance({ trackId: "t1", rating: 3.5, ratingsCount: 2 })];
     const columns = createPerformanceColumns({ ...defaultOptions, userRatingMap: new Map() });
     await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     const cell = screen.getByTestId("TrackRatingCell");
+    // initialRating should be 3.5, not null
     expect(cell.textContent).toContain('"initialRating":3.5');
     expect(cell.textContent).toContain('"ratingsCount":2');
   });
 
   // A performance with rating=0 or rating=undefined should pass
   // initialRating as null (not 0) so TrackRatingCell shows "Rate".
+  // This is correct — there's no community rating to display.
   test("passes initialRating as null when performance.rating is undefined", async () => {
     const performances = [makePerformance({ trackId: "t1", rating: undefined, ratingsCount: undefined })];
     const columns = createPerformanceColumns(defaultOptions);
@@ -110,7 +114,8 @@ describe("createPerformanceColumns", () => {
     expect(cell.textContent).toContain('"ratingsCount":null');
   });
 
-  // Each Date cell links to the show's detail page.
+  // Each Date cell links to the show's detail page so users can click
+  // through to see the full setlist.
   test("Date cell links to /shows/{show.slug}", async () => {
     const performances = [
       makePerformance({ show: { id: "s1", slug: "2024-06-15-the-cap", date: "2024-06-15", venueId: "v1" } }),
@@ -122,15 +127,20 @@ describe("createPerformanceColumns", () => {
     expect(dateLink).toHaveAttribute("href", "/shows/2024-06-15-the-cap");
   });
 
-  // Sortable columns show sort indicators; non-sortable columns do not.
+  // Sortable columns (Date, Set, Rating, Song) show an up/down arrow icon
+  // even when not actively sorted, so users can see at a glance which
+  // columns support sorting. Non-sortable columns (Venue, Sequence, Notes)
+  // render plain text headers with no icon.
   test("sortable columns show sort indicator, non-sortable columns do not", async () => {
     const columns = createPerformanceColumns(defaultOptions);
     await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
+    // Sortable columns render a <button> with an SVG icon inside
     const dateHeader = screen.getByText("Date").closest("button");
     expect(dateHeader).not.toBeNull();
     expect(dateHeader?.querySelector("svg")).not.toBeNull();
 
+    // Set is not sortable — plain text header
     const setHeader = screen.getByText("Set").closest("th");
     expect(setHeader?.querySelector("button")).toBeNull();
 
@@ -138,6 +148,7 @@ describe("createPerformanceColumns", () => {
     expect(ratingHeader).not.toBeNull();
     expect(ratingHeader?.querySelector("svg")).not.toBeNull();
 
+    // Non-sortable columns render a plain <span> with no button
     const venueHeader = screen.getByText("Venue").closest("th");
     expect(venueHeader?.querySelector("button")).toBeNull();
 
@@ -145,7 +156,9 @@ describe("createPerformanceColumns", () => {
     expect(sequenceHeader?.querySelector("button")).toBeNull();
   });
 
-  // Columns that need constrained widths set explicit meta.width.
+  // Columns that need constrained widths (like the narrow allTimer flame
+  // icon and the Set label) set explicit meta.width. Other columns auto-size
+  // to avoid wasted space.
   test("allTimer and Set columns have explicit meta.width", () => {
     const columns = createPerformanceColumns({ ...defaultOptions, showAllTimerColumn: true });
 

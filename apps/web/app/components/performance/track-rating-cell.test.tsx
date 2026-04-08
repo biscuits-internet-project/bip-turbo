@@ -96,6 +96,8 @@ describe("TrackRatingCell", () => {
 
     expect(screen.getByText("4.17")).toBeInTheDocument();
 
+    // Simulate React reusing this component with different data (as happens
+    // when TanStack reorders rows by index after a sort/filter change).
     rerender(
       <MemoryRouter>
         <TrackRatingCell
@@ -109,6 +111,7 @@ describe("TrackRatingCell", () => {
       </MemoryRouter>,
     );
 
+    // Should now show "Rate", not the stale "4.17" from the previous render.
     expect(screen.queryByText("4.17")).not.toBeInTheDocument();
     expect(screen.getByText("Rate")).toBeInTheDocument();
   });
@@ -159,6 +162,7 @@ describe("TrackRatingCell", () => {
       />,
     );
 
+    // Initially golden
     let button = container.querySelector("button");
     expect(button?.className).toContain("border-amber-500");
 
@@ -175,6 +179,9 @@ describe("TrackRatingCell", () => {
       </MemoryRouter>,
     );
 
+    // Should now be dashed (no user rating), not golden.
+    // Check for border-amber-500/50 (the active golden border class)
+    // not just border-amber-500 (which also matches hover:border-amber-500/30).
     button = container.querySelector("button");
     expect(button?.className).toContain("border-dashed");
     expect(button?.className).not.toContain("bg-amber-500");

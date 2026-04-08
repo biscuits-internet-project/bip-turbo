@@ -96,7 +96,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateLastPlayed;
       const show = row.original.lastPlayedShow;
       return date ? (
-        <div className="text-base">
+        <div>
           {show?.slug ? (
             <Link
               to={`/shows/${show.slug}`}
@@ -144,7 +144,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateFirstPlayed;
       const show = row.original.firstPlayedShow;
       return date ? (
-        <div className="text-base">
+        <div>
           {show?.slug ? (
             <Link
               to={`/shows/${show.slug}`}

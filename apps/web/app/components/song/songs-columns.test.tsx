@@ -206,7 +206,9 @@ describe("songsColumns", () => {
   });
 
   // First Played cell mirrors Last Played exactly — same date-format +
-  // show-link + venue-line structure, just reading different fields.
+  // show-link + venue-line structure, just reading different fields. Paired
+  // because the two cells are near-duplicate code today (candidate for a
+  // later shared helper). Regression gate if/when the duplication is DRY'd.
   test("First Played cell formats date, links to show, and shows venue", async () => {
     const song = makeSong({
       dateFirstPlayed: new Date("1995-07-04"),
@@ -228,7 +230,8 @@ describe("songsColumns", () => {
   });
 
   // The First Played column sorts by `dateFirstPlayed`. Users click it to
-  // find the band's earliest or most-recent debut performances.
+  // find the band's earliest or most-recent debut performances — useful for
+  // historical browsing. Symmetric with the Last Played sort test.
   test("clicking First Played header sorts by dateFirstPlayed ascending, then descending", async () => {
     const songs = [
       makeSong({ id: "a", title: "Alpha", slug: "alpha", dateFirstPlayed: new Date("1995-07-04") }),
@@ -253,7 +256,8 @@ describe("songsColumns", () => {
   });
 
   // The Plays column sorts by `timesPlayed`. Users click it to find songs
-  // played most (or least) often across the band's history.
+  // played most (or least) often across the band's history — a core way to
+  // browse the song catalog.
   test("clicking Plays header sorts by timesPlayed ascending, then descending", async () => {
     const songs = [
       makeSong({ id: "a", title: "Alpha", slug: "alpha", timesPlayed: 50 }),
@@ -278,7 +282,8 @@ describe("songsColumns", () => {
   });
 
   // The Last Played column sorts by `dateLastPlayed`. Users click it to find
-  // the most-recently-played songs or the longest dormant songs.
+  // the most-recently-played songs (default desc on date) or the longest
+  // dormant songs. TanStack's default date sort handles the comparison.
   test("clicking Last Played header sorts by dateLastPlayed ascending, then descending", async () => {
     const songs = [
       makeSong({ id: "a", title: "Alpha", slug: "alpha", dateLastPlayed: new Date("2020-01-01") }),
@@ -290,6 +295,7 @@ describe("songsColumns", () => {
     const sortHeader = screen.getByRole("button", { name: /^Last Played/i });
     await user.click(sortHeader);
 
+    // The title column uses the same tag as date cells, so filter by title set
     const titlesAsc = screen
       .getAllByRole("link")
       .filter((el) => ["Alpha", "Beta", "Gamma"].includes(el.textContent ?? ""));
@@ -305,6 +311,7 @@ describe("songsColumns", () => {
   // The "This Year" column has a custom `sortingFn` that sorts by the
   // CURRENT year's play count (not the default alphanumeric sort over the
   // JSON blob). Users click the header to find songs trending this year.
+  // Verifies asc/desc order by checking row position after each click.
   test("yearlyPlayData sortingFn sorts by current-year count ascending, then descending", async () => {
     const songs = [
       makeSong({

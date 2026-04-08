@@ -107,6 +107,7 @@ describe("PerformanceTable", () => {
   });
 
   // Attended rows get a green left border via useAttendanceRowHighlight.
+  // Verifies the hook→rowClassName→DataTable wiring is intact.
   test("attended rows get the attendance highlight class", async () => {
     vi.mocked(useShowUserData).mockReturnValue({
       attendanceMap: new Map([["s-attended", { id: "att-1" } as never]]),
@@ -123,11 +124,15 @@ describe("PerformanceTable", () => {
     await setup(<PerformanceTable performances={performances} />);
 
     const rows = screen.getAllByRole("row");
+    // Attended row should have both the green background tint and the left
+    // border highlight. The !border-l-green-500 class uses Tailwind's
+    // important modifier to avoid border conflicts with TableRow's border-b.
     const attendedRow = rows.find((row) => row.className.includes("bg-green-500"));
     expect(attendedRow).toBeDefined();
     expect(attendedRow?.className).toContain("!border-l-green-500");
     expect(attendedRow?.className).toContain("!border-l-2");
 
+    // Non-attended rows should have neither class
     const nonAttendedRow = rows.find(
       (row) => row.className.includes("hover:bg-hover-glass") && !row.className.includes("bg-green-500"),
     );
@@ -135,7 +140,8 @@ describe("PerformanceTable", () => {
     expect(nonAttendedRow?.className).not.toContain("!border-l-green-500");
   });
 
-  // The isAuthenticated prop flows through to TrackRatingCell.
+  // The isAuthenticated prop flows through to TrackRatingCell so it knows
+  // whether to show an editable or read-only rating UI.
   test("passes isAuthenticated=true to TrackRatingCell when user is logged in", async () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "u1" } as never,
@@ -149,7 +155,9 @@ describe("PerformanceTable", () => {
     expect(cell.textContent).toContain('"isAuthenticated":true');
   });
 
-  // The headerContent prop lets callers inject filter UI above the table.
+  // The headerContent prop lets callers inject filter UI (Year/Era selects,
+  // toggle chips, etc.) above the table. PerformanceTable passes it through
+  // to DataTable's filterComponent slot.
   test("renders headerContent when provided", async () => {
     await setup(
       <PerformanceTable
@@ -162,7 +170,9 @@ describe("PerformanceTable", () => {
     expect(screen.getByText("Filter controls here")).toBeInTheDocument();
   });
 
-  // PerformanceTable shows pagination controls.
+  // PerformanceTable shows pagination controls (Previous/Next buttons) so
+  // users can navigate large performance lists without scrolling through
+  // hundreds of rows.
   test("renders pagination controls above and below the table", async () => {
     await setup(<PerformanceTable performances={[makePerformance()]} />);
 
