@@ -226,10 +226,16 @@ export class SongPageComposer {
             condition: Prisma.sql`tracks.position = (SELECT MAX(t2.position) FROM tracks t2 WHERE t2.show_id = tracks.show_id AND t2.set = tracks.set) AND tracks.set NOT LIKE 'E%'`,
           }
         : null,
-    segueOut: (o) => (o.segueOut ? { condition: Prisma.sql`tracks.segue IS NOT NULL` } : null),
-    segueIn: (o) => (o.segueIn ? { condition: Prisma.sql`prevTracks.segue IS NOT NULL` } : null),
+    segueOut: (o) =>
+      o.segueOut ? { condition: Prisma.sql`tracks.segue IS NOT NULL AND tracks.segue != ''` } : null,
+    segueIn: (o) =>
+      o.segueIn ? { condition: Prisma.sql`prevTracks.segue IS NOT NULL AND prevTracks.segue != ''` } : null,
     standalone: (o) =>
-      o.standalone ? { condition: Prisma.sql`tracks.segue IS NULL AND prevTracks.segue IS NULL` } : null,
+      o.standalone
+        ? {
+            condition: Prisma.sql`(tracks.segue IS NULL OR tracks.segue = '') AND (prevTracks.segue IS NULL OR prevTracks.segue = '')`,
+          }
+        : null,
     allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
     inverted: (o) =>
       o.inverted
