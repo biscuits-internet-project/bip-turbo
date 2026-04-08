@@ -19,7 +19,7 @@ declare module "@tanstack/react-table" {
   }
 }
 
-import { type ReactNode, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useState } from "react";
 
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -28,6 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  getRowId?: (row: TData) => string;
   searchKey?: string;
   searchPlaceholder?: string;
   pageSize?: number;
@@ -40,7 +41,6 @@ interface DataTableProps<TData, TValue> {
   isLoading?: boolean;
   rowClassName?: (data: TData, index: number) => string | undefined;
   initialSorting?: SortingState;
-  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -87,8 +87,71 @@ export function DataTable<TData, TValue>({
     },
   });
 
+  const hasResults = table.getFilteredRowModel().rows.length > 0;
+  const currentPage = table.getState().pagination.pageIndex + 1;
+  const totalPages = table.getPageCount();
+
+  function handlePageInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    const value = Number(event.currentTarget.value);
+    if (Number.isNaN(value)) return;
+    const clamped = Math.max(1, Math.min(totalPages, value));
+    table.setPageIndex(clamped - 1);
+    event.currentTarget.value = String(clamped);
+  }
+
+  const paginationBlock = !hasResults ? null : (
+    <div className="flex items-center justify-between px-2">
+      {!hidePaginationText ? (
+        <div className="text-sm text-content-text-secondary font-medium">
+          {table.getFilteredRowModel().rows.length === 0
+            ? "0 results"
+            : `Showing ${table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to ${Math.min(
+                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+                table.getFilteredRowModel().rows.length,
+              )} of ${table.getFilteredRowModel().rows.length} results`}
+        </div>
+      ) : (
+        <div />
+      )}
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+          className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
+        >
+          Previous
+        </Button>
+        <span className="flex items-center gap-1.5 text-sm text-content-text-secondary">
+          Page
+          <input
+            type="number"
+            min={1}
+            max={totalPages}
+            defaultValue={currentPage}
+            key={currentPage}
+            onKeyDown={handlePageInputKeyDown}
+            className="w-12 rounded border border-glass-border bg-glass-bg px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          of {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+          className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 w-full max-w-full overflow-hidden">
+    <div className="space-y-3 w-full max-w-full overflow-hidden">
       {searchKey && !hideSearch && (
         <div className="flex flex-col gap-3">
           <div className="flex items-end flex-wrap gap-x-6 gap-y-3">
@@ -109,17 +172,20 @@ export function DataTable<TData, TValue>({
           {secondaryFilterComponent}
         </div>
       )}
+      {!searchKey && filterComponent && <div>{filterComponent}</div>}
 
-      <div className="card-premium rounded-lg shadow-lg overflow-hidden w-full">
+      {!hidePagination && paginationBlock}
+
+      <div className="overflow-x-auto w-full">
         <Table className="w-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-glass-border/60 hover:bg-transparent bg-glass-bg/30">
+              <TableRow key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className="text-content-text-secondary font-semibold text-base uppercase tracking-wide py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8"
+                      className="p-3 text-sm text-content-text-secondary"
                       style={{
                         width: header.column.columnDef.meta?.width,
                       }}
@@ -131,7 +197,7 @@ export function DataTable<TData, TValue>({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody className="bg-glass-bg/10">
+          <TableBody>
             {isLoading ? (
               <TableRow>
                 <TableCell
@@ -148,15 +214,10 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={`border-glass-border/30 transition-all duration-200 hover:bg-hover-glass/80 ${
-                    index % 2 === 0 ? "bg-glass-bg/5" : "bg-glass-bg/15"
-                  } ${rowClassName?.(row.original, index) ?? ""}`}
+                  className={`border-t border-glass-border/30 hover:bg-hover-glass ${rowClassName?.(row.original, index) ?? ""}`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className="py-5 px-4 sm:px-6 md:px-8 first:pl-4 sm:first:pl-6 md:first:pl-8 last:pr-4 sm:last:pr-6 md:last:pr-8 text-base"
-                    >
+                    <TableCell key={cell.id} className="p-3">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -181,50 +242,7 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
 
-      {!hidePagination && (
-        <div className="flex items-center justify-between px-2">
-          {!hidePaginationText ? (
-            <div className="text-sm text-content-text-secondary font-medium">
-              Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
-              {Math.min(
-                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-                table.getFilteredRowModel().rows.length,
-              )}{" "}
-              of {table.getFilteredRowModel().rows.length} results
-            </div>
-          ) : (
-            <div></div>
-          )}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 text-sm text-content-text-secondary">
-              <span>Page</span>
-              <span className="font-semibold text-content-text-primary">
-                {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {!hidePagination && paginationBlock}
     </div>
   );
 }
