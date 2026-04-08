@@ -113,13 +113,28 @@ describe("DataTable", () => {
   });
 
   // The default/non-hidePagination mode shows Previous and Next buttons
-  // above and below the table. Complement to the previous test — together
-  // they pin pagination visibility to the `hidePagination` prop exactly.
-  test("pagination buttons render when not hidden", async () => {
-    await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
+  // above and below the table when there are multiple pages.
+  test("pagination buttons render when there are multiple pages", async () => {
+    const manyRows = Array.from({ length: 6 }, (_, i) => ({
+      id: String(i),
+      name: `Row ${i}`,
+      count: i,
+    }));
+
+    await setup(<DataTable columns={basicColumns} data={manyRows} hideSearch pageSize={3} />);
 
     expect(screen.getAllByRole("button", { name: "Previous" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Next" })).toHaveLength(2);
+  });
+
+  // When all data fits on a single page, page navigation controls are hidden
+  // (Previous/Next buttons and page input) but the results summary still shows.
+  test("page controls are hidden when data fits on one page", async () => {
+    await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
+
+    expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Showing 1 to 3 of 3 results/)).toHaveLength(2);
   });
 
   // The page input shows "Page [input] of N" between Previous and Next.

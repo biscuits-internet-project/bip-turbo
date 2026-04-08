@@ -23,6 +23,7 @@ export interface PerformanceFilterOptions {
   inverted?: boolean;
   dyslexic?: boolean;
   allTimer?: boolean;
+  monthDay?: string;
 }
 
 export class SongPageComposer {
@@ -273,6 +274,7 @@ export class SongPageComposer {
           }
         : null,
     allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
+    monthDay: (o) => (o.monthDay ? { condition: Prisma.sql`shows.date LIKE ${`%-${o.monthDay}`}` } : null),
     inverted: (o) =>
       o.inverted
         ? {

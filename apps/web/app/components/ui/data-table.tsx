@@ -114,39 +114,41 @@ export function DataTable<TData, TValue>({
       ) : (
         <div />
       )}
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-          className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-        >
-          Previous
-        </Button>
-        <span className="flex items-center gap-1.5 text-sm text-content-text-secondary">
-          Page
-          <input
-            type="number"
-            min={1}
-            max={totalPages}
-            defaultValue={currentPage}
-            key={currentPage}
-            onKeyDown={handlePageInputKeyDown}
-            className="w-12 rounded border border-glass-border bg-glass-bg px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-          of {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-          className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-        >
-          Next
-        </Button>
-      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+            className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
+          >
+            Previous
+          </Button>
+          <span className="flex items-center gap-1.5 text-sm text-content-text-secondary">
+            Page
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              defaultValue={currentPage}
+              key={currentPage}
+              onKeyDown={handlePageInputKeyDown}
+              className="w-12 rounded border border-glass-border bg-glass-bg px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+            className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 

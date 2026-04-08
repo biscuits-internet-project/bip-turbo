@@ -1,7 +1,9 @@
-import { CacheKeys, type SetlistLight } from "@bip/domain";
+import { CacheKeys, type SetlistLight, type SongPagePerformance } from "@bip/domain";
+import { Flame } from "lucide-react";
 import { useMemo } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
-import { type LoaderFunctionArgs, redirect } from "react-router";
+import { Link, type LoaderFunctionArgs, redirect } from "react-router";
+import { PerformanceTable } from "~/components/performance";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
@@ -11,6 +13,7 @@ import { services } from "~/server/services";
 
 interface LoaderData {
   setlists: SetlistLight[];
+  performances: SongPagePerformance[];
   monthDay: string;
   displayLabel: string;
 }
@@ -35,25 +38,31 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
     throw new Response(null, { status: 404 });
   }
 
-  const cacheKey = CacheKeys.shows.list({ monthDay, sort: "desc" });
+  const setlistsCacheKey = CacheKeys.shows.list({ monthDay, sort: "desc" });
+  const allTimersCacheKey = CacheKeys.songs.allTimersOnThisDay(monthDay);
 
-  const setlists = await services.cache.getOrSet(cacheKey, async () => {
-    return services.setlists.findManyLight({
-      filters: { monthDay },
-      sort: [{ field: "date", direction: "desc" }],
-    });
-  });
+  const [setlists, allTimersResult] = await Promise.all([
+    services.cache.getOrSet(setlistsCacheKey, async () => {
+      return services.setlists.findManyLight({
+        filters: { monthDay },
+        sort: [{ field: "date", direction: "desc" }],
+      });
+    }),
+    services.cache.getOrSet(allTimersCacheKey, async () => {
+      return services.songPageComposer.buildAllTimers({ monthDay });
+    }),
+  ]);
 
   const displayLabel = formatMonthDay(monthDay);
 
-  return { setlists, monthDay, displayLabel };
+  return { setlists, performances: allTimersResult.performances, monthDay, displayLabel };
 });
 
 export function meta({ data }: { data: LoaderData }) {
   if (!data) return [{ title: "On This Day | Biscuits Internet Project" }];
   return [
     { title: `On This Day: ${data.displayLabel} | Biscuits Internet Project` },
-    { name: "description", content: `Disco Biscuits shows played on ${data.displayLabel}` },
+    { name: "description", content: `Disco Biscuits shows and all-time performances on ${data.displayLabel}` },
   ];
 }
 
@@ -63,7 +72,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function OnThisDay() {
-  const { setlists, displayLabel } = useSerializedLoaderData<LoaderData>();
+  const { setlists, performances, displayLabel } = useSerializedLoaderData<LoaderData>();
 
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
   const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
@@ -76,6 +85,28 @@ export default function OnThisDay() {
           <div className="flex justify-center -mt-4">
             <span className="text-content-text-secondary text-3xl font-medium">{displayLabel}</span>
           </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Flame className="h-6 w-6 text-orange-500" />
+              <h2 className="text-2xl font-bold text-content-text-primary">All-Timers</h2>
+            </div>
+            <Link
+              to="/songs/all-timers"
+              className="text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+            >
+              View all →
+            </Link>
+          </div>
+          {performances.length === 0 ? (
+            <div className="text-center py-2">
+              <p className="text-content-text-secondary text-lg">None on this date</p>
+            </div>
+          ) : (
+            <PerformanceTable performances={performances} showSongColumn />
+          )}
         </div>
 
         <div className="space-y-4">
