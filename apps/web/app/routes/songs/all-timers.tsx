@@ -2,6 +2,8 @@ import { type AllTimersPageView, CacheKeys } from "@bip/domain";
 import { ArrowLeft, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PerformanceTable } from "~/components/performance";
+import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
+import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
@@ -18,18 +20,34 @@ export function meta() {
 }
 
 export default function AllTimersPage() {
-  const { performances } = useSerializedLoaderData<AllTimersPageView>();
+  const { performances: allPerformances } = useSerializedLoaderData<AllTimersPageView>();
+  const {
+    filteredData: filteredPerformances,
+    isLoading,
+    selectedYear,
+    selectedEra,
+    coverFilter,
+    selectedAuthor,
+    activeToggleSet,
+    hasActiveFilters,
+    searchText,
+    setSearchText,
+    updateFilter,
+    toggleFilter,
+    clearFilters,
+  } = usePerformancePageFilters({
+    initialData: allPerformances,
+    apiUrl: "/api/all-timers",
+    searchFilter: searchPerformance,
+  });
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Flame className="h-6 w-6 text-orange-500" />
           <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">All-Timers</h1>
         </div>
-      </div>
-
-      <div className="flex justify-start">
         <Link
           to="/songs"
           className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
@@ -39,9 +57,27 @@ export default function AllTimersPage() {
         </Link>
       </div>
 
-      <div className="glass-content rounded-lg p-4 md:p-6">
-        <PerformanceTable performances={performances} showSongColumn />
-      </div>
+      <PerformanceTable
+        performances={filteredPerformances}
+        isLoading={isLoading}
+        showSongColumn
+        headerContent={
+          <PerformanceFilterControls
+            selectedYear={selectedYear}
+            selectedEra={selectedEra}
+            activeToggleSet={activeToggleSet}
+            updateFilter={updateFilter}
+            toggleFilter={toggleFilter}
+            clearFilters={clearFilters}
+            coverFilter={coverFilter}
+            selectedAuthor={selectedAuthor}
+            showAllTimerToggle={false}
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            hasActiveFilters={hasActiveFilters}
+          />
+        }
+      />
     </div>
   );
 }

@@ -1,12 +1,12 @@
-import type { Song, Show } from "@bip/domain";
+import type { Show, Song } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
-// Enhanced Song type that includes show relationships for the data table
 interface SongWithShows extends Song {
   firstPlayedShow?: Show | null;
   lastPlayedShow?: Show | null;
 }
-import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "~/components/ui/button";
 
@@ -20,14 +20,15 @@ const formatDate = (date: Date) => {
 };
 
 const getSortIcon = (sortState: false | "asc" | "desc") => {
-  if (sortState === "asc") return <ArrowUp className="ml-2 h-4 w-4" />;
-  if (sortState === "desc") return <ArrowDown className="ml-2 h-4 w-4" />;
+  if (sortState === "asc") return <ArrowUp className="ml-2 h-4 w-4 text-brand-primary" />;
+  if (sortState === "desc") return <ArrowDown className="ml-2 h-4 w-4 text-brand-primary" />;
   return <ArrowUpDown className="ml-2 h-4 w-4" />;
 };
 
 export const songsColumns: ColumnDef<SongWithShows>[] = [
   {
     accessorKey: "title",
+    meta: { width: "30%" },
     header: ({ column }) => {
       return (
         <Button
@@ -43,7 +44,10 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
     cell: ({ row }) => {
       const song = row.original;
       return (
-        <Link to={`/songs/${song.slug}`} className="text-brand-primary hover:text-brand-secondary font-medium">
+        <Link
+          to={`/songs/${song.slug}`}
+          className="text-base text-brand-primary hover:text-brand-secondary font-medium"
+        >
           {song.title}
         </Link>
       );
@@ -51,6 +55,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "timesPlayed",
+    meta: { width: "10%" },
     header: ({ column }) => {
       return (
         <Button
@@ -74,6 +79,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "dateLastPlayed",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -90,7 +96,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateLastPlayed;
       const show = row.original.lastPlayedShow;
       return date ? (
-        <div className="text-base">
+        <div>
           {show?.slug ? (
             <Link
               to={`/shows/${show.slug}`}
@@ -121,6 +127,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "dateFirstPlayed",
+    meta: { width: "25%" },
     header: ({ column }) => {
       return (
         <Button
@@ -137,7 +144,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
       const date = row.original.dateFirstPlayed;
       const show = row.original.firstPlayedShow;
       return date ? (
-        <div className="text-base">
+        <div>
           {show?.slug ? (
             <Link
               to={`/shows/${show.slug}`}
@@ -168,6 +175,7 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
   },
   {
     accessorKey: "yearlyPlayData",
+    meta: { width: "10%" },
     header: ({ column }) => {
       return (
         <Button

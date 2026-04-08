@@ -59,10 +59,7 @@ export class CacheInvalidationService {
    */
   async invalidateSongCaches(): Promise<void> {
     this.logger.info("Invalidating all song caches");
-    await Promise.all([
-      this.cache.del(CacheKeys.songs.index()),
-      this.cache.delPattern(CacheKeys.songs.allFiltered()),
-    ]);
+    await Promise.all([this.cache.del(CacheKeys.songs.index()), this.cache.delPattern(CacheKeys.songs.allFiltered())]);
   }
 
   /**
@@ -85,6 +82,14 @@ export class CacheInvalidationService {
   async invalidateAllTimers(): Promise<void> {
     this.logger.info("Invalidating all-timers cache");
     await this.cache.del(CacheKeys.songs.allTimers());
+  }
+
+  /**
+   * Invalidate all filtered caches that include a specific user's attendance.
+   */
+  async invalidateAttendanceCaches(userId: string): Promise<void> {
+    this.logger.info(`Invalidating attendance caches for user: ${userId}`);
+    await this.cache.delPattern(CacheKeys.songs.allFilteredForUser(userId));
   }
 
   /**

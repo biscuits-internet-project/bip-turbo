@@ -26,9 +26,17 @@ export function TrackRatingCell({
   const [localHasRated, setLocalHasRated] = useState(userRating != null);
   const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync localHasRated when userRating prop arrives from async fetch
+  // Sync state when props change — handles both async fetch completion
+  // (userRating arriving after initial render) and component reuse (React
+  // keeping the same component mounted but with different data after a
+  // sort or filter change).
   useEffect(() => {
-    if (userRating != null) setLocalHasRated(true);
+    setDisplayedRating(initialRating ?? 0);
+    setDisplayedCount(ratingsCount ?? 0);
+  }, [initialRating, ratingsCount]);
+
+  useEffect(() => {
+    setLocalHasRated(userRating != null);
   }, [userRating]);
 
   // Cleanup timeout on unmount
@@ -65,7 +73,7 @@ export function TrackRatingCell({
           : "glass-secondary border border-dashed border-glass-border",
         isAuthenticated && "hover:brightness-110 cursor-pointer hover:border-amber-500/30",
         !isAuthenticated && "cursor-pointer hover:border-amber-500/30",
-        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
+        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
       )}
     >
       {isExpanded ? (
@@ -86,9 +94,7 @@ export function TrackRatingCell({
   if (!isAuthenticated) {
     return (
       <div className="w-[140px]">
-        <LoginPromptPopover message="Sign in to rate">
-          {ratingButton}
-        </LoginPromptPopover>
+        <LoginPromptPopover message="Sign in to rate">{ratingButton}</LoginPromptPopover>
       </div>
     );
   }

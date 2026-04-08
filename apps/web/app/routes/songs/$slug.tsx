@@ -1,14 +1,16 @@
 import type { SongPageView } from "@bip/domain";
 import { ArrowLeft, BarChart3, FileTextIcon, GuitarIcon, History, Pencil, StarIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
+import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
@@ -98,12 +100,44 @@ export function meta({ data }: { data: SongPageView }) {
 }
 
 export default function SongPage() {
-  const { song, performances } = useSerializedLoaderData<SongPageView>();
-  const allTimers = performances.filter((p) => p.allTimer);
+  const { song, performances: allPerformances } = useSerializedLoaderData<SongPageView>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
   const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
+  const {
+    filteredData: filteredPerformances,
+    isLoading,
+    selectedYear,
+    selectedEra,
+    activeToggleSet,
+    hasActiveFilters,
+    searchText,
+    setSearchText,
+    updateFilter,
+    toggleFilter,
+    clearFilters,
+  } = usePerformancePageFilters({
+    initialData: allPerformances,
+    apiUrl: "/api/songs/performances",
+    extraParams: useMemo(() => ({ slug: song.slug }), [song.slug]),
+    searchFilter: searchPerformance,
+  });
+
+  const allTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
+  const filterContent = (
+    <PerformanceFilterControls
+      selectedYear={selectedYear}
+      selectedEra={selectedEra}
+      activeToggleSet={activeToggleSet}
+      updateFilter={updateFilter}
+      toggleFilter={toggleFilter}
+      clearFilters={clearFilters}
+      searchValue={searchText}
+      onSearchChange={setSearchText}
+      hasActiveFilters={hasActiveFilters}
+    />
+  );
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -127,25 +161,23 @@ export default function SongPage() {
             </span>
           )}
         </div>
-        <AdminOnly>
-          <Button asChild variant="outline" className="btn-secondary">
-            <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Link>
-          </Button>
-        </AdminOnly>
-      </div>
-
-      {/* Subtle back link */}
-      <div className="flex justify-start">
-        <Link
-          to="/songs"
-          className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-        >
-          <ArrowLeft className="h-3 w-3" />
-          <span>Back to songs</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/songs"
+            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            <span>Back to songs</span>
+          </Link>
+          <AdminOnly>
+            <Button asChild variant="outline" className="btn-secondary">
+              <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            </Button>
+          </AdminOnly>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -388,19 +420,23 @@ export default function SongPage() {
               );
             })()}
 
-            {/* Full performance table for all all-timers */}
-            <div className="glass-content rounded-lg p-4 md:p-6">
-              <h3 className="text-lg font-semibold text-content-text-primary mb-4">All-Timer Performances</h3>
-              <PerformanceTable performances={allTimers} songTitle={song.title} />
-            </div>
+            <PerformanceTable
+              performances={allTimers}
+              songTitle={song.title}
+              isLoading={isLoading}
+              headerContent={filterContent}
+            />
           </TabsContent>
         )}
 
         <TabsContent value="performances" className="mt-6">
-          <div className="glass-content rounded-lg p-4 md:p-6">
-            <h3 className="text-lg font-semibold text-content-text-primary mb-4">All Performances</h3>
-            <PerformanceTable performances={performances} songTitle={song.title} showAllTimerColumn />
-          </div>
+          <PerformanceTable
+            performances={filteredPerformances}
+            songTitle={song.title}
+            showAllTimerColumn
+            isLoading={isLoading}
+            headerContent={filterContent}
+          />
         </TabsContent>
 
         <TabsContent value="stats" className="mt-6">

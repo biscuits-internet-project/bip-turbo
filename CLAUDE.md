@@ -51,6 +51,25 @@ make lint                            # Same as bun run lint
 make format                          # Same as bun run format
 ```
 
+**Testing:**
+```bash
+bun run test                         # Run all tests
+make test                            # Same as bun run test
+cd apps/web && bun run test:watch    # Watch mode
+```
+
+Test files are colocated with source: `*.test.{ts,tsx}`. Shared test helpers live in `apps/web/test/test-utils.tsx` (import via `@test/*` alias, e.g. `import { setup } from "@test/test-utils"`).
+
+**Git Hooks:**
+Custom hooks live in `.githooks/`. Enable them once per clone:
+```bash
+git config core.hooksPath .githooks
+```
+- `pre-commit` runs `bun run lint`
+- `pre-push` runs `bun run typecheck:all && bun run test`
+
+Bypass a single hook with `--no-verify` (e.g. `git push --no-verify` for WIP branches).
+
 **Database Operations:**
 ```bash
 make migrate                         # Run Prisma migrations in dev
@@ -136,7 +155,8 @@ This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime. Ke
 1. **Database Changes**: Create migrations with `make migrate-create`, run with `make migrate`
 2. **Type Generation**: Run `bun run typecheck` after schema changes to regenerate types
 3. **New Features**: Follow the repository/service pattern in core, create corresponding UI components in web
-4. **Testing**: No specific test framework mentioned - check if tests exist before assuming testing approach
+4. **Testing**: Run `make test` to verify changes pass all tests
+5. **Formatting**: Always run `bun run format` on every file you change before committing. Biome handles formatting — never use Prettier or other formatters.
 
 ## Important Notes
 

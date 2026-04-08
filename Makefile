@@ -16,6 +16,9 @@ tc:
 lint:
 	bun run lint
 
+test:
+	bun run test
+
 format:
 	bun run format
 

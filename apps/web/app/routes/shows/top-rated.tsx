@@ -6,11 +6,11 @@ import { DataTable } from "~/components/ui/data-table";
 import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { StarRating } from "~/components/ui/star-rating";
 import { YearFilterNav } from "~/components/year-filter-nav";
-import { useSession } from "~/hooks/use-session";
+import { useAttendanceRowHighlight } from "~/hooks/use-attendance-row-highlight";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import { useShowUserData } from "~/hooks/use-show-user-data";
+import { useSession } from "~/hooks/use-session";
 import { publicLoader } from "~/lib/base-loaders";
-import { ATTENDED_ROW_CLASS, cn, formatDateShort } from "~/lib/utils";
+import { cn, formatDateShort } from "~/lib/utils";
 import { getTopRatedShows, type ShowWithRank, type TopRatedShowsLoaderData } from "~/routes/shows/top-rated-shows";
 
 const MIN_SHOW_RATINGS = 10;
@@ -68,7 +68,7 @@ function RatingCell({ show, userRating }: { show: ShowWithRank; userRating?: num
         localHasRated
           ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
           : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
-        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
+        isAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
       )}
     >
       {isExpanded ? (
@@ -90,21 +90,24 @@ function RatingCell({ show, userRating }: { show: ShowWithRank; userRating?: num
 const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<ShowWithRank>[] => [
   {
     accessorKey: "rank",
+    meta: { width: "25%" },
     header: "#",
     cell: ({ row }) => <span className="font-medium text-content-text-primary">{row.original.rank}</span>,
   },
   {
     accessorKey: "averageRating",
+    meta: { width: "25%" },
     header: "Rating",
     cell: ({ row }) => <RatingCell show={row.original} userRating={userRatingMap.get(row.original.id)} />,
   },
   {
     accessorKey: "date",
+    meta: { width: "25%" },
     header: "Date",
     cell: ({ row }) => (
       <Link
         to={`/shows/${row.original.slug}`}
-        className="text-brand-primary hover:text-brand-secondary hover:underline"
+        className="text-base text-brand-primary hover:text-brand-secondary hover:underline"
       >
         {formatDateShort(row.original.date)}
       </Link>
@@ -112,6 +115,7 @@ const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<Sho
   },
   {
     accessorKey: "venue.name",
+    meta: { width: "25%" },
     header: "Venue",
     cell: ({ row }) => {
       const venue = row.original.venue;
@@ -130,18 +134,13 @@ const createColumns = (userRatingMap: Map<string, number | null>): ColumnDef<Sho
 ];
 
 export default function TopRated() {
-  const { user } = useSession();
   const { shows = [] } = useSerializedLoaderData<TopRatedShowsLoaderData>();
   const showsWithRank: ShowWithRank[] = shows.map((show, index) => ({
     ...show,
     rank: index + 1,
   }));
 
-  // Fetch user data (ratings, attendance) for all shows
-  const showIds = useMemo(() => shows.map((show) => show.id), [shows]);
-  const { userRatingMap, attendanceMap } = useShowUserData(user ? showIds : []);
-
-  // Create columns with user rating data
+  const { userRatingMap, rowClassName } = useAttendanceRowHighlight(showsWithRank, (show) => show.id);
   const columns = useMemo(() => createColumns(userRatingMap), [userRatingMap]);
 
   return (
@@ -156,13 +155,7 @@ export default function TopRated() {
           showAllButton={true}
           additionalText={`min ${MIN_SHOW_RATINGS} ratings`}
         />
-        <DataTable
-          columns={columns}
-          data={showsWithRank}
-          hideSearch={true}
-          hidePaginationText={true}
-          rowClassName={(show) => attendanceMap.get(show.id) ? ATTENDED_ROW_CLASS : undefined}
-        />
+        <DataTable columns={columns} data={showsWithRank} hideSearch={true} rowClassName={rowClassName} />
       </div>
     </div>
   );
