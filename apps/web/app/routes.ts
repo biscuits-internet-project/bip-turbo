@@ -53,9 +53,7 @@ export default [
   ]),
 
   // OAuth routes
-  ...prefix("oauth", [
-    route("consent", "routes/oauth/consent.tsx"),
-  ]),
+  ...prefix("oauth", [route("consent", "routes/oauth/consent.tsx")]),
 
   // Profile routes
   ...prefix("profile", [route("edit", "routes/profile/edit.tsx")]),
@@ -110,7 +108,9 @@ export default [
     route("authors/:id", "routes/api/authors/$id.tsx"),
     route("venues", "routes/api/venues.tsx"),
     route("venues/:id", "routes/api/venues/$id.tsx"),
+    route("all-timers", "routes/api/all-timers.tsx"),
     route("songs", "routes/api/songs.tsx"),
+    route("songs/performances", "routes/api/songs/performances.tsx"),
     route("songs/:id", "routes/api/songs/$id.tsx"),
     route("tracks", "routes/api/tracks.tsx"),
     route("tracks/reorder", "routes/api/tracks/reorder.tsx"),
