@@ -152,7 +152,10 @@ export class SongPageComposer {
 
   /** Build the all-timers page view, optionally filtered by date range, cover, author, attendance, and performance tags. */
   async buildAllTimers(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
-    const { conditions, extraJoins } = this.buildFilterQuery([Prisma.sql`tracks.all_timer = true`], options);
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(
+      [Prisma.sql`tracks.all_timer = true`],
+      options,
+    );
 
     const whereClause = Prisma.join(conditions, " AND ");
     const result = await this.queryPerformances({
@@ -176,7 +179,10 @@ export class SongPageComposer {
     const song = await this.songService.findBySlug(songSlug);
     if (!song) throw new Error("Song not found");
 
-    const { conditions, extraJoins } = this.buildFilterQuery([Prisma.sql`tracks.song_id = ${song.id}::uuid`], options);
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(
+      [Prisma.sql`tracks.song_id = ${song.id}::uuid`],
+      options,
+    );
 
     const whereClause = Prisma.join(conditions, " AND ");
     const result = await this.queryPerformances({ whereClause, extraJoins });
@@ -192,12 +198,43 @@ export class SongPageComposer {
   }
 
   /**
+   * Count matching performances per song, grouped by song_id.
+   * Used by /songs to show per-song counts when toggle filters are active.
+   */
+  async buildSongPerformanceCounts(options?: PerformanceFilterOptions): Promise<Record<string, number>> {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], options);
+
+    const whereClause = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}` : Prisma.empty;
+
+    const extraJoinsSql = extraJoins.length > 0 ? Prisma.sql`${Prisma.join(extraJoins, "\n      ")}` : Prisma.empty;
+
+    const rows = await this.db.$queryRaw<Array<{ song_id: string; count: string }>>`
+      SELECT tracks.song_id, COUNT(DISTINCT tracks.id)::text as count
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      JOIN songs ON tracks.song_id = songs.id
+      ${extraJoinsSql}
+      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id
+        AND prevTracks.position = tracks.position - 1
+        AND prevTracks.set = tracks.set
+      ${whereClause}
+      GROUP BY tracks.song_id
+    `;
+
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.song_id] = Number.parseInt(row.count, 10);
+    }
+    return result;
+  }
+
+  /**
    * Maps each filter field to a function that returns its SQL condition
    * (WHERE clause) or join. Returns null when the filter is inactive.
    * Value-carrying filters (dates, IDs) interpolate their values into
    * parameterized SQL. Boolean filters produce static SQL fragments.
    */
-  private static readonly FILTER_BUILDERS: Record<
+  static readonly FILTER_BUILDERS: Record<
     string,
     (options: PerformanceFilterOptions) => { condition?: Prisma.Sql; join?: Prisma.Sql } | null
   > = {
@@ -226,8 +263,7 @@ export class SongPageComposer {
             condition: Prisma.sql`tracks.position = (SELECT MAX(t2.position) FROM tracks t2 WHERE t2.show_id = tracks.show_id AND t2.set = tracks.set) AND tracks.set NOT LIKE 'E%'`,
           }
         : null,
-    segueOut: (o) =>
-      o.segueOut ? { condition: Prisma.sql`tracks.segue IS NOT NULL AND tracks.segue != ''` } : null,
+    segueOut: (o) => (o.segueOut ? { condition: Prisma.sql`tracks.segue IS NOT NULL AND tracks.segue != ''` } : null),
     segueIn: (o) =>
       o.segueIn ? { condition: Prisma.sql`prevTracks.segue IS NOT NULL AND prevTracks.segue != ''` } : null,
     standalone: (o) =>
@@ -252,7 +288,7 @@ export class SongPageComposer {
   };
 
   /** Combine base conditions with active filter conditions and joins. */
-  private buildFilterQuery(
+  static buildFilterQuery(
     baseConditions: Prisma.Sql[],
     options?: PerformanceFilterOptions,
   ): { conditions: Prisma.Sql[]; extraJoins: Prisma.Sql[] } {

@@ -1,7 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 
 const selectTriggerClass =
-  "h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20";
+  "h-[34px] text-sm bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20";
 const selectContentClass = "bg-glass-bg border-glass-border backdrop-blur-md";
 const selectItemClass = "text-content-text-primary hover:bg-hover-glass";
 const labelClass =

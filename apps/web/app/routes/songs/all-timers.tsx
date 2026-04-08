@@ -1,10 +1,8 @@
 import { type AllTimersPageView, CacheKeys } from "@bip/domain";
 import { ArrowLeft, Flame } from "lucide-react";
 import { Link } from "react-router-dom";
-import { AuthorSearch } from "~/components/author/author-search";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
-import { SelectFilter } from "~/components/ui/filters";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -24,7 +22,8 @@ export function meta() {
 export default function AllTimersPage() {
   const { performances: allPerformances } = useSerializedLoaderData<AllTimersPageView>();
   const {
-    filteredPerformances,
+    filteredData: filteredPerformances,
+    isLoading,
     selectedYear,
     selectedEra,
     coverFilter,
@@ -37,42 +36,10 @@ export default function AllTimersPage() {
     toggleFilter,
     clearFilters,
   } = usePerformancePageFilters({
-    allPerformances,
+    initialData: allPerformances,
     apiUrl: "/api/all-timers",
     searchFilter: searchPerformance,
   });
-
-  const extraSelectFilters = (
-    <>
-      <SelectFilter
-        id="cover-filter"
-        label="Original / Cover"
-        value={coverFilter}
-        onValueChange={(value) => updateFilter({ cover: value })}
-        options={[
-          { value: "all", label: "All" },
-          { value: "original", label: "Original" },
-          { value: "cover", label: "Cover" },
-        ]}
-        placeholder="Type"
-        width="w-[120px]"
-      />
-      <div className="flex flex-col">
-        <label
-          htmlFor="author-search"
-          className="text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center"
-        >
-          Author
-        </label>
-        <AuthorSearch
-          value={selectedAuthor}
-          onValueChange={(value) => updateFilter({ author: value === "none" ? null : value })}
-          placeholder="All Authors"
-          className="w-[150px] sm:w-[200px] h-[42px]"
-        />
-      </div>
-    </>
-  );
 
   return (
     <div className="space-y-4">
@@ -92,6 +59,7 @@ export default function AllTimersPage() {
 
       <PerformanceTable
         performances={filteredPerformances}
+        isLoading={isLoading}
         showSongColumn
         headerContent={
           <PerformanceFilterControls
@@ -101,7 +69,8 @@ export default function AllTimersPage() {
             updateFilter={updateFilter}
             toggleFilter={toggleFilter}
             clearFilters={clearFilters}
-            extraSelectFilters={extraSelectFilters}
+            coverFilter={coverFilter}
+            selectedAuthor={selectedAuthor}
             showAllTimerToggle={false}
             searchValue={searchText}
             onSearchChange={setSearchText}

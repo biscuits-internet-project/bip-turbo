@@ -1,9 +1,11 @@
 import type { Annotation, SongPagePerformance } from "@bip/domain";
-import { describe, expect, test } from "vitest";
+import { Prisma } from "@prisma/client";
+import { describe, expect, test, vi } from "vitest";
 import {
   buildSetPositionKey,
   computeTagsForPerformance,
   type PerformanceDto,
+  SongPageComposer,
   transformToSongPagePerformanceView,
 } from "./song-page-composer";
 
@@ -315,5 +317,114 @@ describe("buildSetPositionKey", () => {
   test('produces "showId|||set" format', () => {
     expect(buildSetPositionKey("show-1", "S1")).toBe("show-1|||S1");
     expect(buildSetPositionKey("abc-123", "E2")).toBe("abc-123|||E2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildFilterQuery — static filter-to-SQL builder
+// ---------------------------------------------------------------------------
+
+describe("buildFilterQuery", () => {
+  // With no filter options, only the caller's base conditions should be
+  // returned — no extra WHERE clauses or JOINs injected.
+  test("returns only base conditions when no options provided", () => {
+    const base = [Prisma.sql`tracks.all_timer = true`];
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(base);
+
+    expect(conditions).toHaveLength(1);
+    expect(extraJoins).toHaveLength(0);
+  });
+
+  // Boolean toggle filters (encore, segueOut, etc.) produce WHERE conditions,
+  // not JOINs. Verifies the encore filter generates the expected SQL fragment.
+  test("adds encore condition when encore is true", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], { encore: true });
+
+    expect(conditions.length).toBeGreaterThan(0);
+    expect(extraJoins).toHaveLength(0);
+    // The encore condition should reference tracks.set LIKE 'E%'
+    const sql = conditions[0].strings.join("");
+    expect(sql).toContain("tracks.set LIKE");
+  });
+
+  // The attended filter is special: it produces a JOIN (on the attendances
+  // table) rather than a WHERE condition. Important because JOINs and
+  // conditions are injected at different points in the SQL template.
+  test("adds attendedUserId as a join, not a condition", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], {
+      attendedUserId: "user-123",
+    });
+
+    expect(conditions).toHaveLength(0);
+    expect(extraJoins).toHaveLength(1);
+    const joinSql = extraJoins[0].strings.join("");
+    expect(joinSql).toContain("attendances");
+  });
+
+  // Multiple active filters are combined with AND: base conditions plus each
+  // active filter's condition/join. Verifies the accumulation logic and that
+  // JOINs and conditions are collected separately.
+  test("combines multiple filters with AND semantics", () => {
+    const base = [Prisma.sql`tracks.all_timer = true`];
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(base, {
+      encore: true,
+      segueOut: true,
+      attendedUserId: "user-123",
+    });
+
+    // base + encore + segueOut = 3 conditions
+    expect(conditions).toHaveLength(3);
+    // attendedUserId produces a join
+    expect(extraJoins).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildSongPerformanceCounts — aggregation query
+// ---------------------------------------------------------------------------
+
+describe("buildSongPerformanceCounts", () => {
+  // Helper: creates a SongPageComposer with a mocked $queryRaw that returns
+  // the given rows. Used to test the result transformation without hitting a DB.
+  function createComposer(queryRawResult: Array<{ song_id: string; count: string }>) {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue(queryRawResult),
+    };
+    const mockSongService = {} as never;
+    return { composer: new SongPageComposer(mockDb as never, mockSongService), mockDb };
+  }
+
+  // The raw SQL returns count as text (to avoid BigInt issues). Verifies
+  // the method parses string counts into numbers and keys by song_id.
+  test("returns Record<string, number> from raw query result rows", async () => {
+    const { composer } = createComposer([
+      { song_id: "song-1", count: "5" },
+      { song_id: "song-2", count: "3" },
+    ]);
+
+    const result = await composer.buildSongPerformanceCounts();
+
+    expect(result).toEqual({ "song-1": 5, "song-2": 3 });
+  });
+
+  // When no performances match the filter (e.g., no encores exist), the
+  // result should be an empty object — not null, not undefined.
+  test("returns empty record when no rows match", async () => {
+    const { composer } = createComposer([]);
+
+    const result = await composer.buildSongPerformanceCounts({ encore: true });
+
+    expect(result).toEqual({});
+  });
+
+  // Verifies that the method actually executes a query when filters are
+  // provided. The SQL correctness is tested via buildFilterQuery; this
+  // confirms the integration point calls $queryRaw.
+  test("passes filter options through to the query", async () => {
+    const { composer, mockDb } = createComposer([]);
+
+    await composer.buildSongPerformanceCounts({ encore: true, segueIn: true });
+
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
   });
 });

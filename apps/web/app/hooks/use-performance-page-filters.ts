@@ -1,5 +1,5 @@
 import type { SongPagePerformance } from "@bip/domain";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 export const searchPerformance = (performance: SongPagePerformance, query: string) =>
@@ -9,19 +9,19 @@ export const searchPerformance = (performance: SongPagePerformance, query: strin
   performance.venue?.state?.toLowerCase().includes(query) ||
   false;
 
-interface PerformancePageFiltersOptions {
-  allPerformances: SongPagePerformance[];
+interface PageFiltersOptions<T> {
+  initialData: T[];
   apiUrl: string;
   extraParams?: Record<string, string>;
-  searchFilter?: (performance: SongPagePerformance, query: string) => boolean;
+  searchFilter?: (item: T, query: string) => boolean;
 }
 
-export function usePerformancePageFilters({
-  allPerformances,
+export function usePerformancePageFilters<T>({
+  initialData,
   apiUrl,
   extraParams,
   searchFilter,
-}: PerformancePageFiltersOptions) {
+}: PageFiltersOptions<T>) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const selectedYear = searchParams.get("year") || "all";
@@ -30,6 +30,7 @@ export function usePerformancePageFilters({
   const selectedAuthor = searchParams.get("author") || null;
   const filtersParam = searchParams.get("filters") || "";
   const attendedParam = searchParams.get("attended") || "";
+  const playedParam = searchParams.get("played") || "";
 
   const activeToggles = useMemo(() => {
     const toggles = filtersParam ? filtersParam.split(",").filter(Boolean) : [];
@@ -38,7 +39,9 @@ export function usePerformancePageFilters({
   }, [filtersParam, attendedParam]);
   const activeToggleSet = new Set(activeToggles);
 
-  const [performances, setPerformances] = useState<SongPagePerformance[]>(allPerformances);
+  const [data, setData] = useState<T[]>(initialData);
+  const [isLoading, setIsLoading] = useState(false);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasFilters =
     selectedYear !== "all" ||
@@ -46,15 +49,25 @@ export function usePerformancePageFilters({
     coverFilter !== "all" ||
     !!selectedAuthor ||
     filtersParam !== "" ||
-    attendedParam !== "";
+    attendedParam !== "" ||
+    playedParam !== "";
 
   useEffect(() => {
     if (!hasFilters) {
-      setPerformances(allPerformances);
+      setData(initialData);
+      setIsLoading(false);
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
       return undefined;
     }
 
     const controller = new AbortController();
+
+    loadingTimeoutRef.current = setTimeout(() => {
+      setIsLoading(true);
+    }, 200);
 
     const params = new URLSearchParams();
     if (selectedYear !== "all") params.set("year", selectedYear);
@@ -63,6 +76,7 @@ export function usePerformancePageFilters({
     if (selectedAuthor) params.set("author", selectedAuthor);
     if (filtersParam) params.set("filters", filtersParam);
     if (attendedParam) params.set("attended", attendedParam);
+    if (playedParam) params.set("played", playedParam);
 
     if (extraParams) {
       for (const [key, value] of Object.entries(extraParams)) {
@@ -75,16 +89,30 @@ export function usePerformancePageFilters({
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         return response.json();
       })
-      .then((data: SongPagePerformance[]) => {
-        setPerformances(data);
+      .then((result: T[]) => {
+        setData(result);
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+        setIsLoading(false);
       })
       .catch((error) => {
         if (error.name === "AbortError") return;
-        setPerformances([]);
+        setData([]);
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
+        setIsLoading(false);
       });
 
     return () => {
       controller.abort();
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
     };
   }, [
     selectedYear,
@@ -93,7 +121,8 @@ export function usePerformancePageFilters({
     selectedAuthor,
     filtersParam,
     attendedParam,
-    allPerformances,
+    playedParam,
+    initialData,
     hasFilters,
     apiUrl,
     extraParams,
@@ -140,26 +169,28 @@ export function usePerformancePageFilters({
 
   const [searchText, setSearchText] = useState("");
 
-  const filteredPerformances = useMemo(() => {
-    if (!searchText || !searchFilter) return performances;
+  const filteredData = useMemo(() => {
+    if (!searchText || !searchFilter) return data;
     const lower = searchText.toLowerCase();
-    return performances.filter((performance) => searchFilter(performance, lower));
-  }, [performances, searchText, searchFilter]);
+    return data.filter((item) => searchFilter(item, lower));
+  }, [data, searchText, searchFilter]);
 
   const hasActiveFilters = hasFilters || searchText.length > 0;
 
   const clearFilters = useCallback(() => {
-    updateFilter({ year: null, era: null, cover: null, author: null, filters: null, attended: null });
+    updateFilter({ year: null, era: null, cover: null, author: null, filters: null, attended: null, played: null });
     setSearchText("");
   }, [updateFilter]);
 
   return {
-    performances,
-    filteredPerformances,
+    data,
+    filteredData,
+    isLoading,
     selectedYear,
     selectedEra,
     coverFilter,
     selectedAuthor,
+    playedFilter: playedParam || "all",
     activeToggleSet,
     hasFilters,
     hasActiveFilters,

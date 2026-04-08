@@ -2,7 +2,7 @@ import type { Song } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
-import { resolveAttendedUserId } from "~/lib/performance-filter-params";
+import { parsePerformanceFilters, resolveAttendedUserId } from "~/lib/performance-filter-params";
 import { SONG_FILTERS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
@@ -48,6 +48,7 @@ export const loader = publicLoader(async ({ request, context }) => {
   const authorParam = url.searchParams.get("author");
   const coverParam = url.searchParams.get("cover");
   const attendedParam = url.searchParams.get("attended");
+  const filtersParam = url.searchParams.get("filters");
   const showNotPlayed = playedParam === "notPlayed";
 
   const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
@@ -63,8 +64,10 @@ export const loader = publicLoader(async ({ request, context }) => {
   const dateRangeKey = year || era;
   const hasDateRange = dateRangeKey && dateRangeKey in SONG_FILTERS;
 
-  // Handle filtering by author, cover, date range, attended, or any combination
-  if (authorId || coverFilter !== undefined || hasDateRange || attendedUserId) {
+  const hasToggleFilters = !!filtersParam;
+
+  // Handle filtering by author, cover, date range, attended, toggle filters, or any combination
+  if (authorId || coverFilter !== undefined || hasDateRange || attendedUserId || hasToggleFilters) {
     try {
       const cacheKey = CacheKeys.songs.filtered({
         year: year || null,
@@ -73,6 +76,7 @@ export const loader = publicLoader(async ({ request, context }) => {
         author: authorId || null,
         cover: coverParam || null,
         attended: attendedUserId || null,
+        filters: filtersParam || null,
       });
 
       return await services.cache.getOrSet(
@@ -95,6 +99,16 @@ export const loader = publicLoader(async ({ request, context }) => {
             songs = await services.songs.findManyInDateRange({ startDate, endDate, ...filter });
           } else {
             songs = await services.songs.findMany(filter);
+          }
+
+          // When toggle filters are active, cross-reference with performance counts
+          if (hasToggleFilters) {
+            const performanceFilters = await parsePerformanceFilters(url, context);
+            const counts = await services.songPageComposer.buildSongPerformanceCounts(performanceFilters);
+
+            songs = songs
+              .filter((song) => (counts[song.id] ?? 0) > 0)
+              .map((song) => ({ ...song, timesPlayed: counts[song.id] }));
           }
 
           const filtered = await splitByPlayStatus(

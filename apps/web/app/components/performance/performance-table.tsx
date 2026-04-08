@@ -15,6 +15,7 @@ interface PerformanceTableProps {
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
   headerContent?: ReactNode;
+  isLoading?: boolean;
 }
 
 /**
@@ -28,6 +29,7 @@ export function PerformanceTable({
   showSongColumn,
   showAllTimerColumn,
   headerContent,
+  isLoading,
 }: PerformanceTableProps) {
   const { user } = useSession();
   const isAuthenticated = !!user;
@@ -48,6 +50,7 @@ export function PerformanceTable({
       data={performances}
       getRowId={(performance) => performance.trackId}
       hideSearch
+      isLoading={isLoading}
       filterComponent={headerContent}
       rowClassName={rowClassName}
       initialSorting={[{ id: "date", desc: true }]}
