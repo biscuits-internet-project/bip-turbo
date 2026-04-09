@@ -47,6 +47,18 @@ describe("MonthDayPicker", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/on-this-day/04-15");
   });
 
+  // Selecting a date dismisses the popover so it doesn't obscure the
+  // page content after navigation.
+  test("closes popover after selecting a date", async () => {
+    const { user } = await setupWithRouter(<MonthDayPicker monthDay="04-08" displayLabel="April 8" />);
+
+    await user.click(screen.getByRole("button", { name: /April 8/ }));
+    expect(screen.getByText("April")).toBeInTheDocument();
+
+    await user.click(screen.getByText("15"));
+    expect(screen.queryByText("April")).not.toBeInTheDocument();
+  });
+
   // The calendar hides weekday headers since this picker is year-agnostic
   // and weekdays are meaningless without a specific year.
   test("does not render weekday headers", async () => {

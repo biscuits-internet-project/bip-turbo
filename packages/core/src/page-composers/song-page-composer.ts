@@ -151,6 +151,16 @@ export class SongPageComposer {
     };
   }
 
+  async countAllTimersByMonthDay(monthDay: string): Promise<number> {
+    const result = await this.db.$queryRaw<[{ count: string }]>`
+      SELECT COUNT(*)::text as count
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      WHERE tracks.all_timer = true AND shows.date LIKE ${`%-${monthDay}`}
+    `;
+    return Number.parseInt(result[0].count, 10);
+  }
+
   /** Build the all-timers page view, optionally filtered by date range, cover, author, attendance, and performance tags. */
   async buildAllTimers(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
     const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(

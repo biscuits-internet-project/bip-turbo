@@ -456,10 +456,40 @@ describe("buildSongPerformanceCounts", () => {
 // CacheKeys — on-this-day all-timers key
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// countAllTimersByMonthDay — raw count query
+// ---------------------------------------------------------------------------
+
+describe("countAllTimersByMonthDay", () => {
+  // Parses the raw SQL count string result into a number. Used by the
+  // home page to show how many all-timer performances occurred on a day.
+  test("returns parsed count from raw query", async () => {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue([{ count: "12" }]),
+    };
+    const composer = new SongPageComposer(mockDb as never, {} as never);
+
+    const result = await composer.countAllTimersByMonthDay("04-08");
+
+    expect(result).toBe(12);
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CacheKeys — on-this-day keys
+// ---------------------------------------------------------------------------
+
 describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
     expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08");
+  });
+
+  // The on-this-day counts cache key is used by the home page to cache
+  // show + all-timer counts for today's calendar day.
+  test("onThisDayCounts includes the monthDay in the key", () => {
+    expect(CacheKeys.shows.onThisDayCounts("04-08")).toBe("shows:on-this-day-counts:04-08");
   });
 });

@@ -1,7 +1,7 @@
 import {
-  CacheKeys,
   type Attendance,
   type BlogPostWithUser,
+  CacheKeys,
   type Rating,
   type Setlist,
   type TourDate,
@@ -39,6 +39,7 @@ interface LoaderData {
   latestEpisode: AcastEpisode | null;
   nextTourDate: TourDate | null;
   recentShows: Setlist[];
+  onThisDayCounts: { showCount: number; allTimerCount: number };
 }
 
 export const loader = publicLoader<LoaderData>(async ({ context }) => {
@@ -147,6 +148,17 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     logger.error("Error fetching latest episode", { error });
   }
 
+  const today = new Date();
+  const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const onThisDayCounts = await services.cache.getOrSet(
+    CacheKeys.shows.onThisDayCounts(monthDay),
+    async () => ({
+      showCount: await services.setlists.countByMonthDay(monthDay),
+      allTimerCount: await services.songPageComposer.countAllTimersByMonthDay(monthDay),
+    }),
+    { ttl: 3600 },
+  );
+
   return {
     tourDates,
     mobileRecentShows,
@@ -157,6 +169,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     latestEpisode,
     nextTourDate,
     recentShows,
+    onThisDayCounts,
   };
 });
 
@@ -175,6 +188,7 @@ export default function Index() {
     latestEpisode,
     nextTourDate,
     recentShows = [],
+    onThisDayCounts,
   } = useSerializedLoaderData<LoaderData>();
 
   return (
@@ -233,12 +247,22 @@ export default function Index() {
           <div className="lg:col-span-2">
             <div className="mb-6">
               <h2 className="text-2xl font-bold">Recent Shows</h2>
-              <Link
-                to="/shows"
-                className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
-              >
-                View all shows →
-              </Link>
+              <div className="flex gap-4">
+                <Link
+                  to="/shows"
+                  className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
+                >
+                  View all shows →
+                </Link>
+                {onThisDayCounts.showCount > 0 && (
+                  <Link
+                    to="/on-this-day"
+                    className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
+                  >
+                    On this day: {onThisDayCounts.showCount} shows, {onThisDayCounts.allTimerCount} all-timers →
+                  </Link>
+                )}
+              </div>
             </div>
 
             {desktopRecentShows.length > 0 ? (
@@ -374,7 +398,8 @@ export default function Index() {
                   </div>
                   <div className="p-3">
                     <p className="text-content-text-secondary text-sm leading-relaxed">
-                      A sci-fi concept album following an alien prince whose collision with The Disco Biscuits rewrites the fate of two worlds.
+                      A sci-fi concept album following an alien prince whose collision with The Disco Biscuits rewrites
+                      the fate of two worlds.
                     </p>
                     <span className="text-brand-primary text-sm font-medium mt-2 inline-block group-hover:text-brand-secondary transition-colors">
                       Explore the story →
@@ -472,9 +497,22 @@ export default function Index() {
         <div>
           <div className="mb-6">
             <h2 className="text-xl font-bold">Recent Shows</h2>
-            <Link to="/shows" className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors">
-              View all shows →
-            </Link>
+            <div className="flex gap-4">
+              <Link
+                to="/shows"
+                className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
+              >
+                View all shows →
+              </Link>
+              {onThisDayCounts.showCount > 0 && (
+                <Link
+                  to="/on-this-day"
+                  className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
+                >
+                  On this day: {onThisDayCounts.showCount} shows, {onThisDayCounts.allTimerCount} all-timers →
+                </Link>
+              )}
+            </div>
           </div>
 
           {mobileRecentShows.length > 0 ? (

@@ -462,4 +462,10 @@ export class SetlistService {
         }),
       );
   }
+
+  async countByMonthDay(monthDay: string): Promise<number> {
+    return this.db.show.count({
+      where: { date: { endsWith: `-${monthDay}` } },
+    });
+  }
 }

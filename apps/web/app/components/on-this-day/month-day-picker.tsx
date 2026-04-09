@@ -1,4 +1,5 @@
 import { CalendarDays } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Calendar } from "~/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
@@ -10,10 +11,11 @@ interface MonthDayPickerProps {
 
 export function MonthDayPicker({ monthDay, displayLabel }: MonthDayPickerProps) {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
   const [mm, dd] = monthDay.split("-").map(Number);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -32,6 +34,7 @@ export function MonthDayPicker({ monthDay, displayLabel }: MonthDayPickerProps) 
             if (!date) return;
             const selectedMonth = String(date.getMonth() + 1).padStart(2, "0");
             const selectedDay = String(date.getDate()).padStart(2, "0");
+            setOpen(false);
             navigate(`/on-this-day/${selectedMonth}-${selectedDay}`);
           }}
           formatters={{

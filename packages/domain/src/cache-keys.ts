@@ -32,6 +32,9 @@ export const CacheKeys = {
 
     /** All show listing caches (for pattern deletion) */
     allLists: () => `shows:list:*`,
+
+    /** Show + all-timer counts for a calendar day (On This Day home page widget) */
+    onThisDayCounts: (monthDay: string) => `shows:on-this-day-counts:${monthDay}`,
   },
 
   /**

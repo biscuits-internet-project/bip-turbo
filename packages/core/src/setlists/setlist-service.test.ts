@@ -1,11 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
 import { SetlistService } from "./setlist-service";
 
-// Minimal mock DbClient — only the show.findMany path used by findManyLight
+// Minimal mock DbClient — only the paths used by tests
 function makeMockDb() {
   return {
     show: {
       findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
     },
   };
 }
@@ -47,5 +48,22 @@ describe("SetlistService.findManyLight", () => {
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.date).toBeUndefined();
+  });
+});
+
+describe("SetlistService.countByMonthDay", () => {
+  // Uses Prisma's count with endsWith to match any year for a given
+  // calendar day. Used by the home page to show On This Day counts.
+  test("calls db.show.count with endsWith date filter", async () => {
+    const db = makeMockDb();
+    db.show.count.mockResolvedValue(7);
+    const service = new SetlistService(db as never);
+
+    const result = await service.countByMonthDay("04-08");
+
+    expect(result).toBe(7);
+    expect(db.show.count).toHaveBeenCalledWith({
+      where: { date: { endsWith: "-04-08" } },
+    });
   });
 });
