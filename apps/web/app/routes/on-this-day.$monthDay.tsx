@@ -5,7 +5,9 @@ import type { ClientLoaderFunctionArgs } from "react-router";
 import { Link, type LoaderFunctionArgs, redirect } from "react-router";
 import { MonthDayPicker } from "~/components/on-this-day/month-day-picker";
 import { PerformanceTable } from "~/components/performance";
+import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -83,9 +85,32 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 };
 clientLoader.hydrate = true;
 
+const ALL_TIMERS_PAGE_SIZE = 10;
+
 export default function OnThisDay() {
   const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay } =
     useSerializedLoaderData<LoaderData>();
+
+  const {
+    filteredData: filteredPerformances,
+    isLoading,
+    selectedYear,
+    selectedEra,
+    coverFilter,
+    selectedAuthor,
+    activeToggleSet,
+    hasActiveFilters,
+    searchText,
+    setSearchText,
+    updateFilter,
+    toggleFilter,
+    clearFilters,
+  } = usePerformancePageFilters({
+    initialData: performances,
+    apiUrl: "/api/all-timers",
+    extraParams: { monthDay },
+    searchFilter: searchPerformance,
+  });
 
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
   const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
@@ -134,7 +159,30 @@ export default function OnThisDay() {
               <p className="text-content-text-secondary text-lg">None on this date</p>
             </div>
           ) : (
-            <PerformanceTable performances={performances} showSongColumn pageSize={10} />
+            <PerformanceTable
+              performances={filteredPerformances}
+              isLoading={isLoading}
+              showSongColumn
+              pageSize={ALL_TIMERS_PAGE_SIZE}
+              headerContent={
+                performances.length > ALL_TIMERS_PAGE_SIZE ? (
+                  <PerformanceFilterControls
+                    selectedYear={selectedYear}
+                    selectedEra={selectedEra}
+                    activeToggleSet={activeToggleSet}
+                    updateFilter={updateFilter}
+                    toggleFilter={toggleFilter}
+                    clearFilters={clearFilters}
+                    coverFilter={coverFilter}
+                    selectedAuthor={selectedAuthor}
+                    showAllTimerToggle={false}
+                    searchValue={searchText}
+                    onSearchChange={setSearchText}
+                    hasActiveFilters={hasActiveFilters}
+                  />
+                ) : undefined
+              }
+            />
           )}
         </div>
 
