@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import { useMemo } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { Link, type LoaderFunctionArgs, redirect } from "react-router";
+import { MonthDayPicker } from "~/components/on-this-day/month-day-picker";
 import { PerformanceTable } from "~/components/performance";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -83,7 +84,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function OnThisDay() {
-  const { setlists, performances, displayLabel, previousMonthDay, nextMonthDay } =
+  const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay } =
     useSerializedLoaderData<LoaderData>();
 
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
@@ -103,7 +104,7 @@ export default function OnThisDay() {
               <ChevronLeft className="h-3 w-3" />
               <span>{formatMonthDay(previousMonthDay)}</span>
             </Link>
-            <span className="text-content-text-secondary text-3xl font-medium">{displayLabel}</span>
+            <MonthDayPicker monthDay={monthDay} displayLabel={displayLabel} />
             <Link
               to={`/on-this-day/${nextMonthDay}`}
               prefetch="intent"
