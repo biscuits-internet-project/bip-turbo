@@ -1,4 +1,5 @@
 import type { Annotation, SongPagePerformance } from "@bip/domain";
+import { CacheKeys } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import { describe, expect, test, vi } from "vitest";
 import {
@@ -377,6 +378,28 @@ describe("buildFilterQuery", () => {
     // attendedUserId produces a join
     expect(extraJoins).toHaveLength(1);
   });
+
+  // The monthDay filter produces a LIKE condition on shows.date (VARCHAR
+  // "YYYY-MM-DD") to match any year for a given month+day. Used by the
+  // On This Day page to fetch all-timers for a calendar day.
+  test("monthDay filter produces a LIKE condition on shows.date", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], { monthDay: "04-08" });
+
+    expect(conditions).toHaveLength(1);
+    expect(extraJoins).toHaveLength(0);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toContain("shows.date LIKE");
+  });
+
+  // monthDay composes with base conditions (e.g., all_timer = true) via AND,
+  // so buildAllTimers({ monthDay }) produces the right two-condition WHERE.
+  test("monthDay combines with base conditions", () => {
+    const base = [Prisma.sql`tracks.all_timer = true`];
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(base, { monthDay: "12-31" });
+
+    expect(conditions).toHaveLength(2);
+    expect(extraJoins).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -426,5 +449,47 @@ describe("buildSongPerformanceCounts", () => {
     await composer.buildSongPerformanceCounts({ encore: true, segueIn: true });
 
     expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CacheKeys — on-this-day all-timers key
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// countAllTimersByMonthDay — raw count query
+// ---------------------------------------------------------------------------
+
+describe("countAllTimersByMonthDay", () => {
+  // Parses the raw SQL count string result into a number. Used by the
+  // home page to show how many all-timer performances occurred on a day.
+  test("returns parsed count from raw query", async () => {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue([{ count: "12" }]),
+    };
+    const composer = new SongPageComposer(mockDb as never, {} as never);
+
+    const result = await composer.countAllTimersByMonthDay("04-08");
+
+    expect(result).toBe(12);
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CacheKeys — on-this-day keys
+// ---------------------------------------------------------------------------
+
+describe("CacheKeys", () => {
+  // The on-this-day all-timers cache key must embed the monthDay so each
+  // calendar day gets its own cache entry.
+  test("allTimersOnThisDay includes the monthDay in the key", () => {
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08");
+  });
+
+  // The on-this-day counts cache key is used by the home page to cache
+  // show + all-timer counts for today's calendar day.
+  test("onThisDayCounts includes the monthDay in the key", () => {
+    expect(CacheKeys.shows.onThisDayCounts("04-08")).toBe("shows:on-this-day-counts:04-08");
   });
 });

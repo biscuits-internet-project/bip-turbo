@@ -32,6 +32,9 @@ export const CacheKeys = {
 
     /** All show listing caches (for pattern deletion) */
     allLists: () => `shows:list:*`,
+
+    /** Show + all-timer counts for a calendar day (On This Day home page widget) */
+    onThisDayCounts: (monthDay: string) => `shows:on-this-day-counts:${monthDay}`,
   },
 
   /**
@@ -57,6 +60,8 @@ export const CacheKeys = {
     index: () => "songs:index:full",
     /** All-timers page data */
     allTimers: () => "songs:all-timers",
+    /** All-timers for a specific calendar day (On This Day page) */
+    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}`,
     /** Filtered song results by era/author/cover/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);

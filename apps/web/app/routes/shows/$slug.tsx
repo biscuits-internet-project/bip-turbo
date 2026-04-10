@@ -1,5 +1,5 @@
-import { CacheKeys, type Attendance, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import type { ShowNavItem } from "@bip/core";
+import { type Attendance, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
@@ -16,9 +16,9 @@ import { useSession } from "~/hooks/use-session";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
-import { getShowMeta, getShowStructuredData } from "~/lib/seo";
 import { logger } from "~/lib/logger";
-import { formatDateLong } from "~/lib/utils";
+import { getShowMeta, getShowStructuredData } from "~/lib/seo";
+import { formatDateLong, formatMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 
 interface ArchiveItem {
@@ -155,14 +155,8 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const {
-    setlist,
-    reviews,
-    selectedRecordingId,
-    userAttendance,
-    photos,
-    adjacentShows,
-  } = useSerializedLoaderData<ShowLoaderData>();
+  const { setlist, reviews, selectedRecordingId, userAttendance, photos, adjacentShows } =
+    useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
   const { userRatingMap } = useShowUserData([setlist.show.id]);
@@ -289,6 +283,12 @@ export default function Show() {
           ) : (
             <div />
           )}
+          <Link
+            to={`/on-this-day/${setlist.show.date.slice(5)}`}
+            className="text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+          >
+            All shows on {formatMonthDay(setlist.show.date.slice(5))} →
+          </Link>
           {adjacentShows.next ? (
             <Link
               to={`/shows/${adjacentShows.next.slug}`}
@@ -360,7 +360,9 @@ export default function Show() {
         <div className="mt-10 pt-8 border-t border-border/50">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-2xl font-bold text-content-text-primary">Photos</h2>
-            <span className="text-sm text-content-text-tertiary">{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
+            <span className="text-sm text-content-text-tertiary">
+              {photos.length} photo{photos.length !== 1 ? "s" : ""}
+            </span>
           </div>
           <ShowPhotos photos={photos} />
         </div>

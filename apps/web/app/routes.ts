@@ -5,6 +5,9 @@ export default [
   // Root index route
   index("routes/_index.tsx"),
 
+  // On This Day
+  route("on-this-day/:monthDay?", "routes/on-this-day.$monthDay.tsx"),
+
   // Legal and info pages
   route("about", "routes/about.tsx"),
   route("terms", "routes/terms.tsx"),

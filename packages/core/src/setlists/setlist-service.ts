@@ -5,6 +5,7 @@ import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 
 export type SetlistFilter = {
   year?: number;
+  monthDay?: string;
   venueId?: string;
   hasPhotos?: boolean;
 };
@@ -331,6 +332,7 @@ export class SetlistService {
     filters?: SetlistFilter;
   }): Promise<Setlist[]> {
     const year = options?.filters?.year;
+    const monthDay = options?.filters?.monthDay;
     const venueId = options?.filters?.venueId;
     const hasPhotos = options?.filters?.hasPhotos;
 
@@ -344,12 +346,14 @@ export class SetlistService {
     const results = await this.db.show.findMany({
       where: {
         venueId,
-        date: year
-          ? {
-              gte: `${year}-01-01`,
-              lt: `${year + 1}-01-01`,
-            }
-          : undefined,
+        date: monthDay
+          ? { endsWith: `-${monthDay}` }
+          : year
+            ? {
+                gte: `${year}-01-01`,
+                lt: `${year + 1}-01-01`,
+              }
+            : undefined,
         showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
       },
       orderBy,
@@ -390,6 +394,7 @@ export class SetlistService {
     filters?: SetlistFilter;
   }): Promise<SetlistLight[]> {
     const year = options?.filters?.year;
+    const monthDay = options?.filters?.monthDay;
     const venueId = options?.filters?.venueId;
     const hasPhotos = options?.filters?.hasPhotos;
 
@@ -403,12 +408,14 @@ export class SetlistService {
     const results = await this.db.show.findMany({
       where: {
         venueId,
-        date: year
-          ? {
-              gte: `${year}-01-01`,
-              lt: `${year + 1}-01-01`,
-            }
-          : undefined,
+        date: monthDay
+          ? { endsWith: `-${monthDay}` }
+          : year
+            ? {
+                gte: `${year}-01-01`,
+                lt: `${year + 1}-01-01`,
+              }
+            : undefined,
         showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
       },
       orderBy,
@@ -454,5 +461,11 @@ export class SetlistService {
           })),
         }),
       );
+  }
+
+  async countByMonthDay(monthDay: string): Promise<number> {
+    return this.db.show.count({
+      where: { date: { endsWith: `-${monthDay}` } },
+    });
   }
 }
