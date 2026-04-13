@@ -3,6 +3,7 @@ import type { DbClient, DbSong } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
+import { toTitleCase } from "../_shared/utils/title-case";
 
 export interface SongFilter {
   title?: string;
@@ -329,11 +330,13 @@ export class SongService {
   }
 
   async create(input: CreateSongInput): Promise<Song> {
-    const slug = slugify(input.title);
+    const title = toTitleCase(input.title);
+    const slug = slugify(title);
     const now = new Date();
     const result = await this.db.song.create({
       data: {
         ...input,
+        title,
         slug,
         createdAt: now,
         updatedAt: now,
@@ -347,13 +350,14 @@ export class SongService {
   }
 
   async update(slug: string, input: UpdateSongInput): Promise<Song> {
+    const title = input.title ? toTitleCase(input.title) : undefined;
     const now = new Date();
     const result = await this.db.song.update({
       where: { slug },
       data: {
         ...input,
+        ...(title ? { title, slug: slugify(title) } : {}),
         updatedAt: now,
-        ...(input.title ? { slug: slugify(input.title) } : {}),
       },
     });
 
