@@ -109,6 +109,16 @@ describe("SetlistCard", () => {
     expect(screen.getByText(/Philadelphia, PA/)).toBeInTheDocument();
   });
 
+  // The venue name is a clickable link to the venue page so users can
+  // navigate directly from any setlist card.
+  test("venue is a clickable link to the venue page", async () => {
+    await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+    );
+    const venueLink = screen.getByRole("link", { name: /The Fillmore/ });
+    expect(venueLink).toHaveAttribute("href", "/venues/the-fillmore");
+  });
+
   // Renders the setlist tracks
   test("renders track names", async () => {
     await setupWithRouter(

@@ -192,7 +192,9 @@ function SetlistCardComponent({
               <AnniversaryBadge showDate={setlist.show.date} />
             </div>
             <div className="text-base md:text-xl text-content-text-primary">
-              {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
+              <Link to={`/venues/${setlist.venue.slug}`} className="hover:text-brand-secondary transition-colors">
+                {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
+              </Link>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
