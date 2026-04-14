@@ -60,6 +60,8 @@ export const CacheKeys = {
     index: () => "songs:index:full",
     /** All-timers page data */
     allTimers: () => "songs:all-timers",
+    /** Songs with history content */
+    histories: () => "songs:histories",
     /** All-timers for a specific calendar day (On This Day page) */
     allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}`,
     /** Filtered song results by era/author/cover/tags/attended */

@@ -1,10 +1,7 @@
 import type { Song, TrendingSong } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
-import { Flame, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
-import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -165,49 +162,26 @@ export default function Songs() {
   );
 
   return (
-    <div className="">
-      <div>
-        <div className="relative">
-          <h1 className="page-heading">SONGS</h1>
-          <div className="absolute top-0 right-0 flex items-center gap-3">
-            <Link
-              to="/songs/all-timers"
-              className="flex items-center gap-2 text-sm text-content-text-secondary hover:text-brand-primary transition-colors"
-            >
-              <Flame className="h-4 w-4 text-orange-500" />
-              All-Timers
-            </Link>
-            <AdminOnly>
-              <Button asChild className="btn-primary">
-                <Link to="/songs/new" className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  New Song
-                </Link>
-              </Button>
-            </AdminOnly>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3">
-            {trendingSongs.length > 0 && (
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Trending in Recent Shows</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {trendingSongs.map((song: TrendingSong) => (
-                    <TrendingSongCard key={song.id} song={song} recentShowsCount={recentShowsCount} />
-                  ))}
-                </div>
+    <div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          {trendingSongs.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Trending in Recent Shows</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {trendingSongs.map((song: TrendingSong) => (
+                  <TrendingSongCard key={song.id} song={song} recentShowsCount={recentShowsCount} />
+                ))}
               </div>
-            )}
-          </div>
-          <div className="lg:col-span-1">
-            <YearlyTrendingSongs />
-          </div>
+            </div>
+          )}
         </div>
-
-        <SongsTable songs={filteredSongs} filterComponent={filterControls} isLoading={isLoading} />
+        <div className="lg:col-span-1">
+          <YearlyTrendingSongs />
+        </div>
       </div>
+
+      <SongsTable songs={filteredSongs} filterComponent={filterControls} isLoading={isLoading} />
     </div>
   );
 }
