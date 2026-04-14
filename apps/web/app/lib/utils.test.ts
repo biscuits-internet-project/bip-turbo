@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { addDaysYearAgnostic, formatMonthDay, isValidMonthDay } from "./utils";
+import { describe, expect, test, vi } from "vitest";
+import { addDaysYearAgnostic, formatMonthDay, getAnniversaryYears, getOrdinalSuffix, isValidMonthDay } from "./utils";
 
 describe("formatMonthDay", () => {
   // Converts zero-padded MM-DD to human-readable "Month Day" format
@@ -150,5 +150,151 @@ describe("addDaysYearAgnostic", () => {
   // Output must always be zero-padded MM-DD
   test("zero-pads single-digit months and days", () => {
     expect(addDaysYearAgnostic("01-01", 1)).toBe("01-02");
+  });
+});
+
+describe("getOrdinalSuffix", () => {
+  // Standard "th" suffix for most numbers
+  test("returns 'th' for 0", () => {
+    expect(getOrdinalSuffix(0)).toBe("th");
+  });
+
+  // 1st, 2nd, 3rd are the special cases
+  test("returns 'st' for 1", () => {
+    expect(getOrdinalSuffix(1)).toBe("st");
+  });
+
+  test("returns 'nd' for 2", () => {
+    expect(getOrdinalSuffix(2)).toBe("nd");
+  });
+
+  test("returns 'rd' for 3", () => {
+    expect(getOrdinalSuffix(3)).toBe("rd");
+  });
+
+  // 4-9 all get "th"
+  test("returns 'th' for 5", () => {
+    expect(getOrdinalSuffix(5)).toBe("th");
+  });
+
+  // 11th, 12th, 13th are exceptions to the 1st/2nd/3rd rule
+  test("returns 'th' for 11 (not 'st')", () => {
+    expect(getOrdinalSuffix(11)).toBe("th");
+  });
+
+  test("returns 'th' for 12 (not 'nd')", () => {
+    expect(getOrdinalSuffix(12)).toBe("th");
+  });
+
+  test("returns 'th' for 13 (not 'rd')", () => {
+    expect(getOrdinalSuffix(13)).toBe("th");
+  });
+
+  // 21st, 22nd, 23rd resume the normal pattern
+  test("returns 'st' for 21", () => {
+    expect(getOrdinalSuffix(21)).toBe("st");
+  });
+
+  test("returns 'nd' for 22", () => {
+    expect(getOrdinalSuffix(22)).toBe("nd");
+  });
+
+  test("returns 'rd' for 23", () => {
+    expect(getOrdinalSuffix(23)).toBe("rd");
+  });
+
+  // Typical anniversary values used in this feature
+  test("returns 'th' for 10", () => {
+    expect(getOrdinalSuffix(10)).toBe("th");
+  });
+
+  test("returns 'th' for 20", () => {
+    expect(getOrdinalSuffix(20)).toBe("th");
+  });
+
+  test("returns 'th' for 25", () => {
+    expect(getOrdinalSuffix(25)).toBe("th");
+  });
+});
+
+describe("getAnniversaryYears", () => {
+  // Returns 5 for a show 5 years ago
+  test("returns 5 for 5-year anniversary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2021-04-14")).toBe(5);
+    vi.useRealTimers();
+  });
+
+  // Returns 10 for a show 10 years ago
+  test("returns 10 for 10-year anniversary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2016-04-14")).toBe(10);
+    vi.useRealTimers();
+  });
+
+  // Returns 15 for a show 15 years ago
+  test("returns 15 for 15-year anniversary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2011-04-14")).toBe(15);
+    vi.useRealTimers();
+  });
+
+  // Returns 20 for a show 20 years ago
+  test("returns 20 for 20-year anniversary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2006-04-14")).toBe(20);
+    vi.useRealTimers();
+  });
+
+  // Returns 25 for a show 25 years ago
+  test("returns 25 for 25-year anniversary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2001-04-14")).toBe(25);
+    vi.useRealTimers();
+  });
+
+  // Returns 30 for a show 30 years ago
+  test("returns 30 for 30-year anniversary", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("1996-04-14")).toBe(30);
+    vi.useRealTimers();
+  });
+
+  // Returns null for non-multiples of 5
+  test("returns null for 3-year-old show", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2023-04-14")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  // Returns null for 7-year-old show
+  test("returns null for 7-year-old show", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2019-04-14")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  // Returns null for a show from the current year (0 years)
+  test("returns null for show from current year", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2026-04-14")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  // Returns null for a future show date
+  test("returns null for future show date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-14"));
+    expect(getAnniversaryYears("2027-01-01")).toBeNull();
+    vi.useRealTimers();
   });
 });
