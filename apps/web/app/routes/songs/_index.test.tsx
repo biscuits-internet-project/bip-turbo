@@ -10,45 +10,13 @@ vi.mock("~/lib/seo", () => ({ getSongsMeta: vi.fn() }));
 vi.mock("~/lib/song-utilities", () => ({ addVenueInfoToSongs: vi.fn() }));
 vi.mock("@bip/domain/cache-keys", () => ({ CacheKeys: { songs: { index: vi.fn() } } }));
 
-// Mock the loader data hook to return minimal song data
 vi.mock("~/hooks/use-serialized-loader-data", () => ({
-  useSerializedLoaderData: vi.fn(() => ({
-    songs: [],
-    trendingSongs: [],
-    yearlyTrendingSongs: [],
-    recentShowsCount: 10,
-  })),
+  useSerializedLoaderData: vi.fn(() => ({ songs: [] })),
 }));
 
-// Mock the filter hook to return default state
-vi.mock("~/hooks/use-performance-page-filters", () => ({
-  usePerformancePageFilters: vi.fn(() => ({
-    filteredData: [],
-    isLoading: false,
-    selectedYear: "all",
-    selectedEra: "all",
-    coverFilter: "all",
-    selectedAuthor: null,
-    playedFilter: "all",
-    activeToggleSet: new Set(),
-    hasActiveFilters: false,
-    searchText: "",
-    setSearchText: vi.fn(),
-    updateFilter: vi.fn(),
-    toggleFilter: vi.fn(),
-    clearFilters: vi.fn(),
-  })),
-}));
-
-// Stub heavy child components
-vi.mock("../../components/song/songs-table", () => ({
-  SongsTable: (props: object) => mockShallowComponent("SongsTable", props),
-}));
-vi.mock("~/components/performance/performance-filter-controls", () => ({
-  PerformanceFilterControls: (props: object) => mockShallowComponent("PerformanceFilterControls", props),
-}));
-vi.mock("~/components/admin/admin-only", () => ({
-  AdminOnly: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+// Stub the shared FilteredSongsTable component
+vi.mock("~/components/song/filtered-songs-table", () => ({
+  FilteredSongsTable: (props: object) => mockShallowComponent("FilteredSongsTable", props),
 }));
 
 import Songs from "./_index";
@@ -62,33 +30,46 @@ function renderSongsIndex() {
 }
 
 describe("Songs index page", () => {
-  // The heading is now in the layout, so the index page should not render its own.
+  // The layout renders the heading, so the index page should not render its own.
   test("does not render its own SONGS heading", () => {
     renderSongsIndex();
 
     expect(screen.queryByText("SONGS")).not.toBeInTheDocument();
   });
 
-  // The all-timers link is now a tab in the layout, so the index page should not
-  // render a separate link to it.
+  // The layout tab bar handles navigation to all-timers.
   test("does not render an all-timers link", () => {
     renderSongsIndex();
 
     expect(screen.queryByRole("link", { name: /all-timers/i })).not.toBeInTheDocument();
   });
 
-  // The admin "New Song" button is now in the layout, so the index page should
-  // not render its own.
+  // The layout renders the admin "New Song" button.
   test("does not render a New Song button", () => {
     renderSongsIndex();
 
     expect(screen.queryByRole("link", { name: /new song/i })).not.toBeInTheDocument();
   });
 
-  // The SongsTable should still render as the main content of the tab.
-  test("renders the SongsTable", () => {
+  // The FilteredSongsTable renders the songs table with filter controls.
+  test("renders the FilteredSongsTable", () => {
     renderSongsIndex();
 
-    expect(screen.getByTestId("SongsTable")).toBeInTheDocument();
+    expect(screen.getByTestId("FilteredSongsTable")).toBeInTheDocument();
+  });
+
+  // Trending data is accessible via the "Last 10 Shows" and "This Year" tabs,
+  // so the index page does not render its own trending sections.
+  test("does not render Trending in Recent Shows section", () => {
+    renderSongsIndex();
+
+    expect(screen.queryByText("Trending in Recent Shows")).not.toBeInTheDocument();
+  });
+
+  // Popular This Year data is accessible via the "This Year" tab.
+  test("does not render Popular This Year section", () => {
+    renderSongsIndex();
+
+    expect(screen.queryByText("Popular This Year")).not.toBeInTheDocument();
   });
 });

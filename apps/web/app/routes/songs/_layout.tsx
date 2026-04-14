@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Flame, History, ListMusic, Plus } from "lucide-react";
+import { Calendar, Clock, Flame, History, ListMusic, Plus } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { Button } from "~/components/ui/button";
@@ -14,6 +14,8 @@ interface Tab {
 
 const TABS: Tab[] = [
   { label: "All Songs", path: "/songs", icon: ListMusic },
+  { label: "Last 10 Shows", path: "/songs/recent", icon: Clock },
+  { label: "This Year", path: "/songs/this-year", icon: Calendar },
   { label: "All-Timers", path: "/songs/all-timers", icon: Flame, iconClassName: "text-orange-500" },
   { label: "Histories", path: "/songs/histories", icon: History },
 ];

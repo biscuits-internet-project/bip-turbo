@@ -3,7 +3,7 @@ import { AuthorSearch } from "~/components/author/author-search";
 import { SelectFilter } from "~/components/ui/filters";
 import { ToggleFilterGroup } from "~/components/ui/filters/toggle-filter-group";
 import { Input } from "~/components/ui/input";
-import { ERA_OPTIONS, TOGGLE_FILTER_DEFINITIONS, YEAR_OPTIONS } from "~/lib/song-filters";
+import { TIME_RANGE_GROUPS, TOGGLE_FILTER_DEFINITIONS } from "~/lib/song-filters";
 
 const ALL_TOGGLE_FILTERS = TOGGLE_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
 
@@ -13,14 +13,14 @@ const labelClass =
   "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 
 interface PerformanceFilterControlsProps {
-  selectedYear: string;
-  selectedEra: string;
+  selectedTimeRange: string;
   activeToggleSet: Set<string>;
   updateFilter: (updates: Record<string, string | null>) => void;
   toggleFilter: (key: string) => void;
   clearFilters: () => void;
   extraSelectFilters?: ReactNode;
   showAllTimerToggle?: boolean;
+  hideTimeRange?: boolean;
   coverFilter?: string;
   selectedAuthor?: string | null;
   playedFilter?: string;
@@ -30,14 +30,14 @@ interface PerformanceFilterControlsProps {
 }
 
 export function PerformanceFilterControls({
-  selectedYear,
-  selectedEra,
+  selectedTimeRange,
   activeToggleSet,
   updateFilter,
   toggleFilter,
   clearFilters,
   extraSelectFilters,
   showAllTimerToggle = true,
+  hideTimeRange = false,
   coverFilter,
   selectedAuthor,
   playedFilter,
@@ -58,22 +58,17 @@ export function PerformanceFilterControls({
             className="w-auto min-w-[200px] sm:min-w-[250px] max-w-md h-[34px] text-sm bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
           />
         )}
-        <SelectFilter
-          id="year-filter"
-          label="Year"
-          value={selectedYear}
-          onValueChange={(value) => updateFilter({ year: value, era: null })}
-          options={[{ value: "all", label: "All Years" }, ...YEAR_OPTIONS]}
-          width="w-[130px]"
-        />
-        <SelectFilter
-          id="era-filter"
-          label="Era"
-          value={selectedEra}
-          onValueChange={(value) => updateFilter({ era: value, year: null })}
-          options={[{ value: "all", label: "All Eras" }, ...ERA_OPTIONS]}
-          width="w-[170px]"
-        />
+        {!hideTimeRange && (
+          <SelectFilter
+            id="time-range-filter"
+            label="Time Range"
+            value={selectedTimeRange}
+            onValueChange={(value) => updateFilter({ timeRange: value })}
+            options={[{ value: "all", label: "All Time" }]}
+            groups={TIME_RANGE_GROUPS}
+            width="w-[200px]"
+          />
+        )}
         {coverFilter !== undefined && (
           <SelectFilter
             id="cover-filter"

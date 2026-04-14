@@ -2,8 +2,12 @@ import type { Song } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
-import { parsePerformanceFilters, resolveAttendedUserId } from "~/lib/performance-filter-params";
-import { SONG_FILTERS } from "~/lib/song-filters";
+import {
+  parsePerformanceFilters,
+  resolveAttendedUserId,
+  resolveLast10ShowsDateRange,
+} from "~/lib/performance-filter-params";
+import { getTimeRangeParam, SONG_FILTERS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
@@ -42,8 +46,7 @@ async function splitByPlayStatus(
 export const loader = publicLoader(async ({ request, context }) => {
   const url = new URL(request.url);
   const query = url.searchParams.get("q");
-  const year = url.searchParams.get("year");
-  const era = url.searchParams.get("era");
+  const timeRangeParam = getTimeRangeParam(url.searchParams);
   const playedParam = url.searchParams.get("played");
   const authorParam = url.searchParams.get("author");
   const coverParam = url.searchParams.get("cover");
@@ -60,9 +63,7 @@ export const loader = publicLoader(async ({ request, context }) => {
 
   const attendedUserId = await resolveAttendedUserId(attendedParam, context);
 
-  // Year and era both resolve to a date-range key in SONG_FILTERS (mutually exclusive)
-  const dateRangeKey = year || era;
-  const hasDateRange = dateRangeKey && dateRangeKey in SONG_FILTERS;
+  const hasDateRange = timeRangeParam === "last10shows" || (timeRangeParam && timeRangeParam in SONG_FILTERS);
 
   const hasToggleFilters = !!filtersParam;
 
@@ -70,8 +71,7 @@ export const loader = publicLoader(async ({ request, context }) => {
   if (authorId || coverFilter !== undefined || hasDateRange || attendedUserId || hasToggleFilters) {
     try {
       const cacheKey = CacheKeys.songs.filtered({
-        year: year || null,
-        era: era || null,
+        timeRange: timeRangeParam || null,
         played: playedParam || null,
         author: authorId || null,
         cover: coverParam || null,
@@ -94,8 +94,15 @@ export const loader = publicLoader(async ({ request, context }) => {
           if (attendedUserId) filter.attendedUserId = attendedUserId;
 
           let songs: Song[];
-          if (hasDateRange) {
-            const { startDate, endDate } = SONG_FILTERS[dateRangeKey];
+          if (timeRangeParam === "last10shows") {
+            const dateRange = await resolveLast10ShowsDateRange();
+            if (dateRange) {
+              songs = await services.songs.findManyInDateRange({ startDate: dateRange.startDate, ...filter });
+            } else {
+              songs = await services.songs.findMany(filter);
+            }
+          } else if (timeRangeParam && timeRangeParam in SONG_FILTERS) {
+            const { startDate, endDate } = SONG_FILTERS[timeRangeParam];
             songs = await services.songs.findManyInDateRange({ startDate, endDate, ...filter });
           } else {
             songs = await services.songs.findMany(filter);

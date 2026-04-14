@@ -275,59 +275,6 @@ export class SongService {
     return trendingSongs;
   }
 
-  async findTrendingLastYear(): Promise<TrendingSong[]> {
-    // Calculate date range for the current calendar year
-    const currentYear = new Date().getFullYear();
-
-    // Find shows from the current calendar year
-    const shows = await this.db.show.findMany({
-      where: {
-        date: {
-          gte: `${currentYear}-01-01`,
-          lte: `${currentYear}-12-31`,
-        },
-      },
-    });
-
-    if (shows.length === 0) return [];
-
-    // Get the show IDs
-    const showIds = shows.map((show) => show.id);
-
-    // Find tracks from these shows and count songs
-    const tracks = await this.db.track.findMany({
-      where: { showId: { in: showIds } },
-      include: { song: true },
-    });
-
-    // Count unique shows for each song (not individual tracks)
-    const songCounts = new Map<string, { song: DbSong; showIds: Set<string> }>();
-
-    for (const track of tracks) {
-      if (!track.song) continue;
-
-      const songId = track.song.id;
-      const existing = songCounts.get(songId);
-
-      if (existing) {
-        existing.showIds.add(track.showId);
-      } else {
-        songCounts.set(songId, { song: track.song, showIds: new Set([track.showId]) });
-      }
-    }
-
-    // Convert to array, sort by count, and limit to top 10
-    const trendingSongs = Array.from(songCounts.values())
-      .sort((a, b) => b.showIds.size - a.showIds.size)
-      .slice(0, 10)
-      .map(({ song, showIds }) => ({
-        ...mapSongToDomainEntity(song),
-        count: showIds.size,
-      }));
-
-    return trendingSongs;
-  }
-
   async create(input: CreateSongInput): Promise<Song> {
     const slug = slugify(input.title);
     const now = new Date();

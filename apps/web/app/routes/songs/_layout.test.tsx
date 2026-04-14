@@ -24,14 +24,15 @@ function renderAtPath(path: string) {
 }
 
 describe("SongsLayout", () => {
-  // The layout should render a tab bar with three navigation tabs
-  // linking to /songs, /songs/all-timers, and /songs/histories.
-  test("renders three tab links: All Songs, All-Timers, Histories", () => {
+  // The layout should render a tab bar with five navigation tabs.
+  test("renders five tab links: All Songs, All-Timers, Histories, Last 10 Shows, This Year", () => {
     renderAtPath("/songs");
 
     expect(screen.getByRole("link", { name: /all songs/i })).toHaveAttribute("href", "/songs");
     expect(screen.getByRole("link", { name: /all-timers/i })).toHaveAttribute("href", "/songs/all-timers");
     expect(screen.getByRole("link", { name: /histories/i })).toHaveAttribute("href", "/songs/histories");
+    expect(screen.getByRole("link", { name: /last 10 shows/i })).toHaveAttribute("href", "/songs/recent");
+    expect(screen.getByRole("link", { name: /this year/i })).toHaveAttribute("href", "/songs/this-year");
   });
 
   // The active tab should be visually distinguished via a border-brand-primary
