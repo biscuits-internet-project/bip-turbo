@@ -33,9 +33,6 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
     searchFilter,
   });
 
-  const hasDateRange = selectedTimeRange !== "all";
-  const showPlayedFilter = hasDateRange || activeToggleSet.has("attended");
-
   const filterControls = (
     <PerformanceFilterControls
       selectedTimeRange={selectedTimeRange}
@@ -45,7 +42,7 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
       clearFilters={clearFilters}
       coverFilter={coverFilter}
       selectedAuthor={selectedAuthor}
-      playedFilter={showPlayedFilter ? playedFilter : undefined}
+      playedFilter={playedFilter}
       searchValue={searchText}
       onSearchChange={setSearchText}
       hasActiveFilters={hasActiveFilters}
