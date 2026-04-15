@@ -7,6 +7,7 @@ import {
   resolveAttendedUserId,
   resolveLast10ShowsDateRange,
 } from "~/lib/performance-filter-params";
+import { shouldShowNotPlayed } from "~/lib/played-filter";
 import { getTimeRangeParam, SONG_FILTERS } from "~/lib/song-filters";
 import { addVenueInfoToSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
@@ -52,7 +53,6 @@ export const loader = publicLoader(async ({ request, context }) => {
   const coverParam = url.searchParams.get("cover");
   const attendedParam = url.searchParams.get("attended");
   const filtersParam = url.searchParams.get("filters");
-  const showNotPlayed = playedParam === "notPlayed";
 
   const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
 
@@ -120,7 +120,12 @@ export const loader = publicLoader(async ({ request, context }) => {
 
           const filtered = await splitByPlayStatus(
             songs,
-            showNotPlayed && (!!hasDateRange || !!attendedUserId),
+            shouldShowNotPlayed({
+              playedParam,
+              hasDateRange: !!hasDateRange,
+              hasAttendedUser: !!attendedUserId,
+              hasToggleFilters,
+            }),
             filter,
           );
           return await addVenueInfoToSongs(filtered);

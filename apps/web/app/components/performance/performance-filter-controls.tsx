@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { AuthorSearch } from "~/components/author/author-search";
 import { SelectFilter } from "~/components/ui/filters";
 import { ToggleFilterGroup } from "~/components/ui/filters/toggle-filter-group";
@@ -46,6 +46,15 @@ export function PerformanceFilterControls({
   hasActiveFilters = false,
 }: PerformanceFilterControlsProps) {
   const toggleFilters = showAllTimerToggle ? ALL_TOGGLE_FILTERS : TOGGLE_FILTERS_WITHOUT_ALL_TIMER;
+  const showPlayedFilter =
+    playedFilter !== undefined &&
+    (selectedTimeRange !== "all" || activeToggleSet.size > 0 || (searchValue !== undefined && searchValue.length > 0));
+
+  useEffect(() => {
+    if (!showPlayedFilter && playedFilter !== undefined && playedFilter !== "all") {
+      updateFilter({ played: null });
+    }
+  }, [showPlayedFilter, playedFilter, updateFilter]);
 
   return (
     <div className="space-y-3">
@@ -97,7 +106,7 @@ export function PerformanceFilterControls({
             />
           </div>
         )}
-        {playedFilter !== undefined && (
+        {showPlayedFilter && (
           <SelectFilter
             id="played-filter"
             label="Played"
