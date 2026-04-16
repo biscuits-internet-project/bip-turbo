@@ -2,22 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# 🚨 FUCKING IMPORTANT 🚨
-
 ## ALWAYS USE MAKE COMMANDS
 
-**USE MAKE COMMANDS WHENEVER POSSIBLE** - They handle environment setup and proper execution paths.
-
-## REACT ROUTER V7 ROUTES MUST BE ADDED TO ROUTES.TS
-
-**WHEN YOU ADD NEW ROUTES, ESPECIALLY API ROUTES, YOU MUST ADD THEM TO `apps/web/app/routes.ts`**
-
-React Router v7 uses explicit route configuration. File-based routing alone IS NOT ENOUGH. You must:
-
-1. Create the route file (e.g., `routes/api/cron/$action.tsx`)
-2. **ADD THE ROUTE TO `apps/web/app/routes.ts`** (e.g., `route("cron/:action", "routes/api/cron/$action.tsx")`)
-
-Otherwise the route WILL NOT WORK and you'll get 404s.
+**USE MAKE COMMANDS WHENEVER POSSIBLE** — they handle environment setup and proper execution paths.
 
 ## Common Development Commands
 
@@ -46,10 +33,10 @@ make tc                              # Shorthand for typecheck:all (ALWAYS run f
 **Code Quality:**
 ```bash
 bun run lint                         # Lint all code with Biome
-bun run format                       # Format all code with Biome
 make lint                            # Same as bun run lint
-make format                          # Same as bun run format
 ```
+
+**Formatting:** Always run `make format FILES="file1.ts file2.tsx"` on files you changed before committing. Only format files you modified — never run project-wide formatting. Biome handles formatting, import sorting, and lint fixes — never use Prettier or other formatters.
 
 **Testing:**
 ```bash
@@ -81,22 +68,9 @@ make db-execute FILE=file.sql        # Execute SQL file against local database
 make db-query SQL="SELECT * FROM t"  # Execute SQL query against local database
 ```
 
-**Package-specific commands:**
-```bash
-# Core package (from packages/core/)
-bun prisma:generate                  # Generate Prisma client
-bun prisma:migrate:dev               # Run migrations
-bun prisma:studio                    # Open Prisma Studio
-
-# Web app (from apps/web/)
-bun run gen-root                     # Generate root route file
-react-router typegen                 # Generate route types
-```
-
 ## Project Architecture
 
-### Monorepo Structure
-This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime. Key packages:
+This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime:
 
 - **`apps/web/`**: React Router v7 frontend application with Radix UI components
 - **`packages/core/`**: Database access, services, and core business logic with Prisma ORM
@@ -110,91 +84,23 @@ This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime. Ke
 - **Environment**: Doppler for secrets management
 - **Deployment**: Fly.io with Docker
 
-### Web App Architecture (`apps/web/`)
-- **Router**: React Router v7 with file-based routing in `app/routes/`
-- **Components**: Radix UI primitives in `app/components/ui/`, feature components organized by domain
-- **State**: React Query (@tanstack/react-query) for server state
-- **Auth**: Supabase SSR authentication
-- **Styling**: Tailwind CSS with shadcn/ui component system
+## File Naming Conventions
 
-### Core Package Architecture (`packages/core/`)
-- **Repository Pattern**: Each domain has a repository (e.g., `show-repository.ts`) and service (e.g., `show-service.ts`)
-- **Database**: Prisma client with PostgreSQL, schema at `src/_shared/prisma/schema.prisma`
-- **Services**: Business logic layer that uses repositories
-- **Container**: Dependency injection container at `src/_shared/container.ts`
-
-### Domain Package (`packages/domain/`)
-- **Models**: Zod schemas for validation and TypeScript types
-- **Views**: Composed data structures for UI consumption (e.g., `song-page.ts`)
-
-## Key Patterns and Conventions
-
-### Database Access
-- Always use the repository pattern - don't access Prisma client directly in services
-- Database queries are centralized in repository classes
-- Use the dependency injection container for service instantiation
-
-### Component Organization
-- UI primitives go in `app/components/ui/`
-- Feature components are organized by domain (e.g., `review/`, `setlist/`, `show/`)
-- Form components use React Hook Form with Zod validation
-
-### File Naming
 - Repository files: `[domain]-repository.ts`
 - Service files: `[domain]-service.ts`
 - Component files: kebab-case (e.g., `review-card.tsx`)
 - Route files: React Router v7 file-based routing conventions
 
-### Environment and Config
+## Environment and Config
+
 - All environment variables managed through Doppler
 - Never commit secrets or API keys
 - Use `doppler run --` prefix for commands that need environment variables
 
-## Development Workflow
+## CRITICAL: Don't Guess
 
-1. **Database Changes**: Create migrations with `make migrate-create`, run with `make migrate`
-2. **Type Generation**: Run `bun run typecheck` after schema changes to regenerate types
-3. **New Features**: Follow the repository/service pattern in core, create corresponding UI components in web
-4. **Testing**: Run `make test` to verify changes pass all tests
-5. **Formatting**: Always run `bun run format` on every file you change before committing. Biome handles formatting — never use Prettier or other formatters.
+**NEVER guess field names, function signatures, or code structure.** Always look at the actual files first. This applies to database fields, function parameters, API endpoints, file paths, configuration keys — anything with a definitive answer in the codebase.
 
-## Important Notes
+## CRITICAL: Never Be Lazy
 
-- This project uses **Bun, not Node.js** - always use `bun` commands
-- Package manager is **pnpm** for workspace management but **Bun** for script execution
-- **Doppler is required** for environment variable management in development
-- Database uses **PostgreSQL with Prisma** - all DB operations should go through repositories
-- **Biome** handles both linting and formatting - don't use ESLint or Prettier
-- The web app uses **React Router v7** (latest version) with file-based routing
-
-# CRITICAL RULE: DON'T FUCKING GUESS
-
-**NEVER guess field names, function signatures, or code structure.** Always look at the actual files first. Guessing wastes time, causes bugs, and is lazy. If you're about to write code that uses specific fields or functions, CHECK THE SOURCE FILES FIRST.
-
-This applies to:
-- Database field names
-- Function parameters
-- API endpoints
-- File paths
-- Configuration keys
-- ANYTHING that has a definitive answer in the codebase
-
-No assumptions. No guessing. Look it up.
-
-# CRITICAL RULE: NEVER BE LAZY
-
-**DO NOT EVER BE LAZY.** Being lazy leads to:
-- Sloppy solutions that create more problems
-- Using quick hacks instead of understanding the real issue
-- Adding require() instead of proper TypeScript imports
-- Rushing to "fix" things without reading error messages carefully
-- Creating technical debt that wastes everyone's time
-
-When you encounter a problem:
-1. **READ THE ACTUAL ERROR MESSAGE CAREFULLY**
-2. **UNDERSTAND what the problem actually is**
-3. **ANALYZE the root cause** - don't just treat symptoms
-4. **IMPLEMENT the correct solution** - not the fastest hack
-5. **VERIFY it actually fixes the problem** - don't assume
-
-Being thorough and methodical is faster than being lazy and creating more issues.
+Read the actual error message. Understand the real problem. Analyze the root cause. Implement the correct solution — not the fastest hack. Verify it actually works.
