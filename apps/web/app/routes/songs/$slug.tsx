@@ -124,7 +124,8 @@ export default function SongPage() {
     searchFilter: searchPerformance,
   });
 
-  const allTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
+  const hasAllTimers = useMemo(() => allPerformances.some((p) => p.allTimer), [allPerformances]);
+  const filteredAllTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
   const filterContent = (
     <PerformanceFilterControls
       selectedYear={selectedYear}
@@ -305,7 +306,7 @@ export default function SongPage() {
         </div>
       )}
 
-      <Tabs defaultValue={defaultTab} className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full" onValueChange={() => clearFilters()}>
         <TabsList className="w-full flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
           <TabsTrigger
             value="performances"
@@ -318,7 +319,7 @@ export default function SongPage() {
             <ListMusic className="h-4 w-4" />
             All Performances
           </TabsTrigger>
-          {allTimers.length > 0 && (
+          {hasAllTimers && (
             <TabsTrigger
               value="all-timers"
               className={cn(
@@ -383,11 +384,11 @@ export default function SongPage() {
           )}
         </TabsList>
 
-        {allTimers.length > 0 && (
+        {hasAllTimers && (
           <TabsContent value="all-timers" className="mt-6 space-y-8">
             {/* Featured cards for performances with notes */}
             {(() => {
-              const withNotes = allTimers
+              const withNotes = filteredAllTimers
                 .filter((p) => p.notes)
                 .sort((a, b) => new Date(b.show.date).getTime() - new Date(a.show.date).getTime());
 
@@ -421,7 +422,7 @@ export default function SongPage() {
             })()}
 
             <PerformanceTable
-              performances={allTimers}
+              performances={filteredAllTimers}
               songTitle={song.title}
               isLoading={isLoading}
               headerContent={filterContent}

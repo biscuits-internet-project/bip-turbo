@@ -20,6 +20,13 @@ test:
 	bun run test
 
 format:
+	@if [ -z "$(FILES)" ]; then \
+		echo "Usage: make format FILES=\"file1.ts file2.tsx\""; \
+		exit 1; \
+	fi
+	bunx biome check --fix $(FILES)
+
+format-all:
 	bun run format
 
 clean:
