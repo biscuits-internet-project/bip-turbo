@@ -95,6 +95,8 @@ export default [
       index("routes/songs/_index.tsx"),
       route("all-timers", "routes/songs/all-timers.tsx"),
       route("histories", "routes/songs/histories.tsx"),
+      route("recent", "routes/songs/recent.tsx"),
+      route("this-year", "routes/songs/this-year.tsx"),
       route("new", "routes/songs/new.tsx"),
       route(":slug", "routes/songs/$slug.tsx"),
       route(":slug/edit", "routes/songs/$slug.edit.tsx"),

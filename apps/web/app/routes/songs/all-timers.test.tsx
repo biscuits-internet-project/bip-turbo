@@ -16,8 +16,7 @@ vi.mock("~/hooks/use-performance-page-filters", () => ({
   usePerformancePageFilters: vi.fn(() => ({
     filteredData: [],
     isLoading: false,
-    selectedYear: "all",
-    selectedEra: "all",
+    selectedTimeRange: "all",
     coverFilter: "all",
     selectedAuthor: null,
     activeToggleSet: new Set(),
@@ -50,15 +49,15 @@ function renderAllTimers() {
 }
 
 describe("AllTimersPage", () => {
-  // The "All-Timers" header with flame icon is now handled by the layout tab bar,
-  // so the page should not render its own heading.
+  // The layout tab bar handles the All-Timers heading,
+  // so the page should not render its own.
   test("does not render its own All-Timers heading", () => {
     renderAllTimers();
 
     expect(screen.queryByRole("heading", { name: /all-timers/i })).not.toBeInTheDocument();
   });
 
-  // The "Back to songs" link is replaced by the layout tab bar navigation.
+  // Navigation between song pages is handled by the layout tab bar.
   test("does not render a Back to songs link", () => {
     renderAllTimers();
 

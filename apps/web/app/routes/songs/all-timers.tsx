@@ -22,8 +22,7 @@ export default function AllTimersPage() {
   const {
     filteredData: filteredPerformances,
     isLoading,
-    selectedYear,
-    selectedEra,
+    selectedTimeRange,
     coverFilter,
     selectedAuthor,
     activeToggleSet,
@@ -47,8 +46,7 @@ export default function AllTimersPage() {
         showSongColumn
         headerContent={
           <PerformanceFilterControls
-            selectedYear={selectedYear}
-            selectedEra={selectedEra}
+            selectedTimeRange={selectedTimeRange}
             activeToggleSet={activeToggleSet}
             updateFilter={updateFilter}
             toggleFilter={toggleFilter}

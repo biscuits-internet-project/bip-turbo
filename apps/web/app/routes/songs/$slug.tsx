@@ -108,8 +108,7 @@ export default function SongPage() {
   const {
     filteredData: filteredPerformances,
     isLoading,
-    selectedYear,
-    selectedEra,
+    selectedTimeRange,
     activeToggleSet,
     hasActiveFilters,
     searchText,
@@ -128,8 +127,7 @@ export default function SongPage() {
   const filteredAllTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
   const filterContent = (
     <PerformanceFilterControls
-      selectedYear={selectedYear}
-      selectedEra={selectedEra}
+      selectedTimeRange={selectedTimeRange}
       activeToggleSet={activeToggleSet}
       updateFilter={updateFilter}
       toggleFilter={toggleFilter}
