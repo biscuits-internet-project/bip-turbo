@@ -25,6 +25,7 @@ import { useSession } from "~/hooks/use-session";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
+import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { logger } from "~/lib/logger";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
 import { formatDateLong, formatMonthDay } from "~/lib/utils";
@@ -335,8 +336,8 @@ export default function Show() {
         {/* Right column: Highlights and additional content */}
         <div className="lg:col-span-4">
           <div className="lg:sticky lg:top-4 space-y-6">
-            <ExternalLinkCard faviconDomain="nugs.net" title="Official release" items={nugsLinks} />
-            <ExternalLinkCard faviconDomain="youtube.com" title="Video" items={youtubeLinks} />
+            <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.nugs} title="Official release" items={nugsLinks} />
+            <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.youtube} title="Video" items={youtubeLinks} />
             <ArchiveRecordingsCard items={archiveRecordings} />
 
             {/* Highlights panel */}

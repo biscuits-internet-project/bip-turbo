@@ -1,6 +1,6 @@
 import { Camera } from "lucide-react";
 import { Link } from "react-router-dom";
-import { faviconSrc } from "~/lib/favicon";
+import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { cn } from "~/lib/utils";
 
 /**
@@ -90,14 +90,19 @@ function PhotosBadge({ href, count }: PhotosBadgeProps) {
  * show an empty strip.
  */
 export function ShowExternalBadges({ sources, photosHref, photosCount, className }: ShowExternalBadgesProps) {
-  const hasAny = sources.nugsUrl || sources.archiveUrl || sources.youtubeUrl || (photosHref && photosCount && photosCount > 0);
+  const hasAny =
+    sources.nugsUrl || sources.archiveUrl || sources.youtubeUrl || (photosHref && photosCount && photosCount > 0);
   if (!hasAny) return null;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <FaviconLink domain="nugs.net" href={sources.nugsUrl} label="Available on nugs.net" />
-      <FaviconLink domain="youtube.com" href={sources.youtubeUrl} label="Video on YouTube" />
-      <FaviconLink domain="archive.org" href={sources.archiveUrl} label="Available on archive.org" />
+      <FaviconLink domain={EXTERNAL_SOURCE_DOMAINS.nugs} href={sources.nugsUrl} label="Available on nugs.net" />
+      <FaviconLink domain={EXTERNAL_SOURCE_DOMAINS.youtube} href={sources.youtubeUrl} label="Video on YouTube" />
+      <FaviconLink
+        domain={EXTERNAL_SOURCE_DOMAINS.archive}
+        href={sources.archiveUrl}
+        label="Available on archive.org"
+      />
       <PhotosBadge href={photosHref} count={photosCount} />
     </div>
   );

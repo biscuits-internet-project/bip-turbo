@@ -11,3 +11,15 @@
 export function faviconSrc(domain: string): string {
   return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
 }
+
+/**
+ * Canonical bare-host strings for the external sources shown in listing
+ * badges, filter toggles, and show-page link cards. Centralized so every UI
+ * surface resolves to the same favicon and so adding a source is a one-line
+ * change instead of a grep-and-edit.
+ */
+export const EXTERNAL_SOURCE_DOMAINS = {
+  nugs: "nugs.net",
+  youtube: "youtube.com",
+  archive: "archive.org",
+} as const;
