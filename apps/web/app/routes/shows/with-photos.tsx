@@ -3,15 +3,18 @@ import { ArrowUp, Camera } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 interface LoaderData {
   setlists: SetlistLight[];
+  externalSources: Record<string, ShowExternalSources>;
 }
 
 export const loader = publicLoader(async (): Promise<LoaderData> => {
@@ -22,7 +25,8 @@ export const loader = publicLoader(async (): Promise<LoaderData> => {
     sort: [{ field: "date", direction: "desc" }],
   });
 
-  return { setlists };
+  const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
+  return { setlists, externalSources };
 });
 
 export function meta() {
@@ -38,7 +42,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function ShowsWithPhotos() {
-  const { setlists } = useSerializedLoaderData<LoaderData>();
+  const { setlists, externalSources } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
@@ -102,9 +106,7 @@ export default function ShowsWithPhotos() {
                   className="px-2 py-1.5 text-sm font-medium rounded-md text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white transition-all"
                 >
                   {year}
-                  <span className="ml-1 text-xs text-content-text-tertiary">
-                    ({setlistsByYear[year].length})
-                  </span>
+                  <span className="ml-1 text-xs text-content-text-tertiary">({setlistsByYear[year].length})</span>
                 </a>
               ))}
             </div>
@@ -130,6 +132,7 @@ export default function ShowsWithPhotos() {
                   userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                   userRating={userRatingMap.get(setlist.show.id) ?? null}
                   showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
+                  externalSources={externalSources[setlist.show.id]}
                   className="transition-all duration-300 transform hover:scale-[1.01]"
                 />
               ))}

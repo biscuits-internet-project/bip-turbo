@@ -1,24 +1,27 @@
 import { CacheKeys, type SetlistLight } from "@bip/domain";
 import { ArrowUp, Camera, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, type LoaderFunctionArgs } from "react-router-dom";
 import type { ClientLoaderFunctionArgs } from "react-router";
+import { Link, type LoaderFunctionArgs } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Button } from "~/components/ui/button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { getShowsMeta } from "~/lib/seo";
 import { logger } from "~/lib/logger";
+import { getShowsMeta } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 interface LoaderData {
   setlists: SetlistLight[];
   year: number;
   searchQuery?: string;
+  externalSources: Record<string, ShowExternalSources>;
 }
 
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -27,13 +30,7 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const MIN_SEARCH_CHARS = 4;
 
 // Cache headers for CDN edge caching - different TTLs for current vs past years
-export function headers({
-  loaderHeaders,
-  data,
-}: {
-  loaderHeaders: Headers;
-  data: LoaderData | undefined;
-}): Headers {
+export function headers({ loaderHeaders, data }: { loaderHeaders: Headers; data: LoaderData | undefined }): Headers {
   const headers = new Headers(loaderHeaders);
   const loaderData = data;
   const currentYear = new Date().getFullYear();
@@ -57,7 +54,7 @@ export function headers({
   }
 
   return headers;
-};
+}
 
 export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
@@ -85,6 +82,7 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
       setlists,
       year: yearInt,
       searchQuery,
+      externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
     };
   }
 
@@ -112,6 +110,7 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
   return {
     setlists,
     year: yearInt,
+    externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
   };
 });
 
@@ -126,7 +125,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function ShowsByYear() {
-  const { setlists, year, searchQuery } = useSerializedLoaderData<LoaderData>();
+  const { setlists, year, searchQuery, externalSources } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Extract show IDs for client-side data fetching
@@ -266,6 +265,7 @@ export default function ShowsByYear() {
                       userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                       userRating={userRatingMap.get(setlist.show.id) ?? null}
                       showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
+                      externalSources={externalSources[setlist.show.id]}
                       className="transition-all duration-300 transform hover:scale-[1.01]"
                     />
                   ))}
@@ -289,7 +289,10 @@ export default function ShowsByYear() {
                                 setlist={setlist}
                                 userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                                 userRating={userRatingMap.get(setlist.show.id) ?? null}
-                                showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
+                                showRating={
+                                  averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating
+                                }
+                                externalSources={externalSources[setlist.show.id]}
                                 className="transition-all duration-300 transform hover:scale-[1.01]"
                               />
                             </div>
