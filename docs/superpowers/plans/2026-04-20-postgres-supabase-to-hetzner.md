@@ -46,7 +46,9 @@ This plan is ops/infra, not code. Task pattern is **change → apply → verify 
 
 ## Phase 1: Prep (no user impact)
 
-### Task 1: Provision Cloudflare R2 bucket and API token
+### Task 1: Provision Cloudflare R2 bucket and confirm existing token works
+
+**Decision:** Reuse the existing account-wide `R2 Account Token` ("All buckets", Object Read & Write). Existing Doppler secrets: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`. Tradeoff: rotating the token later affects every consumer, not just the backup job. Acceptable for this project.
 
 **Files:** None (external — Cloudflare dashboard).
 
@@ -64,27 +66,20 @@ Bucket → Settings → Object lifecycle rules → Add rule:
 - Apply to: All objects
 - Action: Delete objects 14 days after creation
 
-- [ ] **Step 3: Create a bucket-scoped API token**
+- [ ] **Step 3: Verify the existing token can reach the new bucket**
 
-R2 → Manage R2 API tokens → Create API token:
-- Token name: `bip-postgres-backups-rw`
-- Permissions: Object Read & Write
-- Specify bucket: `bip-postgres-backups`
-
-Capture the Access Key ID, Secret Access Key, and the S3 endpoint URL (of the form `https://<account-id>.r2.cloudflarestorage.com`).
-
-- [ ] **Step 4: Verify from laptop with aws-cli**
+From your laptop:
 
 ```bash
-AWS_ACCESS_KEY_ID="<key>" \
-AWS_SECRET_ACCESS_KEY="<secret>" \
+AWS_ACCESS_KEY_ID="$(doppler secrets get R2_ACCESS_KEY_ID --plain -p bip -c prd_hetzner)" \
+AWS_SECRET_ACCESS_KEY="$(doppler secrets get R2_SECRET_ACCESS_KEY --plain -p bip -c prd_hetzner)" \
 aws s3 ls s3://bip-postgres-backups/ \
-  --endpoint-url https://<account-id>.r2.cloudflarestorage.com
+  --endpoint-url "https://$(doppler secrets get R2_ACCOUNT_ID --plain -p bip -c prd_hetzner).r2.cloudflarestorage.com"
 ```
 
-Expected: empty output, exit code 0.
+Expected: empty output, exit code 0. (Any auth/404 error means the token can't actually reach the new bucket — stop and investigate.)
 
-- [ ] **Step 5: No commit** (nothing changed in the repo).
+- [ ] **Step 4: No commit** (nothing changed in the repo).
 
 ---
 
@@ -98,25 +93,25 @@ Expected: empty output, exit code 0.
 openssl rand -base64 32 | tr -d '/+=' | head -c 32
 ```
 
-- [ ] **Step 2: Add secrets to Doppler `bip/prd_hetzner`**
+- [ ] **Step 2: Add `POSTGRES_PASSWORD` to Doppler `bip/prd_hetzner`**
 
-Via dashboard or CLI (`doppler secrets set NAME=value -p bip -c prd_hetzner`). Add:
+Via dashboard or CLI:
 
-- `POSTGRES_PASSWORD` — from Step 1
-- `R2_BACKUP_ACCESS_KEY_ID` — from Task 1 Step 3
-- `R2_BACKUP_SECRET_ACCESS_KEY` — from Task 1 Step 3
-- `R2_BACKUP_BUCKET` — `bip-postgres-backups`
-- `R2_BACKUP_ENDPOINT` — `https://<account-id>.r2.cloudflarestorage.com`
+```bash
+doppler secrets set POSTGRES_PASSWORD="<password-from-step-1>" -p bip -c prd_hetzner
+```
+
+No other Doppler changes needed — R2 creds and account ID are already present; bucket name will be hardcoded in `.kamal/secrets` (it's not a secret).
 
 **Do not yet update `DATABASE_URL`.** That happens during cutover (Task 12).
 
 - [ ] **Step 3: Verify from laptop**
 
 ```bash
-doppler secrets get POSTGRES_PASSWORD R2_BACKUP_BUCKET --plain -p bip -c prd_hetzner
+doppler secrets get POSTGRES_PASSWORD --plain -p bip -c prd_hetzner
 ```
 
-Expected: the values you set.
+Expected: the value you set.
 
 - [ ] **Step 4: No commit** (Doppler changes only).
 
@@ -482,19 +477,24 @@ After the `postgres:` accessory, add:
 
 **Why `DATABASE_URL_BACKUP` (not `DATABASE_URL`):** during Phase 1 the app's `DATABASE_URL` still points at Supabase. The backup accessory must target the new Hetzner Postgres from the start, so it gets its own, independently-scoped env var. The backup scripts from Task 6 already read `$DATABASE_URL_BACKUP`.
 
-- [ ] **Step 2: Extend `.kamal/secrets` to fetch the new secrets and derive `DATABASE_URL_BACKUP`**
+- [ ] **Step 2: Extend `.kamal/secrets` to fetch existing R2 vars and derive the backup-scoped aliases**
 
-Add to the secret fetch list on line 1: `R2_BACKUP_ACCESS_KEY_ID R2_BACKUP_SECRET_ACCESS_KEY R2_BACKUP_BUCKET R2_BACKUP_ENDPOINT` (`POSTGRES_PASSWORD` was added in Task 3).
+Add to the secret fetch list on line 1: `R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ACCOUNT_ID` (`POSTGRES_PASSWORD` was added in Task 3).
 
 Then append these lines:
 
 ```bash
-R2_BACKUP_ACCESS_KEY_ID=$(kamal secrets extract R2_BACKUP_ACCESS_KEY_ID $SECRETS)
-R2_BACKUP_SECRET_ACCESS_KEY=$(kamal secrets extract R2_BACKUP_SECRET_ACCESS_KEY $SECRETS)
-R2_BACKUP_BUCKET=$(kamal secrets extract R2_BACKUP_BUCKET $SECRETS)
-R2_BACKUP_ENDPOINT=$(kamal secrets extract R2_BACKUP_ENDPOINT $SECRETS)
+R2_ACCESS_KEY_ID=$(kamal secrets extract R2_ACCESS_KEY_ID $SECRETS)
+R2_SECRET_ACCESS_KEY=$(kamal secrets extract R2_SECRET_ACCESS_KEY $SECRETS)
+R2_ACCOUNT_ID=$(kamal secrets extract R2_ACCOUNT_ID $SECRETS)
+R2_BACKUP_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+R2_BACKUP_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+R2_BACKUP_BUCKET="bip-postgres-backups"
+R2_BACKUP_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 DATABASE_URL_BACKUP="postgres://bip:${POSTGRES_PASSWORD}@bip-web-postgres:5432/bip"
 ```
+
+The `R2_BACKUP_*` aliases are what the backup container's scripts read; Kamal injects them into the container via `env.secret`. Reusing the account-wide `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` from Doppler (scope "All buckets").
 
 - [ ] **Step 3: Boot the backup accessory**
 
@@ -517,10 +517,10 @@ Expected:
 - [ ] **Step 5: Verify the object landed in R2**
 
 ```bash
-AWS_ACCESS_KEY_ID="$(doppler secrets get R2_BACKUP_ACCESS_KEY_ID --plain -p bip -c prd_hetzner)" \
-AWS_SECRET_ACCESS_KEY="$(doppler secrets get R2_BACKUP_SECRET_ACCESS_KEY --plain -p bip -c prd_hetzner)" \
+AWS_ACCESS_KEY_ID="$(doppler secrets get R2_ACCESS_KEY_ID --plain -p bip -c prd_hetzner)" \
+AWS_SECRET_ACCESS_KEY="$(doppler secrets get R2_SECRET_ACCESS_KEY --plain -p bip -c prd_hetzner)" \
 aws s3 ls s3://bip-postgres-backups/ --recursive \
-  --endpoint-url "$(doppler secrets get R2_BACKUP_ENDPOINT --plain -p bip -c prd_hetzner)"
+  --endpoint-url "https://$(doppler secrets get R2_ACCOUNT_ID --plain -p bip -c prd_hetzner).r2.cloudflarestorage.com"
 ```
 
 Expected: one object under `YYYY/MM/DD/bip-YYYYMMDDHHMM.dump` sized ~50–150 MB.
@@ -562,10 +562,10 @@ TMP_DUMP="$(mktemp -t bip-drill.XXXXXX.dump)"
 trap 'docker rm -f "$SCRATCH_NAME" >/dev/null 2>&1 || true; rm -f "$TMP_DUMP"' EXIT
 
 echo "==> fetching R2 credentials from Doppler"
-export AWS_ACCESS_KEY_ID="$(doppler secrets get R2_BACKUP_ACCESS_KEY_ID --plain -p bip -c prd_hetzner)"
-export AWS_SECRET_ACCESS_KEY="$(doppler secrets get R2_BACKUP_SECRET_ACCESS_KEY --plain -p bip -c prd_hetzner)"
-R2_BUCKET="$(doppler secrets get R2_BACKUP_BUCKET --plain -p bip -c prd_hetzner)"
-R2_ENDPOINT="$(doppler secrets get R2_BACKUP_ENDPOINT --plain -p bip -c prd_hetzner)"
+export AWS_ACCESS_KEY_ID="$(doppler secrets get R2_ACCESS_KEY_ID --plain -p bip -c prd_hetzner)"
+export AWS_SECRET_ACCESS_KEY="$(doppler secrets get R2_SECRET_ACCESS_KEY --plain -p bip -c prd_hetzner)"
+R2_BUCKET="bip-postgres-backups"
+R2_ENDPOINT="https://$(doppler secrets get R2_ACCOUNT_ID --plain -p bip -c prd_hetzner).r2.cloudflarestorage.com"
 
 echo "==> finding latest backup"
 LATEST_KEY=$(aws s3api list-objects-v2 \
