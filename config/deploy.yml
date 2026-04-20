@@ -58,3 +58,18 @@ accessories:
     directories:
       - bip-web-redis-data:/data
     cmd: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:18-alpine
+    host: 5.161.124.129
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_USER: bip
+        POSTGRES_DB: bip
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - bip-web-postgres-data:/var/lib/postgresql/data
+    options:
+      shm-size: 256m
