@@ -9,6 +9,7 @@ import { StarRating } from "~/components/ui/star-rating";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn, formatDateShort } from "~/lib/utils";
+import { AnniversaryBadge } from "./anniversary-badge";
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
@@ -181,8 +182,14 @@ function SetlistCardComponent({
       <CardHeader className="relative z-10 border-b border-glass-border/30 px-3 py-3 md:px-6 md:py-5">
         <div className="flex justify-between items-start gap-3">
           <div className="flex flex-col gap-1">
-            <div className="text-lg md:text-2xl font-medium text-brand-primary hover:text-brand-secondary transition-colors">
-              <Link to={setlist.show.slug ? `/shows/${setlist.show.slug}` : `/shows`}>{formattedDate}</Link>
+            <div className="flex items-center gap-2 text-lg md:text-2xl font-medium">
+              <Link
+                to={setlist.show.slug ? `/shows/${setlist.show.slug}` : `/shows`}
+                className="text-brand-primary hover:text-brand-secondary transition-colors"
+              >
+                {formattedDate}
+              </Link>
+              <AnniversaryBadge showDate={setlist.show.date} />
             </div>
             <div className="text-base md:text-xl text-content-text-primary">
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
