@@ -1,5 +1,5 @@
 import type { SongPageView } from "@bip/domain";
-import { ArrowLeft, BarChart3, FileTextIcon, GuitarIcon, History, Pencil, StarIcon } from "lucide-react";
+import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
@@ -316,7 +316,7 @@ export default function SongPage() {
               "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
             )}
           >
-            <FileTextIcon className="h-4 w-4" />
+            <ListMusic className="h-4 w-4" />
             All Performances
           </TabsTrigger>
           {hasAllTimers && (
@@ -328,7 +328,7 @@ export default function SongPage() {
                 "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
               )}
             >
-              <StarIcon className="h-4 w-4 stroke-yellow-500 fill-transparent" />
+              <Flame className="h-4 w-4 text-orange-500" />
               All-Timers
             </TabsTrigger>
           )}
