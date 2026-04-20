@@ -71,6 +71,109 @@ describe("PerformanceFilterControls", () => {
     expect(screen.queryByText("Time Range")).not.toBeInTheDocument();
   });
 
+  // The "Played" dropdown is opt-in via playedFilter prop, but the component
+  // only shows it when a qualifying filter is active (time range, toggles, or
+  // search). Author and cover alone don't qualify — "not played" only makes
+  // sense when narrowing to a subset of performances.
+  test("hides played filter when no qualifying filters are active", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" />);
+
+    expect(screen.queryByText("Played")).not.toBeInTheDocument();
+  });
+
+  test("shows played filter when time range is selected", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" selectedTimeRange="2024" />);
+
+    expect(screen.getByText("Played")).toBeInTheDocument();
+  });
+
+  test("shows played filter when any toggle is active", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" activeToggleSet={new Set(["jam"])} />);
+
+    expect(screen.getByText("Played")).toBeInTheDocument();
+  });
+
+  test("shows played filter when search has text", async () => {
+    await setup(
+      <PerformanceFilterControls
+        {...defaultProps}
+        playedFilter="all"
+        searchValue="Confrontation"
+        onSearchChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Played")).toBeInTheDocument();
+  });
+
+  test("hides played filter when only cover filter is set", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" coverFilter="cover" />);
+
+    expect(screen.queryByText("Played")).not.toBeInTheDocument();
+  });
+
+  test("hides played filter when only author is set", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" selectedAuthor="marc brownstein" />);
+
+    expect(screen.queryByText("Played")).not.toBeInTheDocument();
+  });
+
+  // When the played filter becomes hidden (qualifying filters removed), the
+  // component resets played to null so stale "notPlayed" state doesn't linger
+  // in the URL and silently affect the next API request.
+  test("resets played filter when it becomes hidden", async () => {
+    const handleUpdateFilter = vi.fn();
+    const { rerender } = await setup(
+      <PerformanceFilterControls
+        {...defaultProps}
+        updateFilter={handleUpdateFilter}
+        playedFilter="notPlayed"
+        activeToggleSet={new Set(["jam"])}
+      />,
+    );
+
+    handleUpdateFilter.mockClear();
+
+    rerender(
+      <PerformanceFilterControls
+        {...defaultProps}
+        updateFilter={handleUpdateFilter}
+        playedFilter="notPlayed"
+        activeToggleSet={new Set()}
+      />,
+    );
+
+    expect(handleUpdateFilter).toHaveBeenCalledWith({ played: null });
+  });
+
+  // When the played filter is already "all" (default), no reset is needed —
+  // the value is harmless and firing updateFilter would cause unnecessary
+  // re-renders.
+  test("does not reset played filter when value is already all", async () => {
+    const handleUpdateFilter = vi.fn();
+    const { rerender } = await setup(
+      <PerformanceFilterControls
+        {...defaultProps}
+        updateFilter={handleUpdateFilter}
+        playedFilter="all"
+        activeToggleSet={new Set(["jam"])}
+      />,
+    );
+
+    handleUpdateFilter.mockClear();
+
+    rerender(
+      <PerformanceFilterControls
+        {...defaultProps}
+        updateFilter={handleUpdateFilter}
+        playedFilter="all"
+        activeToggleSet={new Set()}
+      />,
+    );
+
+    expect(handleUpdateFilter).not.toHaveBeenCalled();
+  });
+
   // Clicking Clear All delegates to the parent's clearFilters callback, which
   // resets all URL params and search text in the hook.
   test("clicking Clear All calls clearFilters", async () => {
