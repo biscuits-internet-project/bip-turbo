@@ -106,6 +106,16 @@ describe("PerformanceFilterControls", () => {
     expect(screen.getByText("Played")).toBeInTheDocument();
   });
 
+  // On tab routes like /songs/this-year and /songs/recent, the time range is
+  // baked into the route and the dropdown is hidden (hideTimeRange). The local
+  // selectedTimeRange stays "all" because it isn't driven by URL params there,
+  // so we treat hideTimeRange itself as an active time-range scope.
+  test("shows played filter when hideTimeRange is true (fixed-scope tab routes)", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" hideTimeRange />);
+
+    expect(screen.getByText("Played")).toBeInTheDocument();
+  });
+
   test("hides played filter when only cover filter is set", async () => {
     await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" coverFilter="cover" />);
 

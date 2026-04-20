@@ -48,7 +48,10 @@ export function PerformanceFilterControls({
   const toggleFilters = showAllTimerToggle ? ALL_TOGGLE_FILTERS : TOGGLE_FILTERS_WITHOUT_ALL_TIMER;
   const showPlayedFilter =
     playedFilter !== undefined &&
-    (selectedTimeRange !== "all" || activeToggleSet.size > 0 || (searchValue !== undefined && searchValue.length > 0));
+    (hideTimeRange ||
+      selectedTimeRange !== "all" ||
+      activeToggleSet.size > 0 ||
+      (searchValue !== undefined && searchValue.length > 0));
 
   useEffect(() => {
     if (!showPlayedFilter && playedFilter !== undefined && playedFilter !== "all") {
