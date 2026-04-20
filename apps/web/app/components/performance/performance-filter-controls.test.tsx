@@ -4,8 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { PerformanceFilterControls } from "./performance-filter-controls";
 
 const defaultProps = {
-  selectedYear: "all",
-  selectedEra: "all",
+  selectedTimeRange: "all",
   activeToggleSet: new Set<string>(),
   updateFilter: vi.fn(),
   toggleFilter: vi.fn(),
@@ -53,6 +52,23 @@ describe("PerformanceFilterControls", () => {
     await setup(<PerformanceFilterControls {...defaultProps} hasActiveFilters={false} />);
 
     expect(screen.queryByRole("button", { name: "Clear All" })).not.toBeInTheDocument();
+  });
+
+  // The Time Range dropdown renders with grouped options (Recent, Eras, Years).
+  test("renders a single Time Range dropdown", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} />);
+
+    expect(screen.getByText("Time Range")).toBeInTheDocument();
+    expect(screen.queryByText("Year")).not.toBeInTheDocument();
+    expect(screen.queryByText("Era")).not.toBeInTheDocument();
+  });
+
+  // The hideTimeRange prop suppresses the dropdown for pre-baked tab pages
+  // (e.g., /songs/recent) where the time range is already set by the route.
+  test("does not render Time Range dropdown when hideTimeRange is true", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} hideTimeRange />);
+
+    expect(screen.queryByText("Time Range")).not.toBeInTheDocument();
   });
 
   // Clicking Clear All delegates to the parent's clearFilters callback, which
