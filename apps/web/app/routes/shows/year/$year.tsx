@@ -1,24 +1,33 @@
 import { CacheKeys, type SetlistLight } from "@bip/domain";
-import { ArrowUp, Camera, Plus } from "lucide-react";
+import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, type LoaderFunctionArgs } from "react-router-dom";
 import type { ClientLoaderFunctionArgs } from "react-router";
+import { Link, type LoaderFunctionArgs, useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
+import { ShowFiltersNav } from "~/components/show-filters-nav";
 import { Button } from "~/components/ui/button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { getShowsMeta } from "~/lib/seo";
 import { logger } from "~/lib/logger";
+import { getShowsMeta } from "~/lib/seo";
 import { cn } from "~/lib/utils";
+import { applyExternalSourceFilters } from "~/server/apply-external-source-filters";
 import { services } from "~/server/services";
+import { computeShowCountsByYear } from "~/server/show-counts-by-year";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 interface LoaderData {
   setlists: SetlistLight[];
   year: number;
   searchQuery?: string;
+  externalSources: Record<string, ShowExternalSources>;
+  showCountsByYear: Record<number, number>;
+  monthCounts: Record<number, number>;
+  filters: { photos: boolean; youtube: boolean; nugs: boolean; archive: boolean };
 }
 
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -27,13 +36,7 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const MIN_SEARCH_CHARS = 4;
 
 // Cache headers for CDN edge caching - different TTLs for current vs past years
-export function headers({
-  loaderHeaders,
-  data,
-}: {
-  loaderHeaders: Headers;
-  data: LoaderData | undefined;
-}): Headers {
+export function headers({ loaderHeaders, data }: { loaderHeaders: Headers; data: LoaderData | undefined }): Headers {
   const headers = new Headers(loaderHeaders);
   const loaderData = data;
   const currentYear = new Date().getFullYear();
@@ -57,7 +60,7 @@ export function headers({
   }
 
   return headers;
-};
+}
 
 export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
   const url = new URL(request.url);
@@ -65,19 +68,24 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
   const yearInt = Number.parseInt(year as string, 10);
   const searchQuery = url.searchParams.get("q") || undefined;
 
+  const filters = {
+    photos: url.searchParams.has("photos"),
+    youtube: url.searchParams.has("youtube"),
+    nugs: url.searchParams.has("nugs"),
+    archive: url.searchParams.has("archive"),
+  };
+  const emptyCounts: Record<number, number> = {};
+
   let setlists: SetlistLight[] = [];
 
-  // If there's a search query with at least MIN_SEARCH_CHARS characters, use the search functionality
+  // If there's a search query with at least MIN_SEARCH_CHARS characters, use the search functionality.
+  // Source filters are hidden in this branch — year-page browse nav is replaced by search results.
   if (searchQuery && searchQuery.length >= MIN_SEARCH_CHARS) {
     logger.info(`Loading search results for query: ${searchQuery}`);
-    // Get show IDs from search
     const shows = await services.shows.search(searchQuery);
 
     if (shows.length > 0) {
-      // Get setlists for the found shows
       const showIds = shows.map((show) => show.id);
-
-      // Fetch setlists for these shows
       setlists = await services.setlists.findManyByShowIds(showIds);
     }
 
@@ -85,16 +93,23 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
       setlists,
       year: yearInt,
       searchQuery,
+      externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
+      showCountsByYear: emptyCounts,
+      monthCounts: emptyCounts,
+      filters,
     };
   }
 
-  // Cache year-based listings - these are stable and cacheable
+  // Cache year-based listings - these are stable and cacheable. Filter flags are part of the
+  // cache key so each combination is memoized independently.
   const currentYear = new Date().getFullYear();
   const sortDirection = yearInt === currentYear ? "desc" : "asc";
 
   const yearCacheKey = CacheKeys.shows.list({
     year: yearInt,
     sort: sortDirection,
+    photos: filters.photos,
+    youtube: filters.youtube,
   });
 
   setlists = await services.cache.getOrSet(yearCacheKey, async () => {
@@ -102,16 +117,36 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
     return await services.setlists.findManyLight({
       filters: {
         year: yearInt,
+        hasPhotos: filters.photos || undefined,
+        hasYoutube: filters.youtube || undefined,
       },
       sort: [{ field: "date", direction: sortDirection }],
     });
   });
 
-  logger.info(`Year ${yearInt} shows loaded: ${setlists.length} shows`);
+  const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
+  const filteredSetlists = applyExternalSourceFilters(setlists, externalSources, {
+    nugs: filters.nugs,
+    archive: filters.archive,
+  });
+
+  const showCountsByYear = await computeShowCountsByYear(filters);
+
+  const monthCounts: Record<number, number> = {};
+  for (const setlist of filteredSetlists) {
+    const month = new Date(setlist.show.date).getMonth();
+    monthCounts[month] = (monthCounts[month] ?? 0) + 1;
+  }
+
+  logger.info(`Year ${yearInt} shows loaded: ${filteredSetlists.length} shows`);
 
   return {
-    setlists,
+    setlists: filteredSetlists,
     year: yearInt,
+    externalSources,
+    showCountsByYear,
+    monthCounts,
+    filters,
   };
 });
 
@@ -126,8 +161,15 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function ShowsByYear() {
-  const { setlists, year, searchQuery } = useSerializedLoaderData<LoaderData>();
+  const { setlists, year, searchQuery, externalSources, showCountsByYear, monthCounts } =
+    useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
+
+  // Current URL search params drive the filter bar's active state and the
+  // Filter-by-Year links preserving filters across year switches. Using
+  // useLocation keeps this in sync with react-router navigations (SSR-safe).
+  const location = useLocation();
+  const currentURLParameters = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
   // Extract show IDs for client-side data fetching
   const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
@@ -180,13 +222,10 @@ export default function ShowsByYear() {
         {/* Header Section */}
         <div className="relative">
           <h1 className="page-heading">SHOWS</h1>
-          <div className="absolute top-0 right-0 flex items-center gap-2">
-            <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-              <Link to="/shows/with-photos" className="flex items-center gap-1">
-                <Camera className="h-4 w-4" />
-                <span>Photos</span>
-              </Link>
-            </Button>
+          <div className="absolute top-0 right-0 flex items-start gap-2">
+            {!searchQuery && (
+              <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+            )}
             <AdminOnly>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/shows/new" className="flex items-center gap-1">
@@ -207,7 +246,12 @@ export default function ShowsByYear() {
         {/* Navigation - Only show when not searching */}
         {!searchQuery && (
           <>
-            <YearFilterNav currentYear={year} basePath="/shows/year/" />
+            <YearFilterNav
+              currentYear={year}
+              basePath="/shows/year/"
+              currentURLParameters={currentURLParameters}
+              counts={showCountsByYear}
+            />
             <div className="card-premium rounded-lg overflow-hidden">
               {/* Month navigation */}
               <div className="px-4 py-3">
@@ -218,20 +262,25 @@ export default function ShowsByYear() {
                   </span>
                 </h2>
                 <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
-                  {months.map((month, index) => (
-                    <a
-                      key={month}
-                      href={monthsWithShows.includes(index) ? `#month-${index}` : undefined}
-                      className={cn(
-                        "px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
-                        monthsWithShows.includes(index)
-                          ? "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white cursor-pointer"
-                          : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
-                      )}
-                    >
-                      {month}
-                    </a>
-                  ))}
+                  {months.map((month, index) => {
+                    const active = monthsWithShows.includes(index);
+                    const count = monthCounts[index] ?? 0;
+                    return (
+                      <a
+                        key={month}
+                        href={active ? `#month-${index}` : undefined}
+                        className={cn(
+                          "px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
+                          active
+                            ? "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white cursor-pointer"
+                            : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
+                        )}
+                      >
+                        {month}
+                        {active && count > 0 && <span className="ml-1 opacity-70">({count})</span>}
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -266,6 +315,7 @@ export default function ShowsByYear() {
                       userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                       userRating={userRatingMap.get(setlist.show.id) ?? null}
                       showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
+                      externalSources={externalSources[setlist.show.id]}
                       className="transition-all duration-300 transform hover:scale-[1.01]"
                     />
                   ))}
@@ -289,7 +339,10 @@ export default function ShowsByYear() {
                                 setlist={setlist}
                                 userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                                 userRating={userRatingMap.get(setlist.show.id) ?? null}
-                                showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
+                                showRating={
+                                  averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating
+                                }
+                                externalSources={externalSources[setlist.show.id]}
                                 className="transition-all duration-300 transform hover:scale-[1.01]"
                               />
                             </div>

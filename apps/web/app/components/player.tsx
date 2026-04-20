@@ -32,6 +32,7 @@ interface ArchivePlayerProps {
   identifier: string;
   className?: string;
   showDate?: string;
+  bare?: boolean;
 }
 
 // Utility function to convert date to Archive.org format
@@ -89,7 +90,7 @@ export const convertToArchiveDate = (dateString: string): string => {
   }
 };
 
-const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, className }) => {
+const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, className, bare = false }) => {
   const [metadata, setMetadata] = useState<ArchiveMetadata | null>(null);
   const [audioFiles, setAudioFiles] = useState<ArchiveFile[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
@@ -153,7 +154,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         const selectedFiles: ArchiveFile[] = [];
 
         for (const [_trackNum, trackFiles] of trackGroups.entries()) {
-
           // Score each file based on multiple factors
           const scoredFiles = trackFiles.map((file) => {
             let score = 0;
@@ -209,9 +209,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
           }
           return a.name.localeCompare(b.name);
         });
-        for (const _file of sortedFiles) {
-        }
-
         setAudioFiles(sortedFiles);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred");
@@ -319,22 +316,6 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
     const mins = Math.floor(totalSeconds / 60);
     const secs = Math.floor(totalSeconds % 60);
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
-
-  // Format date with special case handling for known problematic dates
-  const formatDate = (rawDate: string): string => {
-    if (!rawDate) return "";
-
-    // If the date is already in YYYY-MM-DD format, convert to readable format
-    const isoDateMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (isoDateMatch) {
-      const year = isoDateMatch[1];
-      const month = new Date(`${year}-${isoDateMatch[2]}-01`).toLocaleString("default", { month: "long" });
-      const day = Number.parseInt(isoDateMatch[3], 10); // Remove leading zero
-      return `${month} ${day}, ${year}`;
-    }
-
-    return rawDate;
   };
 
   // Get track display name
@@ -485,9 +466,11 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
     }
   };
 
+  const cardClass = bare ? "p-0" : "bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6";
+
   if (isLoading) {
     return (
-      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 text-center">
+      <div className={cn(cardClass, !bare && "text-center")}>
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-4 bg-white/10 rounded w-3/4 mb-4" />
           <div className="h-10 bg-white/10 rounded w-full mb-4" />
@@ -499,7 +482,12 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (error) {
     return (
-      <div className="bg-black/40 backdrop-blur-xl border border-warning rounded-lg p-6 text-warning">
+      <div
+        className={cn(
+          bare ? "p-0" : "bg-black/40 backdrop-blur-xl border border-warning rounded-lg p-6",
+          "text-warning",
+        )}
+      >
         <p>Error loading audio: {error}</p>
       </div>
     );
@@ -507,7 +495,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (!metadata || audioFiles.length === 0) {
     return (
-      <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 text-content-text-tertiary">
+      <div className={cn(cardClass, "text-content-text-tertiary")}>
         <p>No audio files found for this Archive.org item</p>
       </div>
     );
@@ -519,24 +507,16 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   return (
     <div className={cn("archive-player", className)}>
-      <div className="player-container bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 shadow-lg">
+      <div
+        className={cn(
+          "player-container",
+          bare ? "p-0" : "bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-6 shadow-lg",
+        )}
+      >
         {/* Hidden audio element */}
         <audio ref={audioRef} src={audioUrl} preload="metadata">
           <track kind="captions" src="" />
         </audio>
-
-        {/* Player header */}
-        <div className="mb-4">
-          <h3 className="text-xl font-semibold text-brand-secondary mb-1 truncate">
-            {metadata.metadata.title || "Unknown Title"}
-          </h3>
-          {metadata.metadata.creator && (
-            <p className="text-sm text-content-text-tertiary truncate">by {metadata.metadata.creator}</p>
-          )}
-          {metadata.metadata.date && (
-            <p className="text-xs text-content-text-tertiary mt-1">{formatDate(metadata.metadata.date)}</p>
-          )}
-        </div>
 
         {/* Now playing */}
         <div className="mb-4 bg-content-bg-secondary/50 rounded-md p-3 border border-content-bg-secondary">

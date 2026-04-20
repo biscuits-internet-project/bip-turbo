@@ -7,12 +7,14 @@ import { MonthDayPicker } from "~/components/on-this-day/month-day-picker";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { addDaysYearAgnostic, formatMonthDay, isValidMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 interface LoaderData {
   setlists: SetlistLight[];
@@ -21,6 +23,7 @@ interface LoaderData {
   displayLabel: string;
   previousMonthDay: string;
   nextMonthDay: string;
+  externalSources: Record<string, ShowExternalSources>;
 }
 
 export function headers(): Headers {
@@ -69,6 +72,7 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
     displayLabel,
     previousMonthDay,
     nextMonthDay,
+    externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
   };
 });
 
@@ -88,7 +92,7 @@ clientLoader.hydrate = true;
 const ALL_TIMERS_PAGE_SIZE = 10;
 
 export default function OnThisDay() {
-  const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay } =
+  const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay, externalSources } =
     useSerializedLoaderData<LoaderData>();
 
   const {
@@ -199,6 +203,7 @@ export default function OnThisDay() {
                 userAttendance={attendanceMap.get(setlist.show.id) ?? null}
                 userRating={userRatingMap.get(setlist.show.id) ?? null}
                 showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
+                externalSources={externalSources[setlist.show.id]}
                 className="transition-all duration-300 transform hover:scale-[1.01]"
               />
             ))

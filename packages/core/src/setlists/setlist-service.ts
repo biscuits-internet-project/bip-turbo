@@ -8,6 +8,7 @@ export type SetlistFilter = {
   monthDay?: string;
   venueId?: string;
   hasPhotos?: boolean;
+  hasYoutube?: boolean;
 };
 
 type DbTrackLight = {
@@ -335,6 +336,7 @@ export class SetlistService {
     const monthDay = options?.filters?.monthDay;
     const venueId = options?.filters?.venueId;
     const hasPhotos = options?.filters?.hasPhotos;
+    const hasYoutube = options?.filters?.hasYoutube;
 
     const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
     const skip =
@@ -355,6 +357,7 @@ export class SetlistService {
               }
             : undefined,
         showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
+        showYoutubesCount: hasYoutube ? { gt: 0 } : undefined,
       },
       orderBy,
       skip,
@@ -397,6 +400,7 @@ export class SetlistService {
     const monthDay = options?.filters?.monthDay;
     const venueId = options?.filters?.venueId;
     const hasPhotos = options?.filters?.hasPhotos;
+    const hasYoutube = options?.filters?.hasYoutube;
 
     const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
     const skip =
@@ -417,6 +421,7 @@ export class SetlistService {
               }
             : undefined,
         showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
+        showYoutubesCount: hasYoutube ? { gt: 0 } : undefined,
       },
       orderBy,
       skip,

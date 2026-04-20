@@ -1,14 +1,23 @@
 import type { ShowNavItem } from "@bip/core";
-import { type Attendance, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
+import {
+  type ArchiveDotOrgRecording,
+  type Attendance,
+  CacheKeys,
+  type ReviewMinimal,
+  type Setlist,
+  type ShowFile,
+} from "@bip/domain";
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
-import ArchiveMusicPlayer from "~/components/player";
 import { ReviewsList } from "~/components/review";
 import { ReviewForm } from "~/components/review/review-form";
 import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
+import { ArchiveRecordingsCard } from "~/components/show/archive-recordings-card";
+import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-link-card";
 import { ShowPhotos } from "~/components/show/show-photos";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -16,23 +25,20 @@ import { useSession } from "~/hooks/use-session";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
+import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { logger } from "~/lib/logger";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
 import { formatDateLong, formatMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
-
-interface ArchiveItem {
-  identifier: string;
-  title: string;
-  date: string;
-  collection?: string[];
-  creator?: string;
-}
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 interface ShowLoaderData {
   setlist: Setlist;
   reviews: ReviewMinimal[];
-  selectedRecordingId: string | null;
+  archiveRecordings: ArchiveDotOrgRecording[];
+  nugsLinks: ExternalLink[];
+  youtubeLinks: ExternalLink[];
+  externalSources: ShowExternalSources;
   userAttendance: Attendance | null;
   photos: ShowFile[];
   adjacentShows: { previous: ShowNavItem | null; next: ShowNavItem | null };
@@ -98,56 +104,33 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
 
   logger.info(`Show data loaded for ${slug} - setlist cached, reviews fresh`);
 
-  // Find Archive.org recordings for this show date with Redis caching
-  let selectedRecordingId: string | null = null;
-  const archiveCacheKey = CacheKeys.archive.recordings(setlist.show.date);
+  const [archiveRecordings, nugsReleases, youtubeVideoUrls, externalSourcesMap] = await Promise.all([
+    services.archiveDotOrg.findRecordingsForDate(setlist.show.date),
+    services.nugs.findReleasesForDate(setlist.show.date),
+    services.youtube.getVideoUrlsForShow(setlist.show.id),
+    computeShowExternalSources([setlist.show]),
+  ]);
 
-  try {
-    // Try to get from cache first
-    const redis = services.redis;
-    const cachedRecordings = await redis.get<ArchiveItem[]>(archiveCacheKey);
+  const nugsLinks: ExternalLink[] = nugsReleases.map((release) => ({
+    url: release.url,
+    label: `Listen on nugs.net${release.artistName === "Tractorbeam" ? " (Tractorbeam)" : ""}`,
+  }));
+  const youtubeLinks: ExternalLink[] = youtubeVideoUrls.map((url, i) => ({
+    url,
+    label: `Watch on YouTube${youtubeVideoUrls.length > 1 ? ` (${i + 1})` : ""}`,
+  }));
 
-    if (cachedRecordings) {
-      logger.info(`Archive.org recordings served from Redis cache for ${setlist.show.date}`);
-      if (cachedRecordings.length > 0) {
-        selectedRecordingId = cachedRecordings[0].identifier;
-      }
-    } else {
-      // Fetch from archive.org if not cached
-      const detailsUrl = `https://archive.org/advancedsearch.php?q=collection:DiscoBiscuits AND date:${setlist.show.date}&fl=identifier,title,date&sort=date desc&rows=100&output=json`;
-
-      logger.info("Fetching recording details from archive.org", { detailsUrl });
-
-      const detailsResponse = await fetch(detailsUrl);
-      if (!detailsResponse.ok) {
-        throw new Error(`Failed to fetch recording details: ${detailsResponse.status}`);
-      }
-
-      const detailsData = await detailsResponse.json();
-      let archiveRecordings: ArchiveItem[] = [];
-
-      if (detailsData?.response?.docs && detailsData.response.docs.length > 0) {
-        archiveRecordings = detailsData.response.docs as ArchiveItem[];
-
-        if (archiveRecordings.length > 0) {
-          selectedRecordingId = archiveRecordings[0].identifier;
-        }
-      }
-
-      // Cache the results with no expiration (permanent cache)
-      try {
-        await redis.set(archiveCacheKey, archiveRecordings);
-        logger.info(`Archive.org recordings cached permanently for ${setlist.show.date}`);
-      } catch (error) {
-        logger.warn("Failed to cache archive.org recordings", { error });
-      }
-    }
-  } catch (error) {
-    logger.error("Error fetching archive.org recordings", { error });
-    // Continue without recordings if there's an error
-  }
-
-  return { setlist, reviews, selectedRecordingId, userAttendance, photos, adjacentShows };
+  return {
+    setlist,
+    reviews,
+    archiveRecordings,
+    nugsLinks,
+    youtubeLinks,
+    externalSources: externalSourcesMap[setlist.show.id] ?? {},
+    userAttendance,
+    photos,
+    adjacentShows,
+  };
 });
 
 export function meta({ data }: { data: ShowLoaderData }) {
@@ -155,8 +138,17 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const { setlist, reviews, selectedRecordingId, userAttendance, photos, adjacentShows } =
-    useSerializedLoaderData<ShowLoaderData>();
+  const {
+    setlist,
+    reviews,
+    archiveRecordings,
+    nugsLinks,
+    youtubeLinks,
+    externalSources,
+    userAttendance,
+    photos,
+    adjacentShows,
+  } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
   const { userRatingMap } = useShowUserData([setlist.show.id]);
@@ -316,6 +308,7 @@ export default function Show() {
             userAttendance={userAttendance}
             userRating={userRating}
             showRating={setlist.show.averageRating}
+            externalSources={externalSources}
           />
 
           <div className="mt-6">
@@ -343,11 +336,9 @@ export default function Show() {
         {/* Right column: Highlights and additional content */}
         <div className="lg:col-span-4">
           <div className="lg:sticky lg:top-4 space-y-6">
-            {selectedRecordingId && (
-              <div>
-                <ArchiveMusicPlayer identifier={selectedRecordingId} />
-              </div>
-            )}
+            <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.nugs} title="Official release" items={nugsLinks} />
+            <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.youtube} title="Video" items={youtubeLinks} />
+            <ArchiveRecordingsCard items={archiveRecordings} />
 
             {/* Highlights panel */}
             <SetlistHighlights setlist={setlist} />

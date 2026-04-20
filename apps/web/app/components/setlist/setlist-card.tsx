@@ -1,5 +1,5 @@
 import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
-import { Camera, Check, Flame, } from "lucide-react";
+import { Check, Flame } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating";
@@ -9,6 +9,7 @@ import { StarRating } from "~/components/ui/star-rating";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn, formatDateShort } from "~/lib/utils";
+import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
 interface SetlistCardProps {
@@ -17,6 +18,7 @@ interface SetlistCardProps {
   userAttendance: Attendance | null;
   userRating: Rating | number | null;
   showRating: number | null;
+  externalSources?: ShowExternalSources;
 }
 
 function SetlistCardComponent({
@@ -25,6 +27,7 @@ function SetlistCardComponent({
   userAttendance,
   userRating,
   showRating,
+  externalSources,
 }: SetlistCardProps) {
   const { user } = useSession();
   const formattedDate = formatDateShort(setlist.show.date);
@@ -93,7 +96,9 @@ function SetlistCardComponent({
     const previousAttendance = localAttendance; // Capture BEFORE optimistic update
 
     // Optimistically update local state
-    setLocalAttendance(previousAttendance ? null : ({ id: "optimistic", showId: setlist.show.id, userId: "" } as Attendance));
+    setLocalAttendance(
+      previousAttendance ? null : ({ id: "optimistic", showId: setlist.show.id, userId: "" } as Attendance),
+    );
 
     attendanceMutation.mutate(
       { showId: setlist.show.id, currentAttendance: previousAttendance },
@@ -111,7 +116,7 @@ function SetlistCardComponent({
           // Revert on error using captured previous value
           setLocalAttendance(previousAttendance);
         },
-      }
+      },
     );
   };
 
@@ -174,7 +179,7 @@ function SetlistCardComponent({
       )}
     >
       <CardHeader className="relative z-10 border-b border-glass-border/30 px-3 py-3 md:px-6 md:py-5">
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start gap-3">
           <div className="flex flex-col gap-1">
             <div className="text-lg md:text-2xl font-medium text-brand-primary hover:text-brand-secondary transition-colors">
               <Link to={setlist.show.slug ? `/shows/${setlist.show.slug}` : `/shows`}>{formattedDate}</Link>
@@ -183,73 +188,88 @@ function SetlistCardComponent({
               {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
             </div>
           </div>
-          {user && (
-            <div className="flex items-center gap-2">
-              {/* Attendance badge - clickable to toggle */}
-              <button
-                type="button"
-                onClick={toggleAttendance}
-                disabled={attendanceMutation.isPending}
-                className={cn(
-                  "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
-                  "hover:brightness-110 cursor-pointer",
-                  isAttending
-                    ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"
-                    : "glass-secondary border border-dashed border-glass-border hover:border-green-500/30",
-                  isAttendanceAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
-                  attendanceMutation.isPending && "opacity-50"
-                )}
-              >
-                <Check className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", isAttending ? "text-green-500" : "text-content-text-tertiary")} />
-                <span className={cn(
-                  "text-sm font-medium hidden sm:inline",
-                  isAttending ? "text-green-400" : "text-content-text-secondary"
-                )}>
-                  {isAttending ? "Saw it" : "Saw it?"}
-                </span>
-              </button>
-
-              {/* Rating badge - clickable to expand */}
-              <button
-                type="button"
-                onClick={() => setIsRatingExpanded(!isRatingExpanded)}
-                className={cn(
-                  "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
-                  "hover:brightness-110 cursor-pointer",
-                  localHasRated
-                    ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
-                    : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
-                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
-                )}
-              >
-                {isRatingExpanded ? (
-                  <StarRating
-                    rateableId={setlist.show.id}
-                    rateableType="Show"
-                    initialRating={typeof userRating === "number" ? userRating : (userRating?.value ?? null)}
-                    showSlug={setlist.show.slug}
-                    onAverageRatingChange={handleAverageRatingChange}
+          <div className="flex flex-col items-end gap-2">
+            {user && (
+              <div className="flex items-center gap-2">
+                {/* Attendance badge - clickable to toggle */}
+                <button
+                  type="button"
+                  onClick={toggleAttendance}
+                  disabled={attendanceMutation.isPending}
+                  className={cn(
+                    "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
+                    "hover:brightness-110 cursor-pointer",
+                    isAttending
+                      ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"
+                      : "glass-secondary border border-dashed border-glass-border hover:border-green-500/30",
+                    isAttendanceAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+                    attendanceMutation.isPending && "opacity-50",
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      "h-3.5 w-3.5 sm:h-4 sm:w-4",
+                      isAttending ? "text-green-500" : "text-content-text-tertiary",
+                    )}
                   />
-                ) : (
+                  <span
+                    className={cn(
+                      "text-sm font-medium hidden sm:inline",
+                      isAttending ? "text-green-400" : "text-content-text-secondary",
+                    )}
+                  >
+                    {isAttending ? "Saw it" : "Saw it?"}
+                  </span>
+                </button>
+
+                {/* Rating badge - clickable to expand */}
+                <button
+                  type="button"
+                  onClick={() => setIsRatingExpanded(!isRatingExpanded)}
+                  className={cn(
+                    "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
+                    "hover:brightness-110 cursor-pointer",
+                    localHasRated
+                      ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+                      : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
+                    isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+                  )}
+                >
+                  {isRatingExpanded ? (
+                    <StarRating
+                      rateableId={setlist.show.id}
+                      rateableType="Show"
+                      initialRating={typeof userRating === "number" ? userRating : (userRating?.value ?? null)}
+                      showSlug={setlist.show.slug}
+                      onAverageRatingChange={handleAverageRatingChange}
+                    />
+                  ) : (
+                    <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
+                  )}
+                </button>
+              </div>
+            )}
+            {!user && (
+              <LoginPromptPopover message="Sign in to rate">
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center justify-center gap-1 glass-secondary px-2 h-6 sm:px-3 sm:h-8 rounded-md",
+                    "cursor-pointer hover:brightness-110 border border-dashed border-glass-border hover:border-amber-500/30",
+                    isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+                  )}
+                >
                   <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
-                )}
-              </button>
-            </div>
-          )}
-          {!user && (
-            <LoginPromptPopover message="Sign in to rate">
-              <button
-                type="button"
-                className={cn(
-                  "flex items-center justify-center gap-1 glass-secondary px-2 h-6 sm:px-3 sm:h-8 rounded-md",
-                  "cursor-pointer hover:brightness-110 border border-dashed border-glass-border hover:border-amber-500/30",
-                  isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]"
-                )}
-              >
-                <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
-              </button>
-            </LoginPromptPopover>
-          )}
+                </button>
+              </LoginPromptPopover>
+            )}
+            <ShowExternalBadges
+              sources={externalSources ?? {}}
+              photosHref={setlist.show.slug ? `/shows/${setlist.show.slug}#photos` : undefined}
+              photosCount={setlist.show.showPhotosCount}
+              className="pr-2 sm:pr-3"
+            />
+          </div>
         </div>
       </CardHeader>
 
@@ -303,28 +323,15 @@ function SetlistCardComponent({
           ))}
         </div>
 
-        <div className="flex justify-between items-end mt-6 pt-4 border-t border-glass-border/30">
-          {orderedAnnotations.length > 0 ? (
-            <div className="space-y-2">
-              {orderedAnnotations.map((annotation) => (
-                <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-                  <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div />
-          )}
-          {setlist.show.showPhotosCount > 0 && (
-            <Link
-              to={`/shows/${setlist.show.slug}#photos`}
-              className="flex items-center gap-1.5 text-content-text-tertiary hover:text-content-text-secondary transition-colors"
-            >
-              <Camera className="h-5 w-5" />
-              <span className="text-sm">{setlist.show.showPhotosCount}</span>
-            </Link>
-          )}
-        </div>
+        {orderedAnnotations.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
+            {orderedAnnotations.map((annotation) => (
+              <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+                <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
