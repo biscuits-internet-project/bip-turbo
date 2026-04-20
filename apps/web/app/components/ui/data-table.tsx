@@ -16,6 +16,7 @@ declare module "@tanstack/react-table" {
   // biome-ignore lint/correctness/noUnusedVariables: required by TanStack's module augmentation pattern
   interface ColumnMeta<TData extends RowData, TValue> {
     width?: string;
+    cellClassName?: string;
   }
 }
 
@@ -24,6 +25,7 @@ import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { cn } from "~/lib/utils";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -219,7 +221,7 @@ export function DataTable<TData, TValue>({
                   className={`border-t border-glass-border/30 hover:bg-hover-glass ${rowClassName?.(row.original, index) ?? ""}`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="p-3">
+                    <TableCell key={cell.id} className={cn("p-3", cell.column.columnDef.meta?.cellClassName)}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
