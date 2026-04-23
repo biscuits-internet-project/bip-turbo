@@ -1,20 +1,19 @@
 import { CacheKeys, type SetlistLight, type SongPagePerformance } from "@bip/domain";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
-import { useMemo } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
-import { Link, type LoaderFunctionArgs, redirect } from "react-router";
+import { Link, redirect } from "react-router";
 import { MonthDayPicker } from "~/components/on-this-day/month-day-picker";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
-import { SetlistCard } from "~/components/setlist/setlist-card";
+import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { addDaysYearAgnostic, formatMonthDay, isValidMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
+import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
 
 interface LoaderData {
   setlists: SetlistLight[];
@@ -24,6 +23,7 @@ interface LoaderData {
   previousMonthDay: string;
   nextMonthDay: string;
   externalSources: Record<string, ShowExternalSources>;
+  initialUserData: ShowUserDataResponse;
 }
 
 export function headers(): Headers {
@@ -32,7 +32,7 @@ export function headers(): Headers {
   return headers;
 }
 
-export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promise<LoaderData> => {
+export const loader = publicLoader(async ({ params, context }): Promise<LoaderData> => {
   const { monthDay } = params;
 
   if (!monthDay) {
@@ -73,6 +73,10 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
     previousMonthDay,
     nextMonthDay,
     externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
+    initialUserData: await computeShowUserData(
+      context,
+      setlists.map((s) => s.show.id),
+    ),
   };
 });
 
@@ -92,8 +96,16 @@ clientLoader.hydrate = true;
 const ALL_TIMERS_PAGE_SIZE = 10;
 
 export default function OnThisDay() {
-  const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay, externalSources } =
-    useSerializedLoaderData<LoaderData>();
+  const {
+    setlists,
+    performances,
+    displayLabel,
+    monthDay,
+    previousMonthDay,
+    nextMonthDay,
+    externalSources,
+    initialUserData,
+  } = useSerializedLoaderData<LoaderData>();
 
   const {
     filteredData: filteredPerformances,
@@ -114,9 +126,6 @@ export default function OnThisDay() {
     extraParams: { monthDay },
     searchFilter: searchPerformance,
   });
-
-  const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
-  const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
 
   return (
     <div className="py-2">
@@ -189,23 +198,17 @@ export default function OnThisDay() {
         </div>
 
         <div className="space-y-4">
-          {setlists.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-content-text-secondary text-lg">No shows on {displayLabel}.</p>
-            </div>
-          ) : (
-            setlists.map((setlist) => (
-              <SetlistCard
-                key={setlist.show.id}
-                setlist={setlist}
-                userAttendance={attendanceMap.get(setlist.show.id) ?? null}
-                userRating={userRatingMap.get(setlist.show.id) ?? null}
-                showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
-                externalSources={externalSources[setlist.show.id]}
-                className="transition-all duration-300 transform hover:scale-[1.01]"
-              />
-            ))
-          )}
+          <SetlistList
+            setlists={setlists}
+            externalSources={externalSources}
+            initialUserData={initialUserData}
+            className="transition-all duration-300 transform hover:scale-[1.01]"
+            empty={
+              <div className="text-center py-8">
+                <p className="text-content-text-secondary text-lg">No shows on {displayLabel}.</p>
+              </div>
+            }
+          />
         </div>
       </div>
     </div>
