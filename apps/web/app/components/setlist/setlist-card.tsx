@@ -20,6 +20,12 @@ interface SetlistCardProps {
   userRating: Rating | number | null;
   showRating: number | null;
   externalSources?: ShowExternalSources;
+  /**
+   * When true, the card starts with its body hidden and opens on header click.
+   * Clicks originating from interactive descendants (links, buttons) are
+   * ignored so they keep working without toggling the card.
+   */
+  collapsible?: boolean;
 }
 
 function SetlistCardComponent({
@@ -29,6 +35,7 @@ function SetlistCardComponent({
   userRating,
   showRating,
   externalSources,
+  collapsible = false,
 }: SetlistCardProps) {
   const { user } = useSession();
   const formattedDate = formatDateShort(setlist.show.date);
@@ -39,6 +46,7 @@ function SetlistCardComponent({
   const [isAttendanceAnimating, setIsAttendanceAnimating] = useState(false);
   const [localAttendance, setLocalAttendance] = useState<Attendance | null>(userAttendance);
   const [localHasRated, setLocalHasRated] = useState(userRating !== null && userRating !== undefined);
+  const [isOpen, setIsOpen] = useState(!collapsible);
 
   const attendanceMutation = useAttendanceMutation();
   const ratingAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -179,7 +187,23 @@ function SetlistCardComponent({
         className,
       )}
     >
-      <CardHeader className="relative z-10 border-b border-glass-border/30 px-3 py-3 md:px-6 md:py-5">
+      <CardHeader
+        data-testid="setlist-card-header"
+        onClick={
+          collapsible
+            ? (e) => {
+                // Ignore clicks originating from interactive descendants so links
+                // navigate and buttons fire without collapsing the card.
+                if ((e.target as HTMLElement).closest("a, button")) return;
+                setIsOpen((v) => !v);
+              }
+            : undefined
+        }
+        className={cn(
+          "relative z-10 px-3 md:px-6 border-b border-glass-border/30",
+          collapsible ? "py-1 md:py-1 cursor-pointer" : "py-3 md:py-5",
+        )}
+      >
         <div className="flex justify-between items-start gap-3">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2 text-lg md:text-2xl font-medium">
@@ -282,66 +306,80 @@ function SetlistCardComponent({
         </div>
       </CardHeader>
 
-      <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
-        {setlist.show.notes && (
-          <div
-            className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"
-            dangerouslySetInnerHTML={{ __html: setlist.show.notes }}
-          />
+      <div
+        data-testid="setlist-card-body"
+        aria-hidden={collapsible && !isOpen}
+        className={cn(
+          collapsible && "grid transition-[grid-template-rows] duration-300 ease-out",
+          collapsible && (isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"),
         )}
+      >
+        <div className={cn(collapsible && "overflow-hidden")}>
+          <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
+            {setlist.show.notes && (
+              <div
+                className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"
+                dangerouslySetInnerHTML={{ __html: setlist.show.notes }}
+              />
+            )}
 
-        <div className="space-y-2 md:space-y-4">
-          {setlist.sets.map((set, setIndex) => (
-            <span key={setlist.show.id + set.label} className="inline-block w-full md:flex md:gap-4 md:items-baseline">
-              <span className="inline text-base font-medium text-content-text-tertiary">{set.label}</span>
-              <span className="inline ml-2 md:ml-0 md:flex-1">
-                {set.tracks.map((track, i) => (
-                  <span key={track.id} className="inline">
-                    <TrackRatingOverlay track={track}>
-                      <span
-                        className={cn(
-                          "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
-                          track.allTimer && "font-medium",
-                        )}
-                      >
-                        {track.allTimer && (
-                          <Flame className="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5 text-orange-500" />
-                        )}
-                        <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
-                        {trackAnnotationMap.has(track.id) && (
-                          <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
-                            {trackAnnotationMap.get(track.id)?.map((index, i) => (
-                              <span key={index} className={i > 0 ? "ml-1" : ""}>
-                                {index}
-                              </span>
-                            ))}
-                          </sup>
+            <div className="space-y-2 md:space-y-4">
+              {setlist.sets.map((set, setIndex) => (
+                <span
+                  key={setlist.show.id + set.label}
+                  className="inline-block w-full md:flex md:gap-4 md:items-baseline"
+                >
+                  <span className="inline text-base font-medium text-content-text-tertiary">{set.label}</span>
+                  <span className="inline ml-2 md:ml-0 md:flex-1">
+                    {set.tracks.map((track, i) => (
+                      <span key={track.id} className="inline">
+                        <TrackRatingOverlay track={track}>
+                          <span
+                            className={cn(
+                              "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
+                              track.allTimer && "font-medium",
+                            )}
+                          >
+                            {track.allTimer && (
+                              <Flame className="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5 text-orange-500" />
+                            )}
+                            <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
+                            {trackAnnotationMap.has(track.id) && (
+                              <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
+                                {trackAnnotationMap.get(track.id)?.map((index, i) => (
+                                  <span key={index} className={i > 0 ? "ml-1" : ""}>
+                                    {index}
+                                  </span>
+                                ))}
+                              </sup>
+                            )}
+                          </span>
+                        </TrackRatingOverlay>
+                        {i < set.tracks.length - 1 && (
+                          <span className="text-content-text-secondary mx-1 font-medium text-base">
+                            {track.segue ? " > " : ", "}
+                          </span>
                         )}
                       </span>
-                    </TrackRatingOverlay>
-                    {i < set.tracks.length - 1 && (
-                      <span className="text-content-text-secondary mx-1 font-medium text-base">
-                        {track.segue ? " > " : ", "}
-                      </span>
-                    )}
+                    ))}
                   </span>
-                ))}
-              </span>
-              {setIndex < setlist.sets.length - 1 && <span className="hidden"> </span>}
-            </span>
-          ))}
-        </div>
+                  {setIndex < setlist.sets.length - 1 && <span className="hidden"> </span>}
+                </span>
+              ))}
+            </div>
 
-        {orderedAnnotations.length > 0 && (
-          <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
-            {orderedAnnotations.map((annotation) => (
-              <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-                <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
+            {orderedAnnotations.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
+                {orderedAnnotations.map((annotation) => (
+                  <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+                    <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
+            )}
+          </CardContent>
+        </div>
+      </div>
     </Card>
   );
 }
