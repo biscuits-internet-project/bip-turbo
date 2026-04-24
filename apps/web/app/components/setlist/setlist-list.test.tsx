@@ -271,6 +271,51 @@ describe("SetlistList", () => {
     expect(setlistCardMock.mock.calls[3][0].setlist.show.id).toBe("oct-1");
   });
 
+  // When `numbered` is true, each card is preceded by its 1-based rank derived
+  // from the setlist's position in the array. Callers ordered the list by
+  // rank, so the wrapper just emits `index + 1`.
+  test("numbered renders 1-based ranks in setlist order", async () => {
+    setMockReturn();
+    const { container } = await setupWithRouter(
+      <SetlistList
+        setlists={[
+          makeSetlist("show-1", "Basis for a Day"),
+          makeSetlist("show-2", "Spacebirdmatingcall"),
+          makeSetlist("show-3", "Munchkin Invasion"),
+        ]}
+        externalSources={{}}
+        numbered
+      />,
+    );
+    const ranks = Array.from(container.querySelectorAll('[data-testid="setlist-rank"]')).map((el) => el.textContent);
+    expect(ranks).toEqual(["1", "2", "3"]);
+  });
+
+  // Default behavior (no `numbered`) must not emit rank gutters — the existing
+  // year route and other callers render cards without ranks.
+  test("does not render ranks when numbered is absent", async () => {
+    setMockReturn();
+    const { container } = await setupWithRouter(
+      <SetlistList setlists={[makeSetlist("show-1", "Basis for a Day")]} externalSources={{}} />,
+    );
+    expect(container.querySelector('[data-testid="setlist-rank"]')).toBeNull();
+  });
+
+  // The `collapsible` prop is forwarded verbatim to every SetlistCard so the
+  // top-rated route can opt every card into collapsed mode with one flag.
+  test("forwards collapsible flag to every SetlistCard", async () => {
+    setMockReturn();
+    await setupWithRouter(
+      <SetlistList
+        setlists={[makeSetlist("show-1", "Basis for a Day"), makeSetlist("show-2", "Spacebirdmatingcall")]}
+        externalSources={{}}
+        collapsible
+      />,
+    );
+    expect(setlistCardMock.mock.calls[0][0].collapsible).toBe(true);
+    expect(setlistCardMock.mock.calls[1][0].collapsible).toBe(true);
+  });
+
   // The empty prop is only for the empty case — it must not leak into renders
   // that have setlists, so callers can always pass it safely.
   test("does not render the empty prop when setlists is non-empty", async () => {
