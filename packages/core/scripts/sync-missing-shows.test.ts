@@ -386,14 +386,30 @@ describe("matchVenue", () => {
     expect(matchVenue(candidates, { name: "Fox Theatre", city: "Atlanta", state: "GA" })).toBeNull();
   });
 
-  // Two candidates tie on city+state: ambiguous, return null to stay safe
-  // (extremely rare in practice, but correctness > optimism).
+  // Two candidates tie on name + city + state: ambiguous, return null to stay
+  // safe (extremely rare in practice, but correctness > optimism).
   test("returns null when multiple candidates match (ambiguous)", () => {
     const candidates: McpSearchVenueResult[] = [
       { slug: "fox-theatre-a", name: "Fox Theatre", city: "Boulder", state: "CO" },
       { slug: "fox-theatre-b", name: "Fox Theatre", city: "Boulder", state: "CO" },
     ];
     expect(matchVenue(candidates, { name: "Fox Theatre", city: "Boulder", state: "CO" })).toBeNull();
+  });
+
+  // Regression for the Brooklyn Bowl Las Vegas bug: search_venues returned
+  // four venues all in Las Vegas, NV (Brooklyn Bowl + 2x House of Blues +
+  // Legends Lounge). Old logic ignored name and saw 4 ambiguous matches; the
+  // correct behavior is to disambiguate by name and pick the one that matches.
+  test("disambiguates by name when multiple candidates share city+state", () => {
+    const candidates: McpSearchVenueResult[] = [
+      { slug: "brooklyn-bowl-las-vegas", name: "Brooklyn Bowl Las Vegas", city: "Las Vegas", state: "NV" },
+      { slug: "house-of-blues-las-vegas-nv", name: "House of Blues", city: "Las Vegas", state: "NV" },
+      { slug: "house-of-blues-las-vegas", name: "House of Blues", city: "Las Vegas", state: "NV" },
+      { slug: "legends-lounge", name: "Legends Lounge", city: "Las Vegas", state: "NV" },
+    ];
+    expect(matchVenue(candidates, { name: "Brooklyn Bowl Las Vegas", city: "Las Vegas", state: "NV" })).toBe(
+      "brooklyn-bowl-las-vegas",
+    );
   });
 });
 

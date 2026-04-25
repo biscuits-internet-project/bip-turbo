@@ -17,7 +17,10 @@
  */
 
 import { Prisma } from "@prisma/client";
+import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
+import { RedisService } from "../src/_shared/redis";
+import { createTestLogger } from "../src/_shared/test-logger";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
 const DEFAULT_BAND_SLUG = "the-disco-biscuits";
@@ -153,11 +156,17 @@ export function matchVenue(
   candidates: McpSearchVenueResult[],
   target: { name: string; city: string; state: string },
 ): string | null {
+  const wantName = target.name.toLowerCase();
   const wantCity = target.city.toLowerCase();
   const wantState = target.state.toLowerCase();
+  // Name is a required discriminator — without it, any large city (NYC,
+  // Las Vegas) returns multiple search hits sharing city+state and the match
+  // collapses to "ambiguous". See Brooklyn Bowl Las Vegas regression test.
   const matches = candidates.filter(
     (c) =>
-      (c.city ?? "").toLowerCase() === wantCity && (c.state ?? "").toLowerCase() === wantState,
+      (c.name ?? "").toLowerCase() === wantName &&
+      (c.city ?? "").toLowerCase() === wantCity &&
+      (c.state ?? "").toLowerCase() === wantState,
   );
   if (matches.length === 1) return matches[0]?.slug ?? null;
   return null;
@@ -306,6 +315,23 @@ async function syncMissingShows(): Promise<void> {
   const now = new Date();
   const db = prisma;
 
+  // Wire up the same cache invalidation stack the app uses, so re-runs make
+  // freshly-synced shows immediately visible at /shows/year/{year} and
+  // /shows/{slug} (which both go through services.cache.getOrSet on Redis).
+  // Cloudflare cache is intentionally omitted — it's prod-only and the script
+  // runs against the local DB.
+  const logger = createTestLogger();
+  const redisUrl = process.env.REDIS_URL;
+  const redis = redisUrl ? new RedisService(redisUrl, logger) : null;
+  const cache = redis ? new CacheService(redis, logger) : null;
+  const cacheInvalidation = cache ? new CacheInvalidationService(cache, logger) : null;
+  if (redis) await redis.connect();
+
+  // Track every show whose row materially changed this run — used at the end
+  // to invalidate the per-slug show.data + setlist.data cache entries.
+  const changedSlugs = new Set<string>();
+  let songsChanged = false;
+
   const stats: SyncStats = {
     yearsSynced: years,
     showsRemote: 0,
@@ -402,6 +428,7 @@ async function syncMissingShows(): Promise<void> {
             updatedAt: now,
           },
         });
+        changedSlugs.add(remote.slug);
         stats.showsUpdated++;
         console.log(`  🔄 ${remote.slug} (rating ${local.averageRating}→${remote.averageRating}, count ${local.ratingsCount}→${remote.ratingsCount})`);
       } catch (err) {
@@ -521,6 +548,7 @@ async function syncMissingShows(): Promise<void> {
           const created = await db.song.create({ data: buildSongCreateInput(song, now) });
           songSlugToId.set(created.slug, created.id);
           stats.songsCreated++;
+          songsChanged = true;
         } catch (err) {
           console.error(`  ❌ failed to create song ${song.slug}:`, err);
           stats.errors++;
@@ -560,6 +588,7 @@ async function syncMissingShows(): Promise<void> {
               trackCount = result.count;
             }
           }
+          changedSlugs.add(slug);
           stats.showsCreated++;
           stats.tracksCreated += trackCount;
           console.log(`  ✅ ${slug} (${trackCount} tracks, venue=${venueId ? "✓" : "—"})`);
@@ -570,12 +599,28 @@ async function syncMissingShows(): Promise<void> {
       }
     }
 
+    // Cache invalidation: mirrors what ShowService.create + TrackService.create
+    // call on the canonical app paths. Per-slug `invalidateShow` clears
+    // show.data + setlist.data; `invalidateShowListings` covers shows:list:* +
+    // home:*; `invalidateSongCaches` covers songs:index + songs:filtered:*.
+    if (!isDryRun && cacheInvalidation && (changedSlugs.size > 0 || songsChanged)) {
+      console.log(`🧹 Invalidating caches: ${changedSlugs.size} show slug(s)${songsChanged ? " + song caches" : ""}`);
+      for (const slug of changedSlugs) {
+        await cacheInvalidation.invalidateShow(slug);
+      }
+      if (changedSlugs.size > 0) await cacheInvalidation.invalidateShowListings();
+      if (songsChanged) await cacheInvalidation.invalidateSongCaches();
+    } else if (!isDryRun && !cacheInvalidation && (changedSlugs.size > 0 || songsChanged)) {
+      console.warn("⚠️  REDIS_URL not set; skipping cache invalidation. Cached pages may show stale data until TTL expires or you restart the app.");
+    }
+
     printSummary(stats, isDryRun);
   } catch (err) {
     console.error("💥 Sync failed:", err);
     stats.errors++;
   } finally {
     await db.$disconnect();
+    if (redis) await redis.disconnect();
   }
 }
 
