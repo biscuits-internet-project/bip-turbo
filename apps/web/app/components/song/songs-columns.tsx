@@ -25,10 +25,20 @@ const getSortIcon = (sortState: false | "asc" | "desc") => {
   return <ArrowUpDown className="ml-2 h-4 w-4" />;
 };
 
-export const songsColumns: ColumnDef<SongWithShows>[] = [
-  {
+interface GetSongsColumnsOptions {
+  showFilteredPlays: boolean;
+}
+
+/**
+ * Produces the column definitions for the /songs table. The "Filtered Plays"
+ * column is inserted only when a filter scope is active (time range, toggles,
+ * tab-level extraParams, etc.); when absent, "Plays" alone represents all-time
+ * counts.
+ */
+export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): ColumnDef<SongWithShows>[] {
+  const titleColumn: ColumnDef<SongWithShows> = {
     accessorKey: "title",
-    meta: { width: "30%" },
+    meta: { width: showFilteredPlays ? "30%" : "40%" },
     header: ({ column }) => {
       return (
         <Button
@@ -52,8 +62,9 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
         </Link>
       );
     },
-  },
-  {
+  };
+
+  const playsColumn: ColumnDef<SongWithShows> = {
     accessorKey: "timesPlayed",
     meta: { width: "10%" },
     header: ({ column }) => {
@@ -76,8 +87,43 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
         <span className="text-content-text-tertiary text-sm italic">Never performed</span>
       );
     },
-  },
-  {
+  };
+
+  const filteredPlaysColumn: ColumnDef<SongWithShows> = {
+    accessorKey: "filteredTimesPlayed",
+    meta: { width: "10%" },
+    header: ({ column }) => {
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight"
+        >
+          Filtered Plays
+          {getSortIcon(column.getIsSorted())}
+        </Button>
+      );
+    },
+    cell: ({ row }) => {
+      const plays = row.original.filteredTimesPlayed ?? 0;
+      return plays > 0 ? (
+        <span className="text-content-text-primary font-medium">{plays}</span>
+      ) : (
+        <span className="text-content-text-tertiary text-sm">—</span>
+      );
+    },
+    sortingFn: (rowA, rowB) => {
+      const aFiltered = rowA.original.filteredTimesPlayed ?? 0;
+      const bFiltered = rowB.original.filteredTimesPlayed ?? 0;
+      if (aFiltered !== bFiltered) return aFiltered - bFiltered;
+      // Same direction tiebreaker on all-time Plays — TanStack flips the
+      // sign of the whole comparator for desc, so the secondary sort
+      // automatically follows the primary direction.
+      return rowA.original.timesPlayed - rowB.original.timesPlayed;
+    },
+  };
+
+  const lastPlayedColumn: ColumnDef<SongWithShows> = {
     accessorKey: "dateLastPlayed",
     meta: { width: "25%" },
     header: ({ column }) => {
@@ -124,8 +170,9 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
         <span className="text-content-text-tertiary text-sm">—</span>
       );
     },
-  },
-  {
+  };
+
+  const firstPlayedColumn: ColumnDef<SongWithShows> = {
     accessorKey: "dateFirstPlayed",
     meta: { width: "25%" },
     header: ({ column }) => {
@@ -172,39 +219,10 @@ export const songsColumns: ColumnDef<SongWithShows>[] = [
         <span className="text-content-text-tertiary text-sm">—</span>
       );
     },
-  },
-  {
-    accessorKey: "yearlyPlayData",
-    meta: { width: "10%" },
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors"
-        >
-          This Year
-          {getSortIcon(column.getIsSorted())}
-        </Button>
-      );
-    },
-    cell: ({ row }) => {
-      const yearlyData = row.original.yearlyPlayData as Record<string, number>;
-      const currentYear = new Date().getFullYear().toString();
-      const thisYearPlays = yearlyData?.[currentYear] || 0;
-      return thisYearPlays > 0 ? (
-        <span className="text-content-text-primary font-medium">{thisYearPlays}</span>
-      ) : (
-        <span className="text-content-text-tertiary text-sm">—</span>
-      );
-    },
-    sortingFn: (rowA, rowB) => {
-      const currentYear = new Date().getFullYear().toString();
-      const aData = rowA.original.yearlyPlayData as Record<string, number>;
-      const bData = rowB.original.yearlyPlayData as Record<string, number>;
-      const aPlays = aData?.[currentYear] || 0;
-      const bPlays = bData?.[currentYear] || 0;
-      return aPlays - bPlays;
-    },
-  },
-];
+  };
+
+  const columns: ColumnDef<SongWithShows>[] = [titleColumn, playsColumn];
+  if (showFilteredPlays) columns.push(filteredPlaysColumn);
+  columns.push(lastPlayedColumn, firstPlayedColumn);
+  return columns;
+}

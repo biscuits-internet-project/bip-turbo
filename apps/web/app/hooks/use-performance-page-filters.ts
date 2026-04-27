@@ -15,6 +15,14 @@ interface PageFiltersOptions<T> {
   apiUrl: string;
   extraParams?: Record<string, string>;
   searchFilter?: (item: T, query: string) => boolean;
+  /**
+   * When true, the hook never fires its internal `fetch(apiUrl, ...)` —
+   * `data` stays equal to `initialData` and `isLoading` stays false. Use
+   * this when the page's React Router loader is already returning
+   * filter-aware data; loader revalidation drives data updates instead of
+   * a duplicate client-side request.
+   */
+  skipClientFetch?: boolean;
 }
 
 export function usePerformancePageFilters<T>({
@@ -22,6 +30,7 @@ export function usePerformancePageFilters<T>({
   apiUrl,
   extraParams,
   searchFilter,
+  skipClientFetch = false,
 }: PageFiltersOptions<T>) {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -52,7 +61,11 @@ export function usePerformancePageFilters<T>({
     playedParam !== "";
 
   useEffect(() => {
-    if (!hasFilters) {
+    // No filters → use initialData. Or skipClientFetch (e.g. /songs index,
+    // where the loader is already filter-aware) → also use initialData and
+    // let React Router's loader revalidation drive data updates instead
+    // of firing a duplicate fetch.
+    if (!hasFilters || skipClientFetch) {
       setData(initialData);
       setIsLoading(false);
       if (loadingTimeoutRef.current) {
@@ -123,6 +136,7 @@ export function usePerformancePageFilters<T>({
     hasFilters,
     apiUrl,
     extraParams,
+    skipClientFetch,
   ]);
 
   const updateFilter = useCallback(
