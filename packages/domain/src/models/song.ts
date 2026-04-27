@@ -14,6 +14,10 @@ export const songSchema = z.object({
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   timesPlayed: z.number().default(0),
+  // Count of plays within the currently-applied filter scope (time range, toggles, etc.).
+  // Absent when no filter is active; the UI uses its presence to decide whether to render
+  // the "Filtered Plays" column alongside the all-time Plays column.
+  filteredTimesPlayed: z.number().optional(),
   dateLastPlayed: z.date().nullable(),
   dateFirstPlayed: z.date().nullable(),
   actualLastPlayedDate: z.date().nullable(),

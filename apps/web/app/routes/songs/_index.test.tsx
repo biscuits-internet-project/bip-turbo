@@ -7,8 +7,10 @@ import { describe, expect, test, vi } from "vitest";
 vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
 vi.mock("~/lib/seo", () => ({ getSongsMeta: vi.fn() }));
-vi.mock("~/lib/song-utilities", () => ({ addVenueInfoToSongs: vi.fn() }));
-vi.mock("@bip/domain/cache-keys", () => ({ CacheKeys: { songs: { index: vi.fn() } } }));
+vi.mock("~/lib/song-utilities", () => ({
+  addVenueInfoToSongs: vi.fn(),
+  fetchFilteredSongs: vi.fn(),
+}));
 
 vi.mock("~/hooks/use-serialized-loader-data", () => ({
   useSerializedLoaderData: vi.fn(() => ({ songs: [] })),
