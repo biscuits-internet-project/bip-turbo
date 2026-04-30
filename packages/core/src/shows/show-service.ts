@@ -80,6 +80,28 @@ export class ShowService {
     return slug;
   }
 
+  /**
+   * Return `{ date, hasPhotos, hasYoutube }` for every show. Feeds per-year
+   * count bucketing on list pages: the loader joins this against the
+   * date-keyed nugs/archive catalogs to produce filter-aware counts without
+   * resolving external sources per show.
+   */
+  async getShowDatesWithFlags(): Promise<Array<{ date: string; hasPhotos: boolean; hasYoutube: boolean }>> {
+    const results = await this.db.show.findMany({
+      select: {
+        date: true,
+        showPhotosCount: true,
+        showYoutubesCount: true,
+      },
+    });
+
+    return results.map((row: { date: string | Date; showPhotosCount: number; showYoutubesCount: number }) => ({
+      date: String(row.date),
+      hasPhotos: row.showPhotosCount > 0,
+      hasYoutube: row.showYoutubesCount > 0,
+    }));
+  }
+
   async findById(id: string): Promise<Show | null> {
     const result = await this.db.show.findUnique({ where: { id } });
     return result ? mapShowToDomainEntity(result) : null;
@@ -191,10 +213,20 @@ export class ShowService {
     ]);
 
     const previous = previousResults[0]
-      ? { slug: previousResults[0].slug, date: previousResults[0].date, venueName: previousResults[0].venue_name, venueCity: previousResults[0].venue_city }
+      ? {
+          slug: previousResults[0].slug,
+          date: previousResults[0].date,
+          venueName: previousResults[0].venue_name,
+          venueCity: previousResults[0].venue_city,
+        }
       : null;
     const next = nextResults[0]
-      ? { slug: nextResults[0].slug, date: nextResults[0].date, venueName: nextResults[0].venue_name, venueCity: nextResults[0].venue_city }
+      ? {
+          slug: nextResults[0].slug,
+          date: nextResults[0].date,
+          venueName: nextResults[0].venue_name,
+          venueCity: nextResults[0].venue_city,
+        }
       : null;
 
     return { previous, next };

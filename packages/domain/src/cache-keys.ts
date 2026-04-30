@@ -46,10 +46,17 @@ export const CacheKeys = {
   },
 
   /**
-   * Archive.org recording cache keys
+   * archive.org full-catalog cache (date-indexed map of all Disco Biscuits recordings)
    */
-  archive: {
-    recordings: (showDate: string) => `archive-recordings-${showDate}`,
+  archiveDotOrg: {
+    catalog: () => "archive-dot-org-catalog-disco-biscuits",
+  },
+
+  /**
+   * nugs.net catalog cache keys (keyed by nugs artist id)
+   */
+  nugs: {
+    catalog: (artistId: number) => `nugs-catalog-artist-${artistId}`,
   },
 
   /**

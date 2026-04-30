@@ -32,7 +32,7 @@ const navigation = [
   { name: "blog", href: "/blog", icon: FileText },
   { name: "top rated", href: "/shows/top-rated", icon: TrendingUp },
   { name: "tour dates", href: "/shows/tour-dates", icon: CalendarDays },
-  { name: "photos", href: "/shows/with-photos", icon: Camera, mobileOnly: true },
+  { name: "photos", href: `/shows/year/${new Date().getFullYear()}?photos=true`, icon: Camera, mobileOnly: true },
 ];
 
 export function Header() {

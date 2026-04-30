@@ -10,6 +10,7 @@ import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Card } from "~/components/ui/card";
 import { DonationBanner } from "~/components/ui/donation-banner";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -17,6 +18,7 @@ import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { getHomeMeta } from "~/lib/seo";
 import { services } from "~/server/services";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 interface AcastEpisode {
   id: string;
@@ -40,6 +42,7 @@ interface LoaderData {
   nextTourDate: TourDate | null;
   recentShows: Setlist[];
   onThisDayCounts: { showCount: number; allTimerCount: number };
+  externalSources: Record<string, ShowExternalSources>;
 }
 
 export const loader = publicLoader<LoaderData>(async ({ context }) => {
@@ -159,6 +162,11 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     { ttl: 3600 },
   );
 
+  const shownSetlists = [...recentShows, ...desktopRecentShows, ...mobileRecentShows];
+  const externalSources = await computeShowExternalSources(
+    shownSetlists.map((s) => s.show).filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i),
+  );
+
   return {
     tourDates,
     mobileRecentShows,
@@ -170,6 +178,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     nextTourDate,
     recentShows,
     onThisDayCounts,
+    externalSources,
   };
 });
 
@@ -189,6 +198,7 @@ export default function Index() {
     nextTourDate,
     recentShows = [],
     onThisDayCounts,
+    externalSources,
   } = useSerializedLoaderData<LoaderData>();
 
   return (
@@ -215,6 +225,7 @@ export default function Index() {
                   userAttendance={attendancesByShowId[setlist.show.id] || null}
                   userRating={ratingsByShowId[setlist.show.id] || null}
                   showRating={setlist.show.averageRating}
+                  externalSources={externalSources[setlist.show.id]}
                 />
               ))}
             </div>
@@ -274,6 +285,7 @@ export default function Index() {
                     userAttendance={attendancesByShowId[setlist.show.id] || null}
                     userRating={ratingsByShowId[setlist.show.id] || null}
                     showRating={setlist.show.averageRating}
+                    externalSources={externalSources[setlist.show.id]}
                   />
                 ))}
               </div>
@@ -524,6 +536,7 @@ export default function Index() {
                   userAttendance={attendancesByShowId[setlist.show.id] || null}
                   userRating={ratingsByShowId[setlist.show.id] || null}
                   showRating={setlist.show.averageRating}
+                  externalSources={externalSources[setlist.show.id]}
                 />
               ))}
             </div>

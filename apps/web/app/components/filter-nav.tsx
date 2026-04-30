@@ -19,6 +19,12 @@ interface FilterNavProps {
   parameters?: string[];
   currentURLParameters?: URLSearchParams;
   defaultExpanded?: boolean;
+  /**
+   * Optional per-filter counts. When provided, each filter label shows `(N)`
+   * alongside the value; filters with a count of 0 render as disabled text
+   * instead of a link so users see "this year has no matches" at a glance.
+   */
+  filterCounts?: Record<string, number>;
 }
 
 export function FilterNav({
@@ -34,6 +40,7 @@ export function FilterNav({
   parameters = [],
   currentURLParameters = new URLSearchParams(),
   defaultExpanded = true,
+  filterCounts,
 }: FilterNavProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -41,14 +48,8 @@ export function FilterNav({
     "text-xs font-normal text-content-text-tertiary",
     "bg-content-bg-secondary px-2 py-0.5 rounded-full",
   );
-  const itemCSS = cn(
-    "px-2 py-1.5 text-sm font-medium rounded-md",
-    "transition-all duration-200 text-center",
-  );
-  const highlightedItemCSS = cn(
-    "text-white bg-gradient-to-r from-brand-primary to-brand-secondary",
-    "font-semibold",
-  );
+  const itemCSS = cn("px-2 py-1.5 text-sm font-medium rounded-md", "transition-all duration-200 text-center");
+  const highlightedItemCSS = cn("text-white bg-gradient-to-r from-brand-primary to-brand-secondary", "font-semibold");
   const nonHighlightedItemCSS = cn(
     "text-content-text-secondary bg-content-bg-secondary",
     "hover:bg-content-bg-tertiary hover:text-white",
@@ -57,9 +58,7 @@ export function FilterNav({
     "px-3 py-1.5 text-sm font-medium rounded-md",
     "transition-all duration-200 flex items-center gap-2",
   );
-  const toggleActiveCSS = cn(
-    "text-white bg-content-bg-tertiary border border-brand-primary/50",
-  );
+  const toggleActiveCSS = cn("text-white bg-content-bg-tertiary border border-brand-primary/50");
   const toggleInactiveCSS = cn(
     "text-content-text-secondary bg-content-bg-secondary",
     "hover:bg-content-bg-tertiary hover:text-white",
@@ -118,6 +117,28 @@ export function FilterNav({
         >
           <div className={cn("grid gap-1.5", columnCSS)}>
             {filters.map((filter) => {
+              const count = filterCounts?.[filter];
+              const disabled = count === 0;
+              const label = filterCounts ? (
+                <>
+                  {filter}
+                  <span className="ml-1 text-xs opacity-70">({count ?? 0})</span>
+                </>
+              ) : (
+                filter
+              );
+
+              if (disabled) {
+                return (
+                  <span
+                    key={filter}
+                    className={cn(itemCSS, "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40")}
+                  >
+                    {label}
+                  </span>
+                );
+              }
+
               const link = getLink(filter, basePath, currentURLParameters);
               return (
                 <Link
@@ -125,7 +146,7 @@ export function FilterNav({
                   to={link}
                   className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
                 >
-                  {filter}
+                  {label}
                 </Link>
               );
             })}
@@ -160,10 +181,12 @@ export function FilterNav({
                     to={link}
                     className={cn(toggleCSS, hasParam ? toggleActiveCSS : toggleInactiveCSS)}
                   >
-                    <span className={cn(
-                      "w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[10px]",
-                      hasParam ? "bg-brand-primary border-brand-primary text-white" : "border-content-text-tertiary"
-                    )}>
+                    <span
+                      className={cn(
+                        "w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[10px]",
+                        hasParam ? "bg-brand-primary border-brand-primary text-white" : "border-content-text-tertiary",
+                      )}
+                    >
                       {hasParam && "✓"}
                     </span>
                     {parameter}

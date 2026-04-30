@@ -1,11 +1,12 @@
 import type { Attendance, Setlist, Venue } from "@bip/domain";
-import { useMemo } from "react";
 import { format } from "date-fns";
 import { ArrowLeft, CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
+import { useMemo } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistCard } from "~/components/setlist/setlist-card";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -13,6 +14,7 @@ import { type Context, publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { getVenueMeta, getVenueStructuredData } from "~/lib/seo";
 import { services } from "~/server/services";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 
 export const routeParam = "slug";
 
@@ -26,6 +28,7 @@ interface LoaderData {
     yearsPlayed: number[];
   };
   userAttendances: Attendance[];
+  externalSources: Record<string, ShowExternalSources>;
 }
 
 async function fetchUserAttendances(context: Context, showIds: string[]): Promise<Attendance[]> {
@@ -79,7 +82,9 @@ export const loader = publicLoader(async ({ params, context }: LoaderFunctionArg
     setlists.map((setlist) => setlist.show.id),
   );
 
-  return { venue, setlists, stats, userAttendances };
+  const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
+
+  return { venue, setlists, stats, userAttendances, externalSources };
 });
 
 interface StatBoxProps {
@@ -114,7 +119,7 @@ export function meta({ data }: { data: LoaderData }) {
 }
 
 export default function VenuePage() {
-  const { venue, setlists, stats, userAttendances } = useSerializedLoaderData<LoaderData>();
+  const { venue, setlists, stats, userAttendances, externalSources } = useSerializedLoaderData<LoaderData>();
 
   // Create a map for quick attendance lookup by showId
   const attendanceMap = useMemo(
@@ -197,6 +202,7 @@ export default function VenuePage() {
                 userAttendance={attendanceMap.get(setlist.show.id) || null}
                 userRating={null}
                 showRating={setlist.show.averageRating}
+                externalSources={externalSources[setlist.show.id]}
               />
             ))
           ) : (

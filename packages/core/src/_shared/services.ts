@@ -10,8 +10,11 @@ import { ReviewService } from "../reviews/review-service";
 import { PostgresSearchService } from "../search/postgres-search-service";
 import { SearchHistoryService } from "../search/search-history-service";
 import { SetlistService } from "../setlists/setlist-service";
+import { ArchiveDotOrgService } from "../shows/archive-dot-org-service";
+import { NugsService } from "../shows/nugs-service";
 import { ShowService } from "../shows/show-service";
 import { TourDatesService } from "../shows/tour-dates-service";
+import { YoutubeService } from "../shows/youtube-service";
 import { SongService } from "../songs/song-service";
 import { TrackService } from "../tracks/track-service";
 import { UserService } from "../users/user-service";
@@ -36,6 +39,9 @@ export interface Services {
   attendances: AttendanceService;
   songPageComposer: SongPageComposer;
   tourDatesService: TourDatesService;
+  nugs: NugsService;
+  archiveDotOrg: ArchiveDotOrgService;
+  youtube: YoutubeService;
   files: FileService;
   postgresSearch: PostgresSearchService;
   searchHistory: SearchHistoryService;
@@ -69,6 +75,9 @@ export function createServices(container: ServiceContainer): Services {
     attendances: new AttendanceService(container.db, container.logger),
     songPageComposer: new SongPageComposer(container.db, songService),
     tourDatesService: new TourDatesService(container.redis),
+    nugs: new NugsService(container.redis, container.logger),
+    archiveDotOrg: new ArchiveDotOrgService(container.redis, container.logger),
+    youtube: new YoutubeService(container.db),
     files: new FileService(container.db, container.logger, {
       accountId: container.env.CLOUDFLARE_ACCOUNT_ID,
       apiToken: container.env.CLOUDFLARE_IMAGES_API_TOKEN,
