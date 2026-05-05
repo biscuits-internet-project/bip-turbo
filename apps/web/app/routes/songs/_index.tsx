@@ -1,13 +1,13 @@
 import type { Song } from "@bip/domain";
-import { CacheKeys } from "@bip/domain/cache-keys";
 import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
-import { loadSongsWithVenueInfo } from "~/lib/song-utilities";
+import { fetchFilteredSongs } from "~/lib/song-utilities";
 
-export const loader = publicLoader(async () => {
-  return loadSongsWithVenueInfo(CacheKeys.songs.index());
+export const loader = publicLoader(async ({ request, context }) => {
+  const url = new URL(request.url);
+  return { songs: await fetchFilteredSongs(url, context) };
 });
 
 export function meta() {

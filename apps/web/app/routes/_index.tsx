@@ -1,15 +1,8 @@
-import {
-  type Attendance,
-  type BlogPostWithUser,
-  CacheKeys,
-  type Rating,
-  type Setlist,
-  type TourDate,
-} from "@bip/domain";
+import { type BlogPostWithUser, CacheKeys, type Setlist, type TourDate } from "@bip/domain";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
-import { SetlistCard } from "~/components/setlist/setlist-card";
+import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Card } from "~/components/ui/card";
 import { DonationBanner } from "~/components/ui/donation-banner";
@@ -19,6 +12,7 @@ import { logger } from "~/lib/logger";
 import { getHomeMeta } from "~/lib/seo";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
+import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
 
 interface AcastEpisode {
   id: string;
@@ -36,18 +30,15 @@ interface LoaderData {
   mobileRecentShows: Setlist[];
   desktopRecentShows: Setlist[];
   recentBlogPosts: Array<BlogPostWithUser>;
-  attendancesByShowId: Record<string, Attendance>;
-  ratingsByShowId: Record<string, Rating>;
   latestEpisode: AcastEpisode | null;
   nextTourDate: TourDate | null;
   recentShows: Setlist[];
   onThisDayCounts: { showCount: number; allTimerCount: number };
   externalSources: Record<string, ShowExternalSources>;
+  initialUserData: ShowUserDataResponse;
 }
 
 export const loader = publicLoader<LoaderData>(async ({ context }) => {
-  const { currentUser } = context;
-
   const allTourDates = Array.isArray(await services.tourDatesService.getTourDates())
     ? await services.tourDatesService.getTourDates()
     : [];
@@ -108,36 +99,17 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     ],
   });
 
-  // Get attendances and ratings for all shows (mobile + desktop)
+  // Collect every show id rendered on the page so we seed the client's
+  // React Query cache with attendance/rating data in one server-side fetch.
   const allShowIds = [
-    ...new Set([...mobileRecentShows.map((s) => s.show.id), ...desktopRecentShows.map((s) => s.show.id)]),
+    ...new Set([
+      ...recentShows.map((s) => s.show.id),
+      ...mobileRecentShows.map((s) => s.show.id),
+      ...desktopRecentShows.map((s) => s.show.id),
+    ]),
   ];
 
-  // Find local user by email if authenticated
-  let localUserId: string | null = null;
-  if (currentUser) {
-    const localUser = await services.users.findByEmail(currentUser.email);
-    localUserId = localUser?.id || null;
-  }
-
-  const attendances = localUserId ? await services.attendances.findManyByUserIdAndShowIds(localUserId, allShowIds) : [];
-  const ratings = localUserId
-    ? await services.ratings.findManyByUserIdAndRateableIds(localUserId, allShowIds, "Show")
-    : [];
-  const attendancesByShowId = attendances.reduce(
-    (acc, attendance) => {
-      acc[attendance.showId] = attendance;
-      return acc;
-    },
-    {} as Record<string, Attendance>,
-  );
-  const ratingsByShowId = ratings.reduce(
-    (acc, rating) => {
-      acc[rating.rateableId] = rating;
-      return acc;
-    },
-    {} as Record<string, Rating>,
-  );
+  const initialUserData = await computeShowUserData(context, allShowIds);
 
   // Fetch latest podcast episode
   let latestEpisode: AcastEpisode | null = null;
@@ -172,13 +144,12 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     mobileRecentShows,
     desktopRecentShows,
     recentBlogPosts,
-    attendancesByShowId,
-    ratingsByShowId,
     latestEpisode,
     nextTourDate,
     recentShows,
     onThisDayCounts,
     externalSources,
+    initialUserData,
   };
 });
 
@@ -192,13 +163,12 @@ export default function Index() {
     mobileRecentShows = [],
     desktopRecentShows = [],
     recentBlogPosts = [],
-    attendancesByShowId = {} as Record<string, Attendance>,
-    ratingsByShowId = {} as Record<string, Rating>,
     latestEpisode,
     nextTourDate,
     recentShows = [],
     onThisDayCounts,
     externalSources,
+    initialUserData,
   } = useSerializedLoaderData<LoaderData>();
 
   return (
@@ -215,22 +185,15 @@ export default function Index() {
 
       {/* Recent Shows - Only on mobile */}
       <div className="md:hidden">
-        {recentShows.length > 0 && (
-          <div className="mb-6">
-            <div className="space-y-4">
-              {recentShows.slice(0, 2).map((setlist) => (
-                <SetlistCard
-                  key={setlist.show.id}
-                  setlist={setlist}
-                  userAttendance={attendancesByShowId[setlist.show.id] || null}
-                  userRating={ratingsByShowId[setlist.show.id] || null}
-                  showRating={setlist.show.averageRating}
-                  externalSources={externalSources[setlist.show.id]}
-                />
-              ))}
-            </div>
+        <div className="mb-6">
+          <div className="space-y-4">
+            <SetlistList
+              setlists={recentShows.slice(0, 2)}
+              externalSources={externalSources}
+              initialUserData={initialUserData}
+            />
           </div>
-        )}
+        </div>
 
         {/* Next Show Banner - Mobile only */}
         {nextTourDate && (
@@ -276,24 +239,18 @@ export default function Index() {
               </div>
             </div>
 
-            {desktopRecentShows.length > 0 ? (
-              <div className="grid gap-6">
-                {desktopRecentShows.map((setlist) => (
-                  <SetlistCard
-                    key={setlist.show.id}
-                    setlist={setlist}
-                    userAttendance={attendancesByShowId[setlist.show.id] || null}
-                    userRating={ratingsByShowId[setlist.show.id] || null}
-                    showRating={setlist.show.averageRating}
-                    externalSources={externalSources[setlist.show.id]}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-8 border border-dashed rounded-lg">
-                <p className="text-muted-foreground">No recent shows available</p>
-              </div>
-            )}
+            <div className="grid gap-6">
+              <SetlistList
+                setlists={desktopRecentShows}
+                externalSources={externalSources}
+                initialUserData={initialUserData}
+                empty={
+                  <div className="text-center p-8 border border-dashed rounded-lg">
+                    <p className="text-muted-foreground">No recent shows available</p>
+                  </div>
+                }
+              />
+            </div>
           </div>
 
           {/* Right Column - Sidebar Content */}
@@ -527,24 +484,18 @@ export default function Index() {
             </div>
           </div>
 
-          {mobileRecentShows.length > 0 ? (
-            <div className="grid gap-6">
-              {mobileRecentShows.map((setlist) => (
-                <SetlistCard
-                  key={setlist.show.id}
-                  setlist={setlist}
-                  userAttendance={attendancesByShowId[setlist.show.id] || null}
-                  userRating={ratingsByShowId[setlist.show.id] || null}
-                  showRating={setlist.show.averageRating}
-                  externalSources={externalSources[setlist.show.id]}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center p-8 border border-dashed rounded-lg">
-              <p className="text-muted-foreground">No recent shows available</p>
-            </div>
-          )}
+          <div className="grid gap-6">
+            <SetlistList
+              setlists={mobileRecentShows}
+              externalSources={externalSources}
+              initialUserData={initialUserData}
+              empty={
+                <div className="text-center p-8 border border-dashed rounded-lg">
+                  <p className="text-muted-foreground">No recent shows available</p>
+                </div>
+              }
+            />
+          </div>
         </div>
 
         {/* Upcoming Tour Dates Section - Mobile */}

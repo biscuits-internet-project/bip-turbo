@@ -25,6 +25,8 @@ interface FilterNavProps {
    * instead of a link so users see "this year has no matches" at a glance.
    */
   filterCounts?: Record<string, number>;
+  /** Optional count rendered beside the "All" button. Ignored without showAllButton. */
+  allCount?: number;
 }
 
 export function FilterNav({
@@ -41,6 +43,7 @@ export function FilterNav({
   currentURLParameters = new URLSearchParams(),
   defaultExpanded = true,
   filterCounts,
+  allCount,
 }: FilterNavProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -159,6 +162,7 @@ export function FilterNav({
                 })}
               >
                 All
+                {allCount !== undefined && <span className="ml-1 text-xs opacity-70">({allCount})</span>}
               </Link>
             )}
           </div>

@@ -2,7 +2,7 @@ import type { Attendance } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { batchedPostFetch } from "~/lib/batched-fetch";
-import type { ShowUserDataResponse } from "~/routes/api/shows/user-data";
+import type { ShowUserDataResponse } from "~/server/show-user-data";
 
 interface UseShowUserDataResult {
   attendanceMap: Map<string, Attendance | null>;
@@ -28,7 +28,16 @@ function mergeShowUserData(results: ShowUserDataResponse[]): ShowUserDataRespons
   return merged;
 }
 
-export function useShowUserData(showIds: string[]): UseShowUserDataResult {
+interface UseShowUserDataOptions {
+  /**
+   * Server-fetched initial data to seed React Query's cache so SetlistCards
+   * render attendance / rating badges on first paint. When present, the data
+   * is treated as fresh (no background refetch within the stale window).
+   */
+  initialData?: ShowUserDataResponse;
+}
+
+export function useShowUserData(showIds: string[], options?: UseShowUserDataOptions): UseShowUserDataResult {
   // Create a stable key from sorted show IDs
   const queryKey = useMemo(() => ["shows", "user-data", [...showIds].sort().join(",")], [showIds]);
 
@@ -37,7 +46,9 @@ export function useShowUserData(showIds: string[]): UseShowUserDataResult {
     queryFn: () =>
       batchedPostFetch<ShowUserDataResponse>("/api/shows/user-data", showIds, "showIds", 200, mergeShowUserData),
     enabled: showIds.length > 0,
-    staleTime: 30_000, // 30 seconds
+    staleTime: 30_000,
+    initialData: options?.initialData,
+    initialDataUpdatedAt: options?.initialData ? Date.now() : undefined,
   });
 
   // Transform response into Maps for O(1) lookup
@@ -134,20 +145,17 @@ export function useAttendanceMutation() {
       });
 
       // Optimistically update the cache
-      queryClient.setQueriesData<ShowUserDataResponse>(
-        { queryKey: ["shows", "user-data"] },
-        (oldData) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            attendances: {
-              ...oldData.attendances,
-              // Toggle: if currently attending, set to null; otherwise set a placeholder
-              [showId]: currentAttendance ? null : ({ id: "optimistic", showId, userId: "" } as Attendance),
-            },
-          };
-        }
-      );
+      queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          attendances: {
+            ...oldData.attendances,
+            // Toggle: if currently attending, set to null; otherwise set a placeholder
+            [showId]: currentAttendance ? null : ({ id: "optimistic", showId, userId: "" } as Attendance),
+          },
+        };
+      });
 
       return { previousData };
     },
@@ -161,19 +169,16 @@ export function useAttendanceMutation() {
     },
     onSuccess: (result, { showId }) => {
       // Update cache with actual result
-      queryClient.setQueriesData<ShowUserDataResponse>(
-        { queryKey: ["shows", "user-data"] },
-        (oldData) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            attendances: {
-              ...oldData.attendances,
-              [showId]: result.attendance,
-            },
-          };
-        }
-      );
+      queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          attendances: {
+            ...oldData.attendances,
+            [showId]: result.attendance,
+          },
+        };
+      });
     },
   });
 }

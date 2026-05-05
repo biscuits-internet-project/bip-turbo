@@ -202,6 +202,47 @@ describe("usePerformancePageFilters", () => {
     expect(result.current.searchText).toBe("");
   });
 
+  // skipClientFetch lets a consumer disable the internal fetch when the
+  // page's loader is already returning filter-aware data (e.g. /songs).
+  // Filters can be active and yet no fetch fires; data stays = initialData
+  // and isLoading stays false. Loader revalidation drives data updates.
+  test("skipClientFetch=true: no fetch fires even when filters are active", async () => {
+    mockSearchParams = new URLSearchParams("timeRange=2024");
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+
+    const { result } = renderHook(() =>
+      usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test", skipClientFetch: true }),
+    );
+
+    // Advance past the debounce window — still no fetch.
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.data).toEqual(EMPTY);
+  });
+
+  // Default behavior preserved: with skipClientFetch unset (or false), the
+  // hook still fetches when filters are active. Pins that the new option
+  // doesn't accidentally silence the existing client-fetch consumers
+  // (/songs/$slug performances, /songs/all-timers, /on-this-day).
+  test("skipClientFetch defaults to false: fetch still fires for other consumers", async () => {
+    mockSearchParams = new URLSearchParams("timeRange=2024");
+    const fetchMock = vi.fn().mockImplementation(() => new Promise(() => {}));
+    globalThis.fetch = fetchMock;
+
+    renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   // Verifies that the setSearchParams updater clears all URL param keys
   // (timeRange, cover, author, filters, attended, played). We call the updater
   // manually because the mock doesn't trigger React state updates — we just
@@ -221,9 +262,7 @@ describe("usePerformancePageFilters", () => {
 
     const updaterFn = mockSetSearchParams.mock.calls[0][0];
     const nextParams = updaterFn(
-      new URLSearchParams(
-        "timeRange=2024&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
-      ),
+      new URLSearchParams("timeRange=2024&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed"),
     );
 
     expect(nextParams.get("timeRange")).toBeNull();

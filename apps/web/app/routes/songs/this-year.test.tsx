@@ -6,9 +6,10 @@ import { describe, expect, test, vi } from "vitest";
 // Mock server-side modules
 vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
-vi.mock("~/lib/song-utilities", () => ({ addVenueInfoToSongs: vi.fn() }));
-vi.mock("~/lib/song-filters", () => ({ SONG_FILTERS: { thisYear: { startDate: new Date(), endDate: new Date() } } }));
-vi.mock("@bip/domain/cache-keys", () => ({ CacheKeys: { songs: { filtered: vi.fn() } } }));
+vi.mock("~/lib/song-utilities", () => ({
+  addVenueInfoToSongs: vi.fn(),
+  fetchFilteredSongs: vi.fn(),
+}));
 
 vi.mock("~/hooks/use-serialized-loader-data", () => ({
   useSerializedLoaderData: vi.fn(() => ({ songs: [] })),

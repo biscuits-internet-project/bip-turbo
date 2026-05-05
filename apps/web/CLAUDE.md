@@ -9,6 +9,10 @@ React Router v7 uses explicit route configuration. File-based routing alone IS N
 
 Otherwise the route WILL NOT WORK and you'll get 404s.
 
+## Don't let server-only modules leak into the client bundle
+
+If a route component references a runtime value from a `.ts` helper under `app/routes/` that imports `~/server/*`, `@bip/core`, or `@prisma/*`, Vite evaluates the server helper in the client bundle and silently breaks `<Link>` navigation (see PR #58). The route component may only `import type` from the helper — never value imports. When the component needs a value the loader also uses, return it from the loader as part of the loader data (preferred) or factor it into a sibling `*-constants.ts` file with no server imports. Enforced by [app/lib/server-import-leak.test.ts](app/lib/server-import-leak.test.ts).
+
 ## Architecture
 
 - **Router**: React Router v7 with file-based routing in `app/routes/`

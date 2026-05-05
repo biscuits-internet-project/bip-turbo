@@ -1,17 +1,16 @@
 import type { Song } from "@bip/domain";
-import { CacheKeys } from "@bip/domain/cache-keys";
 import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { resolveLast10ShowsDateRange } from "~/lib/performance-filter-params";
-import { loadSongsWithVenueInfo } from "~/lib/song-utilities";
+import { fetchFilteredSongs } from "~/lib/song-utilities";
 
-export const loader = publicLoader(async () => {
-  const dateRange = await resolveLast10ShowsDateRange();
-  return loadSongsWithVenueInfo(
-    CacheKeys.songs.filtered({ timeRange: "last10shows" }),
-    dateRange ?? undefined,
-  );
+export const loader = publicLoader(async ({ request, context }) => {
+  // Synthesize the timeRange into the URL so fetchFilteredSongs sees the
+  // tab's implicit filter as if it were a regular query param. Same cache
+  // entry as /api/songs?timeRange=last10shows.
+  const url = new URL(request.url);
+  url.searchParams.set("timeRange", "last10shows");
+  return { songs: await fetchFilteredSongs(url, context) };
 });
 
 export function meta() {
