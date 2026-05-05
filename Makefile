@@ -69,6 +69,9 @@ db-restore:
 	pg_restore --no-owner --no-acl --data-only -d "$$(doppler secrets get DATABASE_URL --plain)" $(PROD_DATA_PATH) || true
 	@echo "Production data restored successfully."
 
+db-sync-missing-shows:
+	cd packages/core && doppler run -- bun run scripts/sync-missing-shows.ts $(if $(YEARS),--years=$(YEARS)) $(if $(DRY_RUN),--dry-run)
+
 db-load-data-dump:
 	psql "$$(doppler secrets get DATABASE_URL --plain | sed 's|postgresql://postgres:|postgresql://supabase_admin:|')" -f $(PROD_DATA_PATH)
 
