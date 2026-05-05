@@ -50,7 +50,7 @@ describe("usePerformancePageFilters", () => {
   // Loading state is debounced by 200ms to avoid flicker on fast responses.
   // Before the timeout fires, isLoading should remain false.
   test("isLoading becomes true after debounce when filters trigger a fetch", async () => {
-    mockSearchParams = new URLSearchParams("year=2024");
+    mockSearchParams = new URLSearchParams("timeRange=2024");
     // Never-resolving fetch so loading stays true
     globalThis.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
 
@@ -69,7 +69,7 @@ describe("usePerformancePageFilters", () => {
   // Once the fetch resolves, loading state should clear — even if the
   // debounce timeout already fired. Verifies the full loading lifecycle.
   test("isLoading returns to false when fetch completes", async () => {
-    mockSearchParams = new URLSearchParams("year=2024");
+    mockSearchParams = new URLSearchParams("timeRange=2024");
     let resolveResponse: (value: unknown) => void = () => {};
     globalThis.fetch = vi.fn().mockImplementation(
       () =>
@@ -99,7 +99,17 @@ describe("usePerformancePageFilters", () => {
     expect(result.current.hasFilters).toBe(false);
   });
 
-  test("hasFilters is true when year is set", () => {
+  // timeRange is the URL param for time-based filtering (years, eras, presets).
+  test("hasFilters is true when timeRange is set", () => {
+    mockSearchParams = new URLSearchParams("timeRange=2024");
+
+    const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
+
+    expect(result.current.hasFilters).toBe(true);
+  });
+
+  // Legacy year= and era= URL params still activate filters for bookmarked URLs.
+  test("hasFilters is true when legacy year param is set", () => {
     mockSearchParams = new URLSearchParams("year=2024");
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
@@ -107,8 +117,8 @@ describe("usePerformancePageFilters", () => {
     expect(result.current.hasFilters).toBe(true);
   });
 
-  test("hasFilters is true when era is set", () => {
-    mockSearchParams = new URLSearchParams("era=1.0");
+  test("hasFilters is true when legacy era param is set", () => {
+    mockSearchParams = new URLSearchParams("era=sammy");
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
 
@@ -167,7 +177,7 @@ describe("usePerformancePageFilters", () => {
   });
 
   test("hasActiveFilters is true when URL params are set even if searchText is empty", () => {
-    mockSearchParams = new URLSearchParams("year=2024");
+    mockSearchParams = new URLSearchParams("timeRange=2024");
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
 
@@ -192,13 +202,13 @@ describe("usePerformancePageFilters", () => {
     expect(result.current.searchText).toBe("");
   });
 
-  // Verifies that the setSearchParams updater clears all seven URL param keys
-  // (year, era, cover, author, filters, attended, played). We call the updater
+  // Verifies that the setSearchParams updater clears all URL param keys
+  // (timeRange, cover, author, filters, attended, played). We call the updater
   // manually because the mock doesn't trigger React state updates — we just
   // need to confirm the function produces the right params.
   test("clearFilters resets all params", () => {
     mockSearchParams = new URLSearchParams(
-      "year=2024&era=1.0&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
+      "timeRange=2024&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
     );
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
@@ -212,12 +222,11 @@ describe("usePerformancePageFilters", () => {
     const updaterFn = mockSetSearchParams.mock.calls[0][0];
     const nextParams = updaterFn(
       new URLSearchParams(
-        "year=2024&era=1.0&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
+        "timeRange=2024&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
       ),
     );
 
-    expect(nextParams.get("year")).toBeNull();
-    expect(nextParams.get("era")).toBeNull();
+    expect(nextParams.get("timeRange")).toBeNull();
     expect(nextParams.get("cover")).toBeNull();
     expect(nextParams.get("author")).toBeNull();
     expect(nextParams.get("filters")).toBeNull();

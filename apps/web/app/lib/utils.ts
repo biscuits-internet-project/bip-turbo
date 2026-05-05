@@ -69,6 +69,25 @@ export function addDaysYearAgnostic(monthDay: string, delta: number): string {
   return `${m}-${d}`;
 }
 
+export function getOrdinalSuffix(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "st";
+  if (mod10 === 2 && mod100 !== 12) return "nd";
+  if (mod10 === 3 && mod100 !== 13) return "rd";
+  return "th";
+}
+
+export function getAnniversaryYears(showDate: string): number | null {
+  const showYear = Number.parseInt(showDate.split("-")[0], 10);
+  const currentYear = new Date().getFullYear();
+  const years = currentYear - showYear;
+
+  if (years <= 0 || years % 5 !== 0) return null;
+
+  return years;
+}
+
 // this input will be in the format "2025-01-01"
 // this should output as "January 1, 2025"
 export function formatDateLong(date: string): string {

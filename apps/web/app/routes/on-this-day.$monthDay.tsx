@@ -98,8 +98,7 @@ export default function OnThisDay() {
   const {
     filteredData: filteredPerformances,
     isLoading,
-    selectedYear,
-    selectedEra,
+    selectedTimeRange,
     coverFilter,
     selectedAuthor,
     activeToggleSet,
@@ -171,8 +170,7 @@ export default function OnThisDay() {
               headerContent={
                 performances.length > ALL_TIMERS_PAGE_SIZE ? (
                   <PerformanceFilterControls
-                    selectedYear={selectedYear}
-                    selectedEra={selectedEra}
+                    selectedTimeRange={selectedTimeRange}
                     activeToggleSet={activeToggleSet}
                     updateFilter={updateFilter}
                     toggleFilter={toggleFilter}

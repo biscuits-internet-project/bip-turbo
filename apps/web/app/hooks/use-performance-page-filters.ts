@@ -1,6 +1,7 @@
 import type { SongPagePerformance } from "@bip/domain";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { getTimeRangeParam } from "~/lib/song-filters";
 
 export const searchPerformance = (performance: SongPagePerformance, query: string) =>
   performance.songTitle?.toLowerCase().includes(query) ||
@@ -24,8 +25,7 @@ export function usePerformancePageFilters<T>({
 }: PageFiltersOptions<T>) {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const selectedYear = searchParams.get("year") || "all";
-  const selectedEra = searchParams.get("era") || "all";
+  const selectedTimeRange = getTimeRangeParam(searchParams) || "all";
   const coverFilter = (searchParams.get("cover") as "all" | "cover" | "original") || "all";
   const selectedAuthor = searchParams.get("author") || null;
   const filtersParam = searchParams.get("filters") || "";
@@ -44,8 +44,7 @@ export function usePerformancePageFilters<T>({
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasFilters =
-    selectedYear !== "all" ||
-    selectedEra !== "all" ||
+    selectedTimeRange !== "all" ||
     coverFilter !== "all" ||
     !!selectedAuthor ||
     filtersParam !== "" ||
@@ -70,8 +69,7 @@ export function usePerformancePageFilters<T>({
     }, 200);
 
     const params = new URLSearchParams();
-    if (selectedYear !== "all") params.set("year", selectedYear);
-    if (selectedEra !== "all") params.set("era", selectedEra);
+    if (selectedTimeRange !== "all") params.set("timeRange", selectedTimeRange);
     if (coverFilter !== "all") params.set("cover", coverFilter);
     if (selectedAuthor) params.set("author", selectedAuthor);
     if (filtersParam) params.set("filters", filtersParam);
@@ -115,8 +113,7 @@ export function usePerformancePageFilters<T>({
       }
     };
   }, [
-    selectedYear,
-    selectedEra,
+    selectedTimeRange,
     coverFilter,
     selectedAuthor,
     filtersParam,
@@ -178,7 +175,16 @@ export function usePerformancePageFilters<T>({
   const hasActiveFilters = hasFilters || searchText.length > 0;
 
   const clearFilters = useCallback(() => {
-    updateFilter({ year: null, era: null, cover: null, author: null, filters: null, attended: null, played: null });
+    updateFilter({
+      timeRange: null,
+      year: null,
+      era: null,
+      cover: null,
+      author: null,
+      filters: null,
+      attended: null,
+      played: null,
+    });
     setSearchText("");
   }, [updateFilter]);
 
@@ -186,8 +192,7 @@ export function usePerformancePageFilters<T>({
     data,
     filteredData,
     isLoading,
-    selectedYear,
-    selectedEra,
+    selectedTimeRange,
     coverFilter,
     selectedAuthor,
     playedFilter: playedParam || "all",
