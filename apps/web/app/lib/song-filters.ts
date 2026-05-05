@@ -27,9 +27,12 @@ const eraFilters: Record<string, SongFilterConfig> = {
   triscuits: { label: "Triscuits", startDate: new Date("2000-03-11"), endDate: new Date("2000-07-12") },
 };
 
+const currentYear = new Date().getFullYear();
+
 export const SONG_FILTERS: Record<string, SongFilterConfig> = {
   ...yearFilters,
   ...eraFilters,
+  thisYear: yearFilters[String(currentYear)],
 };
 
 export const YEAR_OPTIONS = Object.entries(yearFilters)
@@ -40,6 +43,32 @@ export const ERA_OPTIONS = Object.entries(eraFilters).map(([value, config]) => (
   value,
   label: config.label,
 }));
+
+export const TIME_RANGE_GROUPS = [
+  {
+    label: "Recent",
+    options: [
+      { value: "last10shows", label: "Last 10 Shows" },
+      { value: "thisYear", label: "This Year" },
+    ],
+  },
+  {
+    label: "Eras",
+    options: ERA_OPTIONS,
+  },
+  {
+    label: "Years",
+    options: YEAR_OPTIONS,
+  },
+];
+
+/**
+ * Extract the timeRange value from URL search params, accepting year/era as fallbacks
+ * for bookmarked URLs.
+ */
+export function getTimeRangeParam(params: URLSearchParams): string | null {
+  return params.get("timeRange") || params.get("year") || params.get("era") || null;
+}
 
 /**
  * Tag filters shared between /songs, /songs/all-timers, and /songs/$slug.

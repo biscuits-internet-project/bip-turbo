@@ -2,15 +2,14 @@ import { CacheKeys, type SetlistLight } from "@bip/domain";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
-import { Link, type LoaderFunctionArgs, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { SetlistCard } from "~/components/setlist/setlist-card";
+import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ShowFiltersNav } from "~/components/show-filters-nav";
 import { Button } from "~/components/ui/button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { getShowsMeta } from "~/lib/seo";
@@ -19,6 +18,7 @@ import { applyExternalSourceFilters } from "~/server/apply-external-source-filte
 import { services } from "~/server/services";
 import { computeShowCountsByYear } from "~/server/show-counts-by-year";
 import { computeShowExternalSources } from "~/server/show-external-sources";
+import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
 
 interface LoaderData {
   setlists: SetlistLight[];
@@ -28,6 +28,7 @@ interface LoaderData {
   showCountsByYear: Record<number, number>;
   monthCounts: Record<number, number>;
   filters: { photos: boolean; youtube: boolean; nugs: boolean; archive: boolean };
+  initialUserData: ShowUserDataResponse;
 }
 
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -62,7 +63,7 @@ export function headers({ loaderHeaders, data }: { loaderHeaders: Headers; data:
   return headers;
 }
 
-export const loader = publicLoader(async ({ request, params }: LoaderFunctionArgs): Promise<LoaderData> => {
+export const loader = publicLoader(async ({ request, params, context }): Promise<LoaderData> => {
   const url = new URL(request.url);
   const year = params.year || new Date().getFullYear();
   const yearInt = Number.parseInt(year as string, 10);
@@ -97,6 +98,10 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
       showCountsByYear: emptyCounts,
       monthCounts: emptyCounts,
       filters,
+      initialUserData: await computeShowUserData(
+        context,
+        setlists.map((s) => s.show.id),
+      ),
     };
   }
 
@@ -147,6 +152,10 @@ export const loader = publicLoader(async ({ request, params }: LoaderFunctionArg
     showCountsByYear,
     monthCounts,
     filters,
+    initialUserData: await computeShowUserData(
+      context,
+      filteredSetlists.map((s) => s.show.id),
+    ),
   };
 });
 
@@ -161,7 +170,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function ShowsByYear() {
-  const { setlists, year, searchQuery, externalSources, showCountsByYear, monthCounts } =
+  const { setlists, year, searchQuery, externalSources, showCountsByYear, monthCounts, initialUserData } =
     useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
@@ -171,32 +180,8 @@ export default function ShowsByYear() {
   const location = useLocation();
   const currentURLParameters = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
-  // Extract show IDs for client-side data fetching
-  const showIds = useMemo(() => setlists.map((setlist) => setlist.show.id), [setlists]);
-
-  // Fetch user-specific data client-side (attendances, user ratings, average ratings)
-  const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
-
-  // Group setlists by month - memoize to prevent unnecessary recalculation
-  const setlistsByMonth = useMemo(() => {
-    return setlists.reduce(
-      (acc, setlist) => {
-        const date = new Date(setlist.show.date);
-        const month = date.getMonth();
-        if (!acc[month]) {
-          acc[month] = [];
-        }
-        acc[month].push(setlist);
-        return acc;
-      },
-      {} as Record<number, SetlistLight[]>,
-    );
-  }, [setlists]);
-
-  // Get months that have shows
-  const monthsWithShows = useMemo(() => {
-    return Object.keys(setlistsByMonth).map(Number);
-  }, [setlistsByMonth]);
+  // Months with at least one show — drives the Jump-to-Month nav active state.
+  const monthsWithShows = useMemo(() => Object.keys(monthCounts).map(Number), [monthCounts]);
 
   // Handle scroll event to show/hide back to top button
   useEffect(() => {
@@ -296,61 +281,25 @@ export default function ShowsByYear() {
             </div>
           )}
 
-          {/* Results Content */}
+          {/* Results Content. Loader returns setlists pre-sorted (desc for the
+              current year, asc otherwise); SetlistList preserves that order
+              when grouping by month. */}
           <div>
-            {/* Setlist cards */}
             <div className="space-y-8">
-              {setlists.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-content-text-secondary text-lg">
-                    {searchQuery ? "No shows found matching your search." : "No shows found for this year."}
-                  </p>
-                </div>
-              ) : searchQuery ? (
-                <div className="space-y-4">
-                  {setlists.map((setlist) => (
-                    <SetlistCard
-                      key={setlist.show.id}
-                      setlist={setlist}
-                      userAttendance={attendanceMap.get(setlist.show.id) ?? null}
-                      userRating={userRatingMap.get(setlist.show.id) ?? null}
-                      showRating={averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating}
-                      externalSources={externalSources[setlist.show.id]}
-                      className="transition-all duration-300 transform hover:scale-[1.01]"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  {monthsWithShows
-                    .sort((a, b) => (year === new Date().getFullYear() ? b - a : a - b))
-                    .map((month) => (
-                      <div key={month} className="space-y-4">
-                        {setlistsByMonth[month]
-                          .sort((a, b) => {
-                            const dateA = new Date(a.show.date).getTime();
-                            const dateB = new Date(b.show.date).getTime();
-                            return year === new Date().getFullYear() ? dateB - dateA : dateA - dateB;
-                          })
-                          .map((setlist, index) => (
-                            <div key={setlist.show.id}>
-                              {index === 0 && <div id={`month-${month}`} className="scroll-mt-20" />}
-                              <SetlistCard
-                                setlist={setlist}
-                                userAttendance={attendanceMap.get(setlist.show.id) ?? null}
-                                userRating={userRatingMap.get(setlist.show.id) ?? null}
-                                showRating={
-                                  averageRatingMap.get(setlist.show.id)?.average ?? setlist.show.averageRating
-                                }
-                                externalSources={externalSources[setlist.show.id]}
-                                className="transition-all duration-300 transform hover:scale-[1.01]"
-                              />
-                            </div>
-                          ))}
-                      </div>
-                    ))}
-                </div>
-              )}
+              <SetlistList
+                setlists={setlists}
+                externalSources={externalSources}
+                initialUserData={initialUserData}
+                className="transition-all duration-300 transform hover:scale-[1.01]"
+                groupByMonth={!searchQuery}
+                empty={
+                  <div className="text-center py-8">
+                    <p className="text-content-text-secondary text-lg">
+                      {searchQuery ? "No shows found matching your search." : "No shows found for this year."}
+                    </p>
+                  </div>
+                }
+              />
             </div>
           </div>
         </div>
