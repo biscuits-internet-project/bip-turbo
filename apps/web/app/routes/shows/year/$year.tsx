@@ -13,6 +13,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { getShowsMeta } from "~/lib/seo";
+import { parseTriState, type TriState, triStateToBoolean } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
 import { applyExternalSourceFilters } from "~/server/apply-external-source-filters";
 import { services } from "~/server/services";
@@ -27,7 +28,7 @@ interface LoaderData {
   externalSources: Record<string, ShowExternalSources>;
   showCountsByYear: Record<number, number>;
   monthCounts: Record<number, number>;
-  filters: { photos: boolean; youtube: boolean; nugs: boolean; archive: boolean };
+  filters: { photos: TriState; youtube: TriState; nugs: TriState; archive: TriState };
   initialUserData: ShowUserDataResponse;
 }
 
@@ -70,10 +71,10 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
   const searchQuery = url.searchParams.get("q") || undefined;
 
   const filters = {
-    photos: url.searchParams.has("photos"),
-    youtube: url.searchParams.has("youtube"),
-    nugs: url.searchParams.has("nugs"),
-    archive: url.searchParams.has("archive"),
+    photos: parseTriState(url.searchParams.get("photos")),
+    youtube: parseTriState(url.searchParams.get("youtube")),
+    nugs: parseTriState(url.searchParams.get("nugs")),
+    archive: parseTriState(url.searchParams.get("archive")),
   };
   const emptyCounts: Record<number, number> = {};
 
@@ -122,8 +123,8 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     return await services.setlists.findManyLight({
       filters: {
         year: yearInt,
-        hasPhotos: filters.photos || undefined,
-        hasYoutube: filters.youtube || undefined,
+        hasPhotos: triStateToBoolean(filters.photos),
+        hasYoutube: triStateToBoolean(filters.youtube),
       },
       sort: [{ field: "date", direction: sortDirection }],
     });

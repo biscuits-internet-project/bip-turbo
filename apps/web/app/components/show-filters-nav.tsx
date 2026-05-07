@@ -1,14 +1,12 @@
 import { Camera } from "lucide-react";
-import { Link } from "react-router-dom";
+import { TriStateFilterButton } from "~/components/tri-state-filter-button";
 import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
-import { cn } from "~/lib/utils";
+import { parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
 
 /**
- * The URL param names for the four external-source filters. Values are the
- * literal string `"true"` to match the convention established by
- * {@link FilterNav.parameters}, where presence (not value) drives behavior.
- * Order matches the badge strip in SetlistCard so filter buttons and the
- * per-row indicators read the same way.
+ * The URL param names for the four external-source filters. Order matches
+ * the badge strip in SetlistCard so filter buttons and the per-row
+ * indicators read the same way.
  */
 const FILTER_KEYS = ["nugs", "youtube", "archive", "photos"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
@@ -36,11 +34,10 @@ interface ShowFiltersNavProps {
 }
 
 /**
- * Compact vertical filter stack for the year route header. Each toggle adds
- * or removes a `nugs|youtube|archive|photos=true` param so the loader can
- * stack them with AND logic. Other params (including `q=`) pass through
- * unchanged. Rendered in the page's top-right so it stays out of the way
- * of the main show list but is always visible for quick filtering.
+ * Tri-state filter stack for the year route header. Each toggle cycles
+ * empty → positive → negative → empty so users can express both "must have
+ * media X" and "must NOT have media X" in the same URL. Other params
+ * (including `q=`) pass through unchanged.
  */
 export function ShowFiltersNav({ basePath, currentURLParameters }: ShowFiltersNavProps) {
   return (
@@ -50,38 +47,30 @@ export function ShowFiltersNav({ basePath, currentURLParameters }: ShowFiltersNa
       </h2>
       <div className="grid grid-cols-4 sm:grid-cols-2 gap-1">
         {FILTER_KEYS.map((key) => {
-          const active = currentURLParameters.has(key);
+          const state = parseTriState(currentURLParameters.get(key));
           const next = new URLSearchParams(currentURLParameters);
-          if (active) next.delete(key);
-          else next.set(key, "true");
+          writeTriState(next, key, TRI_STATE_NEXT[state]);
           const search = next.toString();
 
           return (
-            <Link
+            <TriStateFilterButton
               key={key}
-              to={{ pathname: basePath, search: search ? `?${search}` : "" }}
-              className={cn(
-                "px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1.5",
-                active
-                  ? "text-white bg-content-bg-tertiary border border-brand-primary/50"
-                  : "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white border border-transparent",
-              )}
-            >
-              {FILTER_FAVICON_DOMAINS[key] ? (
-                <img
-                  src={faviconSrc(FILTER_FAVICON_DOMAINS[key] as string)}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5"
-                />
-              ) : (
-                <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              {FILTER_LABELS[key]}
-            </Link>
+              state={state}
+              label={FILTER_LABELS[key]}
+              href={`${basePath}${search ? `?${search}` : ""}`}
+              icon={<FilterFavicon filterKey={key} />}
+            />
           );
         })}
       </div>
     </div>
   );
+}
+
+function FilterFavicon({ filterKey }: { filterKey: FilterKey }) {
+  const domain = FILTER_FAVICON_DOMAINS[filterKey];
+  if (domain) {
+    return <img src={faviconSrc(domain)} alt="" aria-hidden="true" className="h-3.5 w-3.5" />;
+  }
+  return <Camera className="h-3.5 w-3.5" aria-hidden="true" />;
 }
