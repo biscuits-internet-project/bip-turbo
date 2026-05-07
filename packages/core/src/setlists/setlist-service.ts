@@ -3,6 +3,12 @@ import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from ".
 import { buildOrderByClause } from "../_shared/database/query-utils";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 
+/**
+ * Filter options for setlist queries. The `hasPhotos` / `hasYoutube` flags
+ * are tri-state: `true` requires the media, `false` requires its absence,
+ * and `undefined` skips the filter. Drives the year-page tri-state media
+ * toggles where users can include OR exclude shows by media presence.
+ */
 export type SetlistFilter = {
   year?: number;
   monthDay?: string;
@@ -10,6 +16,15 @@ export type SetlistFilter = {
   hasPhotos?: boolean;
   hasYoutube?: boolean;
 };
+
+/**
+ * Translate a tri-state media filter into a Prisma numeric where-clause for
+ * a denormalized count column (showPhotosCount, showYoutubesCount).
+ */
+function countFilter(flag: boolean | undefined) {
+  if (flag === undefined) return undefined;
+  return flag ? { gt: 0 } : { equals: 0 };
+}
 
 type DbTrackLight = {
   id: string;
@@ -356,8 +371,8 @@ export class SetlistService {
                 lt: `${year + 1}-01-01`,
               }
             : undefined,
-        showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
-        showYoutubesCount: hasYoutube ? { gt: 0 } : undefined,
+        showPhotosCount: countFilter(hasPhotos),
+        showYoutubesCount: countFilter(hasYoutube),
       },
       orderBy,
       skip,
@@ -420,8 +435,8 @@ export class SetlistService {
                 lt: `${year + 1}-01-01`,
               }
             : undefined,
-        showPhotosCount: hasPhotos ? { gt: 0 } : undefined,
-        showYoutubesCount: hasYoutube ? { gt: 0 } : undefined,
+        showPhotosCount: countFilter(hasPhotos),
+        showYoutubesCount: countFilter(hasYoutube),
       },
       orderBy,
       skip,
