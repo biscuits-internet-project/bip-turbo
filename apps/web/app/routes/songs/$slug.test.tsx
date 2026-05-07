@@ -38,9 +38,7 @@ vi.mock("~/hooks/use-serialized-loader-data", () => ({
 // be visible since the unfiltered data has an all-timer.
 vi.mock("~/hooks/use-performance-page-filters", () => ({
   usePerformancePageFilters: vi.fn(() => ({
-    filteredData: [
-      { trackId: "t2", allTimer: false, show: { date: "2024-02-01" }, venue: {} },
-    ],
+    filteredData: [{ trackId: "t2", allTimer: false, show: { date: "2024-02-01" }, venue: {} }],
     isLoading: false,
     selectedYear: "2024",
     selectedEra: "all",
@@ -78,6 +76,7 @@ vi.mock("recharts", () => ({
   YAxis: () => null,
 }));
 
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import SongPage from "./$slug";
 
 function renderSongPage() {
@@ -111,5 +110,179 @@ describe("SongPage", () => {
     await user.click(statsTab);
 
     expect(mockClearFilters).toHaveBeenCalled();
+  });
+
+  // The 4 stat cards (Times Played, First Played, Last Played, Most
+  // Common Year) render as a 2x2 grid on mobile and 4x1 at lg+ so phone
+  // users only scroll past two rows of cards instead of four.
+  test("stat grid is 2 columns on mobile, 4 columns on lg", () => {
+    renderSongPage();
+
+    const timesPlayedLabel = screen.getByText(/Times Played/);
+    const grid = timesPlayedLabel.closest("dl");
+    expect(grid?.className).toContain("grid-cols-2");
+    expect(grid?.className).toContain("lg:grid-cols-4");
+    // No single-column stacking on mobile — each row pairs two cards.
+    expect(grid?.className).not.toContain("grid-cols-1");
+  });
+
+  // The First/Last Played stat cards include a venue sublabel (sublabel2).
+  // On mobile that wrapped venue line makes the cards taller than the
+  // viewport allows for the 2x2 grid; we hide it via `hidden sm:block`
+  // so phone users see just the date + label.
+  test("StatBox sublabel2 (venue) is hidden on mobile (hidden sm:block)", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
+      song: {
+        title: "I-Man",
+        slug: "i-man",
+        timesPlayed: 100,
+        dateFirstPlayed: "1997-04-19",
+        dateLastPlayed: null,
+        actualLastPlayedDate: null,
+        firstShowSlug: "1997-04-19-frat-party",
+        lastShowSlug: null,
+        firstVenue: { name: "University of Pennsylvania", city: "Philadelphia", state: "PA" },
+        lastVenue: null,
+        showsSinceLastPlayed: null,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+    });
+    renderSongPage();
+
+    const venueLine = screen.getByText(/University of Pennsylvania, Philadelphia, PA/);
+    expect(venueLine.className).toContain("hidden");
+    expect(venueLine.className).toContain("sm:block");
+  });
+
+  // The TabsList on song-detail clips at narrow widths because there can be
+  // up to 6 tabs (All Performances, All-Timers, Stats, History, Lyrics,
+  // Guitar Tabs). Mobile gets a single <select> dropdown instead while sm+
+  // continues to use the horizontal tab strip.
+  test("song tabs render as a select on mobile (sm:hidden) and tab strip on sm+", () => {
+    renderSongPage();
+
+    const tabList = screen.getByRole("tablist");
+    expect(tabList.className).toContain("hidden");
+    expect(tabList.className).toContain("sm:flex");
+
+    const select = screen.getByLabelText(/song view/i);
+    const wrapper = select.closest("div");
+    expect(wrapper?.className).toContain("sm:hidden");
+  });
+
+  // The "last show" sublabel marks the song as having been played at the
+  // most recent show. The backend computes `showsSinceLastPlayed` as a
+  // strict count of shows AFTER the song's last performance, so 0 = "this
+  // was the last show" and any positive value means there have been more
+  // shows since.
+  test("Last Played sublabel reads 'last show' only when showsSinceLastPlayed is 0", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
+      song: {
+        title: "Shelby Rose",
+        slug: "shelby-rose",
+        timesPlayed: 50,
+        dateFirstPlayed: "2010-01-01",
+        dateLastPlayed: "2026-04-25",
+        actualLastPlayedDate: "2026-04-25",
+        firstShowSlug: "2010-01-01-show",
+        lastShowSlug: "2026-04-25-show",
+        firstVenue: null,
+        lastVenue: null,
+        showsSinceLastPlayed: 0,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+    });
+    renderSongPage();
+    expect(screen.getByText(/last show/i)).toBeInTheDocument();
+  });
+
+  // When at least one show has happened since the song's last performance,
+  // the sublabel should report the count rather than claim "last show".
+  // Singular form for exactly one show after.
+  test("Last Played sublabel reads '1 show ago' when showsSinceLastPlayed is 1", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
+      song: {
+        title: "Shelby Rose",
+        slug: "shelby-rose",
+        timesPlayed: 50,
+        dateFirstPlayed: "2010-01-01",
+        dateLastPlayed: "2026-04-24",
+        actualLastPlayedDate: "2026-04-24",
+        firstShowSlug: "2010-01-01-show",
+        lastShowSlug: "2026-04-24-show",
+        firstVenue: null,
+        lastVenue: null,
+        showsSinceLastPlayed: 1,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+    });
+    renderSongPage();
+    expect(screen.getByText(/1 show ago/)).toBeInTheDocument();
+    expect(screen.queryByText(/last show/i)).not.toBeInTheDocument();
+    // Avoid the "1 shows ago" plural-on-one bug.
+    expect(screen.queryByText(/1 shows ago/)).not.toBeInTheDocument();
+  });
+
+  // Plural form for >1 shows after the song's last performance.
+  test("Last Played sublabel reads 'N shows ago' when showsSinceLastPlayed is greater than 1", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
+      song: {
+        title: "Shelby Rose",
+        slug: "shelby-rose",
+        timesPlayed: 50,
+        dateFirstPlayed: "2010-01-01",
+        dateLastPlayed: "2024-01-01",
+        actualLastPlayedDate: "2024-01-01",
+        firstShowSlug: "2010-01-01-show",
+        lastShowSlug: "2024-01-01-show",
+        firstVenue: null,
+        lastVenue: null,
+        showsSinceLastPlayed: 4,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+    });
+    renderSongPage();
+    expect(screen.getByText(/4 shows ago/)).toBeInTheDocument();
+    expect(screen.queryByText(/last show/i)).not.toBeInTheDocument();
+  });
+
+  // Stat card padding tightens on mobile so the cards aren't bigger than
+  // their content. Headline number also shrinks on mobile so the value
+  // fits on one line within the narrower box.
+  test("StatBox uses compact padding/typography on mobile and full sizing on sm+", () => {
+    renderSongPage();
+
+    const timesPlayedLabel = screen.getByText(/Times Played/);
+    const card = timesPlayedLabel.closest("div[class*='glass-content']");
+    expect(card?.className).toContain("p-2");
+    expect(card?.className).toContain("sm:p-6");
+
+    const value = screen.getByText("100");
+    expect(value.className).toContain("text-xl");
+    expect(value.className).toContain("sm:text-3xl");
   });
 });

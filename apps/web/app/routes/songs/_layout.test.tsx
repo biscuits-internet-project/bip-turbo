@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test, vi } from "vitest";
 
@@ -101,5 +101,43 @@ describe("SongsLayout", () => {
     renderAtPath("/songs");
 
     expect(screen.getByTestId("outlet")).toBeInTheDocument();
+  });
+
+  // On mobile, the tab strip is hidden via `sm:flex` (so it does not wrap
+  // and clip the rightmost tab on narrow viewports). A native <select>
+  // dropdown takes its place inside an `sm:hidden` container so users
+  // still have a single-tap way to switch tabs.
+  test("tab strip is hidden on mobile (uses sm:flex), select dropdown is mobile-only", () => {
+    renderAtPath("/songs");
+
+    const tabStrip = screen.getByRole("link", { name: /all songs/i }).closest("div[class*='border-b']");
+    expect(tabStrip?.className).toContain("hidden");
+    expect(tabStrip?.className).toContain("sm:flex");
+
+    // The native select is rendered for mobile; its parent should be sm:hidden
+    const select = screen.getByLabelText(/songs view/i);
+    const wrapper = select.closest("div");
+    expect(wrapper?.className).toContain("sm:hidden");
+  });
+
+  // The mobile select reflects the current tab as its value, so opening
+  // the dropdown shows the user where they are.
+  test("mobile select value reflects the current tab path", () => {
+    renderAtPath("/songs/all-timers");
+
+    const select = screen.getByLabelText(/songs view/i) as HTMLSelectElement;
+    expect(select.value).toBe("/songs/all-timers");
+  });
+
+  // Changing the mobile select navigates to the chosen tab path.
+  test("changing mobile select navigates to the new tab", () => {
+    renderAtPath("/songs");
+
+    const select = screen.getByLabelText(/songs view/i) as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "/songs/all-timers" } });
+
+    // The active tab in the desktop strip should now reflect the new path.
+    const allTimersLink = screen.getByRole("link", { name: /all-timers/i });
+    expect(allTimersLink.className).toContain("border-brand-primary");
   });
 });

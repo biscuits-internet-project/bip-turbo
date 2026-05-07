@@ -24,13 +24,41 @@ export function getSafeRedirectUrl(url: string | null): string {
 
 export const ATTENDED_ROW_CLASS = "!border-l-2 !border-l-green-500 bg-green-500/5";
 
-export function formatDateShort(date: string): string {
-  const dateParts = date.split("T")[0].split("-");
-  if (dateParts.length === 3) {
-    const [year, month, day] = dateParts;
-    return `${Number.parseInt(month, 10)}/${Number.parseInt(day, 10)}/${year}`;
+/**
+ * Canonical desktop short date for show-related dates across the app
+ * (year listings, top-rated, songs/all-timers performance tables, song-detail
+ * stat cards). Output is `M/D/YYYY` with no leading zeros.
+ *
+ * Accepts either an ISO-like string ("2024-06-15", "2024-06-15T...") or a
+ * Date object. When a Date is passed, UTC fields drive the output so
+ * dates render the same regardless of the viewer's timezone — historical
+ * shows shouldn't shift to the previous day for users west of UTC.
+ */
+export function formatDateShort(date: string | Date): string {
+  const parts = extractDateParts(date);
+  if (!parts) return typeof date === "string" ? date : "";
+  return `${parts.month}/${parts.day}/${parts.year}`;
+}
+
+/**
+ * Compact mobile-only short date (`M/D/YY`). Used by `<ShowDate>` to render
+ * the same date in less horizontal space on phone-width tables.
+ */
+export function formatDateShortMobile(date: string | Date): string {
+  const parts = extractDateParts(date);
+  if (!parts) return typeof date === "string" ? date : "";
+  const yy = String(parts.year).slice(-2).padStart(2, "0");
+  return `${parts.month}/${parts.day}/${yy}`;
+}
+
+function extractDateParts(date: string | Date): { year: number; month: number; day: number } | null {
+  if (date instanceof Date) {
+    return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
   }
-  return date;
+  const dateParts = date.split("T")[0].split("-");
+  if (dateParts.length !== 3) return null;
+  const [year, month, day] = dateParts;
+  return { year: Number.parseInt(year, 10), month: Number.parseInt(month, 10), day: Number.parseInt(day, 10) };
 }
 
 const MAX_DAYS_PER_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -53,6 +81,17 @@ export function isValidMonthDay(value: string): boolean {
 export function formatMonthDay(monthDay: string): string {
   const [mm, dd] = monthDay.split("-").map(Number);
   const monthName = new Date(2000, mm - 1, dd).toLocaleString("default", { month: "long" });
+  return `${monthName} ${dd}`;
+}
+
+/**
+ * Formats "MM-DD" as "Mon Day" (e.g., "04-04" → "Apr 4"). Used in tight
+ * layouts (mobile prev/next month links) where the full month name doesn't
+ * fit alongside the chevron and sibling links.
+ */
+export function formatMonthDayShort(monthDay: string): string {
+  const [mm, dd] = monthDay.split("-").map(Number);
+  const monthName = new Date(2000, mm - 1, dd).toLocaleString("default", { month: "short" });
   return `${monthName} ${dd}`;
 }
 

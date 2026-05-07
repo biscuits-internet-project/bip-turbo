@@ -31,7 +31,7 @@ describe("applyExternalSourceFilters", () => {
   test("filters out setlists missing a nugs url when nugs flag is on", () => {
     const setlists = [setlist("astronaut"), setlist("moshi")];
     const externalSources: Record<string, ShowExternalSources> = {
-      astronaut: sources({ nugsUrl: "https://play.nugs.net/release/1" }),
+      astronaut: sources({ nugsUrls: ["https://play.nugs.net/release/1"] }),
       moshi: sources({}),
     };
 
@@ -57,8 +57,8 @@ describe("applyExternalSourceFilters", () => {
   test("requires all active flags (AND) when multiple are set", () => {
     const setlists = [setlist("astronaut"), setlist("moshi"), setlist("basis")];
     const externalSources: Record<string, ShowExternalSources> = {
-      astronaut: sources({ nugsUrl: "n1", archiveUrl: "a1" }),
-      moshi: sources({ nugsUrl: "n2" }),
+      astronaut: sources({ nugsUrls: ["n1"], archiveUrl: "a1" }),
+      moshi: sources({ nugsUrls: ["n2"] }),
       basis: sources({ archiveUrl: "a3" }),
     };
 
@@ -72,7 +72,7 @@ describe("applyExternalSourceFilters", () => {
   test("drops setlists that have no entry in externalSources when a flag is on", () => {
     const setlists = [setlist("astronaut"), setlist("orphan")];
     const externalSources: Record<string, ShowExternalSources> = {
-      astronaut: sources({ nugsUrl: "n1" }),
+      astronaut: sources({ nugsUrls: ["n1"] }),
     };
 
     const result = applyExternalSourceFilters(setlists, externalSources, { nugs: true });

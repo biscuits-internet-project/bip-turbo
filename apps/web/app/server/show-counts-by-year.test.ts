@@ -57,8 +57,8 @@ describe("computeShowCountsByYear", () => {
       { date: "2023-06-15", hasPhotos: false, hasYoutube: false },
     ]);
     getReleaseUrlsByDate.mockResolvedValue({
-      "2004-12-31": "https://play.nugs.net/release/1",
-      "2023-06-15": "https://play.nugs.net/release/2",
+      "2004-12-31": ["https://play.nugs.net/release/1"],
+      "2023-06-15": ["https://play.nugs.net/release/2"],
     });
 
     const result = await computeShowCountsByYear({ nugs: true });
@@ -90,8 +90,8 @@ describe("computeShowCountsByYear", () => {
       { date: "2023-06-15", hasPhotos: true, hasYoutube: false }, // missing youtube
     ]);
     getReleaseUrlsByDate.mockResolvedValue({
-      "2004-12-31": "nugs-url",
-      "2023-06-15": "nugs-url",
+      "2004-12-31": ["nugs-url"],
+      "2023-06-15": ["nugs-url"],
     });
     getPrimaryUrlsByDate.mockResolvedValue({
       "2004-12-31": "archive-url",

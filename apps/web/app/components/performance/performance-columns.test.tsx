@@ -45,19 +45,58 @@ const defaultOptions = {
 };
 
 describe("createPerformanceColumns", () => {
-  // The default column set (no optional columns) renders Date, Venue, Set,
-  // Sequence, Notes, and Rating headers. These are always present regardless
-  // of which page renders the table.
-  test("default columns include Date, Venue, Set, Sequence, Notes, Rating headers", async () => {
+  // The default column set renders Date, Set, Sequence, Notes, and Rating
+  // headers. Venue isn't a separate column — it's folded into the Date
+  // cell via DateVenueCell so narrow viewports show date-only and wider
+  // viewports stack venue beneath the date in the same column.
+  test("default columns include Date, Set, Sequence, Notes, Rating headers (Venue is not a separate column)", async () => {
     const columns = createPerformanceColumns(defaultOptions);
     await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     expect(screen.getByText("Date")).toBeInTheDocument();
-    expect(screen.getByText("Venue")).toBeInTheDocument();
     expect(screen.getByText("Set")).toBeInTheDocument();
     expect(screen.getByText("Sequence")).toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
     expect(screen.getByText("Rating")).toBeInTheDocument();
+    // No standalone Venue column header — venue text lives in the Date cell.
+    expect(screen.queryByRole("columnheader", { name: "Venue" })).not.toBeInTheDocument();
+  });
+
+  // The Date cell renders the venue underneath the date so the venue
+  // information is preserved without a dedicated column. The venue line
+  // is responsive (hidden sm:block) but still in the DOM for desktop users.
+  test("Date cell renders venue name beneath the date", async () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
+
+    expect(screen.getByText(/The Capitol Theatre, Port Chester, NY/)).toBeInTheDocument();
+  });
+
+  // The Notes column carries `hideOnMobile` so the long free-text annotations
+  // do not crowd narrow viewports — DataTable reads this meta and hides the
+  // column on mobile.
+  test("Notes column has meta.hideOnMobile = true", () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    const notesColumn = columns.find((column) => "id" in column && column.id === "notes");
+    expect(notesColumn?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // When the Song column is present (all-timers, on-this-day), Sequence
+  // gets hidden on mobile because the row is already too tight — Song is
+  // the more important column there.
+  test("Sequence column has meta.hideOnMobile when showSongColumn is true", () => {
+    const columns = createPerformanceColumns({ ...defaultOptions, showSongColumn: true });
+    const sequenceColumn = columns.find((column) => "id" in column && column.id === "sequence");
+    expect(sequenceColumn?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // On the song-detail page the Song column is absent (we already know which
+  // song this is), leaving room for Sequence on mobile — and Sequence is
+  // one of the most useful columns in that view.
+  test("Sequence column does not hide on mobile when showSongColumn is false", () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    const sequenceColumn = columns.find((column) => "id" in column && column.id === "sequence");
+    expect(sequenceColumn?.meta?.hideOnMobile).toBeFalsy();
   });
 
   // The Song column only appears on /songs/all-timers where performances
@@ -123,7 +162,9 @@ describe("createPerformanceColumns", () => {
     const columns = createPerformanceColumns(defaultOptions);
     await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
-    const dateLink = screen.getByRole("link", { name: "2024-06-15" });
+    // Date is formatted M/D/YYYY (formatDateShort) for visual consistency
+    // with /shows listings and song-detail stat cards.
+    const dateLink = screen.getByRole("link", { name: /6\/15\/2024/ });
     expect(dateLink).toHaveAttribute("href", "/shows/2024-06-15-the-cap");
   });
 
@@ -149,9 +190,6 @@ describe("createPerformanceColumns", () => {
     expect(ratingHeader?.querySelector("svg")).not.toBeNull();
 
     // Non-sortable columns render a plain <span> with no button
-    const venueHeader = screen.getByText("Venue").closest("th");
-    expect(venueHeader?.querySelector("button")).toBeNull();
-
     const sequenceHeader = screen.getByText("Sequence").closest("th");
     expect(sequenceHeader?.querySelector("button")).toBeNull();
   });

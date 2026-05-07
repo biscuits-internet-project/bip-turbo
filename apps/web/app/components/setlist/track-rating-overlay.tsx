@@ -5,12 +5,10 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "~/components/ui/h
 import { Skeleton } from "~/components/ui/skeleton";
 import { StarRating } from "~/components/ui/star-rating";
 import { useSession } from "~/hooks/use-session";
-import { cn } from "~/lib/utils";
 
 interface TrackRatingOverlayProps {
   track: Track | TrackLight;
   children: React.ReactNode;
-  className?: string;
 }
 
 interface TrackDataResponse {
@@ -25,7 +23,7 @@ interface TrackDataResponse {
   userRating: number | null;
 }
 
-export function TrackRatingOverlay({ track, children, className }: TrackRatingOverlayProps) {
+export function TrackRatingOverlay({ track, children }: TrackRatingOverlayProps) {
   const { user } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState<TrackDataResponse | null>(null);
@@ -73,7 +71,7 @@ export function TrackRatingOverlay({ track, children, className }: TrackRatingOv
 
   return (
     <HoverCard openDelay={600} closeDelay={200} onOpenChange={setIsOpen}>
-      <HoverCardTrigger asChild className={cn("cursor-pointer", className)}>
+      <HoverCardTrigger asChild className="cursor-pointer">
         {children}
       </HoverCardTrigger>
       <HoverCardContent

@@ -48,7 +48,7 @@ export function ShowFiltersNav({ basePath, currentURLParameters }: ShowFiltersNa
       <h2 className="text-[10px] font-semibold text-content-text-tertiary uppercase tracking-wide mb-1.5 text-center">
         Filter by Media
       </h2>
-      <div className="grid grid-cols-2 gap-1">
+      <div className="grid grid-cols-4 sm:grid-cols-2 gap-1">
         {FILTER_KEYS.map((key) => {
           const active = currentURLParameters.has(key);
           const next = new URLSearchParams(currentURLParameters);

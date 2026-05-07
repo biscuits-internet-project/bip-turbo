@@ -34,7 +34,7 @@ export async function computeShowExternalSources(shows: ShowLike[]): Promise<Rec
 
   for (const show of shows) {
     result[show.id] = {
-      nugsUrl: nugsUrlsByDate[show.date],
+      nugsUrls: nugsUrlsByDate[show.date],
       archiveUrl: archiveUrlsByDate[show.date],
       youtubeUrl: youtubeUrlsByShowId[show.id],
     };

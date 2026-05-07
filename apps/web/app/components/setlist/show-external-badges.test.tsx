@@ -18,7 +18,7 @@ describe("ShowExternalBadges", () => {
     await setupWithRouter(
       <ShowExternalBadges
         sources={{
-          nugsUrl: "https://play.nugs.net/release/1",
+          nugsUrls: ["https://play.nugs.net/release/1"],
           archiveUrl: "https://archive.org/details/db2004",
           youtubeUrl: "https://youtube.com/watch?v=aaa",
         }}
@@ -39,10 +39,48 @@ describe("ShowExternalBadges", () => {
     );
   });
 
+  // Dual-billed nights (Disco Biscuits + Tractorbeam) surface two nugs
+  // releases for the same date. We render one favicon per release so users
+  // can tell at a glance there's more than one — disambiguating labels keep
+  // the link names unique for assistive tech.
+  test("renders one nugs favicon per release URL with disambiguated labels", async () => {
+    await setupWithRouter(
+      <ShowExternalBadges
+        sources={{
+          nugsUrls: ["https://play.nugs.net/release/biscuits", "https://play.nugs.net/release/tractorbeam"],
+        }}
+      />,
+    );
+
+    const first = screen.getByRole("link", { name: "Available on nugs.net (release 1)" });
+    const second = screen.getByRole("link", { name: "Available on nugs.net (release 2)" });
+    expect(first).toHaveAttribute("href", "https://play.nugs.net/release/biscuits");
+    expect(second).toHaveAttribute("href", "https://play.nugs.net/release/tractorbeam");
+  });
+
+  // Badge icons must carry shrink-0 so they don't get horizontally squeezed
+  // when the surrounding row has long sibling text (the "nugs icon looks
+  // squished" bug observed on /shows/top-rated mobile rows).
+  test("favicon icon and photos camera icon both carry shrink-0", async () => {
+    const { container } = await setupWithRouter(
+      <ShowExternalBadges
+        sources={{ nugsUrls: ["https://play.nugs.net/release/1"] }}
+        photosHref="/shows/x#photos"
+        photosCount={5}
+      />,
+    );
+
+    const favicon = container.querySelector("img");
+    expect(favicon?.className).toContain("shrink-0");
+
+    const cameraIcon = container.querySelector("svg");
+    expect(cameraIcon?.getAttribute("class") ?? "").toContain("shrink-0");
+  });
+
   // External-source links open in a new tab because they leave the site;
   // rel=noopener guards against tab-nabbing.
   test("external-source links open in a new tab with noopener rel", async () => {
-    await setupWithRouter(<ShowExternalBadges sources={{ nugsUrl: "https://play.nugs.net/release/1" }} />);
+    await setupWithRouter(<ShowExternalBadges sources={{ nugsUrls: ["https://play.nugs.net/release/1"] }} />);
 
     const link = screen.getByRole("link", { name: "Available on nugs.net" });
     expect(link).toHaveAttribute("target", "_blank");
@@ -52,16 +90,15 @@ describe("ShowExternalBadges", () => {
   // Undefined URLs collapse silently — the parent passes raw optional URLs
   // without per-field `&&` gates, so missing services just disappear.
   test("omits favicon links whose URL is undefined", async () => {
-    await setupWithRouter(<ShowExternalBadges sources={{ nugsUrl: "https://play.nugs.net/release/1" }} />);
+    await setupWithRouter(<ShowExternalBadges sources={{ nugsUrls: ["https://play.nugs.net/release/1"] }} />);
 
     expect(screen.getByRole("link", { name: "Available on nugs.net" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Available on archive.org" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Video on YouTube" })).not.toBeInTheDocument();
   });
 
-  // Photos badge shows count + camera icon and links to the show's #photos
-  // anchor; it used to live in the card footer but was hoisted here so the
-  // visual grouping matches the external-source badges.
+  // Photos badge shows count + camera icon and links to the show's
+  // #photos anchor, alongside the external-source favicons.
   test("renders photos badge with count when href + positive count provided", async () => {
     await setupWithRouter(<ShowExternalBadges sources={{}} photosHref="/shows/2004-12-31#photos" photosCount={12} />);
 
@@ -85,15 +122,5 @@ describe("ShowExternalBadges", () => {
     await setupWithRouter(<ShowExternalBadges sources={{}} photosCount={5} />);
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-  });
-
-  // Custom className is applied to the container so callers can tweak
-  // spacing/alignment per route without touching the component.
-  test("applies custom className to the container", async () => {
-    const { container } = await setupWithRouter(
-      <ShowExternalBadges sources={{ nugsUrl: "https://play.nugs.net/release/1" }} className="my-strip" />,
-    );
-
-    expect(container.firstChild).toHaveClass("my-strip");
   });
 });

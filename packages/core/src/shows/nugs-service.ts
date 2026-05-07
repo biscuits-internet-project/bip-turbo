@@ -102,18 +102,20 @@ export class NugsService {
   }
 
   /**
-   * Build a date → release-URL map for every show nugs has, merged across
-   * artist catalogs. Exists so listing pages can render the nugs badge with a
-   * real link target via a single Redis read. When the same date exists under
-   * multiple artists, the first one wins (Disco Biscuits comes before
-   * Tractorbeam in {@link NUGS_ARTIST_IDS}, matching the "main act" default).
+   * Build a date → release-URL list map for every show nugs has, merged
+   * across artist catalogs. Exists so listing pages can render nugs badges
+   * with real link targets via a single Redis read. Dates with both a
+   * Disco Biscuits and a Tractorbeam release surface both URLs (in the
+   * {@link NUGS_ARTIST_IDS} order — Disco Biscuits first), so callers can
+   * indicate "more than one release" without a second round-trip.
    */
-  async getReleaseUrlsByDate(): Promise<Record<string, string>> {
+  async getReleaseUrlsByDate(): Promise<Record<string, string[]>> {
     const maps = await Promise.all(this.catalogs.map((c) => c.getAll()));
-    const urls: Record<string, string> = {};
+    const urls: Record<string, string[]> = {};
     for (const map of maps) {
       for (const [date, release] of Object.entries(map)) {
-        if (!urls[date]) urls[date] = release.url;
+        if (!urls[date]) urls[date] = [];
+        urls[date].push(release.url);
       }
     }
     return urls;

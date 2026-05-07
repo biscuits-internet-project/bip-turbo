@@ -25,7 +25,7 @@ export function applyExternalSourceFilters<T extends Pick<SetlistLight, "show">>
 
   return setlists.filter((setlist) => {
     const sources = externalSources[setlist.show.id];
-    if (flags.nugs && !sources?.nugsUrl) return false;
+    if (flags.nugs && !sources?.nugsUrls?.length) return false;
     if (flags.archive && !sources?.archiveUrl) return false;
     return true;
   });

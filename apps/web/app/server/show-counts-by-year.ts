@@ -25,7 +25,7 @@ export async function computeShowCountsByYear(flags: ShowCountsFilterFlags): Pro
 
   const [showDates, nugsUrlsByDate, archiveUrlsByDate] = await Promise.all([
     services.shows.getShowDatesWithFlags(),
-    needsNugs ? services.nugs.getReleaseUrlsByDate() : Promise.resolve<Record<string, string>>({}),
+    needsNugs ? services.nugs.getReleaseUrlsByDate() : Promise.resolve<Record<string, string[]>>({}),
     needsArchive ? services.archiveDotOrg.getPrimaryUrlsByDate() : Promise.resolve<Record<string, string>>({}),
   ]);
 
@@ -33,7 +33,7 @@ export async function computeShowCountsByYear(flags: ShowCountsFilterFlags): Pro
   for (const show of showDates) {
     if (flags.photos && !show.hasPhotos) continue;
     if (flags.youtube && !show.hasYoutube) continue;
-    if (needsNugs && !nugsUrlsByDate[show.date]) continue;
+    if (needsNugs && !nugsUrlsByDate[show.date]?.length) continue;
     if (needsArchive && !archiveUrlsByDate[show.date]) continue;
 
     const year = Number.parseInt(show.date.slice(0, 4), 10);

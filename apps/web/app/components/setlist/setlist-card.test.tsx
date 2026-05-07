@@ -133,9 +133,9 @@ describe("SetlistCard", () => {
     expect(screen.getByText("Basis for a Day")).toBeInTheDocument();
   });
 
-  // Regression guard: callers that don't opt into collapsible (year route, etc.)
-  // still see the full body on first paint — the new mode must not change the
-  // default.
+  // Callers that don't opt into collapsible (year route, etc.) see the
+  // full body on first paint. Pinning the default so the collapsible mode
+  // can evolve without affecting non-collapsible callers.
   test("renders body by default when collapsible is not set", async () => {
     await setupWithRouter(
       <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
@@ -204,7 +204,7 @@ describe("SetlistCard", () => {
     const body = screen.getByTestId("setlist-card-body");
     expect(body).toHaveAttribute("aria-hidden", "true");
 
-    const dateLink = screen.getByRole("link", { name: "4/14/2021" });
+    const dateLink = screen.getByRole("link", { name: /4\/14\/2021/ });
     await user.click(dateLink);
 
     expect(body).toHaveAttribute("aria-hidden", "true");

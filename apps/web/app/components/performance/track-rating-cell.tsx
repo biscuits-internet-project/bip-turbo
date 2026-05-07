@@ -93,11 +93,11 @@ export function TrackRatingCell({
 
   if (!isAuthenticated) {
     return (
-      <div className="w-[140px]">
+      <div className="w-auto sm:w-[140px]">
         <LoginPromptPopover message="Sign in to rate">{ratingButton}</LoginPromptPopover>
       </div>
     );
   }
 
-  return <div className="w-[140px]">{ratingButton}</div>;
+  return <div className="w-auto sm:w-[140px]">{ratingButton}</div>;
 }

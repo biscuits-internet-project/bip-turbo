@@ -19,10 +19,11 @@ describe("ArchiveRecordingsCard", () => {
   });
 
   // A single recording is auto-picked as primary, rendered in the list,
-  // and embedded in the player below. No "in player below" hint because
-  // there's no ambiguity when only one recording exists.
-  test("renders one recording and embeds the player without the hint", async () => {
-    await setup(
+  // and embedded in the player after the user opens the collapsible
+  // toggle. No "in player below" hint because there's no ambiguity when
+  // only one recording exists.
+  test("renders one recording and embeds the player after expansion without the hint", async () => {
+    const { user } = await setup(
       <ArchiveRecordingsCard
         items={[
           {
@@ -42,6 +43,10 @@ describe("ArchiveRecordingsCard", () => {
     expect(screen.getByText("SBD > DAT")).toBeInTheDocument();
     expect(screen.queryByText("(in player below)")).not.toBeInTheDocument();
 
+    // Player is hidden behind a click-to-expand toggle by default.
+    expect(screen.queryByTestId("ArchiveMusicPlayer")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Play recording/ }));
+
     const player = screen.getByTestId("ArchiveMusicPlayer");
     expect(player).toHaveAttribute("data-identifier", "db2004-12-31.sbd.flac16");
     expect(player).toHaveAttribute("data-bare", "true");
@@ -49,9 +54,9 @@ describe("ArchiveRecordingsCard", () => {
 
   // With multiple recordings the primary (highest scoring — SBD > AUD)
   // gets the "in player below" hint, and only that one is fed to the
-  // embedded player.
+  // embedded player once the user opens the collapsible toggle.
   test("marks the primary recording and embeds only its identifier in the player", async () => {
-    await setup(
+    const { user } = await setup(
       <ArchiveRecordingsCard
         items={[
           {
@@ -76,6 +81,7 @@ describe("ArchiveRecordingsCard", () => {
     const audLink = screen.getByRole("link", { name: "db2004-12-31.aud.flac16" });
     expect(audLink).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: /Play recording/ }));
     expect(screen.getByTestId("ArchiveMusicPlayer")).toHaveAttribute("data-identifier", "db2004-12-31.sbd.flac16");
   });
 

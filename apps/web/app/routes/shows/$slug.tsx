@@ -19,6 +19,7 @@ import type { ShowExternalSources } from "~/components/setlist/show-external-bad
 import { ArchiveRecordingsCard } from "~/components/show/archive-recordings-card";
 import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-link-card";
 import { ShowPhotos } from "~/components/show/show-photos";
+import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
@@ -260,16 +261,21 @@ export default function Show() {
             <span>Back to shows</span>
           </Link>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-2">
           {adjacentShows.previous ? (
             <Link
               to={`/shows/${adjacentShows.previous.slug}`}
-              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0"
             >
-              <ChevronLeft className="h-3 w-3" />
-              <span>
-                {formatDateLong(adjacentShows.previous.date)}
-                {adjacentShows.previous.venueName && ` · ${adjacentShows.previous.venueName}`}
+              <ChevronLeft className="h-3 w-3 shrink-0" />
+              <span className="truncate">
+                <span className="hidden sm:inline">{formatDateLong(adjacentShows.previous.date)}</span>
+                <span className="sm:hidden">
+                  <ShowDate date={adjacentShows.previous.date} />
+                </span>
+                {adjacentShows.previous.venueName && (
+                  <span className="hidden sm:inline">{` · ${adjacentShows.previous.venueName}`}</span>
+                )}
               </span>
             </Link>
           ) : (
@@ -277,20 +283,26 @@ export default function Show() {
           )}
           <Link
             to={`/on-this-day/${setlist.show.date.slice(5)}`}
-            className="text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+            className="text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors text-center shrink-0"
           >
-            All shows on {formatMonthDay(setlist.show.date.slice(5))} →
+            <span className="hidden sm:inline">All shows on {formatMonthDay(setlist.show.date.slice(5))} →</span>
+            <span className="sm:hidden">{formatMonthDay(setlist.show.date.slice(5))} →</span>
           </Link>
           {adjacentShows.next ? (
             <Link
               to={`/shows/${adjacentShows.next.slug}`}
-              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
+              className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0 justify-end"
             >
-              <span>
-                {formatDateLong(adjacentShows.next.date)}
-                {adjacentShows.next.venueName && ` · ${adjacentShows.next.venueName}`}
+              <span className="truncate">
+                <span className="hidden sm:inline">{formatDateLong(adjacentShows.next.date)}</span>
+                <span className="sm:hidden">
+                  <ShowDate date={adjacentShows.next.date} />
+                </span>
+                {adjacentShows.next.venueName && (
+                  <span className="hidden sm:inline">{` · ${adjacentShows.next.venueName}`}</span>
+                )}
               </span>
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight className="h-3 w-3 shrink-0" />
             </Link>
           ) : (
             <div />
@@ -298,9 +310,11 @@ export default function Show() {
         </div>
       </div>
 
-      {/* Main content area with responsive grid */}
+      {/* Main content area with responsive grid. On mobile we reorder so
+          users see the setlist, then external/Archive links + track-note
+          highlights, and reviews land at the bottom (long content tail). */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left column: Setlist */}
+        {/* Setlist — always first */}
         <div className="lg:col-span-8">
           <SetlistCard
             key={setlist.show.id}
@@ -310,32 +324,11 @@ export default function Show() {
             showRating={setlist.show.averageRating}
             externalSources={externalSources}
           />
-
-          <div className="mt-6">
-            {reviews && reviews.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-content-text-secondary">No reviews yet. Be the first to share your thoughts!</p>
-              </div>
-            )}
-            {user && internalUserId && !reviews.some((review: ReviewMinimal) => review.userId === internalUserId) && (
-              <div className="mb-8">
-                <ReviewForm onSubmit={handleReviewSubmit} />
-              </div>
-            )}
-            {reviews && reviews.length > 0 && (
-              <ReviewsList
-                reviews={reviews}
-                currentUserId={internalUserId}
-                onDelete={handleReviewDelete}
-                onUpdate={handleReviewUpdate}
-              />
-            )}
-          </div>
         </div>
 
-        {/* Right column: Highlights and additional content */}
-        <div className="lg:col-span-4">
-          <div className="lg:sticky lg:top-4 space-y-6">
+        {/* Right rail (mobile: sits between setlist and reviews) */}
+        <div className="lg:col-span-4 lg:row-span-2">
+          <div className="lg:sticky lg:top-4 space-y-2">
             <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.nugs} title="Official release" items={nugsLinks} />
             <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.youtube} title="Video" items={youtubeLinks} />
             <ArchiveRecordingsCard items={archiveRecordings} />
@@ -343,6 +336,29 @@ export default function Show() {
             {/* Highlights panel */}
             <SetlistHighlights setlist={setlist} />
           </div>
+        </div>
+
+        {/* Reviews — desktop: under setlist on left column. mobile: below
+            right rail since list-of-reviews can be long. */}
+        <div className="lg:col-span-8 lg:col-start-1">
+          {reviews && reviews.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-content-text-secondary">No reviews yet. Be the first to share your thoughts!</p>
+            </div>
+          )}
+          {user && internalUserId && !reviews.some((review: ReviewMinimal) => review.userId === internalUserId) && (
+            <div className="mb-8">
+              <ReviewForm onSubmit={handleReviewSubmit} />
+            </div>
+          )}
+          {reviews && reviews.length > 0 && (
+            <ReviewsList
+              reviews={reviews}
+              currentUserId={internalUserId}
+              onDelete={handleReviewDelete}
+              onUpdate={handleReviewUpdate}
+            />
+          )}
         </div>
       </div>
 

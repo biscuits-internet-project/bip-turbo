@@ -21,9 +21,9 @@ interface ExternalSourceCardProps {
  */
 export function ExternalSourceCard({ faviconDomain, title, children }: ExternalSourceCardProps) {
   return (
-    <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-lg p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <img src={faviconSrc(faviconDomain)} alt="" className="h-4 w-4" />
+    <div className="card-premium rounded-lg px-3 py-2">
+      <div className="flex items-center gap-2 mb-1.5">
+        <img src={faviconSrc(faviconDomain)} alt="" className="h-4 w-4 shrink-0" />
         <h4 className="text-sm font-medium text-content-text-secondary">{title}</h4>
       </div>
       {children}

@@ -137,8 +137,7 @@ describe("getSongsColumns", () => {
   });
 
   // When showFilteredPlays is true, the factory inserts a "Filtered Plays"
-  // column next to Plays showing the scoped count. This is the replacement
-  // for the removed "This Year" column.
+  // column next to Plays showing the count scoped to the active filter.
   test("showFilteredPlays=true: Filtered Plays column renders the scoped count", async () => {
     await setupWithRouter(
       <DataTable
@@ -188,9 +187,9 @@ describe("getSongsColumns", () => {
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
     // Date text is formatted (not ISO). Regex avoids pinning exact locale format.
-    expect(screen.getByText(/Jun 15, 2024/)).toBeInTheDocument();
+    expect(screen.getByText(/6\/15\/2024/)).toBeInTheDocument();
     // Wrapped in a link to the show
-    const showLink = screen.getByRole("link", { name: /Jun 15, 2024/ });
+    const showLink = screen.getByRole("link", { name: /6\/15\/2024/ });
     expect(showLink).toHaveAttribute("href", "/shows/2024-06-15-the-cap");
     // Venue line is rendered
     expect(screen.getByText(/The Capitol Theatre/)).toBeInTheDocument();
@@ -220,9 +219,9 @@ describe("getSongsColumns", () => {
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    expect(screen.getByText(/Jun 15, 2024/)).toBeInTheDocument();
+    expect(screen.getByText(/6\/15\/2024/)).toBeInTheDocument();
     // No link wraps the date
-    expect(screen.queryByRole("link", { name: /Jun 15, 2024/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /6\/15\/2024/ })).not.toBeInTheDocument();
   });
 
   // First Played cell mirrors Last Played exactly — same date-format +
@@ -236,8 +235,8 @@ describe("getSongsColumns", () => {
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    expect(screen.getByText(/Jul 4, 1995/)).toBeInTheDocument();
-    const showLink = screen.getByRole("link", { name: /Jul 4, 1995/ });
+    expect(screen.getByText(/7\/4\/1995/)).toBeInTheDocument();
+    const showLink = screen.getByRole("link", { name: /7\/4\/1995/ });
     expect(showLink).toHaveAttribute("href", "/shows/1995-07-04-red-rocks");
   });
 
@@ -405,6 +404,111 @@ describe("getSongsColumns", () => {
       .getAllByRole("link")
       .filter((el) => ["Home Again", "Crickets", "Plan B"].includes(el.textContent ?? ""));
     expect(titlesDesc.map((el) => el.textContent)).toEqual(["Crickets", "Plan B", "Home Again"]);
+  });
+
+  // On mobile, the Last Played and First Played dates render in a compact
+  // M/D/YY format so the column fits without overlap. The long format
+  // ("Jun 15, 2024") is preserved at sm+ so desktop users see the full date.
+  // Both formats are present in the DOM, gated by responsive Tailwind classes.
+  test("Last Played cell renders both compact (mobile) and long (desktop) date formats", async () => {
+    const song = makeSong({
+      dateLastPlayed: new Date("2024-06-15"),
+      lastPlayedShow: makeShow({ slug: "2024-06-15-the-cap" }),
+    });
+    await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
+
+    // Long format visible at sm+ (hidden on mobile)
+    const longFormat = screen.getByText(/6\/15\/2024/);
+    expect(longFormat.className).toContain("hidden");
+    expect(longFormat.className).toContain("sm:inline");
+
+    // Compact format visible on mobile (hidden at sm+)
+    const compactFormat = screen.getByText("6/15/24");
+    expect(compactFormat.className).toContain("sm:hidden");
+  });
+
+  // Same dual-format treatment for First Played, mirroring Last Played so
+  // both date columns line up neatly at the same breakpoint.
+  test("First Played cell renders both compact (mobile) and long (desktop) date formats", async () => {
+    const song = makeSong({
+      dateFirstPlayed: new Date("1995-07-04"),
+      firstPlayedShow: makeShow({ id: "show-first", slug: "1995-07-04-red-rocks" }),
+    });
+    await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
+
+    expect(screen.getByText(/7\/4\/1995/).className).toContain("hidden");
+    expect(screen.getByText("7/4/95").className).toContain("sm:hidden");
+  });
+
+  // The venue line beneath Last/First Played dates uses `hidden sm:block`
+  // so the cells collapse to date-only on mobile (matching the perf-table
+  // DateVenueCell pattern). Otherwise the wrapped venue text adds two
+  // extra lines per row on phones for marginal value.
+  test("Last Played venue line is hidden on mobile (hidden sm:block)", async () => {
+    const song = makeSong({
+      dateLastPlayed: new Date("2024-06-15"),
+      lastPlayedShow: makeShow({ slug: "2024-06-15-the-cap" }),
+    });
+    await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
+
+    const venueLine = screen.getByText(/The Capitol Theatre/);
+    expect(venueLine.className).toContain("hidden");
+    expect(venueLine.className).toContain("sm:block");
+  });
+
+  test("First Played venue line is hidden on mobile (hidden sm:block)", async () => {
+    const song = makeSong({
+      dateFirstPlayed: new Date("1995-07-04"),
+      firstPlayedShow: makeShow({
+        id: "show-first",
+        slug: "1995-07-04-red-rocks",
+        venue: {
+          id: "v2",
+          slug: "red-rocks",
+          name: "Red Rocks Amphitheatre",
+          city: "Morrison",
+          state: "CO",
+          country: "USA",
+          createdAt: new Date("2020-01-01"),
+          updatedAt: new Date("2020-01-01"),
+          timesPlayed: 0,
+        },
+      }),
+    });
+    await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
+
+    const venueLine = screen.getByText(/Red Rocks Amphitheatre/);
+    expect(venueLine.className).toContain("hidden");
+    expect(venueLine.className).toContain("sm:block");
+  });
+
+  // Plays and Filtered Plays are short-but-prone-to-overlap headers on
+  // narrow viewports. Both must allow text to wrap (no whitespace-nowrap)
+  // and use leading-tight so the wrapped lines stay compact.
+  test("Plays header allows wrap (whitespace-normal leading-tight)", async () => {
+    await setupWithRouter(<DataTable columns={baseColumns} data={[makeSong()]} hideSearch hidePagination />);
+
+    const playsButton = screen.getByRole("button", { name: /^Plays/i });
+    expect(playsButton.className).toContain("whitespace-normal");
+    expect(playsButton.className).toContain("leading-tight");
+  });
+
+  // When the table is showing both Plays and Filtered Plays, mobile real
+  // estate is too tight for both. The all-time Plays column hides on
+  // mobile so Filtered Plays (the count relevant to the active scope)
+  // gets the room. Desktop continues to show both columns.
+  test("Plays column has meta.hideOnMobile when showFilteredPlays is true", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const playsColumn = columns.find((column) => "accessorKey" in column && column.accessorKey === "timesPlayed");
+    expect(playsColumn?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // When Filtered Plays is absent, Plays is the only count column on the
+  // table and must remain visible on mobile.
+  test("Plays column does not hide on mobile when showFilteredPlays is false", () => {
+    const columns = getSongsColumns({ showFilteredPlays: false });
+    const playsColumn = columns.find((column) => "accessorKey" in column && column.accessorKey === "timesPlayed");
+    expect(playsColumn?.meta?.hideOnMobile).toBeFalsy();
   });
 
   // The /songs page shows songs sorted by times played (most played first)
