@@ -26,8 +26,6 @@ interface SetlistListProps {
    * responsible for sorting setlists before passing them in.
    */
   groupByMonth?: boolean;
-  /** Forwarded to each SetlistCard (not the list container). */
-  className?: string;
   /**
    * When true, renders a left gutter with the 1-based rank (setlist index + 1)
    * next to each card. The caller orders the list by rank before passing it in.
@@ -43,7 +41,6 @@ export function SetlistList({
   initialUserData,
   empty,
   groupByMonth,
-  className,
   numbered,
   collapsible,
 }: SetlistListProps) {
@@ -60,7 +57,6 @@ export function SetlistList({
     const card = (
       <SetlistCard
         setlist={setlist}
-        className={className}
         userAttendance={attendanceMap.get(showId) ?? null}
         userRating={userRatingMap.get(showId) ?? null}
         showRating={liveAverage ?? setlist.show.averageRating ?? null}

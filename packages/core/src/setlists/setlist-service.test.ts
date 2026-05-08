@@ -26,7 +26,8 @@ describe("SetlistService.findManyLight", () => {
     expect(call.where.date).toEqual({ endsWith: "-04-04" });
   });
 
-  // Existing year filter still works (gte/lt range) — no regression
+  // Year filter expands to a half-open date range (gte first day, lt next
+  // year's first day) so it works with the string-shaped date column.
   test("applies gte/lt date filter when year is provided", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
@@ -50,9 +51,9 @@ describe("SetlistService.findManyLight", () => {
     expect(call.where.date).toBeUndefined();
   });
 
-  // hasYoutube maps to showYoutubesCount > 0 — same pattern as hasPhotos but
-  // targets the denormalized YouTube count on the Show model.
-  test("applies showYoutubesCount > 0 when hasYoutube filter is true", async () => {
+  // hasYoutube=true maps to showYoutubesCount > 0 — same pattern as hasPhotos
+  // but targets the denormalized YouTube count on the Show model.
+  test("applies showYoutubesCount > 0 when hasYoutube is true", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
 
@@ -64,9 +65,38 @@ describe("SetlistService.findManyLight", () => {
     expect(call.where.showYoutubesCount).toEqual({ gt: 0 });
   });
 
-  // Without the flag set, the where-clause must not constrain showYoutubesCount
-  // so shows without YouTube videos remain in the results.
-  test("omits showYoutubesCount filter when hasYoutube is not set", async () => {
+  // hasYoutube=false is the negative tri-state branch — caller is asking for
+  // shows that explicitly DO NOT have a YouTube video. Maps to showYoutubesCount = 0
+  // rather than skipping the filter (which is the `undefined` case).
+  test("applies showYoutubesCount = 0 when hasYoutube is false", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never);
+
+    await service.findManyLight({
+      filters: { year: 2024, hasYoutube: false },
+    });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.showYoutubesCount).toEqual({ equals: 0 });
+  });
+
+  // hasPhotos=false — same negative branch on the photos column. Drives the
+  // "shows without photos" filter from the year-page UI.
+  test("applies showPhotosCount = 0 when hasPhotos is false", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never);
+
+    await service.findManyLight({
+      filters: { year: 2024, hasPhotos: false },
+    });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.showPhotosCount).toEqual({ equals: 0 });
+  });
+
+  // Without the flag set (undefined), the where-clause must not constrain
+  // either count column so all shows remain in the results.
+  test("omits photos/youtube filters when hasPhotos and hasYoutube are undefined", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
 
@@ -74,21 +104,23 @@ describe("SetlistService.findManyLight", () => {
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.showYoutubesCount).toBeUndefined();
+    expect(call.where.showPhotosCount).toBeUndefined();
   });
 
   // hasPhotos and hasYoutube combine as AND when both are active — lets the
-  // filter bar stack Photos+YouTube on the year route.
-  test("stacks hasPhotos and hasYoutube filters", async () => {
+  // filter bar stack Photos+YouTube on the year route. Includes a positive
+  // and negative mix to cover the cross-product.
+  test("stacks hasPhotos=true with hasYoutube=false", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
 
     await service.findManyLight({
-      filters: { year: 2024, hasPhotos: true, hasYoutube: true },
+      filters: { year: 2024, hasPhotos: true, hasYoutube: false },
     });
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.showPhotosCount).toEqual({ gt: 0 });
-    expect(call.where.showYoutubesCount).toEqual({ gt: 0 });
+    expect(call.where.showYoutubesCount).toEqual({ equals: 0 });
   });
 });
 

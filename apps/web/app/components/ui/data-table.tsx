@@ -17,6 +17,7 @@ declare module "@tanstack/react-table" {
   interface ColumnMeta<TData extends RowData, TValue> {
     width?: string;
     cellClassName?: string;
+    hideOnMobile?: boolean;
   }
 }
 
@@ -105,14 +106,22 @@ export function DataTable<TData, TValue>({
   const paginationBlock = !hasResults ? null : (
     <div className="flex items-center justify-between px-2">
       {!hidePaginationText ? (
-        <div className="text-sm text-content-text-secondary font-medium">
-          {table.getFilteredRowModel().rows.length === 0
-            ? "0 results"
-            : `Showing ${table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to ${Math.min(
-                (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-                table.getFilteredRowModel().rows.length,
-              )} of ${table.getFilteredRowModel().rows.length} results`}
-        </div>
+        (() => {
+          const total = table.getFilteredRowModel().rows.length;
+          if (total === 0) {
+            return <div className="text-sm text-content-text-secondary font-medium">0 results</div>;
+          }
+          const pageSize = table.getState().pagination.pageSize;
+          const pageIndex = table.getState().pagination.pageIndex;
+          const from = pageIndex * pageSize + 1;
+          const to = Math.min((pageIndex + 1) * pageSize, total);
+          return (
+            <div className="text-sm text-content-text-secondary font-medium">
+              <span className="hidden sm:inline">{`Showing ${from} to ${to} of ${total} results`}</span>
+              <span className="sm:hidden">{`${from}–${to} of ${total}`}</span>
+            </div>
+          );
+        })()
       ) : (
         <div />
       )}
@@ -181,18 +190,27 @@ export function DataTable<TData, TValue>({
       {!hidePagination && paginationBlock}
 
       <div className="overflow-x-auto w-full">
-        <Table className="w-full">
+        <Table className="w-full table-auto sm:table-fixed">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="text-left text-sm text-content-text-secondary">
                 {headerGroup.headers.map((header) => {
+                  const hideOnMobile = header.column.columnDef.meta?.hideOnMobile;
+                  // Width hint applies only at sm+ — on mobile we let
+                  // table-auto size columns to content. Without this,
+                  // desktop-tuned widths (e.g. 180px for the perf-table
+                  // Date column) would starve other columns on phones.
+                  const width = header.column.columnDef.meta?.width;
+                  const widthStyle = width ? ({ "--col-w": width } as React.CSSProperties) : undefined;
                   return (
                     <TableHead
                       key={header.id}
-                      className="p-3 text-sm text-content-text-secondary"
-                      style={{
-                        width: header.column.columnDef.meta?.width,
-                      }}
+                      className={cn(
+                        "px-1.5 py-2 sm:p-3 text-sm text-content-text-secondary align-top",
+                        hideOnMobile && "hidden sm:table-cell",
+                        width && "sm:w-[var(--col-w)]",
+                      )}
+                      style={widthStyle}
                     >
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
@@ -221,7 +239,14 @@ export function DataTable<TData, TValue>({
                   className={`border-t border-glass-border/30 hover:bg-hover-glass ${rowClassName?.(row.original, index) ?? ""}`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className={cn("p-3", cell.column.columnDef.meta?.cellClassName)}>
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        "px-1.5 py-2 sm:p-3 align-top break-words",
+                        cell.column.columnDef.meta?.hideOnMobile && "hidden sm:table-cell",
+                        cell.column.columnDef.meta?.cellClassName,
+                      )}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

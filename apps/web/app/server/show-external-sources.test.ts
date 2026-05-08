@@ -35,7 +35,7 @@ describe("computeShowExternalSources", () => {
   // Shows are keyed by id in the result; nugs/archive URLs lookup by date,
   // youtube URLs lookup by show id — this wiring is the whole point.
   test("maps each show to its resolved URLs by date + show id", async () => {
-    getReleaseUrlsByDate.mockResolvedValue({ "2004-12-31": "https://play.nugs.net/release/1" });
+    getReleaseUrlsByDate.mockResolvedValue({ "2004-12-31": ["https://play.nugs.net/release/1"] });
     getPrimaryUrlsByDate.mockResolvedValue({ "2004-12-31": "https://archive.org/details/db2004" });
     getFirstVideoUrlByShowIds.mockResolvedValue({ "show-nye04": "https://youtube.com/watch?v=aaa" });
 
@@ -43,7 +43,7 @@ describe("computeShowExternalSources", () => {
 
     expect(result).toEqual({
       "show-nye04": {
-        nugsUrl: "https://play.nugs.net/release/1",
+        nugsUrls: ["https://play.nugs.net/release/1"],
         archiveUrl: "https://archive.org/details/db2004",
         youtubeUrl: "https://youtube.com/watch?v=aaa",
       },
@@ -61,7 +61,7 @@ describe("computeShowExternalSources", () => {
     const result = await computeShowExternalSources([{ id: "show-lockn", date: "2019-08-10" }]);
 
     expect(result["show-lockn"]).toEqual({
-      nugsUrl: undefined,
+      nugsUrls: undefined,
       archiveUrl: "https://archive.org/details/db2019",
       youtubeUrl: undefined,
     });
@@ -70,7 +70,7 @@ describe("computeShowExternalSources", () => {
   // Multiple shows in one call share the two catalog fetches but each gets
   // its own per-id youtube lookup — confirms the batching contract.
   test("resolves multiple shows with a single pass through each service", async () => {
-    getReleaseUrlsByDate.mockResolvedValue({ "2004-12-31": "https://play.nugs.net/release/1" });
+    getReleaseUrlsByDate.mockResolvedValue({ "2004-12-31": ["https://play.nugs.net/release/1"] });
     getPrimaryUrlsByDate.mockResolvedValue({ "2019-08-10": "https://archive.org/details/db2019" });
     getFirstVideoUrlByShowIds.mockResolvedValue({
       "show-nye04": "https://youtube.com/watch?v=nye",
@@ -85,9 +85,9 @@ describe("computeShowExternalSources", () => {
     expect(getPrimaryUrlsByDate).toHaveBeenCalledTimes(1);
     expect(getFirstVideoUrlByShowIds).toHaveBeenCalledTimes(1);
     expect(getFirstVideoUrlByShowIds).toHaveBeenCalledWith(["show-nye04", "show-lockn"]);
-    expect(result["show-nye04"].nugsUrl).toBe("https://play.nugs.net/release/1");
+    expect(result["show-nye04"].nugsUrls).toEqual(["https://play.nugs.net/release/1"]);
     expect(result["show-lockn"].archiveUrl).toBe("https://archive.org/details/db2019");
     expect(result["show-nye04"].archiveUrl).toBeUndefined();
-    expect(result["show-lockn"].nugsUrl).toBeUndefined();
+    expect(result["show-lockn"].nugsUrls).toBeUndefined();
   });
 });

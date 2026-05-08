@@ -8,21 +8,16 @@ interface SongWithShows extends Song {
 
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
 
-const formatDate = (date: Date) => {
-  return new Date(date).toLocaleDateString("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
-
 const getSortIcon = (sortState: false | "asc" | "desc") => {
-  if (sortState === "asc") return <ArrowUp className="ml-2 h-4 w-4 text-brand-primary" />;
-  if (sortState === "desc") return <ArrowDown className="ml-2 h-4 w-4 text-brand-primary" />;
-  return <ArrowUpDown className="ml-2 h-4 w-4" />;
+  // Arrow sits below the label on mobile (the header uses flex-col there) so
+  // we drop the left margin in that layout and bring it back at sm+.
+  const className = "ml-0 sm:ml-2 h-4 w-4";
+  if (sortState === "asc") return <ArrowUp className={`${className} text-brand-primary`} />;
+  if (sortState === "desc") return <ArrowDown className={`${className} text-brand-primary`} />;
+  return <ArrowUpDown className={className} />;
 };
 
 interface GetSongsColumnsOptions {
@@ -44,7 +39,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors"
+          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2"
         >
           Song Title
           {getSortIcon(column.getIsSorted())}
@@ -56,7 +51,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       return (
         <Link
           to={`/songs/${song.slug}`}
-          className="text-base text-brand-primary hover:text-brand-secondary font-medium"
+          className="inline-block min-w-[10ch] text-base text-brand-primary hover:text-brand-secondary font-medium [overflow-wrap:anywhere]"
         >
           {song.title}
         </Link>
@@ -66,13 +61,16 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const playsColumn: ColumnDef<SongWithShows> = {
     accessorKey: "timesPlayed",
-    meta: { width: "10%" },
+    // When Filtered Plays is also visible there isn't room for both count
+    // columns on mobile; the all-time count is the less specific of the
+    // two so it drops out at narrow widths.
+    meta: { width: "10%", hideOnMobile: showFilteredPlays },
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors"
+          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2"
         >
           Plays
           {getSortIcon(column.getIsSorted())}
@@ -97,7 +95,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight"
+          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2"
         >
           Filtered Plays
           {getSortIcon(column.getIsSorted())}
@@ -131,7 +129,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors"
+          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2"
         >
           Last Played
           {getSortIcon(column.getIsSorted())}
@@ -148,18 +146,22 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
               to={`/shows/${show.slug}`}
               className="text-brand-primary hover:text-brand-secondary transition-colors"
             >
-              <div>{formatDate(date)}</div>
+              <div>
+                <ShowDate date={date} />
+              </div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary">
+                <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary hidden sm:block">
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
             </Link>
           ) : (
             <div>
-              <div className="text-content-text-secondary">{formatDate(date)}</div>
+              <div className="text-content-text-secondary">
+                <ShowDate date={date} />
+              </div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm">
+                <div className="text-content-text-tertiary text-sm hidden sm:block">
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
@@ -180,7 +182,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors"
+          className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2"
         >
           First Played
           {getSortIcon(column.getIsSorted())}
@@ -197,18 +199,22 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
               to={`/shows/${show.slug}`}
               className="text-brand-primary hover:text-brand-secondary transition-colors"
             >
-              <div>{formatDate(date)}</div>
+              <div>
+                <ShowDate date={date} />
+              </div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary">
+                <div className="text-content-text-tertiary text-sm hover:text-content-text-secondary hidden sm:block">
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}
             </Link>
           ) : (
             <div>
-              <div className="text-content-text-secondary">{formatDate(date)}</div>
+              <div className="text-content-text-secondary">
+                <ShowDate date={date} />
+              </div>
               {show?.venue && (
-                <div className="text-content-text-tertiary text-sm">
+                <div className="text-content-text-tertiary text-sm hidden sm:block">
                   {show.venue.name}, {show.venue.city} {show.venue.state}
                 </div>
               )}

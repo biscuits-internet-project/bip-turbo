@@ -45,7 +45,10 @@ export function FilterNav({
   filterCounts,
   allCount,
 }: FilterNavProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  // The panel always collapses on mobile (`<sm`); on desktop it stays
+  // expanded unless the caller opts in with `defaultExpanded={false}`.
+  const [expanded, setExpanded] = useState(false);
+  const desktopCollapsible = !defaultExpanded;
 
   const subtitleCSS = cn(
     "text-xs font-normal text-content-text-tertiary",
@@ -73,50 +76,61 @@ export function FilterNav({
 
   const allSelected = currentFilter === null || currentFilter === undefined;
   const actualAllURL = allURL || basePath;
-  const canBeCollapsed = !defaultExpanded;
+
+  const headingContent = (
+    <>
+      {title}
+      {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
+      {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
+    </>
+  );
+
+  // The mobile toggle button is always rendered (`sm:hidden`). On desktop
+  // we render either a static h2 (always expanded) or the same toggle
+  // button (collapsible) depending on `defaultExpanded`.
+  const ToggleButton = (
+    <button
+      type="button"
+      className={cn(
+        "w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none transition-colors",
+        expanded ? "mb-3" : "mb-0",
+        !desktopCollapsible && "sm:hidden",
+        {
+          "hover:text-brand-primary": expanded,
+          "hover:text-brand-secondary": !expanded,
+        },
+      )}
+      onClick={() => setExpanded((v) => !v)}
+      aria-expanded={expanded}
+    >
+      {headingContent}
+      <span
+        className={cn("transition-transform duration-300 ml-2", {
+          "rotate-90": expanded,
+          "rotate-0": !expanded,
+        })}
+        aria-hidden
+      >
+        ▶
+      </span>
+    </button>
+  );
 
   return (
     <div className="card-premium rounded-lg overflow-hidden">
       <div className="px-4 py-3">
-        {canBeCollapsed ? (
-          <button
-            type="button"
-            className={cn(
-              "w-full flex items-center gap-2 text-sm font-semibold text-white mb-3 cursor-pointer select-none transition-colors",
-              {
-                "hover:text-brand-primary": expanded,
-                "hover:text-brand-secondary": !expanded,
-              },
-            )}
-            style={{ cursor: "pointer" }}
-            onClick={() => setExpanded((v) => !v)}
-            aria-expanded={expanded}
-          >
-            {title}
-            {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
-            {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
-            <span
-              className={cn("transition-transform duration-300 ml-2", {
-                "rotate-90": expanded,
-                "rotate-0": !expanded,
-              })}
-              aria-hidden
-            >
-              ▶
-            </span>
-          </button>
-        ) : (
-          <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-            {title}
-            {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
-            {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
-          </h2>
+        {ToggleButton}
+        {!desktopCollapsible && (
+          <h2 className="hidden sm:flex text-sm font-semibold text-white mb-3 items-center gap-2">{headingContent}</h2>
         )}
         <div
-          className={cn("overflow-hidden transition-all duration-300", {
-            "max-h-[1000px] opacity-100": expanded || !canBeCollapsed,
-            "max-h-0 opacity-0 pointer-events-none": !expanded && canBeCollapsed,
-          })}
+          className={cn(
+            "overflow-hidden transition-all duration-300",
+            expanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0 pointer-events-none",
+            // Desktop is always visible unless the caller opted into a
+            // desktop-collapsible variant via `defaultExpanded={false}`.
+            !desktopCollapsible && "sm:!max-h-[1000px] sm:!opacity-100 sm:!pointer-events-auto",
+          )}
         >
           <div className={cn("grid gap-1.5", columnCSS)}>
             {filters.map((filter) => {
@@ -125,7 +139,7 @@ export function FilterNav({
               const label = filterCounts ? (
                 <>
                   {filter}
-                  <span className="ml-1 text-xs opacity-70">({count ?? 0})</span>
+                  <span className="ml-1 text-xs opacity-70 hidden sm:inline">({count ?? 0})</span>
                 </>
               ) : (
                 filter
@@ -162,7 +176,9 @@ export function FilterNav({
                 })}
               >
                 All
-                {allCount !== undefined && <span className="ml-1 text-xs opacity-70">({allCount})</span>}
+                {allCount !== undefined && (
+                  <span className="ml-1 text-xs opacity-70 hidden sm:inline">({allCount})</span>
+                )}
               </Link>
             )}
           </div>

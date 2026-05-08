@@ -1,7 +1,9 @@
 import type { SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame } from "lucide-react";
+import { ShowDate } from "~/components/show-date";
 import { CombinedNotes } from "./combined-notes";
+import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
 
 interface PerformanceColumnOptions {
@@ -51,11 +53,16 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
           const title = info.getValue() as string;
           const slug = info.row.original.songSlug;
           return slug ? (
-            <a href={`/songs/${slug}`} className="text-base text-brand-primary hover:text-brand-secondary font-medium">
+            <a
+              href={`/songs/${slug}`}
+              className="inline-block min-w-[10ch] text-base text-brand-primary hover:text-brand-secondary font-medium [overflow-wrap:anywhere]"
+            >
               {title}
             </a>
           ) : (
-            <span className="text-content-text-secondary">{title}</span>
+            <span className="inline-block min-w-[10ch] text-content-text-secondary [overflow-wrap:anywhere]">
+              {title}
+            </span>
           );
         },
       }) as ColumnDef<SongPagePerformance, unknown>,
@@ -67,7 +74,10 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       columnHelper.accessor((row) => row.allTimer ?? false, {
         id: "allTimer",
         header: "",
-        meta: { width: "24px" },
+        // Flame icon sits flush against the row edge at every viewport —
+        // the default cell padding (`px-1.5` on mobile, `sm:p-3` on
+        // desktop) doubles the visual width of the column for no benefit.
+        meta: { width: "24px", cellClassName: "px-0 sm:px-0" },
         enableSorting: false,
         cell: (info) => (info.getValue() ? <Flame className="h-3.5 w-3.5 text-orange-500" /> : null),
       }) as ColumnDef<SongPagePerformance, unknown>,
@@ -77,42 +87,24 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
   columns.push(
     columnHelper.accessor("show.date", {
       id: "date",
-      meta: { width: "120px" },
+      meta: { width: "180px" },
       header: ({ column }) => <SortableHeader column={column} label="Date" />,
       enableSorting: true,
       sortingFn: "datetime",
-      cell: (info) => (
-        <a
-          href={`/shows/${info.row.original.show.slug}`}
-          className="text-base text-brand-primary hover:text-brand-secondary"
-        >
-          {info.getValue()}
-        </a>
-      ),
-    }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor(
-      (row) => ({
-        name: row.venue?.name,
-        city: row.venue?.city,
-        state: row.venue?.state,
-        slug: row.show.slug,
-      }),
-      {
-        id: "venue",
-        header: "Venue",
-        enableSorting: false,
-        cell: (info) => {
-          const venue = info.getValue();
-          return venue.city ? (
-            <a href={`/shows/${venue.slug}`} className="text-brand-primary hover:text-brand-secondary">
-              {venue.name}
-              <br />
-              {venue.city}, {venue.state}
-            </a>
-          ) : null;
-        },
+      cell: (info) => {
+        const date = info.getValue();
+        const showSlug = info.row.original.show.slug;
+        const venue = info.row.original.venue;
+        return (
+          <a href={`/shows/${showSlug}`} className="text-base text-brand-primary hover:text-brand-secondary block">
+            <DateVenueCell
+              date={<ShowDate date={date} />}
+              venue={{ name: venue?.name, city: venue?.city, state: venue?.state }}
+            />
+          </a>
+        );
       },
-    ) as ColumnDef<SongPagePerformance, unknown>,
+    }) as ColumnDef<SongPagePerformance, unknown>,
     columnHelper.accessor("set", {
       header: "Set",
       meta: { width: "48px" },
@@ -136,6 +128,10 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         id: "sequence",
         header: "Sequence",
         enableSorting: false,
+        // Hidden on mobile only when there's a Song column already
+        // competing for room — the song-detail page (no Song column)
+        // has the slack to keep Sequence visible at narrow widths.
+        meta: { hideOnMobile: Boolean(showSongColumn) },
         cell: (info) => {
           const { before, after, currentSong } = info.getValue();
           const parts = [];
@@ -198,7 +194,9 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
             );
           }
 
-          return parts.length > 0 ? <div className="flex items-center flex-wrap">{parts}</div> : null;
+          return parts.length > 0 ? (
+            <div className="flex items-center flex-wrap [overflow-wrap:anywhere]">{parts}</div>
+          ) : null;
         },
       },
     ) as ColumnDef<SongPagePerformance, unknown>,
@@ -211,6 +209,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         id: "notes",
         header: "Notes",
         enableSorting: false,
+        meta: { hideOnMobile: true },
         cell: (info) => {
           const { annotations, notes } = info.getValue();
           const items = [];

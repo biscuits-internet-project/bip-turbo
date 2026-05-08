@@ -6,10 +6,9 @@ import { cn } from "~/lib/utils";
 
 interface ShowPhotosProps {
   photos: ShowFile[];
-  className?: string;
 }
 
-export function ShowPhotos({ photos, className }: ShowPhotosProps) {
+export function ShowPhotos({ photos }: ShowPhotosProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<ShowFile | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -76,7 +75,7 @@ export function ShowPhotos({ photos, className }: ShowPhotosProps) {
   }
 
   return (
-    <div className={cn("relative group", className)}>
+    <div className="relative group">
       {/* Gradient edges for scroll indication */}
       <div className="absolute left-0 top-0 bottom-2 w-8 bg-gradient-to-r from-background to-transparent z-[5] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-background to-transparent z-[5] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -194,9 +193,7 @@ export function ShowPhotos({ photos, className }: ShowPhotosProps) {
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-6 pt-12">
             <div className="flex items-end justify-between">
               <div>
-                {selectedPhoto?.label && (
-                  <p className="text-white font-medium text-lg">{selectedPhoto.label}</p>
-                )}
+                {selectedPhoto?.label && <p className="text-white font-medium text-lg">{selectedPhoto.label}</p>}
                 {selectedPhoto?.source && selectedPhoto.source !== selectedPhoto?.label && (
                   <p className="text-white/60 text-sm mt-0.5">{selectedPhoto.source}</p>
                 )}
@@ -221,14 +218,10 @@ export function ShowPhotos({ photos, className }: ShowPhotosProps) {
                       "flex-shrink-0 rounded-md overflow-hidden transition-all duration-200 border-2",
                       index === selectedIndex
                         ? "border-white scale-100 opacity-100 shadow-lg shadow-white/20"
-                        : "border-white/30 scale-95 opacity-60 hover:opacity-90 hover:scale-100 hover:border-white/50"
+                        : "border-white/30 scale-95 opacity-60 hover:opacity-90 hover:scale-100 hover:border-white/50",
                     )}
                   >
-                    <img
-                      src={photo.thumbnailUrl || photo.url}
-                      alt=""
-                      className="h-14 w-20 object-cover"
-                    />
+                    <img src={photo.thumbnailUrl || photo.url} alt="" className="h-14 w-20 object-cover" />
                   </button>
                 ))}
               </div>

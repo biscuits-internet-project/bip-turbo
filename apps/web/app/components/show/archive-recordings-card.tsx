@@ -1,5 +1,8 @@
 import { type ArchiveDotOrgRecording, pickPrimaryArchiveRecording } from "@bip/domain";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import ArchiveMusicPlayer from "~/components/player";
+import { cn } from "~/lib/utils";
 import { ExternalSourceCard } from "./external-source-card";
 
 /**
@@ -57,12 +60,36 @@ export function ArchiveRecordingsCard({ items }: ArchiveRecordingsCardProps) {
             );
           })}
         </ul>
-        {primary && (
-          <div className="pt-3 border-t border-white/5">
-            <ArchiveMusicPlayer identifier={primary.identifier} bare />
-          </div>
-        )}
+        {primary && <CollapsiblePlayer identifier={primary.identifier} />}
       </div>
     </ExternalSourceCard>
+  );
+}
+
+/**
+ * Wraps the embedded archive.org player behind a click-to-expand toggle.
+ * Starts collapsed on every viewport because the player is heavy (iframe
+ * + autoload behavior) and most visitors don't engage with it; opening it
+ * is a deliberate "I want to listen" action.
+ */
+function CollapsiblePlayer({ identifier }: { identifier: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="pt-3 border-t border-white/5">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between text-sm font-medium text-content-text-secondary hover:text-content-text-primary transition-colors"
+      >
+        <span>{open ? "Hide player" : "Play recording"}</span>
+        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="mt-3">
+          <ArchiveMusicPlayer identifier={identifier} bare />
+        </div>
+      )}
+    </div>
   );
 }

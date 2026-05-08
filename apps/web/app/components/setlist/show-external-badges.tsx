@@ -10,7 +10,13 @@ import { cn } from "~/lib/utils";
  * listing pages pre-resolve these once so per-row rendering stays cheap.
  */
 export interface ShowExternalSources {
-  nugsUrl?: string;
+  /**
+   * Every nugs.net release URL for the show date. Most dates have zero or
+   * one URL; dual-billed nights (Disco Biscuits + Tractorbeam) have two.
+   * Storing the full list lets the badge strip render one favicon per
+   * release so users can tell a rare two-release night at a glance.
+   */
+  nugsUrls?: string[];
   archiveUrl?: string;
   youtubeUrl?: string;
 }
@@ -26,7 +32,6 @@ interface ShowExternalBadgesProps {
   photosHref?: string;
   /** Count of photos attached to the show; suppresses the photos badge when zero. */
   photosCount?: number;
-  className?: string;
 }
 
 /**
@@ -52,8 +57,9 @@ interface PhotosBadgeProps {
   count: number | undefined;
 }
 
-const BADGE_LINK_CLASS = "opacity-80 hover:opacity-100 transition-opacity inline-flex items-center";
-const BADGE_ICON_CLASS = "h-5 w-5";
+const BADGE_LINK_CLASS =
+  "inline-flex items-center transition-transform hover:scale-110 hover:-translate-y-0.5 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.55)]";
+const BADGE_ICON_CLASS = "h-5 w-5 shrink-0";
 
 /**
  * A single favicon-as-link inside the badge strip. Owns its own absence —
@@ -89,14 +95,26 @@ function PhotosBadge({ href, count }: PhotosBadgeProps) {
  * photos anchor. Returns null when nothing matches so listing pages don't
  * show an empty strip.
  */
-export function ShowExternalBadges({ sources, photosHref, photosCount, className }: ShowExternalBadgesProps) {
+export function ShowExternalBadges({ sources, photosHref, photosCount }: ShowExternalBadgesProps) {
+  const nugsUrls = sources.nugsUrls ?? [];
   const hasAny =
-    sources.nugsUrl || sources.archiveUrl || sources.youtubeUrl || (photosHref && photosCount && photosCount > 0);
+    nugsUrls.length > 0 || sources.archiveUrl || sources.youtubeUrl || (photosHref && photosCount && photosCount > 0);
   if (!hasAny) return null;
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <FaviconLink domain={EXTERNAL_SOURCE_DOMAINS.nugs} href={sources.nugsUrl} label="Available on nugs.net" />
+    <div className="flex items-center gap-2">
+      {/* One favicon per nugs release so dual-billed nights (Disco Biscuits +
+          Tractorbeam) read as "two releases" at a glance — that double-icon
+          is the cue users have asked for. Single-release nights look the same
+          as before. */}
+      {nugsUrls.map((url, index) => (
+        <FaviconLink
+          key={url}
+          domain={EXTERNAL_SOURCE_DOMAINS.nugs}
+          href={url}
+          label={nugsUrls.length > 1 ? `Available on nugs.net (release ${index + 1})` : "Available on nugs.net"}
+        />
+      ))}
       <FaviconLink domain={EXTERNAL_SOURCE_DOMAINS.youtube} href={sources.youtubeUrl} label="Video on YouTube" />
       <FaviconLink
         domain={EXTERNAL_SOURCE_DOMAINS.archive}

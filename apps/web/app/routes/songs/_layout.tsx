@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Calendar, Clock, Flame, History, ListMusic, Plus } from "lucide-react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
@@ -24,10 +24,11 @@ const TABBED_PATHS = new Set(TABS.map((tab) => tab.path));
 
 export default function SongsLayout() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const showTabs = TABBED_PATHS.has(pathname);
 
   return (
-    <div className="py-8">
+    <div className="py-2 sm:py-3">
       <div className="relative">
         <h1 className="page-heading">SONGS</h1>
         <div className="absolute top-0 right-0 flex items-center gap-3">
@@ -43,27 +44,47 @@ export default function SongsLayout() {
       </div>
 
       {showTabs && (
-        <div className="w-full flex justify-start border-b border-glass-border/30 mb-6">
-          {TABS.map((tab) => {
-            const isActive = pathname === tab.path;
-            const Icon = tab.icon;
-            return (
-              <Link
-                key={tab.path}
-                to={tab.path}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 text-sm font-medium",
-                  isActive
-                    ? "border-b-2 border-brand-primary text-content-text-primary"
-                    : "text-content-text-tertiary hover:text-content-text-secondary",
-                )}
-              >
-                <Icon className={cn("h-4 w-4", tab.iconClassName)} />
-                {tab.label}
-              </Link>
-            );
-          })}
-        </div>
+        <>
+          <div className="w-full hidden sm:flex justify-start border-b border-glass-border/30 mb-6">
+            {TABS.map((tab) => {
+              const isActive = pathname === tab.path;
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.path}
+                  to={tab.path}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 text-sm font-medium",
+                    isActive
+                      ? "border-b-2 border-brand-primary text-content-text-primary"
+                      : "text-content-text-tertiary hover:text-content-text-secondary",
+                  )}
+                >
+                  <Icon className={cn("h-4 w-4", tab.iconClassName)} />
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="sm:hidden mb-6">
+            <label htmlFor="songs-view-select" className="sr-only">
+              Songs view
+            </label>
+            <select
+              id="songs-view-select"
+              value={pathname}
+              onChange={(event) => navigate(event.target.value)}
+              className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
+            >
+              {TABS.map((tab) => (
+                <option key={tab.path} value={tab.path}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
       )}
 
       <Outlet />

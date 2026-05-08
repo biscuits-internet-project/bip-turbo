@@ -89,8 +89,10 @@ describe("PerformanceTable", () => {
     await setup(<PerformanceTable performances={performances} />);
 
     expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(2);
-    expect(screen.getByText("2024-06-15")).toBeInTheDocument();
-    expect(screen.getByText("2024-07-20")).toBeInTheDocument();
+    // Dates render via ShowDate (M/D/YYYY at sm+, M/D/YY on mobile); both
+    // spans are in the DOM regardless of viewport.
+    expect(screen.getByText("6/15/2024")).toBeInTheDocument();
+    expect(screen.getByText("7/20/2024")).toBeInTheDocument();
   });
 
   // The Song column is only needed on /songs/all-timers where performances

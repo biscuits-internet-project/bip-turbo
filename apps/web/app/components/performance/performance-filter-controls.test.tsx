@@ -184,6 +184,55 @@ describe("PerformanceFilterControls", () => {
     expect(handleUpdateFilter).not.toHaveBeenCalled();
   });
 
+  // On mobile the entire filter block is collapsed behind a "Filters"
+  // toggle button so it doesn't eat the viewport before any results show.
+  // The wrapper carries `hidden` until expanded; sm+ breakpoints keep it
+  // visible regardless via `sm:flex`/`sm:block`.
+  test("renders a mobile-only Filters toggle button (sm:hidden)", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
+
+    const toggle = screen.getByRole("button", { name: /^Filters/ });
+    expect(toggle.className).toContain("sm:hidden");
+  });
+
+  // The filter content wrapper starts hidden on mobile and becomes visible
+  // when the toggle is clicked. At sm+ it is always visible regardless of
+  // the toggle state so desktop users see filters by default.
+  test("filter content is hidden on mobile by default and revealed when Filters is clicked", async () => {
+    const { user, container } = await setup(
+      <PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />,
+    );
+
+    const wrapper = container.querySelector("[data-testid='filter-content-wrapper']") as HTMLElement;
+    expect(wrapper.className).toContain("hidden");
+    expect(wrapper.className).toContain("sm:block");
+
+    await user.click(screen.getByRole("button", { name: /^Filters/ }));
+
+    // After click, mobile-collapse should release.
+    expect(wrapper.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+  });
+
+  // The Filters toggle shows an active-filter count when filters are
+  // applied so users know there's state hidden behind the button without
+  // having to expand it.
+  test("Filters toggle shows count badge when filters are active", async () => {
+    await setup(
+      <PerformanceFilterControls
+        {...defaultProps}
+        searchValue=""
+        onSearchChange={() => {}}
+        hasActiveFilters
+        activeToggleSet={new Set(["jam", "encore"])}
+        selectedTimeRange="2024"
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: /^Filters/ });
+    // Badge is the count of active filters (timeRange + 2 toggles = 3).
+    expect(toggle.textContent).toMatch(/3/);
+  });
+
   // Clicking Clear All delegates to the parent's clearFilters callback, which
   // resets all URL params and search text in the hook.
   test("clicking Clear All calls clearFilters", async () => {

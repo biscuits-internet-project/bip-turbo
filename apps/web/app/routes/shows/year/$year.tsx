@@ -13,6 +13,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { getShowsMeta } from "~/lib/seo";
+import { parseTriState, type TriState, triStateToBoolean } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
 import { applyExternalSourceFilters } from "~/server/apply-external-source-filters";
 import { services } from "~/server/services";
@@ -27,7 +28,7 @@ interface LoaderData {
   externalSources: Record<string, ShowExternalSources>;
   showCountsByYear: Record<number, number>;
   monthCounts: Record<number, number>;
-  filters: { photos: boolean; youtube: boolean; nugs: boolean; archive: boolean };
+  filters: { photos: TriState; youtube: TriState; nugs: TriState; archive: TriState };
   initialUserData: ShowUserDataResponse;
 }
 
@@ -70,10 +71,10 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
   const searchQuery = url.searchParams.get("q") || undefined;
 
   const filters = {
-    photos: url.searchParams.has("photos"),
-    youtube: url.searchParams.has("youtube"),
-    nugs: url.searchParams.has("nugs"),
-    archive: url.searchParams.has("archive"),
+    photos: parseTriState(url.searchParams.get("photos")),
+    youtube: parseTriState(url.searchParams.get("youtube")),
+    nugs: parseTriState(url.searchParams.get("nugs")),
+    archive: parseTriState(url.searchParams.get("archive")),
   };
   const emptyCounts: Record<number, number> = {};
 
@@ -122,8 +123,8 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     return await services.setlists.findManyLight({
       filters: {
         year: yearInt,
-        hasPhotos: filters.photos || undefined,
-        hasYoutube: filters.youtube || undefined,
+        hasPhotos: triStateToBoolean(filters.photos),
+        hasYoutube: triStateToBoolean(filters.youtube),
       },
       sort: [{ field: "date", direction: sortDirection }],
     });
@@ -183,6 +184,10 @@ export default function ShowsByYear() {
   // Months with at least one show — drives the Jump-to-Month nav active state.
   const monthsWithShows = useMemo(() => Object.keys(monthCounts).map(Number), [monthCounts]);
 
+  // Jump-to-Month collapses by default on mobile so the long month grid
+  // doesn't push the show list far below the fold; CSS forces it open at sm+.
+  const [jumpToMonthOpen, setJumpToMonthOpen] = useState(false);
+
   // Handle scroll event to show/hide back to top button
   useEffect(() => {
     const handleScroll = () => {
@@ -209,7 +214,9 @@ export default function ShowsByYear() {
           <h1 className="page-heading">SHOWS</h1>
           <div className="absolute top-0 right-0 flex items-start gap-2">
             {!searchQuery && (
-              <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+              <div className="hidden sm:block">
+                <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+              </div>
             )}
             <AdminOnly>
               <Button variant="outline" size="sm" asChild>
@@ -226,6 +233,11 @@ export default function ShowsByYear() {
               <span className="text-content-text-secondary text-lg">Search results for "{searchQuery}"</span>
             )}
           </div>
+          {!searchQuery && (
+            <div className="mt-3 flex justify-center sm:hidden">
+              <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+            </div>
+          )}
         </div>
 
         {/* Navigation - Only show when not searching */}
@@ -240,13 +252,38 @@ export default function ShowsByYear() {
             <div className="card-premium rounded-lg overflow-hidden">
               {/* Month navigation */}
               <div className="px-4 py-3">
-                <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setJumpToMonthOpen((open) => !open)}
+                  aria-expanded={jumpToMonthOpen}
+                  className={cn(
+                    "sm:hidden w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none",
+                    jumpToMonthOpen ? "mb-3" : "mb-0",
+                  )}
+                >
                   Jump to Month
                   <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
-                    {monthsWithShows.length} active
+                    {monthsWithShows.length} months
+                  </span>
+                  <span
+                    className={cn("transition-transform duration-300 ml-2", jumpToMonthOpen ? "rotate-90" : "rotate-0")}
+                    aria-hidden
+                  >
+                    ▶
+                  </span>
+                </button>
+                <h2 className="hidden sm:flex text-sm font-semibold text-white mb-3 items-center gap-2">
+                  Jump to Month
+                  <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
+                    {monthsWithShows.length} months
                   </span>
                 </h2>
-                <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5">
+                <div
+                  className={cn(
+                    "overflow-hidden transition-all duration-300 grid grid-cols-3 sm:grid-cols-12 gap-1.5 sm:!max-h-[1000px] sm:!opacity-100",
+                    jumpToMonthOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0",
+                  )}
+                >
                   {months.map((month, index) => {
                     const active = monthsWithShows.includes(index);
                     const count = monthCounts[index] ?? 0;
@@ -262,7 +299,7 @@ export default function ShowsByYear() {
                         )}
                       >
                         {month}
-                        {active && count > 0 && <span className="ml-1 opacity-70">({count})</span>}
+                        {active && count > 0 && <span className="ml-1 opacity-70 hidden sm:inline">({count})</span>}
                       </a>
                     );
                   })}
@@ -290,7 +327,6 @@ export default function ShowsByYear() {
                 setlists={setlists}
                 externalSources={externalSources}
                 initialUserData={initialUserData}
-                className="transition-all duration-300 transform hover:scale-[1.01]"
                 groupByMonth={!searchQuery}
                 empty={
                   <div className="text-center py-8">

@@ -208,12 +208,46 @@ describe("DataTable", () => {
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
-  // Pending: DataTable currently hardcodes column widths by ID
-  // (header.id === "title" etc.), a leaky abstraction. This test pins the
-  // desired behavior — a column's `meta.width` is applied as the header's
-  // CSS width — and should be un-skipped once DataTable reads from
-  // `column.columnDef.meta?.width` instead.
-  test("honors meta.width on column defs", async () => {
+  // Columns marked `meta.hideOnMobile` get `hidden sm:table-cell` on both
+  // the header and body cells so they disappear at narrow viewports without
+  // needing a separate mobile column set. Used for the perf-table Notes
+  // column and other long-text columns that crowd phones.
+  test("hideOnMobile meta adds hidden sm:table-cell to header and body cells", async () => {
+    const columnsWithHidden: ColumnDef<Row>[] = [
+      { accessorKey: "name", header: "Name" },
+      { accessorKey: "count", header: "Count", meta: { hideOnMobile: true } },
+    ];
+
+    await setup(<DataTable columns={columnsWithHidden} data={rows} hideSearch />);
+
+    const countHeader = screen.getByText("Count").closest("th");
+    expect(countHeader?.className).toContain("hidden");
+    expect(countHeader?.className).toContain("sm:table-cell");
+
+    const nameHeader = screen.getByText("Name").closest("th");
+    expect(nameHeader?.className ?? "").not.toContain("hidden");
+
+    const countCell = screen.getByText("3").closest("td");
+    expect(countCell?.className).toContain("hidden");
+    expect(countCell?.className).toContain("sm:table-cell");
+  });
+
+  // The table uses `table-auto` on mobile (lets columns size to content,
+  // avoiding header overlap) and `table-fixed` at sm+ (keeps the
+  // percentage-width sizing predictable on desktop).
+  test("table element uses table-auto on mobile and sm:table-fixed at sm+", async () => {
+    const { container } = await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
+
+    const tableEl = container.querySelector("table");
+    expect(tableEl?.className).toContain("table-auto");
+    expect(tableEl?.className).toContain("sm:table-fixed");
+  });
+
+  // `meta.width` is exposed as a CSS custom property and only takes effect
+  // at sm+ via a Tailwind class — on mobile the column sizes to content.
+  // Without this gating, desktop-tuned widths would starve other columns
+  // at phone widths (the bug observed on /songs/all-timers and /on-this-day).
+  test("honors meta.width via --col-w + sm:w-[var(--col-w)] on column defs", async () => {
     const columnsWithWidths: ColumnDef<Row>[] = [
       { accessorKey: "name", header: "Name", meta: { width: "60%" } },
       { accessorKey: "count", header: "Count", meta: { width: "40%" } },
@@ -224,7 +258,9 @@ describe("DataTable", () => {
     const nameHeader = screen.getByText("Name").closest("th");
     const countHeader = screen.getByText("Count").closest("th");
 
-    expect(nameHeader?.style.width).toBe("60%");
-    expect(countHeader?.style.width).toBe("40%");
+    expect(nameHeader?.style.getPropertyValue("--col-w")).toBe("60%");
+    expect(countHeader?.style.getPropertyValue("--col-w")).toBe("40%");
+    expect(nameHeader?.className).toContain("sm:w-[var(--col-w)]");
+    expect(countHeader?.className).toContain("sm:w-[var(--col-w)]");
   });
 });

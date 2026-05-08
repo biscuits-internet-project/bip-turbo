@@ -33,7 +33,7 @@ export function ExternalLinkCard({ faviconDomain, title, items }: ExternalLinkCa
   if (items.length === 0) return null;
   return (
     <ExternalSourceCard faviconDomain={faviconDomain} title={title}>
-      <ul className="space-y-1 pl-6">
+      <ul className="space-y-0.5 pl-6">
         {items.map(({ url, label }) => (
           <li key={url}>
             <a

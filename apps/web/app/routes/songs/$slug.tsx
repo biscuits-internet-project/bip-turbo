@@ -1,6 +1,6 @@
 import type { SongPageView } from "@bip/domain";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -8,6 +8,7 @@ import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
+import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
@@ -26,19 +27,19 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
 
 interface StatBoxProps {
   label: string;
-  value: string | number;
+  value: ReactNode;
   sublabel?: string;
   sublabel2?: string;
 }
 
 function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
   return (
-    <div className="glass-content p-6 rounded-lg">
+    <div className="glass-content p-2 sm:p-6 rounded-lg h-full">
       <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
       <dd className="mt-2">
-        <span className="text-3xl font-bold text-content-text-primary">{value}</span>
-        {sublabel && <span className="ml-2 text-sm text-content-text-tertiary">{sublabel}</span>}
-        {sublabel2 && <div className="mt-3 text-sm text-content-text-tertiary">{sublabel2}</div>}
+        <span className="text-xl sm:text-3xl font-bold text-content-text-primary">{value}</span>
+        {sublabel && <div className="mt-1 text-sm text-content-text-tertiary">{sublabel}</div>}
+        {sublabel2 && <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block">{sublabel2}</div>}
       </dd>
     </div>
   );
@@ -99,12 +100,26 @@ export function meta({ data }: { data: SongPageView }) {
   });
 }
 
+/**
+ * Builds the "Last Played" sublabel — "last show" when the song was played
+ * at the most recent show, otherwise "N show(s) ago" with correct
+ * pluralization. The backend's `showsSinceLastPlayed` is a strict count of
+ * shows played AFTER this song's last performance, so 0 = last show.
+ */
+function lastPlayedSublabel(showsSince: number | null | undefined): string | undefined {
+  if (showsSince === null || showsSince === undefined) return undefined;
+  if (showsSince === 0) return "last show";
+  if (showsSince === 1) return "1 show ago";
+  return `${showsSince} shows ago`;
+}
+
 export default function SongPage() {
   const { song, performances: allPerformances } = useSerializedLoaderData<SongPageView>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
   const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const {
     filteredData: filteredPerformances,
     isLoading,
@@ -180,23 +195,13 @@ export default function SongPage() {
       </div>
 
       {/* Stats Grid */}
-      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatBox label="Times Played" value={song.timesPlayed} sublabel="total plays" />
+      <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatBox label="Times Played" value={song.timesPlayed} />
         {song.firstShowSlug ? (
           <Link to={`/shows/${song.firstShowSlug}`} className="block">
             <StatBox
               label="First Played"
-              value={
-                song.dateFirstPlayed
-                  ? (() => {
-                      const date = new Date(song.dateFirstPlayed);
-                      const month = date.getUTCMonth() + 1;
-                      const day = date.getUTCDate();
-                      const year = date.getUTCFullYear();
-                      return `${month}/${day}/${year}`;
-                    })()
-                  : "Never"
-              }
+              value={song.dateFirstPlayed ? <ShowDate date={song.dateFirstPlayed} /> : "Never"}
               sublabel2={
                 song.firstVenue
                   ? song.firstVenue.city && song.firstVenue.state
@@ -209,17 +214,7 @@ export default function SongPage() {
         ) : (
           <StatBox
             label="First Played"
-            value={
-              song.dateFirstPlayed
-                ? (() => {
-                    const date = new Date(song.dateFirstPlayed);
-                    const month = date.getUTCMonth() + 1;
-                    const day = date.getUTCDate();
-                    const year = date.getUTCFullYear();
-                    return `${month}/${day}/${year}`;
-                  })()
-                : "Never"
-            }
+            value={song.dateFirstPlayed ? <ShowDate date={song.dateFirstPlayed} /> : "Never"}
             sublabel2={
               song.firstVenue
                 ? song.firstVenue.city && song.firstVenue.state
@@ -233,26 +228,8 @@ export default function SongPage() {
           <Link to={`/shows/${song.lastShowSlug}`} className="block">
             <StatBox
               label="Last Played"
-              value={
-                song.actualLastPlayedDate
-                  ? (() => {
-                      const date = new Date(song.actualLastPlayedDate);
-                      const month = date.getUTCMonth() + 1;
-                      const day = date.getUTCDate();
-                      const year = date.getUTCFullYear();
-                      return `${month}/${day}/${year}`;
-                    })()
-                  : "Never"
-              }
-              sublabel={
-                song.actualLastPlayedDate &&
-                song.showsSinceLastPlayed !== null &&
-                song.showsSinceLastPlayed !== undefined
-                  ? song.showsSinceLastPlayed <= 1
-                    ? "last show"
-                    : `${song.showsSinceLastPlayed} shows ago`
-                  : undefined
-              }
+              value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
+              sublabel={song.actualLastPlayedDate ? lastPlayedSublabel(song.showsSinceLastPlayed) : undefined}
               sublabel2={
                 song.lastVenue
                   ? song.lastVenue.city && song.lastVenue.state
@@ -265,24 +242,8 @@ export default function SongPage() {
         ) : (
           <StatBox
             label="Last Played"
-            value={
-              song.actualLastPlayedDate
-                ? (() => {
-                    const date = new Date(song.actualLastPlayedDate);
-                    const month = date.getUTCMonth() + 1;
-                    const day = date.getUTCDate();
-                    const year = date.getUTCFullYear();
-                    return `${month}/${day}/${year}`;
-                  })()
-                : "Never"
-            }
-            sublabel={
-              song.actualLastPlayedDate && song.showsSinceLastPlayed !== null && song.showsSinceLastPlayed !== undefined
-                ? song.showsSinceLastPlayed <= 1
-                  ? "last show"
-                  : `${song.showsSinceLastPlayed} shows ago`
-                : undefined
-            }
+            value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
+            sublabel={song.actualLastPlayedDate ? lastPlayedSublabel(song.showsSinceLastPlayed) : undefined}
             sublabel2={
               song.lastVenue
                 ? song.lastVenue.city && song.lastVenue.state
@@ -304,8 +265,36 @@ export default function SongPage() {
         </div>
       )}
 
-      <Tabs defaultValue={defaultTab} className="w-full" onValueChange={() => clearFilters()}>
-        <TabsList className="w-full flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
+      <Tabs
+        value={activeTab}
+        className="w-full"
+        onValueChange={(value) => {
+          setActiveTab(value);
+          clearFilters();
+        }}
+      >
+        <div className="sm:hidden mb-4">
+          <label htmlFor="song-view-select" className="sr-only">
+            Song view
+          </label>
+          <select
+            id="song-view-select"
+            value={activeTab}
+            onChange={(event) => {
+              setActiveTab(event.target.value);
+              clearFilters();
+            }}
+            className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
+          >
+            <option value="performances">All Performances</option>
+            {hasAllTimers && <option value="all-timers">All-Timers</option>}
+            <option value="stats">Stats</option>
+            {song.history && <option value="history">History</option>}
+            {song.lyrics && <option value="lyrics">Lyrics</option>}
+            {(song.tabs || song.guitarTabsUrl) && <option value="guitar-tabs">Guitar Tabs</option>}
+          </select>
+        </div>
+        <TabsList className="w-full hidden sm:flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
           <TabsTrigger
             value="performances"
             className={cn(

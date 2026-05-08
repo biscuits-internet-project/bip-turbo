@@ -3,19 +3,19 @@ import { Check, Flame } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating";
+import { ShowDate } from "~/components/show-date";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { StarRating } from "~/components/ui/star-rating";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
-import { cn, formatDateShort } from "~/lib/utils";
+import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
 interface SetlistCardProps {
   setlist: Setlist | SetlistLight;
-  className?: string;
   userAttendance: Attendance | null;
   userRating: Rating | number | null;
   showRating: number | null;
@@ -30,7 +30,6 @@ interface SetlistCardProps {
 
 function SetlistCardComponent({
   setlist,
-  className,
   userAttendance,
   userRating,
   showRating,
@@ -38,7 +37,6 @@ function SetlistCardComponent({
   collapsible = false,
 }: SetlistCardProps) {
   const { user } = useSession();
-  const formattedDate = formatDateShort(setlist.show.date);
   const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
   const [displayedCount, setDisplayedCount] = useState<number>(setlist.show.ratingsCount ?? 0);
   const [isRatingAnimating, setIsRatingAnimating] = useState(false);
@@ -181,12 +179,7 @@ function SetlistCardComponent({
   const orderedAnnotations = Array.from(uniqueAnnotations.values()).sort((a, b) => a.index - b.index);
 
   return (
-    <Card
-      className={cn(
-        "card-premium relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-purple-900/30 hover:border-brand-primary/80",
-        className,
-      )}
-    >
+    <Card className="card-premium relative overflow-hidden">
       <CardHeader
         data-testid="setlist-card-header"
         onClick={
@@ -211,7 +204,7 @@ function SetlistCardComponent({
                 to={setlist.show.slug ? `/shows/${setlist.show.slug}` : `/shows`}
                 className="text-brand-primary hover:text-brand-secondary transition-colors"
               >
-                {formattedDate}
+                <ShowDate date={setlist.show.date} />
               </Link>
               <AnniversaryBadge showDate={setlist.show.date} />
             </div>
@@ -296,12 +289,13 @@ function SetlistCardComponent({
                 </button>
               </LoginPromptPopover>
             )}
-            <ShowExternalBadges
-              sources={externalSources ?? {}}
-              photosHref={setlist.show.slug ? `/shows/${setlist.show.slug}#photos` : undefined}
-              photosCount={setlist.show.showPhotosCount}
-              className="pr-2 sm:pr-3"
-            />
+            <div className="pr-2 sm:pr-3">
+              <ShowExternalBadges
+                sources={externalSources ?? {}}
+                photosHref={setlist.show.slug ? `/shows/${setlist.show.slug}#photos` : undefined}
+                photosCount={setlist.show.showPhotosCount}
+              />
+            </div>
           </div>
         </div>
       </CardHeader>

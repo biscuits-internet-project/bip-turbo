@@ -10,7 +10,7 @@ import type { ShowExternalSources } from "~/components/setlist/show-external-bad
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { addDaysYearAgnostic, formatMonthDay, isValidMonthDay } from "~/lib/utils";
+import { addDaysYearAgnostic, formatMonthDay, formatMonthDayShort, isValidMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
@@ -139,7 +139,8 @@ export default function OnThisDay() {
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
             >
               <ChevronLeft className="h-3 w-3" />
-              <span>{formatMonthDay(previousMonthDay)}</span>
+              <span className="sm:hidden">{formatMonthDayShort(previousMonthDay)}</span>
+              <span className="hidden sm:inline">{formatMonthDay(previousMonthDay)}</span>
             </Link>
             <MonthDayPicker monthDay={monthDay} displayLabel={displayLabel} />
             <Link
@@ -147,7 +148,8 @@ export default function OnThisDay() {
               prefetch="intent"
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
             >
-              <span>{formatMonthDay(nextMonthDay)}</span>
+              <span className="sm:hidden">{formatMonthDayShort(nextMonthDay)}</span>
+              <span className="hidden sm:inline">{formatMonthDay(nextMonthDay)}</span>
               <ChevronRight className="h-3 w-3" />
             </Link>
           </div>
@@ -202,7 +204,6 @@ export default function OnThisDay() {
             setlists={setlists}
             externalSources={externalSources}
             initialUserData={initialUserData}
-            className="transition-all duration-300 transform hover:scale-[1.01]"
             empty={
               <div className="text-center py-8">
                 <p className="text-content-text-secondary text-lg">No shows on {displayLabel}.</p>
