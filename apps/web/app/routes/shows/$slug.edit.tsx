@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { ShowDayOrderManager, type ShowDayOrderRow } from "~/components/show/show-day-order-manager";
 import { ShowForm, type ShowFormValues } from "~/components/show/show-form";
 import { TrackManager } from "~/components/track/track-manager";
 import { Button } from "~/components/ui/button";
@@ -17,6 +18,7 @@ interface LoaderData {
   bands: Band[];
   venues: Venue[];
   tracks: Track[];
+  sameDateShows: ShowDayOrderRow[];
 }
 
 export const loader = adminLoader(async ({ params }) => {
@@ -36,7 +38,17 @@ export const loader = adminLoader(async ({ params }) => {
   // Get tracks for this show
   const tracks = await services.tracks.findByShowId(show.id);
 
-  return { show, bands, venues, tracks };
+  // Same-date show group — drives the reorder widget visibility/seed.
+  const sameDateRaw = await services.shows.findByDate(show.date);
+  const sameDateShows: ShowDayOrderRow[] = sameDateRaw.map((s) => ({
+    id: s.id,
+    slug: s.slug,
+    date: s.date,
+    dayOrder: s.dayOrder,
+    venueName: s.venue?.name ?? null,
+  }));
+
+  return { show, bands, venues, tracks, sameDateShows };
 });
 
 export const action = adminAction(async ({ request, params }) => {
@@ -52,6 +64,7 @@ export const action = adminAction(async ({ request, params }) => {
     bandId: bandId === "none" ? undefined : bandId,
     notes: (formData.get("notes") as string) || null,
     relistenUrl: (formData.get("relistenUrl") as string) || null,
+    countForStats: formData.get("countForStats") === "true",
   };
 
   // Update the show
@@ -61,7 +74,7 @@ export const action = adminAction(async ({ request, params }) => {
 });
 
 export default function EditShow() {
-  const { show, bands, tracks } = useSerializedLoaderData<LoaderData>();
+  const { show, bands, tracks, sameDateShows } = useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<ShowFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,6 +88,7 @@ export default function EditShow() {
         bandId: show.bandId || "none",
         notes: show.notes || "",
         relistenUrl: show.relistenUrl || "",
+        countForStats: show.countForStats ?? true,
       });
       setIsLoading(false);
     }
@@ -90,6 +104,7 @@ export default function EditShow() {
       formData.append("bandId", data.bandId);
       formData.append("notes", data.notes);
       formData.append("relistenUrl", data.relistenUrl);
+      formData.append("countForStats", data.countForStats ? "true" : "false");
 
       const response = await fetch(`/shows/${show.slug}/edit`, {
         method: "POST",
@@ -135,6 +150,10 @@ export default function EditShow() {
             />
           </CardContent>
         </Card>
+
+        {sameDateShows.length >= 2 && (
+          <ShowDayOrderManager currentShowId={show.id} date={show.date} initialShows={sameDateShows} />
+        )}
 
         <div className="mt-6">
           <TrackManager showId={show.id} initialTracks={tracks} />

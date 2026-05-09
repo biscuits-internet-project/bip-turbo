@@ -32,6 +32,7 @@ export interface ShowServiceCreateInput {
   bandId?: string;
   notes?: string | null;
   relistenUrl?: string | null;
+  countForStats?: boolean;
 }
 
 export type ShowCreateInput = Prisma.ShowCreateInput;
@@ -374,6 +375,7 @@ export class ShowService {
       band: data.bandId ? { connect: { id: data.bandId } } : undefined,
       notes: data.notes,
       relistenUrl: data.relistenUrl,
+      countForStats: data.countForStats,
     };
 
     const result = await this.db.show.update({
@@ -403,6 +405,48 @@ export class ShowService {
     }
 
     return show;
+  }
+
+  /**
+   * Rewrites `dayOrder` to 1..N for the supplied id sequence inside a single
+   * transaction. Used by the admin reorder widget when multiple shows share a
+   * date and need an explicit tiebreaker for listings/adjacency.
+   *
+   * Fails closed if any id is unknown or attached to a different date — that
+   * would silently move a show off its real date in listing order.
+   */
+  async reorderByDate(date: string, orderedIds: string[]): Promise<void> {
+    if (orderedIds.length === 0) return;
+
+    const existing = await this.db.show.findMany({
+      where: { id: { in: orderedIds } },
+      select: { id: true, date: true },
+    });
+
+    if (existing.length !== orderedIds.length) {
+      const found = new Set(existing.map((row) => row.id));
+      const missing = orderedIds.filter((id) => !found.has(id));
+      throw new Error(`Shows not found: ${missing.join(", ")}`);
+    }
+    for (const row of existing) {
+      if (String(row.date) !== date) {
+        throw new Error(`Show ${row.id} is not on date ${date}`);
+      }
+    }
+
+    const now = new Date();
+    await this.db.$transaction(
+      orderedIds.map((id, index) =>
+        this.db.show.update({
+          where: { id },
+          data: { dayOrder: index + 1, updatedAt: now },
+        }),
+      ),
+    );
+
+    if (this.cacheInvalidation) {
+      await this.cacheInvalidation.invalidateShowListings();
+    }
   }
 
   async delete(id: string): Promise<boolean> {
