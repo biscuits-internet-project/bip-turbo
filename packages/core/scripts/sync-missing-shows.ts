@@ -20,6 +20,7 @@ import { Prisma } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
+import { StatsService } from "../src/stats/stats-service";
 import { createTestLogger } from "../src/_shared/test-logger";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
@@ -325,11 +326,19 @@ async function syncMissingShows(): Promise<void> {
   const redis = redisUrl ? new RedisService(redisUrl, logger) : null;
   const cache = redis ? new CacheService(redis, logger) : null;
   const cacheInvalidation = cache ? new CacheInvalidationService(cache, logger) : null;
+  // StatsService is wired without a cache here — the script never reads
+  // cached aggregates, only triggers the post-batch gap rebuild.
+  const statsService = new StatsService(prisma, cache ?? undefined);
   if (redis) await redis.connect();
 
   // Track every show whose row materially changed this run — used at the end
   // to invalidate the per-slug show.data + setlist.data cache entries.
   const changedSlugs = new Set<string>();
+  // The earliest date of any show INSERTED this run (drift updates don't
+  // shift gap math). Scopes the post-batch gap rebuild — pre-this-date
+  // chains are unaffected. ISO YYYY-MM-DD strings compare lexicographically
+  // the same as chronologically, so `<` works directly.
+  let earliestInsertedDate: string | null = null;
   let songsChanged = false;
 
   const stats: SyncStats = {
@@ -589,6 +598,10 @@ async function syncMissingShows(): Promise<void> {
             }
           }
           changedSlugs.add(slug);
+          const showDate = String(show.date);
+          if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+            earliestInsertedDate = showDate;
+          }
           stats.showsCreated++;
           stats.tracksCreated += trackCount;
           console.log(`  ✅ ${slug} (${trackCount} tracks, venue=${venueId ? "✓" : "—"})`);
@@ -612,6 +625,20 @@ async function syncMissingShows(): Promise<void> {
       if (songsChanged) await cacheInvalidation.invalidateSongCaches();
     } else if (!isDryRun && !cacheInvalidation && (changedSlugs.size > 0 || songsChanged)) {
       console.warn("⚠️  REDIS_URL not set; skipping cache invalidation. Cached pages may show stale data until TTL expires or you restart the app.");
+    }
+
+    // Rebuild Track.gap + Song.* aggregates once for the whole batch. Bulk
+    // operation — a single rebuild covering the earliest inserted date is
+    // cheaper than N per-show rebuilds, and it captures every chain that
+    // could have shifted as a result of these inserts.
+    if (!isDryRun && earliestInsertedDate !== null) {
+      console.log(`📐 Rebuilding gaps + song stats since ${earliestInsertedDate}`);
+      try {
+        await statsService.rebuildGapsAndSongStatsSince(earliestInsertedDate);
+      } catch (err) {
+        console.error("  ❌ stats rebuild failed:", err);
+        stats.errors++;
+      }
     }
 
     printSummary(stats, isDryRun);

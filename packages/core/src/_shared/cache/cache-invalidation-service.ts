@@ -50,8 +50,18 @@ export class CacheInvalidationService {
     await Promise.all([
       this.cache.delPattern(CacheKeys.shows.allLists()),
       this.cache.delPattern("home:*"), // Invalidate all home page caches
+      this.cache.del(CacheKeys.stats.showsByYear()), // shows-per-year aggregate is tied to the show catalog
       this.cloudflareCache?.purgeYearListings(),
     ]);
+  }
+
+  /**
+   * Invalidate the cross-domain shows-by-year aggregate. Standalone hook
+   * for callers that mutate shows without going through the listing flow.
+   */
+  async invalidateStatsShowsByYear(): Promise<void> {
+    this.logger.info("Invalidating stats:shows-by-year");
+    await this.cache.del(CacheKeys.stats.showsByYear());
   }
 
   /**

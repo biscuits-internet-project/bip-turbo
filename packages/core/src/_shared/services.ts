@@ -16,6 +16,7 @@ import { ShowService } from "../shows/show-service";
 import { TourDatesService } from "../shows/tour-dates-service";
 import { YoutubeService } from "../shows/youtube-service";
 import { SongService } from "../songs/song-service";
+import { StatsService } from "../stats/stats-service";
 import { TrackService } from "../tracks/track-service";
 import { UserService } from "../users/user-service";
 import { VenueService } from "../venues/venue-service";
@@ -30,6 +31,7 @@ export interface Services {
   blogPosts: BlogPostService;
   shows: ShowService;
   songs: SongService;
+  stats: StatsService;
   tracks: TrackService;
   setlists: SetlistService;
   venues: VenueService;
@@ -59,13 +61,17 @@ export function createServices(container: ServiceContainer): Services {
 
   // Create core services
   const songService = new SongService(container.db, container.logger);
+  // StatsService is constructed first so ShowService can hand it the
+  // post-mutation rebuild dependency.
+  const statsService = new StatsService(container.db, container.cache);
 
   return {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
     authors: new AuthorService(container.db, container.logger),
     blogPosts: new BlogPostService(container.db, container.redis, container.logger),
-    shows: new ShowService(container.db, container.logger, container.cacheInvalidation),
+    shows: new ShowService(container.db, container.logger, container.cacheInvalidation, statsService),
     songs: songService,
+    stats: statsService,
     tracks: new TrackService(container.db, container.logger, container.cacheInvalidation),
     setlists: new SetlistService(container.db),
     venues: new VenueService(container.db, container.logger),

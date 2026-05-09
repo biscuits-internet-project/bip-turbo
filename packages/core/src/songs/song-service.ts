@@ -2,7 +2,8 @@ import type { Logger, Song, TrendingSong } from "@bip/domain";
 import type { DbClient, DbSong } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
-import { SHOW_ORDER_DESC, STATS_SHOWS_WHERE } from "../_shared/show-ordering";
+import { SHOW_ORDER_DESC, STATS_SHOWS_WHERE, TRACK_BY_SHOW_ORDER_ASC } from "../_shared/show-ordering";
+import { computeSongStats, computeTrackGaps, sortTracksForGapWalk, type TrackForGapWalk } from "../_shared/track-gap";
 import { slugify } from "../_shared/utils/slugify";
 
 export interface SongFilter {
@@ -321,26 +322,33 @@ export class SongService {
   }
 
   /**
-   * Recalculate and update statistics for a specific song based on its tracks
+   * Recalculate denormalized stats for a specific song: per-track gap +
+   * previousPerformanceShowId, and Song.timesPlayed / dateFirst/LastPlayed /
+   * yearlyPlayData. Algorithm lives in pure functions in `_shared/track-gap.ts`
+   * so it's unit-tested without DB mocks; this method is a thin wrapper that
+   * fetches data, runs the pure functions, and writes results.
+   *
+   * Stats rules:
+   *  - Shows with `countForStats=false` (soundchecks, radio sessions, cancelled
+   *    stubs, late-night Tractorbeam sets) are excluded from `timesPlayed` /
+   *    `dateFirst/LastPlayed` / `yearlyPlayData`.
+   *  - Tracks on those shows get a gap pointing at the prior stats-show (so
+   *    the soundcheck row reads "last really played N shows ago") but never
+   *    act as a `prev` for later tracks — the next stats-performance walks
+   *    back past them.
    */
   async updateSongStatistics(songId: string): Promise<void> {
-    // Get all unique shows for this song (count shows, not individual tracks)
-    const uniqueShows = await this.db.track.findMany({
+    const tracks = await this.db.track.findMany({
       where: { songId },
-      distinct: ["showId"],
       include: {
         show: {
-          select: { date: true },
+          select: { id: true, date: true, dayOrder: true, countForStats: true },
         },
       },
-      orderBy: {
-        show: {
-          date: "asc",
-        },
-      },
+      orderBy: TRACK_BY_SHOW_ORDER_ASC,
     });
 
-    if (uniqueShows.length === 0) {
+    if (tracks.length === 0) {
       // No tracks, reset statistics
       await this.db.song.update({
         where: { id: songId },
@@ -354,30 +362,55 @@ export class SongService {
       return;
     }
 
-    // Calculate statistics based on unique shows
-    const timesPlayed = uniqueShows.length;
-    const firstShow = uniqueShows[0];
-    const lastShow = uniqueShows[uniqueShows.length - 1];
-
-    // Build yearly play data (count unique shows per year)
-    const yearlyPlayData: Record<string, number> = {};
-    uniqueShows.forEach((track) => {
-      if (track.show?.date) {
-        const year = new Date(track.show.date).getFullYear().toString();
-        yearlyPlayData[year] = (yearlyPlayData[year] || 0) + 1;
-      }
+    // Universe of stats-show dates feeds the "shows between" denominator.
+    const statsShows = await this.db.show.findMany({
+      where: STATS_SHOWS_WHERE,
+      select: { date: true },
+      orderBy: { date: "asc" },
     });
 
-    // Update the song
-    await this.db.song.update({
-      where: { id: songId },
-      data: {
-        timesPlayed,
-        dateFirstPlayed: firstShow.show?.date ? new Date(firstShow.show.date) : null,
-        dateLastPlayed: lastShow.show?.date ? new Date(lastShow.show.date) : null,
-        yearlyPlayData: yearlyPlayData,
-        updatedAt: new Date(),
-      },
+    const walkInput: TrackForGapWalk[] = tracks.flatMap((t) => {
+      // Drop tracks whose show row failed to join (shouldn't happen — FK
+      // is enforced — but the include's type is `show: Show | null`).
+      if (!t.show) return [];
+      return [
+        {
+          trackId: t.id,
+          showId: t.show.id,
+          showDate: t.show.date,
+          dayOrder: t.show.dayOrder,
+          showCountForStats: t.show.countForStats,
+          position: t.position,
+        },
+      ];
     });
+
+    const sortedTracks = sortTracksForGapWalk(walkInput);
+    const gapResults = computeTrackGaps(
+      sortedTracks,
+      statsShows.map((s) => s.date),
+    );
+    const songStats = computeSongStats(
+      walkInput.filter((t) => t.showCountForStats).map((t) => ({ showId: t.showId, showDate: t.showDate })),
+    );
+
+    await Promise.all([
+      ...gapResults.map((g) =>
+        this.db.track.update({
+          where: { id: g.trackId },
+          data: { gap: g.gap, previousPerformanceShowId: g.previousPerformanceShowId },
+        }),
+      ),
+      this.db.song.update({
+        where: { id: songId },
+        data: {
+          timesPlayed: songStats.timesPlayed,
+          dateFirstPlayed: songStats.dateFirstPlayed,
+          dateLastPlayed: songStats.dateLastPlayed,
+          yearlyPlayData: songStats.yearlyPlayData,
+          updatedAt: new Date(),
+        },
+      }),
+    ]);
   }
 }

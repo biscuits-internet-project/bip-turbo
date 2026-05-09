@@ -93,6 +93,15 @@ export const CacheKeys = {
     /** Recent setlists for home page (limit + sort direction) */
     recentSetlists: (limit: number) => `home:recent-setlists:${limit}`,
   },
+
+  /**
+   * Cross-domain stats cache keys (denormalized aggregates that span shows
+   * and songs and back rarity/normalization features).
+   */
+  stats: {
+    /** Map of `{year: showCount}` for the entire show catalog. */
+    showsByYear: () => "stats:shows-by-year",
+  },
 } as const;
 
 /**

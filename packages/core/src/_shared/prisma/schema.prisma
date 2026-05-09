@@ -339,6 +339,7 @@ model Show {
   band              Band?                    @relation(fields: [bandId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_bands_band_id")
   venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_venues_venue_id")
   tracks            Track[]
+  previousPerformanceTracks Track[]            @relation("TrackPreviousPerformance")
   segueRuns         SegueRun[]
   files             ShowToFile[]
 
@@ -474,9 +475,12 @@ model Track {
   ratingsCount    Int                      @default(0) @map("ratings_count")
   searchText      String?                  @map("search_text") @db.Text
   searchVector    Unsupported("tsvector")? @map("search_vector")
+  gap                       Int?
+  previousPerformanceShowId String?         @map("previous_performance_show_id") @db.Uuid
   annotations     Annotation[]
   show            Show                     @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_shows_show_id")
   song            Song                     @relation(fields: [songId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_songs_song_id")
+  previousPerformanceShow   Show?           @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
 
   @@index([likesCount])
   @@index([nextTrackId])

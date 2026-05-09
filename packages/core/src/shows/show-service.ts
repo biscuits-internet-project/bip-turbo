@@ -13,6 +13,7 @@ import {
   showOrderTuple,
 } from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
+import type { StatsService } from "../stats/stats-service";
 
 export interface ShowFilter {
   year?: number;
@@ -68,7 +69,14 @@ export class ShowService {
   constructor(
     protected readonly db: DbClient,
     protected readonly logger: Logger,
-    protected readonly cacheInvalidation?: CacheInvalidationService,
+    protected readonly cacheInvalidation: CacheInvalidationService,
+    /**
+     * Triggered after every show mutation (create/update/delete) to keep
+     * Track.gap and Song.* aggregates consistent — the universe of
+     * count_for_stats=true shows changes whenever a show is mutated, which
+     * ripples to chains spanning the affected date.
+     */
+    protected readonly stats: StatsService,
   ) {}
 
   private async generateShowSlug(date: string, venueId?: string): Promise<string> {
@@ -342,9 +350,15 @@ export class ShowService {
     const show = mapShowToDomainEntity(result);
 
     // Invalidate show listing caches (new show affects listings)
-    if (this.cacheInvalidation) {
-      await this.cacheInvalidation.invalidateShowListings();
-    }
+    await this.cacheInvalidation.invalidateShowListings();
+
+    // Adding a count_for_stats=true show changes the "shows between"
+    // denominator for songs whose chains span this date — rebuild gaps
+    // for tracks at or after this show. A brand-new show has no tracks
+    // yet (tracks come later via TrackService) so this is typically a
+    // no-op; the cost only kicks in if the new show is in the past and
+    // tracks already exist there (rare).
+    await this.stats.rebuildGapsAndSongStatsSince(String(data.date));
 
     return show;
   }
@@ -389,19 +403,25 @@ export class ShowService {
 
     const show = mapShowToDomainEntity(result);
 
-    // Invalidate caches
-    if (this.cacheInvalidation) {
-      if (newSlug && newSlug !== slug) {
-        // Slug changed - invalidate both old and new
-        await Promise.all([
-          this.cacheInvalidation.invalidateShow(slug), // old slug
-          this.cacheInvalidation.invalidateShow(newSlug), // new slug
-          this.cacheInvalidation.invalidateShowListings(),
-        ]);
-      } else {
-        // Regular update - invalidate current show and listings
-        await this.cacheInvalidation.invalidateShowComprehensive(currentShow.id, slug);
-      }
+    if (newSlug && newSlug !== slug) {
+      // Slug changed - invalidate both old and new
+      await Promise.all([
+        this.cacheInvalidation.invalidateShow(slug), // old slug
+        this.cacheInvalidation.invalidateShow(newSlug), // new slug
+        this.cacheInvalidation.invalidateShowListings(),
+      ]);
+    } else {
+      await this.cacheInvalidation.invalidateShowComprehensive(currentShow.id, slug);
+    }
+
+    // Show edits that move the show in time (or later: count_for_stats /
+    // day_order toggles) can change the gap denominator. Rebuild from the
+    // earlier of the old and new dates so chains spanning either side are
+    // recomputed. Skip when the date didn't change — notes / relistenUrl /
+    // venue edits don't affect gap.
+    if (data.date && String(data.date) !== currentShow.date) {
+      const sinceDate = String(data.date) < currentShow.date ? String(data.date) : currentShow.date;
+      await this.stats.rebuildGapsAndSongStatsSince(sinceDate);
     }
 
     return show;
@@ -444,26 +464,31 @@ export class ShowService {
       ),
     );
 
-    if (this.cacheInvalidation) {
-      await this.cacheInvalidation.invalidateShowListings();
-    }
+    await this.cacheInvalidation.invalidateShowListings();
   }
 
   async delete(id: string): Promise<boolean> {
     try {
-      // Get show data before deletion for cache invalidation
+      // Capture slug + date before deletion — slug for cache invalidation,
+      // date for the stats rebuild scope.
       const show = await this.db.show.findUnique({
         where: { id },
-        select: { slug: true },
+        select: { slug: true, date: true },
       });
 
       await this.db.show.delete({
         where: { id },
       });
 
-      // Invalidate caches
-      if (this.cacheInvalidation && show?.slug) {
+      if (show?.slug) {
         await this.cacheInvalidation.invalidateShowComprehensive(id, show.slug);
+      }
+
+      // Removing a stats-show shrinks the "shows between" denominator for
+      // chains that span its date. Rebuild from the deleted show's date
+      // forward — earlier chains are unaffected.
+      if (show?.date) {
+        await this.stats.rebuildGapsAndSongStatsSince(show.date);
       }
 
       return true;
