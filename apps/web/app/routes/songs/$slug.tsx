@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { pickGapTier } from "~/lib/gap-tier";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -28,13 +29,13 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
 interface StatBoxProps {
   label: string;
   value: ReactNode;
-  sublabel?: string;
+  sublabel?: ReactNode;
   sublabel2?: string;
 }
 
 function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
   return (
-    <div className="glass-content p-2 sm:p-6 rounded-lg h-full">
+    <div className="glass-content p-2 sm:p-3 rounded-lg h-full">
       <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
       <dd className="mt-2">
         <span className="text-xl sm:text-3xl font-bold text-content-text-primary">{value}</span>
@@ -105,12 +106,49 @@ export function meta({ data }: { data: SongPageView }) {
  * at the most recent show, otherwise "N show(s) ago" with correct
  * pluralization. The backend's `showsSinceLastPlayed` is a strict count of
  * shows played AFTER this song's last performance, so 0 = last show.
+ *
+ * Colors the text by tier: amber when the current gap exceeds this song's
+ * average frequency, red when it exceeds the longest gap on record.
  */
-function lastPlayedSublabel(showsSince: number | null | undefined): string | undefined {
+function lastPlayedSublabel(
+  showsSince: number | null | undefined,
+  average: number | null,
+  longest: number | null,
+): ReactNode | undefined {
   if (showsSince === null || showsSince === undefined) return undefined;
   if (showsSince === 0) return "last show";
-  if (showsSince === 1) return "1 show ago";
-  return `${showsSince} shows ago`;
+
+  const text = showsSince === 1 ? "1 show ago" : `${showsSince} shows ago`;
+  const tier = pickGapTier({ showsSince, average, longest });
+  const tierClass =
+    tier === "danger" ? "text-red-500 font-semibold" : tier === "warn" ? "text-amber-500 font-medium" : "";
+
+  return tierClass ? <span className={tierClass}>{text}</span> : text;
+}
+
+const percentFormatter = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
+
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return percentFormatter.format(value);
+}
+
+function formatCount(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return value.toLocaleString();
+}
+
+function everyShowsValue(value: number | null | undefined): ReactNode {
+  if (value === null || value === undefined) return "—";
+  return (
+    <>
+      {value.toFixed(1)}
+      <span className="ml-1 text-base sm:text-lg font-normal text-content-text-secondary">shows</span>
+    </>
+  );
 }
 
 export default function SongPage() {
@@ -197,6 +235,44 @@ export default function SongPage() {
       {/* Stats Grid */}
       <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatBox label="Times Played" value={song.timesPlayed} />
+        <StatBox label="Song Performed Every" value={everyShowsValue(song.averageShowsPerPlay)} />
+        {song.lastShowSlug ? (
+          <Link to={`/shows/${song.lastShowSlug}`} className="block">
+            <StatBox
+              label="Last Played"
+              value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
+              sublabel={
+                song.actualLastPlayedDate
+                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                  : undefined
+              }
+              sublabel2={
+                song.lastVenue
+                  ? song.lastVenue.city && song.lastVenue.state
+                    ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
+                    : song.lastVenue.name
+                  : undefined
+              }
+            />
+          </Link>
+        ) : (
+          <StatBox
+            label="Last Played"
+            value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
+            sublabel={
+              song.actualLastPlayedDate
+                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                : undefined
+            }
+            sublabel2={
+              song.lastVenue
+                ? song.lastVenue.city && song.lastVenue.state
+                  ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
+                  : song.lastVenue.name
+                : undefined
+            }
+          />
+        )}
         {song.firstShowSlug ? (
           <Link to={`/shows/${song.firstShowSlug}`} className="block">
             <StatBox
@@ -224,35 +300,12 @@ export default function SongPage() {
             }
           />
         )}
-        {song.lastShowSlug ? (
-          <Link to={`/shows/${song.lastShowSlug}`} className="block">
-            <StatBox
-              label="Last Played"
-              value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
-              sublabel={song.actualLastPlayedDate ? lastPlayedSublabel(song.showsSinceLastPlayed) : undefined}
-              sublabel2={
-                song.lastVenue
-                  ? song.lastVenue.city && song.lastVenue.state
-                    ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
-                    : song.lastVenue.name
-                  : undefined
-              }
-            />
-          </Link>
-        ) : (
-          <StatBox
-            label="Last Played"
-            value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
-            sublabel={song.actualLastPlayedDate ? lastPlayedSublabel(song.showsSinceLastPlayed) : undefined}
-            sublabel2={
-              song.lastVenue
-                ? song.lastVenue.city && song.lastVenue.state
-                  ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
-                  : song.lastVenue.name
-                : undefined
-            }
-          />
-        )}
+        <StatBox label="% of All Shows" value={formatPercent(song.percentOfAllShows)} />
+        <StatBox label="% Since Debut" value={formatPercent(song.percentSinceDebut)} />
+        <StatBox
+          label="Shows Before / Since Debut"
+          value={`${formatCount(song.showsBeforeDebut)} / ${formatCount(song.showsSinceDebut)}`}
+        />
         <StatBox label="Most Common Year" value={song.mostCommonYear || "—"} />
       </dl>
 
