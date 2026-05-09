@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
 import type { SearchResult } from "@bip/domain";
+import { useCallback, useRef, useState } from "react";
 
 export interface SearchResponse {
   results: SearchResult[];

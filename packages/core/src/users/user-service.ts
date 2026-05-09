@@ -1,4 +1,4 @@
-import type { Logger, User, UserMinimal } from "@bip/domain";
+import type { Logger, User } from "@bip/domain";
 import type { DbClient, DbUser } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
@@ -39,14 +39,6 @@ function mapUserToDbModel(entity: Partial<User>): Partial<DbUser> {
   // Exclude avatar fields - use setAvatar/clearAvatar instead
   const { avatarFileId: _, avatarUrl: __, ...rest } = entity;
   return rest as Partial<DbUser>;
-}
-
-function mapToUserMinimal(dbUser: DbUser): UserMinimal {
-  return {
-    id: dbUser.id,
-    username: dbUser.username ?? "",
-    avatarUrl: dbUser.avatarFileUrl ?? null,
-  };
 }
 
 export class UserService {
@@ -397,7 +389,9 @@ export class UserService {
 
     if (metric === "blogPostCount") {
       this.logger.info("Top bloggers after filter", {
-        topBloggers: filteredStats.slice(0, 3).map((s) => ({ username: s.user.username, blogPostCount: s.blogPostCount })),
+        topBloggers: filteredStats
+          .slice(0, 3)
+          .map((s) => ({ username: s.user.username, blogPostCount: s.blogPostCount })),
       });
     }
 

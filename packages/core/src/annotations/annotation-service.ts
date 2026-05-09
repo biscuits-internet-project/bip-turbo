@@ -13,10 +13,6 @@ function mapAnnotationToDomainEntity(dbAnnotation: DbAnnotation): Annotation {
   };
 }
 
-function mapAnnotationToDbModel(entity: Partial<Annotation>): Partial<DbAnnotation> {
-  return entity as Partial<DbAnnotation>;
-}
-
 export class AnnotationService {
   constructor(
     protected readonly db: DbClient,

@@ -70,10 +70,9 @@ describe("computeShowUserData", () => {
     getAveragesForRateables.mockResolvedValue({});
     findByEmail.mockResolvedValue(null);
 
-    const result = await computeShowUserData(
-      { currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } },
-      ["show-1"],
-    );
+    const result = await computeShowUserData({ currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } }, [
+      "show-1",
+    ]);
 
     expect(result.attendances["show-1"]).toBeNull();
     expect(result.userRatings["show-1"]).toBeNull();
@@ -96,10 +95,10 @@ describe("computeShowUserData", () => {
       { rateableId: "show-2", rateableType: "Show", value: 5, userId: "user-1" },
     ]);
 
-    const result = await computeShowUserData(
-      { currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } },
-      ["show-1", "show-2"],
-    );
+    const result = await computeShowUserData({ currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } }, [
+      "show-1",
+      "show-2",
+    ]);
 
     expect(result.attendances["show-1"]).toBe(attendance1);
     expect(result.attendances["show-2"]).toBeNull();

@@ -139,8 +139,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
             const song = await songResponse.json();
             trackWithSong = { ...newTrack, song };
           }
-        } catch (_error) {
-        }
+        } catch (_error) {}
       }
 
       setTracks((prev) =>

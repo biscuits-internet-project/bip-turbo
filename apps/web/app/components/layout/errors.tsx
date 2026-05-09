@@ -1,5 +1,5 @@
 import { AlertTriangle, Ghost } from "lucide-react";
-import { Link, useRouteError, isRouteErrorResponse } from "react-router-dom";
+import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
 import { Button } from "../ui/button";
 
 function getErrorMessage(error: unknown): string {

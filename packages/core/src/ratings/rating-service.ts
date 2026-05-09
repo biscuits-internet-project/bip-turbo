@@ -52,16 +52,6 @@ function mapRatingToDomainEntity(dbRating: DbRating): Rating {
   };
 }
 
-function mapRatingToDbModel(entity: Partial<Rating>): Partial<DbRating> {
-  return {
-    id: entity.id,
-    rateableId: entity.rateableId,
-    rateableType: entity.rateableType,
-    userId: entity.userId,
-    value: entity.value,
-  };
-}
-
 export class RatingService {
   constructor(
     protected readonly db: DbClient,
