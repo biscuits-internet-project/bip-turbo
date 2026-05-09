@@ -1,4 +1,4 @@
-import type { SongPageView } from "@bip/domain";
+import { compareByShowDate, type SongPageView } from "@bip/domain";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -375,9 +375,7 @@ export default function SongPage() {
           <TabsContent value="all-timers" className="mt-6 space-y-8">
             {/* Featured cards for performances with notes */}
             {(() => {
-              const withNotes = filteredAllTimers
-                .filter((p) => p.notes)
-                .sort((a, b) => new Date(b.show.date).getTime() - new Date(a.show.date).getTime());
+              const withNotes = filteredAllTimers.filter((p) => p.notes).sort((a, b) => compareByShowDate(b, a));
 
               return (
                 withNotes.length > 0 && (

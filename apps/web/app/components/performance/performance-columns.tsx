@@ -1,10 +1,50 @@
 import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
-import { type Column, type ColumnDef, createColumnHelper } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame } from "lucide-react";
+import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
+import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame, RotateCcw, Star } from "lucide-react";
+import type { ReactElement } from "react";
 import { ShowDate } from "~/components/show-date";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
+
+/**
+ * Wraps a small status icon (★ debut, ↺ this-show repeat) in a tooltip so
+ * users can hover/tap to learn what the icon means without crowding the cell.
+ */
+function GapIcon({ icon, label }: { icon: ReactElement; label: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span role="img" aria-label={label}>
+            {icon}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * Sort comparator for the Gap column. Debuts (gap=null) sort first because a
+ * debut is the rarest possible event; remaining rows sort by gap ascending.
+ * Ties break by show date so all rows from the same show — including
+ * within-show repeats, which share both gap and date — cluster together;
+ * track position is the final tiebreak so within-show repeats stay in
+ * setlist order relative to each other.
+ */
+export function gapSortingFn(a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number {
+  const aGap = a.original.gap;
+  const bGap = b.original.gap;
+  const aKey = aGap == null ? Number.NEGATIVE_INFINITY : aGap;
+  const bKey = bGap == null ? Number.NEGATIVE_INFINITY : bGap;
+  if (aKey !== bKey) return aKey - bKey;
+  const dateCmp = compareByShowDate(a.original, b.original);
+  if (dateCmp !== 0) return dateCmp;
+  return (a.original.position ?? 0) - (b.original.position ?? 0);
+}
 
 interface PerformanceColumnOptions {
   showSongColumn?: boolean;
@@ -101,6 +141,52 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
               date={<ShowDate date={date} />}
               venue={{ name: venue?.name, city: venue?.city, state: venue?.state }}
             />
+          </a>
+        );
+      },
+    }) as ColumnDef<SongPagePerformance, unknown>,
+    columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
+      id: "gap",
+      meta: { width: "64px" },
+      header: ({ column }) => <SortableHeader column={column} label="Gap" />,
+      enableSorting: true,
+      sortingFn: gapSortingFn,
+      cell: (info) => {
+        const row = info.row.original;
+        const allRows = info.table.getCoreRowModel().rows;
+        // Within-show repeat: another row exists in the same show with an
+        // earlier track position. Phase 1 stores the same gap on both tracks
+        // of a within-show repeat, so the icon — not the gap value — is what
+        // distinguishes the repeat from its first occurrence.
+        const isRepeat = allRows.some(
+          (other) => other.original.show.id === row.show.id && (other.original.position ?? 0) < (row.position ?? 0),
+        );
+
+        if (isRepeat) {
+          return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />;
+        }
+
+        if (row.gap == null) {
+          return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />;
+        }
+
+        return <span className="text-content-text-secondary tabular-nums">{row.gap}</span>;
+      },
+    }) as ColumnDef<SongPagePerformance, unknown>,
+    columnHelper.accessor((row) => row.previousShow?.date ?? "", {
+      id: "lastPlayed",
+      meta: { width: "110px", hideOnMobile: true },
+      header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
+      enableSorting: true,
+      sortingFn: "alphanumeric",
+      cell: (info) => {
+        const previousShow = info.row.original.previousShow;
+        if (!previousShow) {
+          return <span className="text-content-text-tertiary">—</span>;
+        }
+        return (
+          <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
+            <ShowDate date={previousShow.date} />
           </a>
         );
       },

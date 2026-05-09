@@ -363,7 +363,11 @@ export class SongPageComposer {
         tracks.all_timer,
         tracks.average_rating,
         tracks.ratings_count,
-        tracks.note
+        tracks.note,
+        tracks.gap,
+        tracks.previous_performance_show_id,
+        prevShows.slug as previous_show_slug,
+        prevShows.date as previous_show_date
         ${songColumns},
         nextTracks.segue as next_track_segue,
         prevTracks.segue as prev_track_segue,
@@ -386,6 +390,7 @@ export class SongPageComposer {
         AND prevTracks.position = tracks.position - 1
         AND prevTracks.set = tracks.set
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
+      LEFT JOIN shows prevShows ON tracks.previous_performance_show_id = prevShows.id
       WHERE ${options.whereClause}
       ORDER BY ${showOrderBySql("shows", "DESC")}, tracks.set, tracks.position
     `;
@@ -564,6 +569,12 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     position: row.position,
     cover: row.song_cover ?? undefined,
     authorId: row.song_author_id ?? null,
+    gap: row.gap,
+    previousPerformanceShowId: row.previous_performance_show_id,
+    previousShow:
+      row.previous_show_slug && row.previous_show_date
+        ? { slug: row.previous_show_slug, date: row.previous_show_date }
+        : undefined,
   };
 }
 
@@ -593,6 +604,10 @@ export type PerformanceDto = {
   average_rating: number;
   ratings_count: number;
   note: string | null;
+  gap: number | null;
+  previous_performance_show_id: string | null;
+  previous_show_slug: string | null;
+  previous_show_date: string | null;
 
   // Next/Prev track fields
   next_track_segue: string | null;

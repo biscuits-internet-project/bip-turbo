@@ -15,7 +15,14 @@ import {
 function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
   return {
     trackId: "track-1",
-    show: { id: "show-1", slug: "2024-06-15", date: "2024-06-15", venueId: "venue-1", dayOrder: null, countForStats: true },
+    show: {
+      id: "show-1",
+      slug: "2024-06-15",
+      date: "2024-06-15",
+      venueId: "venue-1",
+      dayOrder: null,
+      countForStats: true,
+    },
     set: "S1",
     position: 3,
     segue: null,
@@ -70,6 +77,10 @@ function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
     average_rating: 4.5,
     ratings_count: 12,
     note: null,
+    gap: null,
+    previous_performance_show_id: null,
+    previous_show_slug: null,
+    previous_show_date: null,
     // Next/Prev track segues
     next_track_segue: null,
     prev_track_segue: null,
@@ -299,6 +310,22 @@ describe("transformToSongPagePerformanceView", () => {
   // current impl). Documented quirk: `|| undefined` means `0` values also
   // become `undefined`, which is fine for rating/ratingsCount but worth
   // pinning so the behavior is explicit.
+  // Phase 1 of the stats expansion denormalized gap onto Track. The
+  // composer must surface gap and previousPerformanceShowId on the view so
+  // the song-detail performances table can render the Gap column without
+  // an extra query per row.
+  test("maps gap and previous_performance_show_id through to the view", () => {
+    const debutView = transformToSongPagePerformanceView(makeDto({ gap: null, previous_performance_show_id: null }));
+    expect(debutView.gap).toBeNull();
+    expect(debutView.previousPerformanceShowId).toBeNull();
+
+    const subsequentView = transformToSongPagePerformanceView(
+      makeDto({ gap: 7, previous_performance_show_id: "prior-show-id" }),
+    );
+    expect(subsequentView.gap).toBe(7);
+    expect(subsequentView.previousPerformanceShowId).toBe("prior-show-id");
+  });
+
   test("null rating, ratings_count, and note all map to undefined", () => {
     const view = transformToSongPagePerformanceView(
       makeDto({ average_rating: null as never, ratings_count: null as never, note: null }),
