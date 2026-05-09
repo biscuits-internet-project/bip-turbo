@@ -1,4 +1,4 @@
-import type { SongPagePerformance } from "@bip/domain";
+import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame } from "lucide-react";
 import { ShowDate } from "~/components/show-date";
@@ -90,7 +90,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       meta: { width: "180px" },
       header: ({ column }) => <SortableHeader column={column} label="Date" />,
       enableSorting: true,
-      sortingFn: "datetime",
+      sortingFn: (a, b) => compareByShowDate(a.original, b.original),
       cell: (info) => {
         const date = info.getValue();
         const showSlug = info.row.original.show.slug;

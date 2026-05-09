@@ -41,7 +41,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           className="h-auto p-0 font-semibold text-left justify-start hover:bg-brand-primary/10 hover:text-brand-primary transition-colors whitespace-normal leading-tight flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2"
         >
-          Song Title
+          Song
           {getSortIcon(column.getIsSorted())}
         </Button>
       );

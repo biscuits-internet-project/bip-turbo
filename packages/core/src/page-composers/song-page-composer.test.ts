@@ -15,7 +15,7 @@ import {
 function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
   return {
     trackId: "track-1",
-    show: { id: "show-1", slug: "2024-06-15", date: "2024-06-15", venueId: "venue-1" },
+    show: { id: "show-1", slug: "2024-06-15", date: "2024-06-15", venueId: "venue-1", dayOrder: null, countForStats: true },
     set: "S1",
     position: 3,
     segue: null,
@@ -52,6 +52,8 @@ function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
     date: "2024-06-15",
     venue_id: "venue-1",
     slug: "2024-06-15",
+    day_order: null,
+    count_for_stats: true,
     // Venue fields
     venue_name: "The Capitol Theatre",
     venue_city: "Port Chester",
@@ -231,6 +233,8 @@ describe("transformToSongPagePerformanceView", () => {
       slug: "2024-06-15",
       date: "2024-06-15",
       venueId: "venue-1",
+      dayOrder: null,
+      countForStats: true,
     });
     expect(view.venue).toEqual({
       id: "venue-1",

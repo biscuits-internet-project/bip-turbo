@@ -98,7 +98,7 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
 
       return await addVenueInfoToSongs(result);
     },
-    { ttl: 3600 },
+    { ttl: 86400 },
   );
 }
 

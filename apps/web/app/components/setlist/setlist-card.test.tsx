@@ -46,6 +46,7 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
       showPhotosCount: 0,
       showYoutubesCount: 0,
       reviewsCount: 0,
+      countForStats: true,
     },
     venue: {
       id: "venue-1",

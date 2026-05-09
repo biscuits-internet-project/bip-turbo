@@ -1,7 +1,7 @@
 import type { Annotation, Setlist, SetlistLight, Show, Track, TrackLight, Venue } from "@bip/domain";
 import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
-import { buildOrderByClause } from "../_shared/database/query-utils";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
+import { resolveShowOrderBy, SHOW_ORDER_ASC, SHOW_ORDER_DESC, STATS_SHOWS_WHERE } from "../_shared/show-ordering";
 
 /**
  * Filter options for setlist queries. The `hasPhotos` / `hasYoutube` flags
@@ -301,7 +301,7 @@ export class SetlistService {
   ): Promise<Setlist[]> {
     if (!showIds.length) return [];
 
-    const orderBy = buildOrderByClause(options?.sort, { date: "desc" });
+    const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_DESC);
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -353,7 +353,7 @@ export class SetlistService {
     const hasPhotos = options?.filters?.hasPhotos;
     const hasYoutube = options?.filters?.hasYoutube;
 
-    const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
+    const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_ASC);
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -417,7 +417,7 @@ export class SetlistService {
     const hasPhotos = options?.filters?.hasPhotos;
     const hasYoutube = options?.filters?.hasYoutube;
 
-    const orderBy = buildOrderByClause(options?.sort, { date: "asc" });
+    const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_ASC);
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -485,7 +485,7 @@ export class SetlistService {
 
   async countByMonthDay(monthDay: string): Promise<number> {
     return this.db.show.count({
-      where: { date: { endsWith: `-${monthDay}` } },
+      where: { ...STATS_SHOWS_WHERE, date: { endsWith: `-${monthDay}` } },
     });
   }
 }

@@ -15,7 +15,7 @@ vi.mock("./combined-notes", () => ({
 function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
   return {
     trackId: "track-1",
-    show: { id: "show-1", slug: "2024-06-15-the-cap", date: "2024-06-15", venueId: "venue-1" },
+    show: { id: "show-1", slug: "2024-06-15-the-cap", date: "2024-06-15", venueId: "venue-1", countForStats: true },
     venue: {
       id: "venue-1",
       slug: "the-cap",
@@ -157,7 +157,9 @@ describe("createPerformanceColumns", () => {
   // through to see the full setlist.
   test("Date cell links to /shows/{show.slug}", async () => {
     const performances = [
-      makePerformance({ show: { id: "s1", slug: "2024-06-15-the-cap", date: "2024-06-15", venueId: "v1" } }),
+      makePerformance({
+        show: { id: "s1", slug: "2024-06-15-the-cap", date: "2024-06-15", venueId: "v1", countForStats: true },
+      }),
     ];
     const columns = createPerformanceColumns(defaultOptions);
     await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);

@@ -1,6 +1,7 @@
 import type { AllTimersPageView, Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
+import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import type { SongService } from "../songs/song-service";
 
 /**
@@ -44,6 +45,7 @@ export class SongPageComposer {
         SELECT COUNT(*)::text as count
         FROM shows
         WHERE date::date > ${song.dateLastPlayed}::date
+          AND ${statsShowsSql("shows")}
       `;
       showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
     }
@@ -68,7 +70,8 @@ export class SongPageComposer {
       JOIN shows ON tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
       WHERE tracks.song_id = ${song.id}::uuid
-      ORDER BY shows.date DESC
+        AND ${statsShowsSql("shows")}
+      ORDER BY ${showOrderBySql("shows", "DESC")}
       LIMIT 1
     `;
 
@@ -99,7 +102,8 @@ export class SongPageComposer {
       JOIN shows ON tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
       WHERE tracks.song_id = ${song.id}::uuid
-      ORDER BY shows.date ASC
+        AND ${statsShowsSql("shows")}
+      ORDER BY ${showOrderBySql("shows", "ASC")}
       LIMIT 1
     `;
 
@@ -122,6 +126,7 @@ export class SongPageComposer {
         SELECT COUNT(*)::text as count
         FROM shows
         WHERE date::date > ${actualLastPlayedDate}::date
+          AND ${statsShowsSql("shows")}
       `;
       showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
     }
@@ -156,7 +161,9 @@ export class SongPageComposer {
       SELECT COUNT(*)::text as count
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
-      WHERE tracks.all_timer = true AND shows.date LIKE ${`%-${monthDay}`}
+      WHERE tracks.all_timer = true
+        AND shows.date LIKE ${`%-${monthDay}`}
+        AND ${statsShowsSql("shows")}
     `;
     return Number.parseInt(result[0].count, 10);
   }
@@ -213,7 +220,9 @@ export class SongPageComposer {
    * Used by /songs to show per-song counts when toggle filters are active.
    */
   async buildSongPerformanceCounts(options?: PerformanceFilterOptions): Promise<Record<string, number>> {
-    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], options);
+    // Always exclude count_for_stats=false shows so the "filtered plays"
+    // column on /songs matches the global Song.timesPlayed semantic.
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([statsShowsSql("shows")], options);
 
     const whereClause = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}` : Prisma.empty;
 
@@ -338,6 +347,8 @@ export class SongPageComposer {
         shows.date,
         shows.venue_id,
         shows.slug,
+        shows.day_order,
+        shows.count_for_stats,
         venues.id as venue_id,
         venues.name as venue_name,
         venues.city as venue_city,
@@ -376,7 +387,7 @@ export class SongPageComposer {
         AND prevTracks.set = tracks.set
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
       WHERE ${options.whereClause}
-      ORDER BY shows.date DESC, tracks.set, tracks.position
+      ORDER BY ${showOrderBySql("shows", "DESC")}, tracks.set, tracks.position
     `;
   }
 
@@ -510,6 +521,8 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
       slug: row.slug,
       date: row.date,
       venueId: row.venue_id,
+      dayOrder: row.day_order,
+      countForStats: row.count_for_stats,
     },
     venue:
       row.venue_id && row.venue_slug && row.venue_name
@@ -560,6 +573,8 @@ export type PerformanceDto = {
   date: string;
   venue_id: string;
   slug: string;
+  day_order: number | null;
+  count_for_stats: boolean;
 
   // Venue fields
   venue_name: string | null;

@@ -324,6 +324,15 @@ export default function Show() {
             showRating={setlist.show.averageRating}
             externalSources={externalSources}
           />
+          {/* Note when count_for_stats=false (soundchecks, radio sessions,
+              cancelled stubs, late-night Tractorbeam sets). Yellow accent on
+              the left edge for attention, no full background so it doesn't
+              dominate the layout. */}
+          {setlist.show.countForStats === false && (
+            <p className="mt-3 border-l-2 border-amber-500 pl-3 py-1 text-sm text-content-text-secondary">
+              This performance does not count for stats purposes.
+            </p>
+          )}
         </div>
 
         {/* Right rail (mobile: sits between setlist and reviews) */}

@@ -1,9 +1,17 @@
 import type { Logger, Show, Venue } from "@bip/domain";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbClient, DbShow, DbVenue } from "../_shared/database/models";
-import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
+import { buildIncludeClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
+import {
+  DAY_ORDER_NULL_SENTINEL,
+  resolveShowOrderBy,
+  SHOW_ORDER_ASC,
+  SHOW_ORDER_DESC,
+  showOrderBySql,
+  showOrderTuple,
+} from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
 
 export interface ShowFilter {
@@ -138,7 +146,7 @@ export class ShowService {
     this.logger?.info("findMany options", { options });
     const include = options?.includes ? buildIncludeClause(options.includes) : {};
     const where = options?.filters ? buildWhereClause(options.filters) : {};
-    const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ date: "desc" }];
+    const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_DESC);
     const skip =
       options?.pagination?.page && options?.pagination?.limit
         ? (options.pagination.page - 1) * options.pagination.limit
@@ -169,9 +177,7 @@ export class ShowService {
       include: {
         venue: true,
       },
-      orderBy: {
-        date: "asc",
-      },
+      orderBy: SHOW_ORDER_ASC,
     });
 
     return results.map((result) => {
@@ -191,23 +197,34 @@ export class ShowService {
     date: string,
     slug: string,
   ): Promise<{ previous: ShowNavItem | null; next: ShowNavItem | null }> {
+    // Adjacency uses (date, dayOrder NULLS LAST, id) so prev/next on same-date
+    // pairs respects the user-set ordering; falls back to id for unset pairs.
+    // Resolve the current row's dayOrder/id so the comparison is exact.
+    const current = await this.db.show.findUnique({
+      where: { slug },
+      select: { id: true, dayOrder: true },
+    });
+    const currentDayOrder = current?.dayOrder ?? DAY_ORDER_NULL_SENTINEL;
+    const currentId = current?.id ?? "00000000-0000-0000-0000-000000000000";
+    const hereTuple = Prisma.sql`(${date}, ${currentDayOrder}, ${currentId}::text)`;
+
     const [previousResults, nextResults] = await Promise.all([
       this.db.$queryRaw<Array<{ slug: string; date: string; venue_name: string | null; venue_city: string | null }>>`
         SELECT s.slug, s.date, v.name as venue_name, v.city as venue_city
         FROM shows s
         LEFT JOIN venues v ON s.venue_id = v.id
-        WHERE (s.date < ${date} OR (s.date = ${date} AND s.slug < ${slug}))
-          AND s.slug IS NOT NULL
-        ORDER BY s.date DESC, s.slug DESC
+        WHERE s.slug IS NOT NULL
+          AND ${showOrderTuple("s")} < ${hereTuple}
+        ORDER BY ${showOrderBySql("s", "DESC")}
         LIMIT 1
       `,
       this.db.$queryRaw<Array<{ slug: string; date: string; venue_name: string | null; venue_city: string | null }>>`
         SELECT s.slug, s.date, v.name as venue_name, v.city as venue_city
         FROM shows s
         LEFT JOIN venues v ON s.venue_id = v.id
-        WHERE (s.date > ${date} OR (s.date = ${date} AND s.slug > ${slug}))
-          AND s.slug IS NOT NULL
-        ORDER BY s.date ASC, s.slug ASC
+        WHERE s.slug IS NOT NULL
+          AND ${showOrderTuple("s")} > ${hereTuple}
+        ORDER BY ${showOrderBySql("s", "ASC")}
         LIMIT 1
       `,
     ]);
@@ -283,7 +300,7 @@ export class ShowService {
           in: showIds,
         },
       },
-      orderBy: options?.sort ? buildOrderByClause(options.sort) : [{ date: "desc" }],
+      orderBy: resolveShowOrderBy(options?.sort, SHOW_ORDER_DESC),
       skip:
         options?.pagination?.page && options?.pagination?.limit
           ? (options.pagination.page - 1) * options.pagination.limit

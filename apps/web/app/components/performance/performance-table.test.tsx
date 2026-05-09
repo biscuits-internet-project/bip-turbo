@@ -35,7 +35,7 @@ import { PerformanceTable } from "./performance-table";
 function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
   return {
     trackId: "track-1",
-    show: { id: "show-1", slug: "2024-06-15-show-1", date: "2024-06-15", venueId: "venue-1" },
+    show: { id: "show-1", slug: "2024-06-15-show-1", date: "2024-06-15", venueId: "venue-1", countForStats: true },
     venue: {
       id: "venue-1",
       slug: "the-cap",
@@ -106,6 +106,59 @@ describe("PerformanceTable", () => {
 
     await setup(<PerformanceTable performances={performances} />);
     expect(screen.queryByRole("link", { name: "Cassidy" })).not.toBeInTheDocument();
+  });
+
+  // Performances at count_for_stats=false shows (TV appearances, soundchecks,
+  // radio sessions, cancelled stubs) get a muted/greyed row so users see
+  // visually why this performance doesn't appear in stats.
+  test("greys out rows where show.countForStats is false", async () => {
+    const performances = [
+      makePerformance({
+        trackId: "t-stats",
+        show: { ...makePerformance().show, id: "s-stats", countForStats: true },
+      }),
+      makePerformance({
+        trackId: "t-not-stats",
+        show: { ...makePerformance().show, id: "s-not-stats", countForStats: false },
+      }),
+    ];
+    await setup(<PerformanceTable performances={performances} />);
+
+    const rows = screen.getAllByRole("row");
+    const greyedRow = rows.find((row) => row.className.includes("opacity-60"));
+    expect(greyedRow).toBeDefined();
+    expect(greyedRow?.className).toContain("text-content-text-tertiary");
+    const otherRows = rows.filter((row) => row !== greyedRow && row.getAttribute("role") === "row");
+    for (const row of otherRows) {
+      expect(row.className).not.toContain("opacity-60");
+    }
+  });
+
+  // The grey-row signal (count_for_stats=false) and the attended-row signal
+  // (green left border) are independent axes — a user attending a soundcheck
+  // is meaningful even if it doesn't count for stats. The row should carry
+  // BOTH classes when both apply.
+  test("a count_for_stats=false show that the user attended gets both signals", async () => {
+    vi.mocked(useShowUserData).mockReturnValue({
+      attendanceMap: new Map([["s-soundcheck", { id: "att-1" } as never]]),
+      userRatingMap: new Map(),
+      averageRatingMap: new Map(),
+      isLoading: false,
+      error: null,
+    });
+
+    const performances = [
+      makePerformance({
+        trackId: "t-soundcheck",
+        show: { ...makePerformance().show, id: "s-soundcheck", countForStats: false },
+      }),
+    ];
+    await setup(<PerformanceTable performances={performances} />);
+
+    const row = screen.getAllByRole("row").find((r) => r.className.includes("opacity-60"));
+    expect(row).toBeDefined();
+    expect(row?.className).toContain("text-content-text-tertiary");
+    expect(row?.className).toContain("!border-l-green-500");
   });
 
   // Attended rows get a green left border via useAttendanceRowHighlight.

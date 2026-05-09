@@ -126,8 +126,9 @@ describe("SetlistService.findManyLight", () => {
 
 describe("SetlistService.countByMonthDay", () => {
   // Uses Prisma's count with endsWith to match any year for a given
-  // calendar day. Used by the home page to show On This Day counts.
-  test("calls db.show.count with endsWith date filter", async () => {
+  // calendar day, AND filters out count_for_stats=false shows so the home
+  // page widget matches Song.timesPlayed semantics (no soundchecks etc).
+  test("calls db.show.count with endsWith date filter scoped to stats shows", async () => {
     const db = makeMockDb();
     db.show.count.mockResolvedValue(7);
     const service = new SetlistService(db as never);
@@ -136,7 +137,7 @@ describe("SetlistService.countByMonthDay", () => {
 
     expect(result).toBe(7);
     expect(db.show.count).toHaveBeenCalledWith({
-      where: { date: { endsWith: "-04-08" } },
+      where: { countForStats: true, date: { endsWith: "-04-08" } },
     });
   });
 });

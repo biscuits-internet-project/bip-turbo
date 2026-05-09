@@ -43,6 +43,7 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
       showPhotosCount: 0,
       showYoutubesCount: 0,
       reviewsCount: 0,
+      countForStats: true,
     },
     venue: {
       id: "venue-1",

@@ -30,6 +30,7 @@ function makeShow(overrides: Partial<Show> = {}): Show {
     showPhotosCount: 0,
     showYoutubesCount: 0,
     reviewsCount: 0,
+    countForStats: true,
     venue: overrides.venue ?? {
       id: "venue-1",
       slug: "the-cap",

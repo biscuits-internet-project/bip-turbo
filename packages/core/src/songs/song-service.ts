@@ -2,6 +2,7 @@ import type { Logger, Song, TrendingSong } from "@bip/domain";
 import type { DbClient, DbSong } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
+import { SHOW_ORDER_DESC, STATS_SHOWS_WHERE } from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
 
 export interface SongFilter {
@@ -133,8 +134,11 @@ export class SongService {
       where,
     });
 
-    // Build show filter for tracks query
+    // Build show filter for tracks query. The STATS_SHOWS_WHERE prefix
+    // excludes count_for_stats=false shows so the filtered timesPlayed we
+    // produce here matches the global Song.timesPlayed semantic.
     const showFilter: Record<string, unknown> = {
+      ...STATS_SHOWS_WHERE,
       date: {
         ...(startDate ? { gte: startDate.toISOString().slice(0, 10) } : {}),
         ...(endDate ? { lte: endDate.toISOString().slice(0, 10) } : {}),
@@ -230,9 +234,12 @@ export class SongService {
   }
 
   async findTrendingLastXShows(lastXShows: number, limit: number): Promise<TrendingSong[]> {
-    // Get the most recent shows
+    // Trending counts performances at real shows only — soundchecks, radio
+    // sessions, and cancelled stubs are excluded so they don't dilute the
+    // "what got played at the last N shows" answer.
     const recentShows = await this.db.show.findMany({
-      orderBy: { date: "desc" },
+      where: STATS_SHOWS_WHERE,
+      orderBy: SHOW_ORDER_DESC,
       take: lastXShows,
     });
 
