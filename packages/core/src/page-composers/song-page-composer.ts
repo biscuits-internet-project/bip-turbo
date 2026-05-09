@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
 import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import type { SongService } from "../songs/song-service";
+import type { StatsService } from "../stats/stats-service";
 
 /**
  * Filters for querying performances. All fields are optional — only
@@ -31,6 +32,7 @@ export class SongPageComposer {
   constructor(
     private db: DbClient,
     private songService: SongService,
+    private statsService?: StatsService,
   ) {}
 
   async build(songSlug: string): Promise<SongPageView> {
@@ -142,6 +144,25 @@ export class SongPageComposer {
     }));
     await this.enrichPerformances(performances);
 
+    const showsByYear = this.statsService ? await this.statsService.getShowsByYear() : {};
+    const rarity = computeRarityStats(
+      { dateFirstPlayed: song.dateFirstPlayed, timesPlayed: song.timesPlayed },
+      showsByYear,
+    );
+
+    // Longest historical gap (in shows) for this song, restricted to
+    // stats-eligible shows so non-stats sets (e.g., late-night side
+    // projects) don't pollute the maximum. Null when the song has only
+    // ever been played once — debuts have no gap recorded.
+    const longestGapResult = await this.db.$queryRaw<[{ longest: number | null }]>`
+      SELECT MAX(tracks.gap)::int as longest
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      WHERE tracks.song_id = ${song.id}::uuid
+        AND ${statsShowsSql("shows")}
+    `;
+    const longestGapShows = longestGapResult[0]?.longest ?? null;
+
     return {
       song: {
         ...song,
@@ -151,6 +172,8 @@ export class SongPageComposer {
         lastShowSlug,
         firstVenue,
         firstShowSlug,
+        ...rarity,
+        longestGapShows,
       },
       performances,
     };
@@ -575,6 +598,58 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
       row.previous_show_slug && row.previous_show_date
         ? { slug: row.previous_show_slug, date: row.previous_show_date }
         : undefined,
+  };
+}
+
+/**
+ * Compute the catalogue-relative rarity numbers shown on the song detail
+ * page. Pure function — no DB, no side effects. Year-bucket granularity
+ * matches the per-year show-count cache (`stats:shows-by-year`); the
+ * debut year is counted on the "since" side, so Before + Since always
+ * equals totalShows.
+ */
+export function computeRarityStats(
+  song: { dateFirstPlayed: Date | null; timesPlayed: number },
+  showsByYear: Record<number, number>,
+): {
+  totalShows: number;
+  showsBeforeDebut: number | null;
+  showsSinceDebut: number | null;
+  percentOfAllShows: number | null;
+  percentSinceDebut: number | null;
+  averageShowsPerPlay: number | null;
+} {
+  const totalShows = Object.values(showsByYear).reduce((sum, count) => sum + count, 0);
+  const percentOfAllShows = totalShows === 0 ? null : song.timesPlayed / totalShows;
+
+  if (!song.dateFirstPlayed) {
+    return {
+      totalShows,
+      showsBeforeDebut: null,
+      showsSinceDebut: null,
+      percentOfAllShows,
+      percentSinceDebut: null,
+      averageShowsPerPlay: null,
+    };
+  }
+
+  const debutYear = song.dateFirstPlayed.getUTCFullYear();
+  const showsSinceDebut = Object.entries(showsByYear)
+    .filter(([year]) => Number(year) >= debutYear)
+    .reduce((sum, [, count]) => sum + count, 0);
+  const showsBeforeDebut = totalShows - showsSinceDebut;
+  const percentSinceDebut = showsSinceDebut === 0 ? null : song.timesPlayed / showsSinceDebut;
+  // Inverse of percentSinceDebut, surfaced separately because "played every
+  // X shows" reads more naturally than a percentage for sparse songs.
+  const averageShowsPerPlay = song.timesPlayed === 0 ? null : showsSinceDebut / song.timesPlayed;
+
+  return {
+    totalShows,
+    showsBeforeDebut,
+    showsSinceDebut,
+    percentOfAllShows,
+    percentSinceDebut,
+    averageShowsPerPlay,
   };
 }
 

@@ -270,16 +270,17 @@ describe("SongPage", () => {
     expect(screen.queryByText(/last show/i)).not.toBeInTheDocument();
   });
 
-  // Stat card padding tightens on mobile so the cards aren't bigger than
-  // their content. Headline number also shrinks on mobile so the value
+  // StatBox uses light padding (sm:p-3) so the eight-card grid reads as a
+  // compact info strip. Headline number shrinks on mobile so the value
   // fits on one line within the narrower box.
-  test("StatBox uses compact padding/typography on mobile and full sizing on sm+", () => {
+  test("StatBox uses light padding and scales headline with viewport", () => {
     renderSongPage();
 
     const timesPlayedLabel = screen.getByText(/Times Played/);
     const card = timesPlayedLabel.closest("div[class*='glass-content']");
     expect(card?.className).toContain("p-2");
-    expect(card?.className).toContain("sm:p-6");
+    expect(card?.className).toContain("sm:p-3");
+    expect(card?.className).not.toContain("sm:p-6");
 
     const value = screen.getByText("100");
     expect(value.className).toContain("text-xl");
