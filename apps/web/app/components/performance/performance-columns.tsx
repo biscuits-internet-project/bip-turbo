@@ -1,31 +1,12 @@
 import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame, RotateCcw, Star } from "lucide-react";
-import type { ReactElement } from "react";
+import { GapIcon } from "~/components/gap-icon";
+import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
-
-/**
- * Wraps a small status icon (★ debut, ↺ this-show repeat) in a tooltip so
- * users can hover/tap to learn what the icon means without crowding the cell.
- */
-function GapIcon({ icon, label }: { icon: ReactElement; label: string }) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span role="img" aria-label={label}>
-            {icon}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
 
 /**
  * Sort comparator for the Gap column. Debuts (gap=null) sort first because a
@@ -197,11 +178,10 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       enableSorting: false,
       cell: (info) => {
         const set = info.getValue();
-        return set ? (
-          <span className="text-content-text-secondary">{set}</span>
-        ) : (
-          <span className="text-content-text-tertiary">—</span>
-        );
+        if (!set) return <span className="text-content-text-tertiary">—</span>;
+        // Cross-show table — we don't know the encore count of any one
+        // show, so single-encore collapse (E1 → E) is left off here.
+        return <span className="text-content-text-secondary">{formatSetLabel(set)}</span>;
       },
     }) as ColumnDef<SongPagePerformance, unknown>,
     columnHelper.accessor(

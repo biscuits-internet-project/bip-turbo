@@ -73,12 +73,17 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
             allTimer: false,
             averageRating: null,
             ratingsCount: 0,
+            gap: null,
+            previousPerformanceShowId: null,
+            previousPerformanceShow: null,
             song: { id: "song-1", title, slug: title.toLowerCase().replace(/\s+/g, "-") },
           },
         ],
       },
     ],
     annotations: [],
+    averageSongGap: null,
+    medianSongGap: null,
   };
 }
 

@@ -76,12 +76,17 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
             allTimer: false,
             averageRating: null,
             ratingsCount: 0,
+            gap: null,
+            previousPerformanceShowId: null,
+            previousPerformanceShow: null,
             song: { id: "song-1", title: "Basis for a Day", slug: "basis-for-a-day" },
           },
         ],
       },
     ],
     annotations: [],
+    averageSongGap: null,
+    medianSongGap: null,
   };
 }
 
@@ -219,5 +224,96 @@ describe("SetlistCard", () => {
     );
     const header = screen.getByTestId("setlist-card-header");
     expect(header.className).toMatch(/\bpy-1\b/);
+  });
+
+  // The setlist/gap chart toggle lives inside the body, paired with the
+  // "Average song gap" label on the same line. Default view is setlist
+  // (the existing flow text), preserving today's first-paint.
+  test("renders setlist/gap chart toggle inside body, defaulting to setlist view", async () => {
+    await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+    );
+    const body = screen.getByTestId("setlist-card-body");
+    const setlistButton = screen.getByRole("button", { name: /^setlist$/i });
+    const gapChartButton = screen.getByRole("button", { name: /gap chart/i });
+    expect(body.contains(setlistButton)).toBe(true);
+    expect(body.contains(gapChartButton)).toBe(true);
+    // Default = setlist view: flow text is rendered, SetlistTable is not.
+    expect(screen.getByText("Basis for a Day")).toBeInTheDocument();
+  });
+
+  // Clicking "gap chart" swaps to the table view. Existence of the
+  // SetlistTable column headers (Set/Song/Last Played/Gap) is the signal.
+  test("clicking gap chart swaps to the table view", async () => {
+    const user = userEvent.setup();
+    await setupWithRouter(
+      <SetlistCard
+        setlist={{ ...makeSetlist(), averageSongGap: 7.5, medianSongGap: 6 }}
+        userAttendance={null}
+        userRating={null}
+        showRating={null}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /gap chart/i }));
+    // Average gap formats to one decimal place — terse, matches the rest
+    // of the rarity stat presentation on the song-detail page.
+    expect(screen.getByText(/Average \/ Median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Last Played" })).toBeInTheDocument();
+  });
+
+  // The average gap summary lives BELOW the setlist text on the same row
+  // as the setlist/gap-chart toggle. Renders for every caller — show page
+  // and list pages alike — so users always see the rarity number.
+  test("setlist view renders the average gap summary below the setlist", async () => {
+    await setupWithRouter(
+      <SetlistCard
+        setlist={{ ...makeSetlist(), averageSongGap: 7.5, medianSongGap: 6 }}
+        userAttendance={null}
+        userRating={null}
+        showRating={null}
+      />,
+    );
+    const summary = screen.getByText(/Average \/ Median song gap:\s*7\.5\s*\/\s*6\.0/);
+    const trackText = screen.getByText("Basis for a Day");
+    // DOM order: track text comes before the summary line. compareDocumentPosition
+    // returns DOCUMENT_POSITION_FOLLOWING (4) when `summary` follows `trackText`.
+    expect(trackText.compareDocumentPosition(summary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  // List-page regression (year, top-rated, on-this-day, venue, home): without
+  // an onViewChange callback, toggling stays purely local — no URL mutation,
+  // no leaked state to sibling cards. This covers the contract that every
+  // list-page caller relies on by omitting the prop.
+  test("toggling without onViewChange does not invoke any URL writer", async () => {
+    const user = userEvent.setup();
+    const onViewChange = vi.fn();
+    await setupWithRouter(
+      <SetlistCard
+        setlist={{ ...makeSetlist(), averageSongGap: 7.5, medianSongGap: 6 }}
+        userAttendance={null}
+        userRating={null}
+        showRating={null}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /gap chart/i }));
+    // The card flipped views (table renders), but no callback was invoked
+    // because none was passed — the only way list pages preserve local state.
+    expect(screen.getByRole("columnheader", { name: "Last Played" })).toBeInTheDocument();
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  // averageSongGap=null happens for all-debut/all-repeat shows. The summary
+  // line should be omitted entirely (not "Average song gap: —") so the
+  // toggle row stays clean on shows where the number isn't meaningful.
+  test("setlist view omits the average summary when averageSongGap is null", async () => {
+    await setupWithRouter(
+      <SetlistCard
+        setlist={{ ...makeSetlist(), averageSongGap: null }}
+        userAttendance={null}
+        userRating={null}
+        showRating={null}
+      />,
+    );
+    expect(screen.queryByText(/song gap/i)).not.toBeInTheDocument();
   });
 });

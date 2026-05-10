@@ -14,6 +14,8 @@ export type Setlist = {
   venue: Venue;
   sets: Set[];
   annotations: Annotation[];
+  averageSongGap: number | null;
+  medianSongGap: number | null;
 };
 
 export type SetLight = {
@@ -27,4 +29,6 @@ export type SetlistLight = {
   venue: Venue;
   sets: SetLight[];
   annotations: Annotation[];
+  averageSongGap: number | null;
+  medianSongGap: number | null;
 };
