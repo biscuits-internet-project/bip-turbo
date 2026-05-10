@@ -30,6 +30,7 @@ vi.mock("~/hooks/use-serialized-loader-data", () => ({
       { trackId: "t1", allTimer: true, show: { date: "2024-01-01" }, venue: {} },
       { trackId: "t2", allTimer: false, show: { date: "2024-02-01" }, venue: {} },
     ],
+    showsByYear: {},
   })),
 }));
 
@@ -106,8 +107,8 @@ describe("SongPage", () => {
     const user = userEvent.setup();
     renderSongPage();
 
-    const statsTab = screen.getByRole("tab", { name: /stats/i });
-    await user.click(statsTab);
+    const graphsTab = screen.getByRole("tab", { name: /graphs/i });
+    await user.click(graphsTab);
 
     expect(mockClearFilters).toHaveBeenCalled();
   });
@@ -152,6 +153,7 @@ describe("SongPage", () => {
         yearlyPlayData: {},
       },
       performances: [],
+      showsByYear: {},
     });
     renderSongPage();
 
@@ -203,6 +205,7 @@ describe("SongPage", () => {
         yearlyPlayData: {},
       },
       performances: [],
+      showsByYear: {},
     });
     renderSongPage();
     expect(screen.getByText(/last show/i)).toBeInTheDocument();
@@ -233,6 +236,7 @@ describe("SongPage", () => {
         yearlyPlayData: {},
       },
       performances: [],
+      showsByYear: {},
     });
     renderSongPage();
     expect(screen.getByText(/1 show ago/)).toBeInTheDocument();
@@ -264,6 +268,7 @@ describe("SongPage", () => {
         yearlyPlayData: {},
       },
       performances: [],
+      showsByYear: {},
     });
     renderSongPage();
     expect(screen.getByText(/4 shows ago/)).toBeInTheDocument();

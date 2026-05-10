@@ -3,12 +3,12 @@ import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMus
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
+import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
@@ -152,7 +152,7 @@ function everyShowsValue(value: number | null | undefined): ReactNode {
 }
 
 export default function SongPage() {
-  const { song, performances: allPerformances } = useSerializedLoaderData<SongPageView>();
+  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<SongPageView>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
@@ -381,7 +381,7 @@ export default function SongPage() {
             )}
           >
             <BarChart3 className="h-4 w-4" />
-            Stats
+            Graphs
           </TabsTrigger>
           {song.history && (
             <TabsTrigger
@@ -479,48 +479,10 @@ export default function SongPage() {
         </TabsContent>
 
         <TabsContent value="stats" className="mt-6">
-          <div className="glass-content rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-content-text-primary mb-4">Times Played by Year</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={Object.entries(song.yearlyPlayData || {})
-                    .map(([year, count]) => ({
-                      year: Number.parseInt(year, 10),
-                      plays: count as number,
-                    }))
-                    .sort((a, b) => a.year - b.year)}
-                  margin={{
-                    top: 20,
-                    right: 30,
-                    left: 20,
-                    bottom: 20,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                  <XAxis dataKey="year" stroke="#9CA3AF" fontSize={12} />
-                  <YAxis stroke="#9CA3AF" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "6px",
-                      color: "#F3F4F6",
-                    }}
-                    labelStyle={{ color: "#F3F4F6" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="plays"
-                    stroke="#8B5CF6"
-                    strokeWidth={2}
-                    dot={{ fill: "#8B5CF6", strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: "#8B5CF6", strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <YearlyPlayChart
+            yearlyPlayData={(song.yearlyPlayData || {}) as Record<number, number>}
+            showsByYear={showsByYear}
+          />
         </TabsContent>
 
         {song.history && (
