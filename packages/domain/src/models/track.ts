@@ -2,6 +2,13 @@ import { z } from "zod";
 import { annotationSchema } from "./annotation";
 import { songSchema } from "./song";
 
+const previousPerformanceShowSchema = z
+  .object({
+    date: z.string(),
+    slug: z.string(),
+  })
+  .nullable();
+
 export const trackSchema = z.object({
   id: z.string().uuid(),
   showId: z.string().uuid(),
@@ -19,6 +26,9 @@ export const trackSchema = z.object({
   nextTrackId: z.string().uuid().nullable(),
   averageRating: z.number().default(0.0).nullable(),
   ratingsCount: z.number().default(0),
+  gap: z.number().nullable(),
+  previousPerformanceShowId: z.string().uuid().nullable(),
+  previousPerformanceShow: previousPerformanceShowSchema,
   song: songSchema.optional(),
   annotations: z.array(annotationSchema).optional(),
 });
@@ -55,6 +65,9 @@ export const trackLightSchema = z.object({
   allTimer: z.boolean().nullable().default(false),
   averageRating: z.number().default(0.0).nullable(),
   ratingsCount: z.number().default(0),
+  gap: z.number().nullable(),
+  previousPerformanceShowId: z.string().uuid().nullable(),
+  previousPerformanceShow: previousPerformanceShowSchema,
   song: songLightSchema.optional(),
 });
 

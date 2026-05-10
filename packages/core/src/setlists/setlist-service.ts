@@ -38,9 +38,70 @@ type DbTrackLight = {
   allTimer: boolean | null;
   averageRating: number | null;
   ratingsCount: number;
+  gap: number | null;
+  previousPerformanceShowId: string | null;
+  previousPerformanceShow: { date: string; slug: string | null } | null;
   song: { id: string; title: string; slug: string } | null;
   annotations: DbAnnotation[];
 };
+
+/**
+ * Eligible gap values for setlist-level aggregations. Excludes debuts (gap
+ * is null — no prior performance to compare against) and within-show
+ * repeats (a song's second appearance in the same show carries the same
+ * gap as its first; counting it would double-weight that song's recency).
+ * Shared by the average and median computations so both apply identical
+ * exclusion rules.
+ */
+function eligibleGapsForAggregation(
+  tracks: ReadonlyArray<{ songId: string; position: number; gap: number | null }>,
+): number[] {
+  const seenSongIds = new Set<string>();
+  const eligible: number[] = [];
+  const ordered = [...tracks].sort((a, b) => a.position - b.position);
+  for (const t of ordered) {
+    if (t.gap === null) continue;
+    if (seenSongIds.has(t.songId)) continue;
+    seenSongIds.add(t.songId);
+    eligible.push(t.gap);
+  }
+  return eligible;
+}
+
+/**
+ * Arithmetic mean of `track.gap` across a setlist's tracks. Returns null
+ * when no eligible tracks remain so the gap-chart UI can hide the summary.
+ */
+export function computeAverageSongGap(
+  tracks: ReadonlyArray<{ songId: string; position: number; gap: number | null }>,
+): number | null {
+  const eligible = eligibleGapsForAggregation(tracks);
+  if (eligible.length === 0) return null;
+  const sum = eligible.reduce((acc, v) => acc + v, 0);
+  return sum / eligible.length;
+}
+
+/**
+ * Median of `track.gap` across a setlist's tracks. Resists outliers (one
+ * very-high-gap rarity won't drag the typical-gap signal up the way the
+ * average does), so it pairs with the average to give users both the
+ * typical and the central-tendency view.
+ */
+export function computeMedianSongGap(
+  tracks: ReadonlyArray<{ songId: string; position: number; gap: number | null }>,
+): number | null {
+  const sorted = eligibleGapsForAggregation(tracks).sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function previousPerformanceShowFromDb(
+  prev: { date: string; slug: string | null } | null,
+): { date: string; slug: string } | null {
+  if (!prev || !prev.slug) return null;
+  return { date: String(prev.date), slug: prev.slug };
+}
 
 // Mapper functions
 function mapShowToDomainEntity(dbShow: DbShow): Show {
@@ -78,13 +139,19 @@ function mapAnnotationToDomainEntity(dbAnnotation: DbAnnotation): Annotation {
   };
 }
 
-function mapTrackToDomainEntity(dbTrack: DbTrack & { song: DbSong | null }): Track {
-  const { createdAt, updatedAt, slug, ...rest } = dbTrack;
+function mapTrackToDomainEntity(
+  dbTrack: DbTrack & {
+    song: DbSong | null;
+    previousPerformanceShow?: { date: string; slug: string | null } | null;
+  },
+): Track {
+  const { createdAt, updatedAt, slug, previousPerformanceShow, ...rest } = dbTrack;
   return {
     ...rest,
     slug: slug ?? "",
     createdAt: new Date(createdAt),
     updatedAt: new Date(updatedAt),
+    previousPerformanceShow: previousPerformanceShowFromDb(previousPerformanceShow ?? null),
     song: dbTrack.song
       ? {
           id: dbTrack.song.id,
@@ -148,7 +215,11 @@ function getSetSortOrder(setLabel: string): number {
 
 function mapSetlistToDomainEntity(
   show: DbShow & {
-    tracks: (DbTrack & { song: DbSong | null; annotations: DbAnnotation[] })[];
+    tracks: (DbTrack & {
+      song: DbSong | null;
+      annotations: DbAnnotation[];
+      previousPerformanceShow?: { date: string; slug: string | null } | null;
+    })[];
     venue: DbVenue;
   },
 ): Setlist {
@@ -187,6 +258,8 @@ function mapSetlistToDomainEntity(
     venue: mapVenueToDomainEntity(show.venue),
     sets,
     annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
+    averageSongGap: computeAverageSongGap(tracks),
+    medianSongGap: computeMedianSongGap(tracks),
   };
 }
 
@@ -203,6 +276,9 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
     allTimer: track.allTimer,
     averageRating: track.averageRating,
     ratingsCount: track.ratingsCount,
+    gap: track.gap,
+    previousPerformanceShowId: track.previousPerformanceShowId,
+    previousPerformanceShow: previousPerformanceShowFromDb(track.previousPerformanceShow),
     song: track.song ?? undefined,
   };
 }
@@ -243,6 +319,8 @@ function mapSetlistLightToDomainEntity(
     venue: mapVenueToDomainEntity(show.venue),
     sets,
     annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
+    averageSongGap: computeAverageSongGap(tracks),
+    medianSongGap: computeMedianSongGap(tracks),
   };
 }
 
@@ -252,11 +330,13 @@ export class SetlistService {
   async findByShowId(id: string): Promise<Setlist | null> {
     const show = await this.db.show.findUnique({
       where: { id },
+      relationLoadStrategy: "join",
       include: {
         tracks: {
           include: {
             song: true,
             annotations: true,
+            previousPerformanceShow: { select: { date: true, slug: true } },
           },
         },
         venue: true,
@@ -274,11 +354,13 @@ export class SetlistService {
   async findByShowSlug(slug: string): Promise<Setlist | null> {
     const result = await this.db.show.findUnique({
       where: { slug },
+      relationLoadStrategy: "join",
       include: {
         tracks: {
           include: {
             song: true,
             annotations: true,
+            previousPerformanceShow: { select: { date: true, slug: true } },
           },
         },
         venue: true,
@@ -324,11 +406,16 @@ export class SetlistService {
       orderBy,
       skip,
       take,
+      // Single LATERAL-joined query instead of 5 batched roundtrips. With
+      // 100 shows × ~25 tracks each + relations, the per-roundtrip latency
+      // dominates the page load on un-cached routes (top-rated etc).
+      relationLoadStrategy: "join",
       include: {
         tracks: {
           include: {
             song: true,
             annotations: true,
+            previousPerformanceShow: { select: { date: true, slug: true } },
           },
         },
         venue: true,
@@ -384,11 +471,13 @@ export class SetlistService {
       orderBy,
       skip,
       take,
+      relationLoadStrategy: "join",
       include: {
         tracks: {
           include: {
             song: true,
             annotations: true,
+            previousPerformanceShow: { select: { date: true, slug: true } },
           },
         },
         venue: true,
@@ -448,6 +537,7 @@ export class SetlistService {
       orderBy,
       skip,
       take,
+      relationLoadStrategy: "join",
       include: {
         tracks: {
           select: {
@@ -462,6 +552,9 @@ export class SetlistService {
             allTimer: true,
             averageRating: true,
             ratingsCount: true,
+            gap: true,
+            previousPerformanceShowId: true,
+            previousPerformanceShow: { select: { date: true, slug: true } },
             song: {
               select: {
                 id: true,

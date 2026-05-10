@@ -11,8 +11,12 @@ import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
+import { SetlistTable } from "./setlist-table";
+import { SetlistViewControl } from "./setlist-view-control";
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 import { TrackRatingOverlay } from "./track-rating-overlay";
+
+export type SetlistView = "setlist" | "gap-chart";
 
 interface SetlistCardProps {
   setlist: Setlist | SetlistLight;
@@ -26,6 +30,18 @@ interface SetlistCardProps {
    * ignored so they keep working without toggling the card.
    */
   collapsible?: boolean;
+  /**
+   * Initial view for the setlist/gap-chart toggle. Defaults to "setlist".
+   * The /shows/:slug route reads `?view=gap-chart` and passes it here so a
+   * shared link round-trips into the table view.
+   */
+  defaultView?: SetlistView;
+  /**
+   * Called whenever the user flips the toggle. Wired only on /shows/:slug
+   * to round-trip `?view=gap-chart` through the URL; list pages omit this
+   * so toggling stays local to each card.
+   */
+  onViewChange?: (view: SetlistView) => void;
 }
 
 function SetlistCardComponent({
@@ -35,7 +51,14 @@ function SetlistCardComponent({
   showRating,
   externalSources,
   collapsible = false,
+  defaultView = "setlist",
+  onViewChange,
 }: SetlistCardProps) {
+  const [view, setView] = useState<SetlistView>(defaultView);
+  function changeView(next: SetlistView) {
+    setView(next);
+    onViewChange?.(next);
+  }
   const { user } = useSession();
   const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
   const [displayedCount, setDisplayedCount] = useState<number>(setlist.show.ratingsCount ?? 0);
@@ -317,59 +340,81 @@ function SetlistCardComponent({
               />
             )}
 
-            <div className="space-y-2 md:space-y-4">
-              {setlist.sets.map((set, setIndex) => (
-                <span
-                  key={setlist.show.id + set.label}
-                  className="inline-block w-full md:flex md:gap-4 md:items-baseline"
-                >
-                  <span className="inline text-base font-medium text-content-text-tertiary">{set.label}</span>
-                  <span className="inline ml-2 md:ml-0 md:flex-1">
-                    {set.tracks.map((track, i) => (
-                      <span key={track.id} className="inline">
-                        <TrackRatingOverlay track={track}>
-                          <span
-                            className={cn(
-                              "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
-                              track.allTimer && "font-medium",
-                            )}
-                          >
-                            {track.allTimer && (
-                              <Flame className="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5 text-orange-500" />
-                            )}
-                            <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
-                            {trackAnnotationMap.has(track.id) && (
-                              <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
-                                {trackAnnotationMap.get(track.id)?.map((index, i) => (
-                                  <span key={index} className={i > 0 ? "ml-1" : ""}>
-                                    {index}
-                                  </span>
-                                ))}
-                              </sup>
-                            )}
-                          </span>
-                        </TrackRatingOverlay>
-                        {i < set.tracks.length - 1 && (
-                          <span className="text-content-text-secondary mx-1 font-medium text-base">
-                            {track.segue ? " > " : ", "}
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </span>
-                  {setIndex < setlist.sets.length - 1 && <span className="hidden"> </span>}
-                </span>
-              ))}
-            </div>
-
-            {orderedAnnotations.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
-                {orderedAnnotations.map((annotation) => (
-                  <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-                    <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
-                  </div>
-                ))}
+            {view === "gap-chart" ? (
+              <div className="space-y-2">
+                <SetlistViewControl
+                  view={view}
+                  onChange={changeView}
+                  averageSongGap={setlist.averageSongGap}
+                  medianSongGap={setlist.medianSongGap}
+                />
+                <SetlistTable tracks={setlist.sets.flatMap((s) => s.tracks)} />
               </div>
+            ) : (
+              <>
+                <div className="space-y-2 md:space-y-4">
+                  {setlist.sets.map((set, setIndex) => (
+                    <span
+                      key={setlist.show.id + set.label}
+                      className="inline-block w-full md:flex md:gap-4 md:items-baseline"
+                    >
+                      <span className="inline text-base font-medium text-content-text-tertiary">{set.label}</span>
+                      <span className="inline ml-2 md:ml-0 md:flex-1">
+                        {set.tracks.map((track, i) => (
+                          <span key={track.id} className="inline">
+                            <TrackRatingOverlay track={track}>
+                              <span
+                                className={cn(
+                                  "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
+                                  track.allTimer && "font-medium",
+                                )}
+                              >
+                                {track.allTimer && (
+                                  <Flame className="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5 text-orange-500" />
+                                )}
+                                <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
+                                {trackAnnotationMap.has(track.id) && (
+                                  <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
+                                    {trackAnnotationMap.get(track.id)?.map((index, i) => (
+                                      <span key={index} className={i > 0 ? "ml-1" : ""}>
+                                        {index}
+                                      </span>
+                                    ))}
+                                  </sup>
+                                )}
+                              </span>
+                            </TrackRatingOverlay>
+                            {i < set.tracks.length - 1 && (
+                              <span className="text-content-text-secondary mx-1 font-medium text-base">
+                                {track.segue ? " > " : ", "}
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </span>
+                      {setIndex < setlist.sets.length - 1 && <span className="hidden"> </span>}
+                    </span>
+                  ))}
+                </div>
+
+                {orderedAnnotations.length > 0 && (
+                  <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
+                    {orderedAnnotations.map((annotation) => (
+                      <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+                        <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4">
+                  <SetlistViewControl
+                    view={view}
+                    onChange={changeView}
+                    averageSongGap={setlist.averageSongGap}
+                    medianSongGap={setlist.medianSongGap}
+                  />
+                </div>
+              </>
             )}
           </CardContent>
         </div>

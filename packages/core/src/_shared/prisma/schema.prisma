@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -42,6 +43,7 @@ model Annotation {
   updatedAt DateTime @map("updated_at") @db.Timestamp(6)
   track     Track    @relation(fields: [trackId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_annotations_tracks_track_id")
 
+  @@index([trackId])
   @@map("annotations")
 }
 
@@ -485,6 +487,9 @@ model Track {
   @@index([likesCount])
   @@index([nextTrackId])
   @@index([previousTrackId])
+  @@index([songId])
+  @@index([previousPerformanceShowId])
+  @@index([showId, set, position], map: "tracks_show_set_position_idx")
   @@map("tracks")
 }
 

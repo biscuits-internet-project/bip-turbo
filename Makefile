@@ -51,7 +51,8 @@ migrate:
 	cd packages/core && bun prisma:migrate:dev
 
 migrate-create:
-	cd packages/core && bun prisma:migrate:create
+	@if [ -z "$(NAME)" ]; then echo "Usage: make migrate-create NAME=add_foo_index" && exit 1; fi
+	cd packages/core && bun prisma:migrate:create -- --name $(NAME)
 
 migrate-baseline:
 	cd packages/core && bun prisma:migrate:baseline
