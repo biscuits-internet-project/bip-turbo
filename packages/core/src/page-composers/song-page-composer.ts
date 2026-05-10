@@ -176,6 +176,7 @@ export class SongPageComposer {
         longestGapShows,
       },
       performances,
+      showsByYear,
     };
   }
 

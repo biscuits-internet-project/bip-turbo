@@ -7,6 +7,7 @@ import type { VenueMinimal } from "../models/venue";
 export type SongPageView = {
   song: Song;
   performances: SongPagePerformance[];
+  showsByYear: Record<number, number>;
 };
 
 export type SongPagePerformance = {
