@@ -51,6 +51,7 @@ export class CacheInvalidationService {
       this.cache.delPattern(CacheKeys.shows.allLists()),
       this.cache.delPattern("home:*"), // Invalidate all home page caches
       this.cache.del(CacheKeys.stats.showsByYear()), // shows-per-year aggregate is tied to the show catalog
+      this.cache.del(CacheKeys.stats.showDates()), // sorted stats-show-dates array backs Current Gap on /songs
       this.cloudflareCache?.purgeYearListings(),
     ]);
   }
@@ -60,8 +61,8 @@ export class CacheInvalidationService {
    * for callers that mutate shows without going through the listing flow.
    */
   async invalidateStatsShowsByYear(): Promise<void> {
-    this.logger.info("Invalidating stats:shows-by-year");
-    await this.cache.del(CacheKeys.stats.showsByYear());
+    this.logger.info("Invalidating stats:shows-by-year + stats:show-dates");
+    await Promise.all([this.cache.del(CacheKeys.stats.showsByYear()), this.cache.del(CacheKeys.stats.showDates())]);
   }
 
   /**

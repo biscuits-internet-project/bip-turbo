@@ -141,14 +141,9 @@ function formatCount(value: number | null | undefined): string {
   return value.toLocaleString();
 }
 
-function everyShowsValue(value: number | null | undefined): ReactNode {
+function formatDecimal(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
-  return (
-    <>
-      {value.toFixed(1)}
-      <span className="ml-1 text-base sm:text-lg font-normal text-content-text-secondary">shows</span>
-    </>
-  );
+  return value.toFixed(1);
 }
 
 export default function SongPage() {
@@ -235,7 +230,7 @@ export default function SongPage() {
       {/* Stats Grid */}
       <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatBox label="Times Played" value={song.timesPlayed} />
-        <StatBox label="Song Performed Every" value={everyShowsValue(song.averageShowsPerPlay)} />
+        <StatBox label="Average Gap" value={formatDecimal(song.averageShowsPerPlay)} />
         {song.lastShowSlug ? (
           <Link to={`/shows/${song.lastShowSlug}`} className="block">
             <StatBox

@@ -275,6 +275,68 @@ describe("SongPage", () => {
     expect(screen.queryByText(/last show/i)).not.toBeInTheDocument();
   });
 
+  // The play-frequency stat card surfaces `averageShowsPerPlay` (shows
+  // since debut / timesPlayed). Labeled "Average Gap" to share terminology
+  // with the same-named column on /songs. Value is the bare number —
+  // the surrounding label carries the unit.
+  test("Average Gap StatBox renders label 'Average Gap' and the bare numeric value", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
+      song: {
+        title: "Tractorbeam",
+        slug: "tractorbeam",
+        timesPlayed: 200,
+        dateFirstPlayed: "1995-06-01",
+        dateLastPlayed: "2024-01-01",
+        averageShowsPerPlay: 5.7,
+        showsSinceLastPlayed: 12,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+      showsByYear: {},
+    });
+    renderSongPage();
+
+    expect(screen.getByText("Average Gap")).toBeInTheDocument();
+    expect(screen.getByText("5.7")).toBeInTheDocument();
+    // The previous label and the trailing "shows" suffix are gone.
+    expect(screen.queryByText(/Song Performed Every/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^shows$/)).not.toBeInTheDocument();
+  });
+
+  // Null `averageShowsPerPlay` (never-played or no-debut songs) renders
+  // the standard em-dash placeholder, mirroring the other stat cards.
+  test("Average Gap StatBox renders em-dash when averageShowsPerPlay is null", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
+      song: {
+        title: "Munchkin Invasion",
+        slug: "munchkin-invasion",
+        timesPlayed: 0,
+        dateFirstPlayed: null,
+        dateLastPlayed: null,
+        averageShowsPerPlay: null,
+        showsSinceLastPlayed: null,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+      showsByYear: {},
+    });
+    renderSongPage();
+
+    expect(screen.getByText("Average Gap")).toBeInTheDocument();
+    // The Average Gap card should have an em-dash; other null cards may too.
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
   // StatBox uses light padding (sm:p-3) so the eight-card grid reads as a
   // compact info strip. Headline number shrinks on mobile so the value
   // fits on one line within the narrower box.

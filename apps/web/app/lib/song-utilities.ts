@@ -1,3 +1,4 @@
+import { computeRarityStats } from "@bip/core";
 import type { Show, Song } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import type { PublicContext } from "~/lib/base-loaders";
@@ -96,10 +97,39 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
           .map((song) => ({ ...song, filteredTimesPlayed: scopeCountsById.get(song.id) }));
       }
 
-      return await addVenueInfoToSongs(result);
+      const withVenues = await addVenueInfoToSongs(result);
+      return await populateRarityFields(withVenues);
     },
     { ttl: 86400 },
   );
+}
+
+/**
+ * Fills the rarity fields the canonical SongService leaves as null:
+ * `showsSinceLastPlayed`, `percentSinceDebut`, `averageShowsPerPlay`.
+ * Drives the Current Gap / % Since Debut / Avg Gap columns on /songs.
+ * Runs inside the cached `fetchFilteredSongs` path so the bulk gap query
+ * fires at most once per cache window.
+ */
+async function populateRarityFields<T extends Song>(songs: T[]): Promise<T[]> {
+  if (songs.length === 0) return songs;
+  const songIds = songs.map((s) => s.id);
+  const [showsByYear, gaps] = await Promise.all([
+    services.stats.getShowsByYear(),
+    services.stats.getShowsSinceLastPlayedBySongIds(songIds),
+  ]);
+  return songs.map((song) => {
+    const rarity = computeRarityStats(
+      { dateFirstPlayed: song.dateFirstPlayed, timesPlayed: song.timesPlayed },
+      showsByYear,
+    );
+    return {
+      ...song,
+      showsSinceLastPlayed: gaps.get(song.id) ?? null,
+      percentSinceDebut: rarity.percentSinceDebut,
+      averageShowsPerPlay: rarity.averageShowsPerPlay,
+    };
+  });
 }
 
 interface ScopeContext {

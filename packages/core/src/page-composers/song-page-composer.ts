@@ -40,16 +40,11 @@ export class SongPageComposer {
 
     if (!song) throw new Error("Song not found");
 
-    // Calculate shows since last played and get last venue
+    // Computed off the cached stats-show-dates array; cheap enough that
+    // recomputing below against `actualLastPlayedDate` is fine.
     let showsSinceLastPlayed: number | null = null;
-    if (song.dateLastPlayed) {
-      const showsAfterLastPlayed = await this.db.$queryRaw<[{ count: string }]>`
-        SELECT COUNT(*)::text as count
-        FROM shows
-        WHERE date::date > ${song.dateLastPlayed}::date
-          AND ${statsShowsSql("shows")}
-      `;
-      showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
+    if (song.dateLastPlayed && this.statsService) {
+      showsSinceLastPlayed = await this.statsService.getShowsSinceLastPlayed(song.dateLastPlayed);
     }
 
     // Get actual last performance date, venue, and show slug
@@ -122,15 +117,11 @@ export class SongPageComposer {
       }
     }
 
-    // Recalculate shows since last played using the actual date
-    if (actualLastPlayedDate) {
-      const showsAfterLastPlayed = await this.db.$queryRaw<[{ count: string }]>`
-        SELECT COUNT(*)::text as count
-        FROM shows
-        WHERE date::date > ${actualLastPlayedDate}::date
-          AND ${statsShowsSql("shows")}
-      `;
-      showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
+    // Recompute against the stats-eligible actual-last-played date — may
+    // differ from song.dateLastPlayed if the most recent track sits on a
+    // count_for_stats=false show.
+    if (actualLastPlayedDate && this.statsService) {
+      showsSinceLastPlayed = await this.statsService.getShowsSinceLastPlayed(actualLastPlayedDate);
     }
 
     const result = await this.queryPerformances({
