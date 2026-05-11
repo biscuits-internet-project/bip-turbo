@@ -131,7 +131,7 @@ describe("computeAverageSongGap", () => {
   // average down to "we never played this".
   test("averages real gaps and ignores debuts", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: null }, // Tractorbeam debut
+      { songId: "a", position: 1, gap: null }, // Basis for a Day debut
       { songId: "b", position: 2, gap: 5 }, // Above the Waves
       { songId: "c", position: 3, gap: 10 }, // Confrontation
     ];
@@ -169,7 +169,7 @@ describe("computeMedianSongGap", () => {
   // an outlier dragging it like the average can.
   test("returns the middle value for an odd-count eligible list", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: 30 }, // Tractorbeam
+      { songId: "a", position: 1, gap: 30 }, // Basis for a Day
       { songId: "b", position: 2, gap: 5 }, // Above the Waves
       { songId: "c", position: 3, gap: 10 }, // Confrontation
     ];
@@ -207,7 +207,7 @@ describe("computeMedianSongGap", () => {
   // hide the summary line entirely.
   test("returns null when no eligible tracks remain", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: null }, // Tractorbeam debut
+      { songId: "a", position: 1, gap: null }, // Basis for a Day debut
       { songId: "b", position: 2, gap: null }, // Above the Waves debut
     ];
     expect(computeMedianSongGap(tracks)).toBeNull();
@@ -215,10 +215,10 @@ describe("computeMedianSongGap", () => {
 });
 
 describe("SetlistService.findByShowSlug", () => {
-  // The setlist payload powers the gap-chart view (Phase 5). It needs the
-  // prior-show date+slug for the "Last Played" column, so the query must
-  // include the previousPerformanceShow relation with date+slug only (no full
-  // show payload — keeps the response compact).
+  // The setlist payload powers the gap-chart view. It needs the prior-show
+  // date+slug for the "Last Played" column, so the query must include the
+  // previousPerformanceShow relation with date+slug only (no full show
+  // payload — keeps the response compact).
   test("includes previousPerformanceShow date+slug on tracks", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
@@ -232,8 +232,8 @@ describe("SetlistService.findByShowSlug", () => {
   });
 
   // The setlist domain object exposes averageSongGap so SetlistTable can
-  // render the summary without recomputing client-side. Tracks come back from
-  // Prisma with `gap` already populated (Phase 1 denormalization).
+  // render the summary without recomputing client-side. Tracks come back
+  // from Prisma with the denormalized `gap` field already populated.
   test("returns averageSongGap derived from tracks", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
@@ -246,7 +246,7 @@ describe("SetlistService.findByShowSlug", () => {
       venueId: "v-1",
       bandId: "b-1",
       tracks: [
-        // Tractorbeam debut — gap=null
+        // Basis for a Day debut — gap=null
         {
           id: "t-1",
           showId: "show-1",

@@ -38,6 +38,7 @@ const mockFindManyInDateRange = vi.fn();
 const mockShowsFindMany = vi.fn();
 const mockFindManyByDates = vi.fn().mockResolvedValue([]);
 const mockBuildSongPerformanceCounts = vi.fn();
+const mockBuildFilteredSongRarity = vi.fn().mockResolvedValue(new Map());
 const mockCacheGetOrSet = vi.fn().mockImplementation((_key: string, fn: () => Promise<unknown>) => fn());
 const mockFindByEmail = vi.fn();
 const mockFindByUsername = vi.fn();
@@ -52,6 +53,7 @@ vi.mock("~/server/services", () => ({
     },
     songPageComposer: {
       buildSongPerformanceCounts: (...args: unknown[]) => mockBuildSongPerformanceCounts(...args),
+      buildFilteredSongRarity: (...args: unknown[]) => mockBuildFilteredSongRarity(...args),
     },
     cache: {
       getOrSet: (...args: unknown[]) => mockCacheGetOrSet(...args),
@@ -205,9 +207,9 @@ describe("fetchFilteredSongs", () => {
   // song through computeRarityStats so the columns render real values
   // rather than em-dashes.
   test("rarity: populates showsSinceLastPlayed / percentSinceDebut / averageShowsPerPlay on returned rows", async () => {
-    const tractorbeam = {
-      id: "tb",
-      title: "Tractorbeam",
+    const helicopters = {
+      id: "hel",
+      title: "Helicopters",
       timesPlayed: 200,
       dateFirstPlayed: new Date(Date.UTC(1995, 5, 1)),
       dateLastPlayed: new Date(Date.UTC(2024, 0, 1)),
@@ -219,30 +221,30 @@ describe("fetchFilteredSongs", () => {
       dateFirstPlayed: new Date(Date.UTC(2010, 0, 1)),
       dateLastPlayed: new Date(Date.UTC(2023, 0, 1)),
     } as unknown as Song;
-    mockFindMany.mockResolvedValueOnce([tractorbeam, aboveTheWaves]);
+    mockFindMany.mockResolvedValueOnce([helicopters, aboveTheWaves]);
 
-    // 1995 + 2010 era totals chosen so the math comes out clean: tractorbeam
-    // debuted in 1995 and gets all 1000 shows since debut (200/1000 = 20%,
-    // every 5.0 shows). aboveTheWaves debuted in 2010 with 600 shows since
-    // (50/600 ≈ 8.33%, every 12.0 shows).
+    // 1995 + 2010 era totals: Helicopters debuted in 1995 and gets all 1000
+    // shows since debut → 200/1000 = 20%, mean-gap = (1000-200)/(200-1) ≈
+    // 4.02 shows. Above The Waves debuted in 2010 with 600 shows since →
+    // 50/600 ≈ 8.33%, mean-gap = (600-50)/(50-1) ≈ 11.22 shows.
     mockGetShowsByYear.mockResolvedValueOnce({ 1995: 400, 2010: 600 });
     mockGetShowsSinceLastPlayedBySongIds.mockResolvedValueOnce(
       new Map([
-        ["tb", 12],
+        ["hel", 12],
         ["atw", 47],
       ]),
     );
 
     const result = await fetchFilteredSongs(new URL("http://test/songs"), ctx);
 
-    const tb = result.find((s) => s.id === "tb");
+    const hel = result.find((s) => s.id === "hel");
     const atw = result.find((s) => s.id === "atw");
-    expect(tb?.showsSinceLastPlayed).toBe(12);
-    expect(tb?.percentSinceDebut).toBeCloseTo(0.2, 5);
-    expect(tb?.averageShowsPerPlay).toBeCloseTo(5, 5);
+    expect(hel?.showsSinceLastPlayed).toBe(12);
+    expect(hel?.percentSinceDebut).toBeCloseTo(0.2, 5);
+    expect(hel?.averageShowsPerPlay).toBeCloseTo(800 / 199, 5);
     expect(atw?.showsSinceLastPlayed).toBe(47);
     expect(atw?.percentSinceDebut).toBeCloseTo(50 / 600, 5);
-    expect(atw?.averageShowsPerPlay).toBeCloseTo(12, 5);
+    expect(atw?.averageShowsPerPlay).toBeCloseTo(550 / 49, 5);
   });
 
   // Songs with no debut date keep null rarity fields (computeRarityStats

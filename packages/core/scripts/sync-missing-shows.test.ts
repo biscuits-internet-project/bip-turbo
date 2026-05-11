@@ -553,8 +553,8 @@ describe("buildSongCreateInput", () => {
     const now = new Date("2026-04-23T12:00:00Z");
     const input = buildSongCreateInput(
       {
-        slug: "tractorbeam",
-        title: "Tractorbeam",
+        slug: "basis-for-a-day",
+        title: "Basis for a Day",
         author: "Disco Biscuits",
         lyrics: null,
         timesPlayed: 412,
@@ -564,8 +564,8 @@ describe("buildSongCreateInput", () => {
       now,
     );
     expect(input).toEqual({
-      slug: "tractorbeam",
-      title: "Tractorbeam",
+      slug: "basis-for-a-day",
+      title: "Basis for a Day",
       lyrics: null,
       timesPlayed: 412,
       dateFirstPlayed: new Date("1998-07-04"),

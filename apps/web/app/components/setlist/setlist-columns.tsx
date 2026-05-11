@@ -6,10 +6,9 @@ import { ShowDate } from "~/components/show-date";
 import { countDistinctEncores, formatSetLabel } from "./set-label";
 
 /**
- * Row shape consumed by the gap-chart table. A SetlistTableRow is a TrackLight
- * (with the Phase 5 gap+previousPerformanceShow fields) and is intentionally
- * narrowed from the full Setlist tree so the column factory doesn't depend on
- * Set/Show/Venue context.
+ * Row shape consumed by the gap-chart table. Narrowed from the full Setlist
+ * tree so the column factory doesn't depend on Set/Show/Venue context —
+ * just a TrackLight with the denormalized gap + previous-performance fields.
  */
 export type SetlistTableRow = TrackLight;
 
@@ -152,8 +151,8 @@ export function createSetlistColumns(): ColumnDef<SetlistTableRow, unknown>[] {
       enableSorting: true,
       // Numeric ascending; debuts (gap=null) become +∞ so they cluster at
       // the end on asc and at the start on desc. Within-show repeats share
-      // their first occurrence's gap by Phase 1 design — sort treats them
-      // as equal and the icon (not the value) tells the story per row.
+      // their first occurrence's gap value — sort treats them as equal and
+      // the icon (not the value) tells the story per row.
       sortingFn: "basic",
       // First click sorts ascending. TanStack auto-flips to desc-first for
       // numeric accessors; force asc so "smallest gap first" matches the

@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Filter } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { AuthorSearch } from "~/components/author/author-search";
 import { SelectFilter } from "~/components/ui/filters";
@@ -80,6 +80,7 @@ export function PerformanceFilterControls({
         aria-expanded={mobileOpen}
       >
         <span className="flex items-center gap-2">
+          <Filter className="h-4 w-4" aria-hidden="true" />
           Filters
           {activeFilterCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-brand-primary/20 text-brand-primary text-xs">

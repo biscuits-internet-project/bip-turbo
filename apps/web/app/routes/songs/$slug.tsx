@@ -173,6 +173,10 @@ export default function SongPage() {
 
   const hasAllTimers = useMemo(() => allPerformances.some((p) => p.allTimer), [allPerformances]);
   const filteredAllTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
+  // Server-narrowing filter active = any UI filter that affects the
+  // performance set the server returned. Excludes `searchText` (client-only).
+  // Used to render the Filtered Gap column in the performances table.
+  const hasServerNarrowingFilter = selectedTimeRange !== "all" || activeToggleSet.size > 0;
   const filterContent = (
     <PerformanceFilterControls
       selectedTimeRange={selectedTimeRange}
@@ -458,6 +462,7 @@ export default function SongPage() {
               performances={filteredAllTimers}
               songTitle={song.title}
               isLoading={isLoading}
+              hasNarrowingFilter={hasServerNarrowingFilter}
               headerContent={filterContent}
             />
           </TabsContent>
@@ -469,6 +474,7 @@ export default function SongPage() {
             songTitle={song.title}
             showAllTimerColumn
             isLoading={isLoading}
+            hasNarrowingFilter={hasServerNarrowingFilter}
             headerContent={filterContent}
           />
         </TabsContent>

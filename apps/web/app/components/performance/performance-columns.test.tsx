@@ -101,6 +101,101 @@ describe("createPerformanceColumns", () => {
     expect(sequenceColumn?.meta?.hideOnMobile).toBeFalsy();
   });
 
+  // Gap and Last Played are per-song signals — they only make sense when
+  // every row of the table refers to the same song. On surfaces that mix
+  // songs (`/songs/all-timers`, `/on-this-day/:monthDay`), the columns
+  // become noise and the caller passes `showGapColumns={false}` to hide
+  // both at once.
+  test("Gap and Last Played columns are present by default", () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    expect(ids).toContain("gap");
+    expect(ids).toContain("lastPlayed");
+  });
+
+  test("Gap and Last Played columns are absent when showGapColumns is false", () => {
+    const columns = createPerformanceColumns({ ...defaultOptions, showGapColumns: false });
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    expect(ids).not.toContain("gap");
+    expect(ids).not.toContain("lastPlayed");
+  });
+
+  // Filtered Gap appears only when a server-narrowing filter is active —
+  // the column has no meaning otherwise (it would just duplicate Gap).
+  test("Filtered Gap column is absent by default", () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    expect(ids).not.toContain("filteredGap");
+  });
+
+  // When narrowing is active, Filtered Gap renders immediately after the
+  // all-time Gap column so the two read as a paired comparison.
+  test("Filtered Gap column is present when hasNarrowingFilter is true", () => {
+    const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    const gapIdx = ids.indexOf("gap");
+    const filteredGapIdx = ids.indexOf("filteredGap");
+    expect(filteredGapIdx).toBeGreaterThan(-1);
+    expect(filteredGapIdx).toBe(gapIdx + 1);
+  });
+
+  // Filtered Gap rides on the same `showGapColumns` gate as Gap. On
+  // mixed-song surfaces (all-timers, on-this-day) the entire gap family
+  // hides regardless of whether the filter is narrowing.
+  test("Filtered Gap column is hidden when showGapColumns is false even with hasNarrowingFilter", () => {
+    const columns = createPerformanceColumns({
+      ...defaultOptions,
+      showGapColumns: false,
+      hasNarrowingFilter: true,
+    });
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    expect(ids).not.toContain("filteredGap");
+  });
+
+  // Cell rendering mirrors the all-time Gap column: ★ for debut of the
+  // filtered set (filteredGap == null), ↺ for the second occurrence within
+  // the same show, integer otherwise.
+  test("Filtered Gap cell renders Star icon for filteredGap=null debut", async () => {
+    const performances = [makePerformance({ trackId: "t-debut", filteredGap: null, position: 1 })];
+    const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
+    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    // Two stars expected: the all-time Gap column treats this row the same
+    // way (its gap field defaulted to 5 from makePerformance, so the Gap
+    // cell renders a number, not a star). Filtered Gap renders the star.
+    expect(container.querySelectorAll(".lucide-star").length).toBe(1);
+  });
+
+  test("Filtered Gap cell renders rotate icon for within-show repeat", async () => {
+    const performances = [
+      makePerformance({
+        trackId: "t-first",
+        filteredGap: 3,
+        position: 2,
+        show: { id: "s-1", slug: "2024-06-15", date: "2024-06-15", venueId: "v", countForStats: true },
+      }),
+      makePerformance({
+        trackId: "t-repeat",
+        filteredGap: 3,
+        position: 7,
+        show: { id: "s-1", slug: "2024-06-15", date: "2024-06-15", venueId: "v", countForStats: true },
+      }),
+    ];
+    const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
+    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    // Within-show repeats render ↺ in both Gap AND Filtered Gap columns on
+    // the second row — two `.lucide-rotate-ccw` icons total.
+    expect(container.querySelectorAll(".lucide-rotate-ccw").length).toBe(2);
+  });
+
+  test("Filtered Gap cell renders the numeric value when not a debut or repeat", async () => {
+    const performances = [makePerformance({ trackId: "t-1", filteredGap: 7, position: 1 })];
+    const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
+    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    // The Gap column renders 5 (from makePerformance default); Filtered Gap
+    // renders 7. Looking for "7" is unambiguous since the all-time Gap is 5.
+    expect(screen.getByText("7")).toBeInTheDocument();
+  });
+
   // The Song column only appears on /songs/all-timers where performances
   // span multiple songs. On /songs/$slug (single song), it's omitted.
   test("Song column present when showSongColumn is true, absent otherwise", async () => {
@@ -251,8 +346,8 @@ describe("createPerformanceColumns", () => {
     expect(container.querySelectorAll(".lucide-star").length).toBe(1);
   });
 
-  // When a song is played twice in the same show, Phase 1 stores the SAME
-  // gap on both tracks (the gap to the previous *show* the song was played).
+  // When a song is played twice in the same show, both tracks carry the
+  // SAME gap value (the gap to the previous *show* the song was played).
   // The repeat is identified at render time by checking for an earlier-
   // position track in the same show, and gets a RotateCcw icon instead of
   // a number to flag the within-show repeat.
@@ -278,8 +373,8 @@ describe("createPerformanceColumns", () => {
   });
 
   // The Last Played column shows the date of the song's prior performance
-  // (sourced from Phase 1's Track.previousPerformanceShowId join) and links
-  // to that show. When sorted by Gap (or any non-date order), this column
+  // (sourced from the Track.previousPerformanceShowId join) and links to
+  // that show. When sorted by Gap (or any non-date order), this column
   // gives users back the chronological context the Date column otherwise
   // provides at a glance.
   test("Last Played column renders linked date for non-debut rows", async () => {

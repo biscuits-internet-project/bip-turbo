@@ -20,7 +20,7 @@ function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: 
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
     previousPerformanceShow: overrides.previousPerformanceShow ?? null,
-    song: overrides.song ?? { id: overrides.songId, title: "Tractorbeam", slug: "tractorbeam" },
+    song: overrides.song ?? { id: overrides.songId, title: "Basis for a Day", slug: "basis-for-a-day" },
   };
 }
 
@@ -50,7 +50,7 @@ describe("SetlistTable", () => {
             songId: "a",
             position: 1,
             set: "S1",
-            song: { id: "a", title: "Tractorbeam", slug: "x" },
+            song: { id: "a", title: "Basis for a Day", slug: "x" },
           }),
           makeTrack({
             songId: "a2",
@@ -63,7 +63,7 @@ describe("SetlistTable", () => {
     );
     const cells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 2);
     expect(cells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
-      "Tractorbeam",
+      "Basis for a Day",
       "Above the Waves",
       "Tempest",
       "Crickets",

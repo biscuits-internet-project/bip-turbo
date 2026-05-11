@@ -1,6 +1,6 @@
 import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Flame, RotateCcw, Star } from "lucide-react";
+import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, Flame, RotateCcw, Star } from "lucide-react";
 import { GapIcon } from "~/components/gap-icon";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
@@ -9,43 +9,95 @@ import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
 
 /**
- * Sort comparator for the Gap column. Debuts (gap=null) sort first because a
- * debut is the rarest possible event; remaining rows sort by gap ascending.
- * Ties break by show date so all rows from the same show — including
- * within-show repeats, which share both gap and date — cluster together;
- * track position is the final tiebreak so within-show repeats stay in
- * setlist order relative to each other.
+ * Sort comparator for any gap-flavored column. Debuts (gap=null) sort first
+ * because a debut is the rarest possible event; remaining rows sort by gap
+ * ascending. Ties break by show date so all rows from the same show —
+ * including within-show repeats, which share both gap and date — cluster
+ * together; track position is the final tiebreak so within-show repeats
+ * stay in setlist order relative to each other.
+ *
+ * Parameterized by `key` so the same comparator drives both Gap (`gap`)
+ * and Filtered Gap (`filteredGap`).
  */
-export function gapSortingFn(a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number {
-  const aGap = a.original.gap;
-  const bGap = b.original.gap;
-  const aKey = aGap == null ? Number.NEGATIVE_INFINITY : aGap;
-  const bKey = bGap == null ? Number.NEGATIVE_INFINITY : bGap;
-  if (aKey !== bKey) return aKey - bKey;
-  const dateCmp = compareByShowDate(a.original, b.original);
-  if (dateCmp !== 0) return dateCmp;
-  return (a.original.position ?? 0) - (b.original.position ?? 0);
+function makeGapSortingFn(key: "gap" | "filteredGap") {
+  return (a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number => {
+    const aGap = a.original[key];
+    const bGap = b.original[key];
+    const aKey = aGap == null ? Number.NEGATIVE_INFINITY : aGap;
+    const bKey = bGap == null ? Number.NEGATIVE_INFINITY : bGap;
+    if (aKey !== bKey) return aKey - bKey;
+    const dateCmp = compareByShowDate(a.original, b.original);
+    if (dateCmp !== 0) return dateCmp;
+    return (a.original.position ?? 0) - (b.original.position ?? 0);
+  };
+}
+
+export const gapSortingFn = makeGapSortingFn("gap");
+export const filteredGapSortingFn = makeGapSortingFn("filteredGap");
+
+/**
+ * Shared cell renderer for Gap and Filtered Gap. Same icon semantics: ★
+ * for a debut (null), ↺ for the second occurrence within the same show,
+ * tabular number otherwise.
+ */
+function renderGapCell({ value, isRepeat }: { value: number | null | undefined; isRepeat: boolean }) {
+  if (isRepeat) {
+    return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />;
+  }
+  if (value == null) {
+    return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />;
+  }
+  return <span className="text-content-text-secondary tabular-nums">{value}</span>;
+}
+
+/**
+ * Detects whether `row` is the second-or-later occurrence of its song
+ * within the same show. The gap and filtered-gap values themselves are
+ * shared across within-show repeats, so the icon — not the number —
+ * distinguishes the repeat from its first occurrence.
+ */
+function isWithinShowRepeat(row: SongPagePerformance, allRows: Array<{ original: SongPagePerformance }>): boolean {
+  return allRows.some(
+    (other) => other.original.show.id === row.show.id && (other.original.position ?? 0) < (row.position ?? 0),
+  );
 }
 
 interface PerformanceColumnOptions {
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
+  /**
+   * Gap + Last Played are per-song signals. On surfaces that mix songs
+   * (all-timers, on-this-day), pass `false` to hide both. Defaults true.
+   */
+  showGapColumns?: boolean;
+  /**
+   * When true, render the Filtered Gap column alongside the all-time Gap.
+   * The route sets this from `hasNarrowingFilter` so the column only
+   * appears when the filtered set differs from all-time.
+   */
+  hasNarrowingFilter?: boolean;
   songTitle?: string;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
 }
 
-function SortableHeader({ column, label }: { column: Column<SongPagePerformance, unknown>; label: string }) {
+function SortableHeader({
+  column,
+  label,
+}: {
+  column: Column<SongPagePerformance, unknown>;
+  label: string | React.ReactNode;
+}) {
   if (!column.getCanSort()) return <span>{label}</span>;
 
   return (
     <button
       type="button"
-      className="cursor-pointer select-none hover:text-content-text-primary w-full text-left"
+      className="cursor-pointer select-none hover:text-content-text-primary w-full text-left flex items-start gap-1"
       onClick={() => column.toggleSorting()}
     >
       <span className={column.getIsSorted() ? "text-content-text-primary font-semibold" : ""}>{label}</span>
-      <span className={column.getIsSorted() ? "text-brand-primary ml-1" : "ml-1"}>
+      <span className={column.getIsSorted() ? "text-brand-primary" : ""}>
         {column.getIsSorted() === "asc" ? (
           <ArrowUpIcon className="h-4 w-4 inline" />
         ) : column.getIsSorted() === "desc" ? (
@@ -59,7 +111,16 @@ function SortableHeader({ column, label }: { column: Column<SongPagePerformance,
 }
 
 export function createPerformanceColumns(options: PerformanceColumnOptions): ColumnDef<SongPagePerformance, unknown>[] {
-  const { showSongColumn, showAllTimerColumn, songTitle, userRatingMap, isAuthenticated } = options;
+  const {
+    showSongColumn,
+    showAllTimerColumn,
+    showGapColumns,
+    hasNarrowingFilter,
+    songTitle,
+    userRatingMap,
+    isAuthenticated,
+  } = options;
+  const includeGapColumns = showGapColumns !== false;
   const columnHelper = createColumnHelper<SongPagePerformance>();
   const columns: ColumnDef<SongPagePerformance, unknown>[] = [];
 
@@ -126,52 +187,77 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         );
       },
     }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
-      id: "gap",
-      meta: { width: "64px" },
-      header: ({ column }) => <SortableHeader column={column} label="Gap" />,
-      enableSorting: true,
-      sortingFn: gapSortingFn,
-      cell: (info) => {
-        const row = info.row.original;
-        const allRows = info.table.getCoreRowModel().rows;
-        // Within-show repeat: another row exists in the same show with an
-        // earlier track position. Phase 1 stores the same gap on both tracks
-        // of a within-show repeat, so the icon — not the gap value — is what
-        // distinguishes the repeat from its first occurrence.
-        const isRepeat = allRows.some(
-          (other) => other.original.show.id === row.show.id && (other.original.position ?? 0) < (row.position ?? 0),
-        );
+  );
 
-        if (isRepeat) {
-          return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />;
-        }
+  if (includeGapColumns) {
+    columns.push(
+      columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
+        id: "gap",
+        meta: { width: "64px" },
+        header: ({ column }) => <SortableHeader column={column} label="Gap" />,
+        enableSorting: true,
+        sortingFn: gapSortingFn,
+        cell: (info) => {
+          const row = info.row.original;
+          return renderGapCell({
+            value: row.gap,
+            isRepeat: isWithinShowRepeat(row, info.table.getCoreRowModel().rows),
+          });
+        },
+      }) as ColumnDef<SongPagePerformance, unknown>,
+    );
+    if (hasNarrowingFilter) {
+      columns.push(
+        columnHelper.accessor((row) => row.filteredGap ?? Number.NEGATIVE_INFINITY, {
+          id: "filteredGap",
+          meta: { width: "72px" },
+          header: ({ column }) => (
+            <SortableHeader
+              column={column}
+              label={
+                <span className="inline-flex items-center gap-1">
+                  <Filter className="h-3 w-3" aria-hidden="true" />
+                  <span className="sr-only">Filtered</span>
+                  Gap
+                </span>
+              }
+            />
+          ),
+          enableSorting: true,
+          sortingFn: filteredGapSortingFn,
+          cell: (info) => {
+            const row = info.row.original;
+            return renderGapCell({
+              value: row.filteredGap,
+              isRepeat: isWithinShowRepeat(row, info.table.getCoreRowModel().rows),
+            });
+          },
+        }) as ColumnDef<SongPagePerformance, unknown>,
+      );
+    }
+    columns.push(
+      columnHelper.accessor((row) => row.previousShow?.date ?? "", {
+        id: "lastPlayed",
+        meta: { width: "110px", hideOnMobile: true },
+        header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
+        enableSorting: true,
+        sortingFn: "alphanumeric",
+        cell: (info) => {
+          const previousShow = info.row.original.previousShow;
+          if (!previousShow) {
+            return <span className="text-content-text-tertiary">—</span>;
+          }
+          return (
+            <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
+              <ShowDate date={previousShow.date} />
+            </a>
+          );
+        },
+      }) as ColumnDef<SongPagePerformance, unknown>,
+    );
+  }
 
-        if (row.gap == null) {
-          return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />;
-        }
-
-        return <span className="text-content-text-secondary tabular-nums">{row.gap}</span>;
-      },
-    }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor((row) => row.previousShow?.date ?? "", {
-      id: "lastPlayed",
-      meta: { width: "110px", hideOnMobile: true },
-      header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
-      enableSorting: true,
-      sortingFn: "alphanumeric",
-      cell: (info) => {
-        const previousShow = info.row.original.previousShow;
-        if (!previousShow) {
-          return <span className="text-content-text-tertiary">—</span>;
-        }
-        return (
-          <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
-            <ShowDate date={previousShow.date} />
-          </a>
-        );
-      },
-    }) as ColumnDef<SongPagePerformance, unknown>,
+  columns.push(
     columnHelper.accessor("set", {
       header: "Set",
       meta: { width: "48px" },

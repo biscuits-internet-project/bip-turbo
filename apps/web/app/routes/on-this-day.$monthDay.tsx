@@ -177,6 +177,7 @@ export default function OnThisDay() {
               performances={filteredPerformances}
               isLoading={isLoading}
               showSongColumn
+              showGapColumns={false}
               pageSize={ALL_TIMERS_PAGE_SIZE}
               headerContent={
                 performances.length > ALL_TIMERS_PAGE_SIZE ? (

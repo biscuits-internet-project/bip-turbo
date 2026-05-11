@@ -97,8 +97,14 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
           .map((song) => ({ ...song, filteredTimesPlayed: scopeCountsById.get(song.id) }));
       }
 
-      const withVenues = await addVenueInfoToSongs(result);
-      return await populateRarityFields(withVenues);
+      // When a narrowing filter is in effect, also pull per-song filtered
+      // rarity aggregates so the filtered columns on /songs have data.
+      // populateRarityFields runs first because it attaches the
+      // dateFirstFilteredPlayed / dateLastFilteredPlayed Date fields that
+      // addVenueInfoToSongs then resolves to Show records for the link.
+      const filterOptions = scopeCountsById && !showNotPlayed ? await parsePerformanceFilters(url, context) : null;
+      const withRarity = await populateRarityFields(result, filterOptions);
+      return await addVenueInfoToSongs(withRarity);
     },
     { ttl: 86400 },
   );
@@ -111,23 +117,37 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
  * Runs inside the cached `fetchFilteredSongs` path so the bulk gap query
  * fires at most once per cache window.
  */
-async function populateRarityFields<T extends Song>(songs: T[]): Promise<T[]> {
+async function populateRarityFields<T extends Song>(
+  songs: T[],
+  filterOptions: Awaited<ReturnType<typeof parsePerformanceFilters>> | null,
+): Promise<T[]> {
   if (songs.length === 0) return songs;
   const songIds = songs.map((s) => s.id);
-  const [showsByYear, gaps] = await Promise.all([
+  const [showsByYear, gaps, filteredRarity] = await Promise.all([
     services.stats.getShowsByYear(),
     services.stats.getShowsSinceLastPlayedBySongIds(songIds),
+    filterOptions ? services.songPageComposer.buildFilteredSongRarity(songIds, filterOptions) : Promise.resolve(null),
   ]);
   return songs.map((song) => {
     const rarity = computeRarityStats(
       { dateFirstPlayed: song.dateFirstPlayed, timesPlayed: song.timesPlayed },
       showsByYear,
     );
+    const filtered = filteredRarity?.get(song.id);
     return {
       ...song,
       showsSinceLastPlayed: gaps.get(song.id) ?? null,
       percentSinceDebut: rarity.percentSinceDebut,
       averageShowsPerPlay: rarity.averageShowsPerPlay,
+      ...(filtered
+        ? {
+            filteredShowsSinceLastPlayed: filtered.filteredShowsSinceLastPlayed,
+            filteredPercentSinceDebut: filtered.filteredPercentSinceDebut,
+            filteredAverageShowsPerPlay: filtered.filteredAverageShowsPerPlay,
+            dateFirstFilteredPlayed: filtered.dateFirstFilteredPlayed,
+            dateLastFilteredPlayed: filtered.dateLastFilteredPlayed,
+          }
+        : {}),
     };
   });
 }
@@ -195,11 +215,22 @@ async function resolveDateRangeForTimeRange(
 }
 
 /**
- * Adds the venue info to a songs firstPlayedShow and lastPlayedShow.
+ * Adds the venue info to a song's firstPlayedShow / lastPlayedShow, and
+ * — when the song carries `dateFirst/LastFilteredPlayed` from the filtered
+ * rarity pass — also to firstFilteredPlayedShow / lastFilteredPlayedShow.
+ * All four show columns on /songs resolve against the same single batch
+ * fetch of show records by date.
  */
-export async function addVenueInfoToSongs(
-  songs: Song[],
-): Promise<Array<Song & { firstPlayedShow: Show | null; lastPlayedShow: Show | null }>> {
+export async function addVenueInfoToSongs(songs: Song[]): Promise<
+  Array<
+    Song & {
+      firstPlayedShow: Show | null;
+      lastPlayedShow: Show | null;
+      firstFilteredPlayedShow?: Show | null;
+      lastFilteredPlayedShow?: Show | null;
+    }
+  >
+> {
   const showDates = new Set<string>();
   songs.forEach((song) => {
     if (song.dateFirstPlayed) {
@@ -207,6 +238,12 @@ export async function addVenueInfoToSongs(
     }
     if (song.dateLastPlayed) {
       showDates.add(dateToISOStringSansTime(song.dateLastPlayed));
+    }
+    if (song.dateFirstFilteredPlayed) {
+      showDates.add(dateToISOStringSansTime(song.dateFirstFilteredPlayed));
+    }
+    if (song.dateLastFilteredPlayed) {
+      showDates.add(dateToISOStringSansTime(song.dateLastFilteredPlayed));
     }
   });
 
@@ -221,5 +258,11 @@ export async function addVenueInfoToSongs(
     lastPlayedShow: song.dateLastPlayed
       ? (showsByDate.get(dateToISOStringSansTime(song.dateLastPlayed)) ?? null)
       : null,
+    firstFilteredPlayedShow: song.dateFirstFilteredPlayed
+      ? (showsByDate.get(dateToISOStringSansTime(song.dateFirstFilteredPlayed)) ?? null)
+      : undefined,
+    lastFilteredPlayedShow: song.dateLastFilteredPlayed
+      ? (showsByDate.get(dateToISOStringSansTime(song.dateLastFilteredPlayed)) ?? null)
+      : undefined,
   }));
 }

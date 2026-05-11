@@ -276,6 +276,58 @@ export class UserService {
     }
   }
 
+  /**
+   * Tab labels on the user profile page ("Reviews (N)", "Track Ratings (N)",
+   * etc.) need counts even when we don't fetch the underlying rows. Heavy
+   * users have 7,000+ track ratings; pulling that array just to call
+   * `.length` costs megabytes of payload. These COUNT queries replace that.
+   */
+  async getUserTabCounts(userId: string): Promise<{
+    reviewCount: number;
+    showRatingsCount: number;
+    trackRatingsCount: number;
+    blogPostCount: number;
+  }> {
+    const [reviewCount, showRatingsCount, trackRatingsCount, blogPostCount] = await Promise.all([
+      this.db.review.count({ where: { userId } }),
+      this.db.rating.count({ where: { userId, rateableType: "Show", value: { gte: 1, lte: 5 } } }),
+      this.db.rating.count({ where: { userId, rateableType: "Track", value: { gte: 1, lte: 5 } } }),
+      this.db.blogPost.count({ where: { userId, state: "published" } }),
+    ]);
+    return { reviewCount, showRatingsCount, trackRatingsCount, blogPostCount };
+  }
+
+  /**
+   * Header summary for the user-profile page: total attendance count plus
+   * the oldest and newest shows the user has marked attended. Avoids
+   * fetching the full attendance list (~30-50ms on heavy users) just to
+   * derive these three values for the page header.
+   */
+  async getUserProfileHeader(userId: string): Promise<{
+    attendanceCount: number;
+    firstShow: { id: string; date: string } | null;
+    lastShow: { id: string; date: string } | null;
+  }> {
+    const [attendanceCount, firstAttendance, lastAttendance] = await Promise.all([
+      this.db.attendance.count({ where: { userId } }),
+      this.db.attendance.findFirst({
+        where: { userId },
+        orderBy: { show: { date: "asc" } },
+        select: { show: { select: { id: true, date: true } } },
+      }),
+      this.db.attendance.findFirst({
+        where: { userId },
+        orderBy: { show: { date: "desc" } },
+        select: { show: { select: { id: true, date: true } } },
+      }),
+    ]);
+    return {
+      attendanceCount,
+      firstShow: firstAttendance?.show ?? null,
+      lastShow: lastAttendance?.show ?? null,
+    };
+  }
+
   async getUserStats(userId?: string): Promise<UserStats[]> {
     this.logger.info("getUserStats called", { userId });
     const whereClause = userId ? { id: userId } : {};

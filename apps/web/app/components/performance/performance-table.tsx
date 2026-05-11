@@ -14,6 +14,13 @@ interface PerformanceTableProps {
   songTitle?: string;
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
+  showGapColumns?: boolean;
+  /**
+   * When true, render the Filtered Gap column. Route is responsible for
+   * deriving this from its server-narrowing filter state (timeRange,
+   * attended, toggles) — `searchText` does not count.
+   */
+  hasNarrowingFilter?: boolean;
   headerContent?: ReactNode;
   isLoading?: boolean;
   pageSize?: number;
@@ -29,6 +36,8 @@ export function PerformanceTable({
   songTitle,
   showSongColumn,
   showAllTimerColumn,
+  showGapColumns,
+  hasNarrowingFilter,
   headerContent,
   isLoading,
   pageSize,
@@ -56,8 +65,17 @@ export function PerformanceTable({
   const { userRatingMap } = useTrackUserRatings(trackIds);
 
   const columns = useMemo(
-    () => createPerformanceColumns({ showSongColumn, showAllTimerColumn, songTitle, userRatingMap, isAuthenticated }),
-    [showSongColumn, showAllTimerColumn, songTitle, userRatingMap, isAuthenticated],
+    () =>
+      createPerformanceColumns({
+        showSongColumn,
+        showAllTimerColumn,
+        showGapColumns,
+        hasNarrowingFilter,
+        songTitle,
+        userRatingMap,
+        isAuthenticated,
+      }),
+    [showSongColumn, showAllTimerColumn, showGapColumns, hasNarrowingFilter, songTitle, userRatingMap, isAuthenticated],
   );
 
   return (
