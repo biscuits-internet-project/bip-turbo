@@ -14,6 +14,7 @@ interface PerformanceTableProps {
   songTitle?: string;
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
+  showGapColumns?: boolean;
   headerContent?: ReactNode;
   isLoading?: boolean;
   pageSize?: number;
@@ -29,6 +30,7 @@ export function PerformanceTable({
   songTitle,
   showSongColumn,
   showAllTimerColumn,
+  showGapColumns,
   headerContent,
   isLoading,
   pageSize,
@@ -56,8 +58,16 @@ export function PerformanceTable({
   const { userRatingMap } = useTrackUserRatings(trackIds);
 
   const columns = useMemo(
-    () => createPerformanceColumns({ showSongColumn, showAllTimerColumn, songTitle, userRatingMap, isAuthenticated }),
-    [showSongColumn, showAllTimerColumn, songTitle, userRatingMap, isAuthenticated],
+    () =>
+      createPerformanceColumns({
+        showSongColumn,
+        showAllTimerColumn,
+        showGapColumns,
+        songTitle,
+        userRatingMap,
+        isAuthenticated,
+      }),
+    [showSongColumn, showAllTimerColumn, showGapColumns, songTitle, userRatingMap, isAuthenticated],
   );
 
   return (

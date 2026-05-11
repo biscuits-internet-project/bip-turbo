@@ -44,6 +44,7 @@ export default function AllTimersPage() {
         performances={filteredPerformances}
         isLoading={isLoading}
         showSongColumn
+        showGapColumns={false}
         headerContent={
           <PerformanceFilterControls
             selectedTimeRange={selectedTimeRange}

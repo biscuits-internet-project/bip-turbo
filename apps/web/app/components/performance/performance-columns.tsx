@@ -30,6 +30,11 @@ export function gapSortingFn(a: Row<SongPagePerformance>, b: Row<SongPagePerform
 interface PerformanceColumnOptions {
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
+  /**
+   * Gap + Last Played are per-song signals. On surfaces that mix songs
+   * (all-timers, on-this-day), pass `false` to hide both. Defaults true.
+   */
+  showGapColumns?: boolean;
   songTitle?: string;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
@@ -59,7 +64,8 @@ function SortableHeader({ column, label }: { column: Column<SongPagePerformance,
 }
 
 export function createPerformanceColumns(options: PerformanceColumnOptions): ColumnDef<SongPagePerformance, unknown>[] {
-  const { showSongColumn, showAllTimerColumn, songTitle, userRatingMap, isAuthenticated } = options;
+  const { showSongColumn, showAllTimerColumn, showGapColumns, songTitle, userRatingMap, isAuthenticated } = options;
+  const includeGapColumns = showGapColumns !== false;
   const columnHelper = createColumnHelper<SongPagePerformance>();
   const columns: ColumnDef<SongPagePerformance, unknown>[] = [];
 
@@ -126,52 +132,60 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         );
       },
     }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
-      id: "gap",
-      meta: { width: "64px" },
-      header: ({ column }) => <SortableHeader column={column} label="Gap" />,
-      enableSorting: true,
-      sortingFn: gapSortingFn,
-      cell: (info) => {
-        const row = info.row.original;
-        const allRows = info.table.getCoreRowModel().rows;
-        // Within-show repeat: another row exists in the same show with an
-        // earlier track position. Phase 1 stores the same gap on both tracks
-        // of a within-show repeat, so the icon — not the gap value — is what
-        // distinguishes the repeat from its first occurrence.
-        const isRepeat = allRows.some(
-          (other) => other.original.show.id === row.show.id && (other.original.position ?? 0) < (row.position ?? 0),
-        );
+  );
 
-        if (isRepeat) {
-          return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />;
-        }
+  if (includeGapColumns) {
+    columns.push(
+      columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
+        id: "gap",
+        meta: { width: "64px" },
+        header: ({ column }) => <SortableHeader column={column} label="Gap" />,
+        enableSorting: true,
+        sortingFn: gapSortingFn,
+        cell: (info) => {
+          const row = info.row.original;
+          const allRows = info.table.getCoreRowModel().rows;
+          // Within-show repeat: another row exists in the same show with an
+          // earlier track position. Phase 1 stores the same gap on both tracks
+          // of a within-show repeat, so the icon — not the gap value — is what
+          // distinguishes the repeat from its first occurrence.
+          const isRepeat = allRows.some(
+            (other) => other.original.show.id === row.show.id && (other.original.position ?? 0) < (row.position ?? 0),
+          );
 
-        if (row.gap == null) {
-          return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />;
-        }
+          if (isRepeat) {
+            return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />;
+          }
 
-        return <span className="text-content-text-secondary tabular-nums">{row.gap}</span>;
-      },
-    }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor((row) => row.previousShow?.date ?? "", {
-      id: "lastPlayed",
-      meta: { width: "110px", hideOnMobile: true },
-      header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
-      enableSorting: true,
-      sortingFn: "alphanumeric",
-      cell: (info) => {
-        const previousShow = info.row.original.previousShow;
-        if (!previousShow) {
-          return <span className="text-content-text-tertiary">—</span>;
-        }
-        return (
-          <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
-            <ShowDate date={previousShow.date} />
-          </a>
-        );
-      },
-    }) as ColumnDef<SongPagePerformance, unknown>,
+          if (row.gap == null) {
+            return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />;
+          }
+
+          return <span className="text-content-text-secondary tabular-nums">{row.gap}</span>;
+        },
+      }) as ColumnDef<SongPagePerformance, unknown>,
+      columnHelper.accessor((row) => row.previousShow?.date ?? "", {
+        id: "lastPlayed",
+        meta: { width: "110px", hideOnMobile: true },
+        header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
+        enableSorting: true,
+        sortingFn: "alphanumeric",
+        cell: (info) => {
+          const previousShow = info.row.original.previousShow;
+          if (!previousShow) {
+            return <span className="text-content-text-tertiary">—</span>;
+          }
+          return (
+            <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
+              <ShowDate date={previousShow.date} />
+            </a>
+          );
+        },
+      }) as ColumnDef<SongPagePerformance, unknown>,
+    );
+  }
+
+  columns.push(
     columnHelper.accessor("set", {
       header: "Set",
       meta: { width: "48px" },

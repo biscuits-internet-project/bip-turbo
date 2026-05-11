@@ -101,6 +101,25 @@ describe("createPerformanceColumns", () => {
     expect(sequenceColumn?.meta?.hideOnMobile).toBeFalsy();
   });
 
+  // Gap and Last Played are per-song signals — they only make sense when
+  // every row of the table refers to the same song. On surfaces that mix
+  // songs (`/songs/all-timers`, `/on-this-day/:monthDay`), the columns
+  // become noise and the caller passes `showGapColumns={false}` to hide
+  // both at once.
+  test("Gap and Last Played columns are present by default", () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    expect(ids).toContain("gap");
+    expect(ids).toContain("lastPlayed");
+  });
+
+  test("Gap and Last Played columns are absent when showGapColumns is false", () => {
+    const columns = createPerformanceColumns({ ...defaultOptions, showGapColumns: false });
+    const ids = columns.map((c) => ("id" in c ? c.id : undefined));
+    expect(ids).not.toContain("gap");
+    expect(ids).not.toContain("lastPlayed");
+  });
+
   // The Song column only appears on /songs/all-timers where performances
   // span multiple songs. On /songs/$slug (single song), it's omitted.
   test("Song column present when showSongColumn is true, absent otherwise", async () => {
