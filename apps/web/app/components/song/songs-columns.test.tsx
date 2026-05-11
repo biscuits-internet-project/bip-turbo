@@ -692,7 +692,7 @@ describe("getSongsColumns", () => {
   // them at the top, masking the smallest real gaps.
   test("Current Gap sort puts nulls last on asc and first on desc", async () => {
     const songs = [
-      makeSong({ id: "a", title: "Tractorbeam", slug: "tractorbeam", showsSinceLastPlayed: 5 }),
+      makeSong({ id: "a", title: "Basis for a Day", slug: "basis-for-a-day", showsSinceLastPlayed: 5 }),
       makeSong({ id: "b", title: "Above The Waves", slug: "above-the-waves", showsSinceLastPlayed: null }),
       makeSong({ id: "c", title: "Tempest", slug: "tempest", showsSinceLastPlayed: 30 }),
     ];
@@ -707,14 +707,14 @@ describe("getSongsColumns", () => {
 
     const titlesAsc = screen
       .getAllByRole("link")
-      .filter((el) => ["Tractorbeam", "Above The Waves", "Tempest"].includes(el.textContent ?? ""));
-    expect(titlesAsc.map((el) => el.textContent)).toEqual(["Tractorbeam", "Tempest", "Above The Waves"]);
+      .filter((el) => ["Basis for a Day", "Above The Waves", "Tempest"].includes(el.textContent ?? ""));
+    expect(titlesAsc.map((el) => el.textContent)).toEqual(["Basis for a Day", "Tempest", "Above The Waves"]);
 
     await user.click(sortHeader); // desc
     const titlesDesc = screen
       .getAllByRole("link")
-      .filter((el) => ["Tractorbeam", "Above The Waves", "Tempest"].includes(el.textContent ?? ""));
-    expect(titlesDesc.map((el) => el.textContent)).toEqual(["Above The Waves", "Tempest", "Tractorbeam"]);
+      .filter((el) => ["Basis for a Day", "Above The Waves", "Tempest"].includes(el.textContent ?? ""));
+    expect(titlesDesc.map((el) => el.textContent)).toEqual(["Above The Waves", "Tempest", "Basis for a Day"]);
   });
 
   // The /songs page shows songs sorted by times played (most played first)

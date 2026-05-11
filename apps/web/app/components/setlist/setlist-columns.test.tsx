@@ -22,7 +22,7 @@ function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: 
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
     previousPerformanceShow: overrides.previousPerformanceShow ?? null,
-    song: overrides.song ?? { id: overrides.songId, title: "Tractorbeam", slug: "tractorbeam" },
+    song: overrides.song ?? { id: overrides.songId, title: "Basis for a Day", slug: "basis-for-a-day" },
   };
 }
 
@@ -93,7 +93,7 @@ describe("createSetlistColumns", () => {
   // Played) interleave sets, so every row keeps its label.
   test("hides repeated set labels when sorted by Set", async () => {
     await renderTable([
-      makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Tractorbeam", slug: "x" } }),
+      makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Basis for a Day", slug: "x" } }),
       makeTrack({ songId: "b", position: 2, set: "S1", song: { id: "b", title: "Above the Waves", slug: "y" } }),
       makeTrack({ songId: "c", position: 3, set: "S2", song: { id: "c", title: "Confrontation", slug: "z" } }),
       makeTrack({ songId: "d", position: 4, set: "S2", song: { id: "d", title: "Crickets", slug: "w" } }),
@@ -112,7 +112,7 @@ describe("createSetlistColumns", () => {
   test("shows the set label on every row when sorted by Gap", async () => {
     const user = userEvent.setup();
     await renderTable([
-      makeTrack({ songId: "a", position: 1, set: "S1", gap: 10, song: { id: "a", title: "Tractorbeam", slug: "x" } }),
+      makeTrack({ songId: "a", position: 1, set: "S1", gap: 10, song: { id: "a", title: "Basis for a Day", slug: "x" } }),
       makeTrack({ songId: "b", position: 2, set: "S1", gap: 5, song: { id: "b", title: "Above the Waves", slug: "y" } }),
       makeTrack({ songId: "c", position: 3, set: "S2", gap: 20, song: { id: "c", title: "Confrontation", slug: "z" } }),
     ]);
@@ -141,7 +141,7 @@ describe("createSetlistColumns", () => {
         position: 2,
         set: "S1",
         previousPerformanceShow: { date: "2024-01-15", slug: "older" },
-        song: { id: "a", title: "Tractorbeam", slug: "x" },
+        song: { id: "a", title: "Basis for a Day", slug: "x" },
       }),
       makeTrack({
         songId: "b",
@@ -154,7 +154,7 @@ describe("createSetlistColumns", () => {
     await user.click(screen.getByRole("button", { name: /Last Played/i }));
     const songCells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 2);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
-      "Tractorbeam",
+      "Basis for a Day",
       "Above the Waves",
       "Crickets",
     ]);
@@ -172,7 +172,7 @@ describe("createSetlistColumns", () => {
         position: 2,
         set: "S1",
         gap: 5,
-        song: { id: "a", title: "Tractorbeam", slug: "x" },
+        song: { id: "a", title: "Basis for a Day", slug: "x" },
       }),
       makeTrack({
         songId: "b",
@@ -185,7 +185,7 @@ describe("createSetlistColumns", () => {
     await user.click(screen.getByRole("button", { name: /Gap/i }));
     const songCells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 2);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
-      "Tractorbeam",
+      "Basis for a Day",
       "Above the Waves",
       "Crickets",
     ]);
@@ -195,7 +195,7 @@ describe("createSetlistColumns", () => {
   // independent of the cumulative position in the show.
   test("renders Track # 1-indexed within each set/encore", async () => {
     await renderTable([
-      makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Tractorbeam", slug: "x" } }),
+      makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Basis for a Day", slug: "x" } }),
       makeTrack({ songId: "b", position: 2, set: "S1", song: { id: "b", title: "Above the Waves", slug: "y" } }),
       makeTrack({ songId: "c", position: 3, set: "S2", song: { id: "c", title: "Confrontation", slug: "z" } }),
       makeTrack({ songId: "d", position: 4, set: "E1", song: { id: "d", title: "Crickets", slug: "w" } }),
@@ -228,7 +228,7 @@ describe("createSetlistColumns", () => {
   // the user which encore came first.
   test("renders a single encore as 'E' but keeps E1/E2 when multiple encores exist", async () => {
     await renderTable([
-      makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Tractorbeam", slug: "t" } }),
+      makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Basis for a Day", slug: "t" } }),
       makeTrack({ songId: "b", position: 2, set: "E1", song: { id: "b", title: "Crickets", slug: "c" } }),
     ]);
     const singleCells = screen.getAllByRole("cell");
@@ -310,7 +310,7 @@ describe("createSetlistColumns", () => {
 
   // Segue indicator carries over from the flow view: a track whose `segue`
   // is truthy gets a trailing ">" so the table preserves the same flow
-  // information ("Tractorbeam > Above the Waves") readers already know.
+  // information ("Basis for a Day > Above the Waves") readers already know.
   // Non-segue rows render the song title alone (no trailing punctuation —
   // the table row separator already does that job).
   test("renders > after segueing tracks and nothing after non-segueing tracks", async () => {
@@ -320,7 +320,7 @@ describe("createSetlistColumns", () => {
         position: 1,
         gap: 5,
         segue: ">",
-        song: { id: "song-segue", title: "Tractorbeam", slug: "tractorbeam" },
+        song: { id: "song-segue", title: "Basis for a Day", slug: "basis-for-a-day" },
       }),
       makeTrack({
         songId: "song-end",
@@ -330,8 +330,8 @@ describe("createSetlistColumns", () => {
         song: { id: "song-end", title: "Crickets", slug: "crickets" },
       }),
     ]);
-    const segueCell = screen.getByRole("link", { name: "Tractorbeam" }).parentElement;
-    expect(segueCell?.textContent).toMatch(/Tractorbeam\s*>/);
+    const segueCell = screen.getByRole("link", { name: "Basis for a Day" }).parentElement;
+    expect(segueCell?.textContent).toMatch(/Basis for a Day\s*>/);
     const endCell = screen.getByRole("link", { name: "Crickets" }).parentElement;
     expect(endCell?.textContent).toBe("Crickets");
   });

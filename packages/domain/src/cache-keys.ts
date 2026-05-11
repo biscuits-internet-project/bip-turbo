@@ -87,6 +87,23 @@ export const CacheKeys = {
   },
 
   /**
+   * Per-user cache keys
+   */
+  users: {
+    /**
+     * Pre-built SetlistList payload (setlists + external sources) for one
+     * page of a user's attended shows. Paginated because the heaviest users
+     * have 400+ attended shows and the un-paginated payload is large enough
+     * to be slow to deserialize/transport even from Redis.
+     */
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}`,
+    /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
+    allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
+    /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
+    allAttendedSetlists: () => "user:*:attended-setlists:*",
+  },
+
+  /**
    * Home page cache keys
    */
   home: {

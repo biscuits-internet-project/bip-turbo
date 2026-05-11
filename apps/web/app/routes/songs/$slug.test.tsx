@@ -282,8 +282,8 @@ describe("SongPage", () => {
   test("Average Gap StatBox renders label 'Average Gap' and the bare numeric value", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
       song: {
-        title: "Tractorbeam",
-        slug: "tractorbeam",
+        title: "Basis for a Day",
+        slug: "basis-for-a-day",
         timesPlayed: 200,
         dateFirstPlayed: "1995-06-01",
         dateLastPlayed: "2024-01-01",

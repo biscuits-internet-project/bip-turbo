@@ -4,7 +4,7 @@ import { buildYearlyChartData, expandPlayedYears, expandYearlyDataToRange } from
 describe("buildYearlyChartData", () => {
   // Count mode is the default rendering: each year's raw play count maps
   // straight to `value`. Years are sorted ascending so the line chart reads
-  // left-to-right chronologically. Disco Biscuits' "Tractorbeam" — a
+  // left-to-right chronologically. Disco Biscuits' "Basis for a Day" — a
   // long-running staple — exercises the multi-year case.
   test("count mode returns sorted {year, value} pairs of raw play counts", () => {
     const yearlyPlayData = { 2010: 12, 2008: 5, 2012: 8 };

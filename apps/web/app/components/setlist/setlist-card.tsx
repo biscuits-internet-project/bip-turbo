@@ -247,6 +247,7 @@ function SetlistCardComponent({
                   disabled={attendanceMutation.isPending}
                   className={cn(
                     "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
+                    "shrink-0 whitespace-nowrap",
                     "hover:brightness-110 cursor-pointer",
                     isAttending
                       ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"

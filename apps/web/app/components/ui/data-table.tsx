@@ -21,10 +21,10 @@ declare module "@tanstack/react-table" {
   }
 }
 
-import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 
-import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { PaginationControls } from "~/components/ui/pagination-controls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { cn } from "~/lib/utils";
 
@@ -94,73 +94,15 @@ export function DataTable<TData, TValue>({
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalPages = table.getPageCount();
 
-  function handlePageInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== "Enter") return;
-    const value = Number(event.currentTarget.value);
-    if (Number.isNaN(value)) return;
-    const clamped = Math.max(1, Math.min(totalPages, value));
-    table.setPageIndex(clamped - 1);
-    event.currentTarget.value = String(clamped);
-  }
-
   const paginationBlock = !hasResults ? null : (
-    <div className="flex items-center justify-between px-2">
-      {!hidePaginationText ? (
-        (() => {
-          const total = table.getFilteredRowModel().rows.length;
-          if (total === 0) {
-            return <div className="text-sm text-content-text-secondary font-medium">0 results</div>;
-          }
-          const pageSize = table.getState().pagination.pageSize;
-          const pageIndex = table.getState().pagination.pageIndex;
-          const from = pageIndex * pageSize + 1;
-          const to = Math.min((pageIndex + 1) * pageSize, total);
-          return (
-            <div className="text-sm text-content-text-secondary font-medium">
-              <span className="hidden sm:inline">{`Showing ${from} to ${to} of ${total} results`}</span>
-              <span className="sm:hidden">{`${from}–${to} of ${total}`}</span>
-            </div>
-          );
-        })()
-      ) : (
-        <div />
-      )}
-      {totalPages > 1 && (
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-            className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-          >
-            Previous
-          </Button>
-          <span className="flex items-center gap-1.5 text-sm text-content-text-secondary">
-            Page
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              defaultValue={currentPage}
-              key={currentPage}
-              onKeyDown={handlePageInputKeyDown}
-              className="w-12 rounded border border-glass-border bg-glass-bg px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-            className="hover:bg-brand-primary/20 hover:border-brand-primary/40"
-          >
-            Next
-          </Button>
-        </div>
-      )}
-    </div>
+    <PaginationControls
+      page={currentPage}
+      totalPages={totalPages}
+      pageSize={table.getState().pagination.pageSize}
+      total={table.getFilteredRowModel().rows.length}
+      onPageChange={(nextPage) => table.setPageIndex(nextPage - 1)}
+      hidePaginationText={hidePaginationText}
+    />
   );
 
   return (

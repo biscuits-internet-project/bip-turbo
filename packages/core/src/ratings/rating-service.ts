@@ -2,9 +2,17 @@ import type { Rating } from "@bip/domain";
 import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbClient, DbRating } from "../_shared/database/models";
 
-export interface RatingWithShow extends Rating {
+/**
+ * Slim show-rating row for list views — only fields the user-profile page
+ * actually renders. UUIDs, rateable_id/type, userId, and updatedAt are
+ * omitted because heavy users have 1000+ ratings and the unused fields
+ * dominate the JSON payload.
+ */
+export interface RatingWithShow {
+  id: string;
+  value: number;
+  createdAt: Date;
   show: {
-    id: string;
     slug: string | null;
     date: string;
     venue: {
@@ -15,24 +23,25 @@ export interface RatingWithShow extends Rating {
   };
 }
 
-export interface RatingWithTrack extends Rating {
+/**
+ * Slim track-rating row for list views. Same motivation as RatingWithShow —
+ * we additionally drop venue.city/state on the nested show because the
+ * track-rating row doesn't display them (the show-rating row does).
+ */
+export interface RatingWithTrack {
+  id: string;
+  value: number;
+  createdAt: Date;
   track: {
-    id: string;
     slug: string | null;
     position: number;
     set: string;
     show: {
-      id: string;
       slug: string | null;
       date: string;
-      venue: {
-        name: string | null;
-        city: string | null;
-        state: string | null;
-      } | null;
+      venue: { name: string | null } | null;
     };
     song: {
-      id: string;
       slug: string;
       title: string;
     };
@@ -189,7 +198,7 @@ export class RatingService {
     return result ? mapRatingToDomainEntity(result) : null;
   }
 
-  async findShowRatingsByUserId(userId: string): Promise<RatingWithShow[]> {
+  async findShowRatingsByUserId(userId: string, options?: { skip?: number; take?: number }): Promise<RatingWithShow[]> {
     const results = await this.db.rating.findMany({
       where: {
         userId,
@@ -197,26 +206,35 @@ export class RatingService {
         value: { gte: 1, lte: 5 }, // Only valid ratings
       },
       orderBy: { createdAt: "desc" },
+      skip: options?.skip,
+      take: options?.take,
     });
 
-    // Get show data for all ratings
+    // Get show data for all ratings — narrow projection (slug/date/venue
+    // trio) since the user-profile list cards don't use any other field.
     const showIds = results.map((r) => r.rateableId);
     const shows = await this.db.show.findMany({
       where: { id: { in: showIds } },
-      include: { venue: true },
+      select: {
+        id: true,
+        slug: true,
+        date: true,
+        venue: { select: { name: true, city: true, state: true } },
+      },
     });
 
     const showMap = new Map(shows.map((show) => [show.id, show]));
 
     return results
-      .map((rating) => {
+      .map((rating): RatingWithShow | null => {
         const show = showMap.get(rating.rateableId);
         if (!show) return null;
 
         return {
-          ...mapRatingToDomainEntity(rating),
+          id: rating.id,
+          value: rating.value,
+          createdAt: rating.createdAt,
           show: {
-            id: show.id,
             slug: show.slug,
             date: show.date,
             venue: show.venue
@@ -232,7 +250,10 @@ export class RatingService {
       .filter((rating): rating is RatingWithShow => rating !== null);
   }
 
-  async findTrackRatingsByUserId(userId: string): Promise<RatingWithTrack[]> {
+  async findTrackRatingsByUserId(
+    userId: string,
+    options?: { skip?: number; take?: number },
+  ): Promise<RatingWithTrack[]> {
     const results = await this.db.rating.findMany({
       where: {
         userId,
@@ -240,46 +261,53 @@ export class RatingService {
         value: { gte: 1, lte: 5 }, // Only valid ratings
       },
       orderBy: { createdAt: "desc" },
+      skip: options?.skip,
+      take: options?.take,
     });
 
-    // Get track data with show and song info
+    // Get track data with show and song info — narrow projection: the
+    // user-profile track-rating cards only display set/position + nested
+    // slug/date/venue.name + song.slug/title.
     const trackIds = results.map((r) => r.rateableId);
     const tracks = await this.db.track.findMany({
       where: { id: { in: trackIds } },
-      include: {
-        show: { include: { venue: true } },
-        song: true,
+      select: {
+        id: true,
+        slug: true,
+        position: true,
+        set: true,
+        show: {
+          select: {
+            slug: true,
+            date: true,
+            venue: { select: { name: true } },
+          },
+        },
+        song: { select: { slug: true, title: true } },
       },
     });
 
     const trackMap = new Map(tracks.map((track) => [track.id, track]));
 
     return results
-      .map((rating) => {
+      .map((rating): RatingWithTrack | null => {
         const track = trackMap.get(rating.rateableId);
         if (!track) return null;
 
         return {
-          ...mapRatingToDomainEntity(rating),
+          id: rating.id,
+          value: rating.value,
+          createdAt: rating.createdAt,
           track: {
-            id: track.id,
             slug: track.slug,
             position: track.position,
             set: track.set,
             show: {
-              id: track.show.id,
               slug: track.show.slug,
               date: track.show.date,
-              venue: track.show.venue
-                ? {
-                    name: track.show.venue.name,
-                    city: track.show.venue.city,
-                    state: track.show.venue.state,
-                  }
-                : null,
+              venue: track.show.venue ? { name: track.show.venue.name } : null,
             },
             song: {
-              id: track.song.id,
               slug: track.song.slug,
               title: track.song.title,
             },
