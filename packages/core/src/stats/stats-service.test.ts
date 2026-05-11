@@ -108,7 +108,7 @@ describe("songStatsChanged", () => {
 // ---------------------------------------------------------------------------
 
 describe("countShowsAfter", () => {
-  // Drives the songs-list Current Gap column (number of stats-eligible shows
+  // Drives the songs-list Gap to Now column (number of stats-eligible shows
   // since a song's dateLastPlayed) and the song-detail page's "X shows ago"
   // sublabel. Backed by a single cached date array so the binary search
   // runs in O(log n) per song.

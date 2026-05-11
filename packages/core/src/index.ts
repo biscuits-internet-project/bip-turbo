@@ -19,5 +19,6 @@ export * from "./shows/nugs-service";
 export * from "./shows/show-service";
 export * from "./shows/youtube-service";
 export * from "./tracks/track-service";
+export * from "./users/personal-song-history-service";
 export * from "./users/user-service";
 export * from "./venues/venue-service";

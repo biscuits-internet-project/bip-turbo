@@ -101,7 +101,7 @@ function HeaderLabel({
 interface SortableColumnOptions {
   accessorKey: keyof SongWithShows;
   label: ReactNode;
-  /** Hover tooltip; used when `label` is a shorthand (e.g. "Gap" → "Current Gap"). */
+  /** Hover tooltip; used when the visible label needs disambiguation in prose. */
   title?: string;
   width?: string;
   hideOnMobile?: boolean;
@@ -335,8 +335,12 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const currentGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
     accessorKey: "showsSinceLastPlayed",
-    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap</HeaderLabel>,
-    title: "Current Gap",
+    // Spelled out vs. plain "Gap" so users can't confuse it with "Avg Gap"
+    // on a quick scan. "to Now" anchors that this is the count up to today
+    // (the filtered variant uses "to End" because its denominator stops
+    // at the filter boundary).
+    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap to Now</HeaderLabel>,
+    title: "Gap to Now",
     width: "7%",
     hideOnMobile: true,
     cell: (song) => dashOrSpan(song.showsSinceLastPlayed),
@@ -347,10 +351,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     accessorKey: "filteredShowsSinceLastPlayed",
     label: (
       <HeaderLabel filtered reserveIconRow>
-        <span>Gap</span>
+        <span>Gap to End</span>
       </HeaderLabel>
     ),
-    title: "Filtered Current Gap",
+    title: "Filtered Gap to End",
     width: "7%",
     hideOnMobile: true,
     cell: (song) => dashOrSpan(song.filteredShowsSinceLastPlayed ?? null),

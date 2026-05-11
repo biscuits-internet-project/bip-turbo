@@ -12,11 +12,12 @@ import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { SetlistTable } from "./setlist-table";
-import { SetlistViewControl } from "./setlist-view-control";
+import { SetlistTablePersonal } from "./setlist-table-personal";
+import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-control";
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
-export type SetlistView = "setlist" | "gap-chart";
+export type SetlistView = "setlist" | "gap-chart" | "personal";
 
 interface SetlistCardProps {
   setlist: Setlist | SetlistLight;
@@ -60,6 +61,27 @@ function SetlistCardComponent({
     onViewChange?.(next);
   }
   const { user } = useSession();
+  const [personalSummary, setPersonalSummary] = useState<{
+    average: number | null;
+    median: number | null;
+    debutCount: number;
+  }>({ average: null, median: null, debutCount: 0 });
+
+  // Pre-build the two summary shapes so the SetlistViewControl call sites
+  // stay one-liners. The catalog summary is server-computed; the personal
+  // summary is hoisted from SetlistTablePersonal via onSummaryChange.
+  const catalogSummary: SetlistViewSummary = {
+    label: "Average / median song gap",
+    average: setlist.averageSongGap,
+    median: setlist.medianSongGap,
+    debutCount: setlist.debutCount,
+  };
+  const personalSummaryView: SetlistViewSummary = {
+    label: "Your average / median song gap",
+    average: personalSummary.average,
+    median: personalSummary.median,
+    debutCount: personalSummary.debutCount,
+  };
   const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
   const [displayedCount, setDisplayedCount] = useState<number>(setlist.show.ratingsCount ?? 0);
   const [isRatingAnimating, setIsRatingAnimating] = useState(false);
@@ -346,10 +368,19 @@ function SetlistCardComponent({
                 <SetlistViewControl
                   view={view}
                   onChange={changeView}
-                  averageSongGap={setlist.averageSongGap}
-                  medianSongGap={setlist.medianSongGap}
+                  summary={catalogSummary}
+                  showPersonal={Boolean(user)}
                 />
                 <SetlistTable tracks={setlist.sets.flatMap((s) => s.tracks)} />
+              </div>
+            ) : view === "personal" && user ? (
+              <div className="space-y-2">
+                <SetlistViewControl view={view} onChange={changeView} summary={personalSummaryView} showPersonal />
+                <SetlistTablePersonal
+                  tracks={setlist.sets.flatMap((s) => s.tracks)}
+                  showDate={setlist.show.date}
+                  onSummaryChange={setPersonalSummary}
+                />
               </div>
             ) : (
               <>
@@ -411,8 +442,8 @@ function SetlistCardComponent({
                   <SetlistViewControl
                     view={view}
                     onChange={changeView}
-                    averageSongGap={setlist.averageSongGap}
-                    medianSongGap={setlist.medianSongGap}
+                    summary={catalogSummary}
+                    showPersonal={Boolean(user)}
                   />
                 </div>
               </>

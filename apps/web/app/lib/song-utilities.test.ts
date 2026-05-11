@@ -200,7 +200,7 @@ describe("fetchFilteredSongs", () => {
     expect(result.map((s) => s.title)).not.toContain("Shelby Rose");
   });
 
-  // The rarity columns on /songs (Current Gap, % Since Debut, Avg Gap)
+  // The rarity columns on /songs (Gap to Now, % Since Debut, Avg Gap)
   // read showsSinceLastPlayed, percentSinceDebut, and averageShowsPerPlay
   // off each row. Verifies fetchFilteredSongs pulls showsByYear (cached
   // catalogue-level data) + per-song current-gap counts and runs each

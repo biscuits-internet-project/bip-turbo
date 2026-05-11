@@ -113,7 +113,7 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
 /**
  * Fills the rarity fields the canonical SongService leaves as null:
  * `showsSinceLastPlayed`, `percentSinceDebut`, `averageShowsPerPlay`.
- * Drives the Current Gap / % Since Debut / Avg Gap columns on /songs.
+ * Drives the Gap to Now / % Since Debut / Avg Gap columns on /songs.
  * Runs inside the cached `fetchFilteredSongs` path so the bulk gap query
  * fires at most once per cache window.
  */

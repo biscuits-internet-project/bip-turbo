@@ -71,7 +71,7 @@ export class StatsService {
   /**
    * Returns sorted ISO date strings (`YYYY-MM-DD`) for every
    * count_for_stats=true show. Cached 24h. Read by callers that need to
-   * count stats-eligible shows after a given date (Current Gap on /songs,
+   * count stats-eligible shows after a given date (Gap to Now on /songs,
    * "X shows ago" sublabel on song detail) — a single fetch backs every
    * such computation across the request.
    */
@@ -98,7 +98,7 @@ export class StatsService {
   /**
    * Number of stats-eligible shows strictly after a song's `dateLastPlayed`
    * — drives the "X shows ago" reading on the song detail page and the
-   * Current Gap column on /songs.
+   * Gap to Now column on /songs.
    */
   async getShowsSinceLastPlayed(dateLastPlayed: Date | string): Promise<number> {
     const dates = await this.getStatsShowDates();
@@ -108,7 +108,7 @@ export class StatsService {
   /**
    * Returns a `Map<songId, gap>` where `gap` is the number of stats-eligible
    * shows that have happened since each song's `dateLastPlayed`. Drives the
-   * Current Gap column on `/songs` — same semantic as `showsSinceLastPlayed`
+   * Gap to Now column on `/songs` — same semantic as `showsSinceLastPlayed`
    * on the song detail page, but computed in bulk for the songs index.
    *
    * Songs without `dateLastPlayed` (never played) and songs not present in
