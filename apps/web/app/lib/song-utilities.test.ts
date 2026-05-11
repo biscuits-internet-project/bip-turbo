@@ -41,6 +41,8 @@ const mockBuildSongPerformanceCounts = vi.fn();
 const mockCacheGetOrSet = vi.fn().mockImplementation((_key: string, fn: () => Promise<unknown>) => fn());
 const mockFindByEmail = vi.fn();
 const mockFindByUsername = vi.fn();
+const mockGetShowsByYear = vi.fn();
+const mockGetShowsSinceLastPlayedBySongIds = vi.fn();
 
 vi.mock("~/server/services", () => ({
   services: {
@@ -62,6 +64,10 @@ vi.mock("~/server/services", () => ({
       findByEmail: (...args: unknown[]) => mockFindByEmail(...args),
       findByUsername: (...args: unknown[]) => mockFindByUsername(...args),
     },
+    stats: {
+      getShowsByYear: (...args: unknown[]) => mockGetShowsByYear(...args),
+      getShowsSinceLastPlayedBySongIds: (...args: unknown[]) => mockGetShowsSinceLastPlayedBySongIds(...args),
+    },
   },
 }));
 
@@ -78,6 +84,8 @@ describe("fetchFilteredSongs", () => {
     mockBuildSongPerformanceCounts.mockResolvedValue({});
     mockShowsFindMany.mockResolvedValue([]);
     mockFindManyByDates.mockResolvedValue([]);
+    mockGetShowsByYear.mockResolvedValue({});
+    mockGetShowsSinceLastPlayedBySongIds.mockResolvedValue(new Map());
   });
 
   // The unfiltered /songs path calls findMany({}) for the canonical all-time
@@ -188,6 +196,80 @@ describe("fetchFilteredSongs", () => {
 
     expect(result.every((s) => s.filteredTimesPlayed === undefined)).toBe(true);
     expect(result.map((s) => s.title)).not.toContain("Shelby Rose");
+  });
+
+  // The rarity columns on /songs (Current Gap, % Since Debut, Avg Gap)
+  // read showsSinceLastPlayed, percentSinceDebut, and averageShowsPerPlay
+  // off each row. Verifies fetchFilteredSongs pulls showsByYear (cached
+  // catalogue-level data) + per-song current-gap counts and runs each
+  // song through computeRarityStats so the columns render real values
+  // rather than em-dashes.
+  test("rarity: populates showsSinceLastPlayed / percentSinceDebut / averageShowsPerPlay on returned rows", async () => {
+    const tractorbeam = {
+      id: "tb",
+      title: "Tractorbeam",
+      timesPlayed: 200,
+      dateFirstPlayed: new Date(Date.UTC(1995, 5, 1)),
+      dateLastPlayed: new Date(Date.UTC(2024, 0, 1)),
+    } as unknown as Song;
+    const aboveTheWaves = {
+      id: "atw",
+      title: "Above The Waves",
+      timesPlayed: 50,
+      dateFirstPlayed: new Date(Date.UTC(2010, 0, 1)),
+      dateLastPlayed: new Date(Date.UTC(2023, 0, 1)),
+    } as unknown as Song;
+    mockFindMany.mockResolvedValueOnce([tractorbeam, aboveTheWaves]);
+
+    // 1995 + 2010 era totals chosen so the math comes out clean: tractorbeam
+    // debuted in 1995 and gets all 1000 shows since debut (200/1000 = 20%,
+    // every 5.0 shows). aboveTheWaves debuted in 2010 with 600 shows since
+    // (50/600 ≈ 8.33%, every 12.0 shows).
+    mockGetShowsByYear.mockResolvedValueOnce({ 1995: 400, 2010: 600 });
+    mockGetShowsSinceLastPlayedBySongIds.mockResolvedValueOnce(
+      new Map([
+        ["tb", 12],
+        ["atw", 47],
+      ]),
+    );
+
+    const result = await fetchFilteredSongs(new URL("http://test/songs"), ctx);
+
+    const tb = result.find((s) => s.id === "tb");
+    const atw = result.find((s) => s.id === "atw");
+    expect(tb?.showsSinceLastPlayed).toBe(12);
+    expect(tb?.percentSinceDebut).toBeCloseTo(0.2, 5);
+    expect(tb?.averageShowsPerPlay).toBeCloseTo(5, 5);
+    expect(atw?.showsSinceLastPlayed).toBe(47);
+    expect(atw?.percentSinceDebut).toBeCloseTo(50 / 600, 5);
+    expect(atw?.averageShowsPerPlay).toBeCloseTo(12, 5);
+  });
+
+  // Songs with no debut date keep null rarity fields (computeRarityStats
+  // returns nulls for percentSinceDebut and averageShowsPerPlay) — the
+  // table cell renders em-dash instead of NaN/Infinity. showsSinceLastPlayed
+  // also stays null when the gap map has no entry for the song.
+  test("rarity: never-debuted song keeps null rarity fields", async () => {
+    const neverPlayed = {
+      id: "np",
+      title: "Munchkin Invasion",
+      timesPlayed: 0,
+      dateFirstPlayed: null,
+      dateLastPlayed: null,
+    } as unknown as Song;
+    // Played-but-never-played songs are filtered out without a scope, so
+    // we use the played-but-no-debut-date edge case (rare migration drift)
+    // by giving it timesPlayed > 0 so it survives the filter.
+    const survivor = { ...neverPlayed, timesPlayed: 3 } as unknown as Song;
+    mockFindMany.mockResolvedValueOnce([survivor]);
+    mockGetShowsByYear.mockResolvedValueOnce({ 2000: 100 });
+    mockGetShowsSinceLastPlayedBySongIds.mockResolvedValueOnce(new Map());
+
+    const result = await fetchFilteredSongs(new URL("http://test/songs"), ctx);
+
+    expect(result[0].showsSinceLastPlayed).toBeNull();
+    expect(result[0].percentSinceDebut).toBeNull();
+    expect(result[0].averageShowsPerPlay).toBeNull();
   });
 
   // The cache wrapper keys off the URL params. Same URL → one upstream

@@ -101,6 +101,8 @@ export const CacheKeys = {
   stats: {
     /** Map of `{year: showCount}` for the entire show catalog. */
     showsByYear: () => "stats:shows-by-year",
+    /** Sorted ISO date strings (YYYY-MM-DD) for every count_for_stats=true show. */
+    showDates: () => "stats:show-dates",
   },
 } as const;
 

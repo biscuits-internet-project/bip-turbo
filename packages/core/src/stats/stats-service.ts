@@ -69,6 +69,70 @@ export class StatsService {
   }
 
   /**
+   * Returns sorted ISO date strings (`YYYY-MM-DD`) for every
+   * count_for_stats=true show. Cached 24h. Read by callers that need to
+   * count stats-eligible shows after a given date (Current Gap on /songs,
+   * "X shows ago" sublabel on song detail) — a single fetch backs every
+   * such computation across the request.
+   */
+  async getStatsShowDates(): Promise<string[]> {
+    if (!this.cache) {
+      throw new Error("StatsService.getStatsShowDates() requires a cache; constructed without one");
+    }
+    return this.cache.getOrSet(
+      CacheKeys.stats.showDates(),
+      async () => {
+        const rows = await this.db.$queryRaw<Array<{ d: string }>>`
+          SELECT to_char(date::date, 'YYYY-MM-DD') AS d
+          FROM shows
+          WHERE date IS NOT NULL
+            AND ${statsShowsSql("shows")}
+          ORDER BY date
+        `;
+        return rows.map((r) => r.d);
+      },
+      { ttl: ONE_DAY_SECONDS },
+    );
+  }
+
+  /**
+   * Number of stats-eligible shows strictly after a song's `dateLastPlayed`
+   * — drives the "X shows ago" reading on the song detail page and the
+   * Current Gap column on /songs.
+   */
+  async getShowsSinceLastPlayed(dateLastPlayed: Date | string): Promise<number> {
+    const dates = await this.getStatsShowDates();
+    return countShowsAfter(dates, toIsoDate(dateLastPlayed));
+  }
+
+  /**
+   * Returns a `Map<songId, gap>` where `gap` is the number of stats-eligible
+   * shows that have happened since each song's `dateLastPlayed`. Drives the
+   * Current Gap column on `/songs` — same semantic as `showsSinceLastPlayed`
+   * on the song detail page, but computed in bulk for the songs index.
+   *
+   * Songs without `dateLastPlayed` (never played) and songs not present in
+   * the input list are absent from the map; callers render em-dash for
+   * missing entries.
+   */
+  async getShowsSinceLastPlayedBySongIds(songIds: string[]): Promise<Map<string, number>> {
+    if (songIds.length === 0) return new Map();
+    const [songs, dates] = await Promise.all([
+      this.db.song.findMany({
+        where: { id: { in: songIds }, dateLastPlayed: { not: null } },
+        select: { id: true, dateLastPlayed: true },
+      }),
+      this.getStatsShowDates(),
+    ]);
+    const out = new Map<string, number>();
+    for (const song of songs) {
+      if (!song.dateLastPlayed) continue;
+      out.set(song.id, countShowsAfter(dates, toIsoDate(song.dateLastPlayed)));
+    }
+    return out;
+  }
+
+  /**
    * Recompute Track.gap + Track.previousPerformanceShowId for every track
    * at a show on or after `sinceDate`, and Song.timesPlayed /
    * dateFirstPlayed / dateLastPlayed / yearlyPlayData for every song with
@@ -256,6 +320,34 @@ export function songStatsChanged(
 
 function dateMs(d: Date | null): number | null {
   return d ? d.getTime() : null;
+}
+
+/**
+ * Coerces a `Date` or already-ISO string to a `YYYY-MM-DD` string. Used to
+ * key into `getStatsShowDates()` which returns dates in that exact format.
+ */
+function toIsoDate(d: Date | string): string {
+  if (typeof d === "string") return d.length > 10 ? d.slice(0, 10) : d;
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Counts entries strictly greater than `target` in a sorted-ascending
+ * string array via binary search. Strictly-greater (not `>=`) so a song
+ * played at the most recent stats-eligible show reads "0 shows ago",
+ * not "1 show ago".
+ */
+export function countShowsAfter(sortedDates: string[], target: string): number {
+  if (sortedDates.length === 0) return 0;
+  // Find the index of the first element strictly greater than target.
+  let lo = 0;
+  let hi = sortedDates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDates[mid] <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return sortedDates.length - lo;
 }
 
 function stableYearlyJson(value: unknown): string {
