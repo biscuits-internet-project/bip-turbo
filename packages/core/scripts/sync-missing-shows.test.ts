@@ -3,6 +3,7 @@ import {
   buildShowCreateInput,
   buildSongCreateInput,
   buildTrackCreateInputs,
+  buildShowDriftUpdate,
   buildVenueCreateInput,
   collectSongSlugs,
   collectVenueKeys,
@@ -386,14 +387,20 @@ describe("matchVenue", () => {
     expect(matchVenue(candidates, { name: "Fox Theatre", city: "Atlanta", state: "GA" })).toBeNull();
   });
 
-  // Two candidates tie on name + city + state: ambiguous, return null to stay
-  // safe (extremely rare in practice, but correctness > optimism).
-  test("returns null when multiple candidates match (ambiguous)", () => {
+  // Two candidates tie on name + city + state: prod actually has duplicate
+  // venue rows for some venues (e.g. Higher Ground / South Burlington / VT
+  // exists as both `higher-ground` and `the-new-higher-ground`). Returning
+  // null here used to leave shows with `venueId = NULL`, which made the show
+  // page 404 because the loader requires a venue. Tiebreak deterministically
+  // on lex-min slug so re-runs always pick the same canonical row.
+  test("breaks ties deterministically by lex-min slug when multiple candidates match", () => {
     const candidates: McpSearchVenueResult[] = [
-      { slug: "fox-theatre-a", name: "Fox Theatre", city: "Boulder", state: "CO" },
-      { slug: "fox-theatre-b", name: "Fox Theatre", city: "Boulder", state: "CO" },
+      { slug: "the-new-higher-ground", name: "Higher Ground", city: "South Burlington", state: "VT" },
+      { slug: "higher-ground", name: "Higher Ground", city: "South Burlington", state: "VT" },
     ];
-    expect(matchVenue(candidates, { name: "Fox Theatre", city: "Boulder", state: "CO" })).toBeNull();
+    expect(
+      matchVenue(candidates, { name: "Higher Ground", city: "South Burlington", state: "VT" }),
+    ).toBe("higher-ground");
   });
 
   // Regression for the Brooklyn Bowl Las Vegas bug: search_venues returned
@@ -410,6 +417,99 @@ describe("matchVenue", () => {
     expect(matchVenue(candidates, { name: "Brooklyn Bowl Las Vegas", city: "Las Vegas", state: "NV" })).toBe(
       "brooklyn-bowl-las-vegas",
     );
+  });
+});
+
+// buildShowDriftUpdate computes the patch to apply to an existing local show
+// row. Two independent triggers: aggregate drift (rating/notes/relisten) AND
+// venue back-fill (local landed with venueId=NULL under an older sync, but the
+// venue is now resolvable). Either one alone must yield an update; neither
+// means we skip the write entirely so re-runs stay idempotent.
+describe("buildShowDriftUpdate", () => {
+  const remote: McpShow = {
+    slug: "2025-11-15-brooklyn-steel-brooklyn-ny",
+    date: "2025-11-15",
+    venueName: "Brooklyn Steel",
+    venueCity: "Brooklyn",
+    averageRating: 3.7,
+    ratingsCount: 12,
+    notes: null,
+    relistenUrl: null,
+  };
+  const localInSync = {
+    averageRating: 3.7,
+    ratingsCount: 12,
+    notes: null,
+    relistenUrl: null,
+    venueId: "venue-brooklyn-steel-uuid",
+  };
+
+  // Nothing drifted, venue already linked: no patch — caller must skip the
+  // UPDATE entirely so re-runs don't churn updatedAt for unchanged rows.
+  test("returns null when aggregates match and venue is already linked", () => {
+    expect(buildShowDriftUpdate(localInSync, remote, "venue-brooklyn-steel-uuid")).toBeNull();
+  });
+
+  // Pure aggregate drift, venue unchanged: patch contains the four mirrored
+  // fields and does NOT touch venueId (avoid clobbering with same value).
+  test("emits aggregate fields when ratingsCount drifts", () => {
+    const patch = buildShowDriftUpdate({ ...localInSync, ratingsCount: 11 }, remote, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({
+      averageRating: 3.7,
+      ratingsCount: 12,
+      notes: null,
+      relistenUrl: null,
+    });
+  });
+
+  // The Bug B fix: a show that landed with venueId=NULL under an older buggy
+  // sync (e.g. 2025-11-15-brooklyn-steel-brooklyn-ny) must self-heal on the
+  // next run when venue resolution now succeeds. Patch must include venueId.
+  test("emits venueId when local has null venue and remote venue resolves", () => {
+    const localMissingVenue = { ...localInSync, venueId: null };
+    const patch = buildShowDriftUpdate(localMissingVenue, remote, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({ venueId: "venue-brooklyn-steel-uuid" });
+  });
+
+  // Combined case: aggregates drifted AND venue needs back-fill. Patch
+  // must carry both — single UPDATE round-trip, not two.
+  test("combines aggregate drift and venue back-fill into one patch", () => {
+    const patch = buildShowDriftUpdate(
+      { ...localInSync, ratingsCount: 11, venueId: null },
+      remote,
+      "venue-brooklyn-steel-uuid",
+    );
+    expect(patch).toEqual({
+      averageRating: 3.7,
+      ratingsCount: 12,
+      notes: null,
+      relistenUrl: null,
+      venueId: "venue-brooklyn-steel-uuid",
+    });
+  });
+
+  // Local is missing venue, but resolution still failed (e.g. unmatched search):
+  // no venue back-fill patch component. If aggregates also match, return null
+  // so we don't churn updatedAt on a show we can't fix yet.
+  test("returns null when local has null venue but resolution also failed and aggregates match", () => {
+    expect(buildShowDriftUpdate({ ...localInSync, venueId: null }, remote, null)).toBeNull();
+  });
+
+  // Local already has a venueId; never overwrite even if resolution returns a
+  // different slug. The rename/dedupe path is a separate workflow — drift sync
+  // is conservative.
+  test("never overwrites an already-set venueId", () => {
+    const patch = buildShowDriftUpdate(
+      { ...localInSync, venueId: "existing-venue-uuid", ratingsCount: 11 },
+      remote,
+      "different-venue-uuid",
+    );
+    expect(patch).toEqual({
+      averageRating: 3.7,
+      ratingsCount: 12,
+      notes: null,
+      relistenUrl: null,
+    });
   });
 });
 

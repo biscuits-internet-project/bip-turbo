@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SONG_FILTERS, getTimeRangeParam, TIME_RANGE_GROUPS } from "./song-filters";
+import { getTimeRangeParam, SONG_FILTERS, TIME_RANGE_GROUPS } from "./song-filters";
 
 describe("TIME_RANGE_GROUPS", () => {
   // The groups should be ordered: Recent, Eras, Years — matching the

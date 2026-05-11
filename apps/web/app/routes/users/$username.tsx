@@ -1,3 +1,4 @@
+import { compareByShowDate } from "@bip/domain";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useLoaderData } from "react-router-dom";
@@ -78,9 +79,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const totalRatings = showRatingsCount + trackRatingsCount;
 
   // Calculate first and last show dates
-  const sortedAttendances = userAttendances.sort(
-    (a, b) => new Date(a.show.date).getTime() - new Date(b.show.date).getTime(),
-  );
+  const sortedAttendances = userAttendances.sort(compareByShowDate);
   const firstShow = sortedAttendances[0]?.show || null;
   const lastShow = sortedAttendances[sortedAttendances.length - 1]?.show || null;
 

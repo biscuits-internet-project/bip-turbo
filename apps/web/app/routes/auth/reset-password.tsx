@@ -1,8 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { useNavigate, useRouteLoaderData } from "react-router-dom";
 import { toast } from "sonner";
-import { useState } from "react";
 import { ResetPasswordForm } from "~/components/reset-password-form";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
@@ -22,8 +22,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       status: 302,
       headers: {
         ...headers,
-        Location: "/auth/forgot-password?error=expired_link"
-      }
+        Location: "/auth/forgot-password?error=expired_link",
+      },
     });
   }
 

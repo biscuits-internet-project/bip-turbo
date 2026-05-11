@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import { VenueSearch } from "~/components/venue/venue-search";
 
@@ -16,6 +17,7 @@ const showFormSchema = z.object({
   bandId: z.string(),
   notes: z.string(),
   relistenUrl: z.string(),
+  countForStats: z.boolean(),
 });
 
 export type ShowFormValues = z.infer<typeof showFormSchema>;
@@ -37,6 +39,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
       bandId: "db7f2c5d-2727-41fd-bd6f-e91c74164f09",
       notes: "",
       relistenUrl: "",
+      countForStats: true,
     },
   });
 
@@ -138,6 +141,25 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
                   className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
                 />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="countForStats"
+          render={({ field }: { field: ControllerRenderProps<ShowFormValues, "countForStats"> }) => (
+            <FormItem className="flex items-center gap-3">
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="Count for stats" />
+              </FormControl>
+              <div className="space-y-0.5">
+                <FormLabel className="text-content-text-secondary">Count for stats</FormLabel>
+                <p className="text-xs text-content-text-tertiary">
+                  Off for soundchecks, radio sessions, cancelled stubs.
+                </p>
+              </div>
               <FormMessage />
             </FormItem>
           )}

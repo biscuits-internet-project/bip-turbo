@@ -7,6 +7,7 @@ import type { VenueMinimal } from "../models/venue";
 export type SongPageView = {
   song: Song;
   performances: SongPagePerformance[];
+  showsByYear: Record<number, number>;
 };
 
 export type SongPagePerformance = {
@@ -27,6 +28,9 @@ export type SongPagePerformance = {
   songSlug?: string;
   cover?: boolean;
   authorId?: string | null;
+  gap?: number | null;
+  previousPerformanceShowId?: string | null;
+  previousShow?: { slug: string; date: string };
   tags?: {
     setOpener?: boolean;
     setCloser?: boolean;

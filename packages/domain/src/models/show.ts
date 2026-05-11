@@ -19,6 +19,8 @@ export const showSchema = z.object({
   showPhotosCount: z.number().default(0),
   showYoutubesCount: z.number().default(0),
   reviewsCount: z.number().default(0),
+  countForStats: z.boolean().default(true),
+  dayOrder: z.number().nullable().optional(),
   tracks: z.array(trackSchema).nullable().optional(),
   venue: venueSchema.optional(),
 });
@@ -28,6 +30,8 @@ export const showMinimalSchema = showSchema.pick({
   slug: true,
   date: true,
   venueId: true,
+  dayOrder: true,
+  countForStats: true,
 });
 
 export interface TourDate {

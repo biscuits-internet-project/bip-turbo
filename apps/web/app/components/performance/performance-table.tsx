@@ -36,7 +36,21 @@ export function PerformanceTable({
   const { user } = useSession();
   const isAuthenticated = !!user;
 
-  const { rowClassName } = useAttendanceRowHighlight(performances, getShowId);
+  const { rowClassName: attendanceRowClassName } = useAttendanceRowHighlight(performances, getShowId);
+
+  // Two independent row signals that can stack:
+  //   * count_for_stats=false (soundchecks, radio sessions, cancelled stubs,
+  //     late-night Tractorbeam sets) → muted text.
+  //   * the user attended this show → green left border (from useAttendanceRowHighlight).
+  // A soundcheck the user attended gets both — the dim text doesn't hide
+  // the attendance border.
+  const rowClassName = (perf: SongPagePerformance) => {
+    const parts: string[] = [];
+    if (perf.show.countForStats === false) parts.push("opacity-60 text-content-text-tertiary");
+    const attendance = attendanceRowClassName(perf);
+    if (attendance) parts.push(attendance);
+    return parts.length > 0 ? parts.join(" ") : undefined;
+  };
 
   const trackIds = useMemo(() => performances.map((performance) => performance.trackId), [performances]);
   const { userRatingMap } = useTrackUserRatings(trackIds);

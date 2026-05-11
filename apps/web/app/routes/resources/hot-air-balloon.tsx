@@ -420,23 +420,13 @@ function CharacterCard({ character }: { character: (typeof characters)[number] }
       >
         {character.initial}
       </div>
-      <h4 className="text-lg font-bold text-purple-100 mb-2 font-[Rajdhani] tracking-wide">
-        {character.name}
-      </h4>
+      <h4 className="text-lg font-bold text-purple-100 mb-2 font-[Rajdhani] tracking-wide">{character.name}</h4>
       <p className="text-base text-content-text-secondary leading-relaxed">{character.description}</p>
     </div>
   );
 }
 
-function StoryCard({
-  song,
-  index,
-  actLabel,
-}: {
-  song: SongSection;
-  index: number;
-  actLabel: string;
-}) {
+function StoryCard({ song, index, actLabel }: { song: SongSection; index: number; actLabel: string }) {
   const isEven = index % 2 === 0;
   return (
     <div className="relative">
@@ -458,9 +448,7 @@ function StoryCard({
         <div className="p-6 md:p-8">
           {/* Header */}
           <div className="mb-4">
-            <span className="text-xs font-semibold tracking-[3px] text-purple-400/70 uppercase">
-              {actLabel}
-            </span>
+            <span className="text-xs font-semibold tracking-[3px] text-purple-400/70 uppercase">{actLabel}</span>
             <h3 className="text-2xl md:text-3xl font-bold text-purple-100 font-[Rajdhani] tracking-wide mt-0.5">
               {song.name}
             </h3>
@@ -496,9 +484,7 @@ const HotAirBalloon: React.FC = () => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[hsl(240,10%,3.9%)] via-[hsl(240,10%,3.9%)]/60 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-8">
-            <h1 className="font-[Audiowide] text-2xl md:text-4xl text-white tracking-wider">
-              THE HOT AIR BALLOON
-            </h1>
+            <h1 className="font-[Audiowide] text-2xl md:text-4xl text-white tracking-wider">THE HOT AIR BALLOON</h1>
             <p className="text-purple-300/80 text-base md:text-lg mt-1 font-[Rajdhani] tracking-wide">
               The First Rock Opera by The Disco Biscuits
             </p>
@@ -509,8 +495,8 @@ const HotAirBalloon: React.FC = () => {
       {/* ── Introduction ── */}
       <div className="space-y-4 text-content-text-secondary leading-relaxed text-base md:text-lg">
         <p>
-          <strong className="text-content-text-primary">The Hot Air Balloon</strong> is the Disco
-          Biscuits' first full-length rock opera, written by Jon Gutwillig, and debuted on{" "}
+          <strong className="text-content-text-primary">The Hot Air Balloon</strong> is the Disco Biscuits' first
+          full-length rock opera, written by Jon Gutwillig, and debuted on{" "}
           <Link
             to="/shows/1998-12-31-silk-city-diner-philadelphia-pa"
             className="text-brand-primary hover:text-brand-secondary"
@@ -520,18 +506,16 @@ const HotAirBalloon: React.FC = () => {
           at Silk City in Philadelphia.
         </p>
         <p>
-          The story follows Corrinado, an eccentric inventor who creates the world's first hot air
-          balloon and starts a successful business with his friend Morris Mulberry. His invention
-          attracts the attention of powerful businessman Manilla Trane, whose wife Leora falls in
-          love with Corrinado, setting in motion a tale of romance, betrayal, and escape.
+          The story follows Corrinado, an eccentric inventor who creates the world's first hot air balloon and starts a
+          successful business with his friend Morris Mulberry. His invention attracts the attention of powerful
+          businessman Manilla Trane, whose wife Leora falls in love with Corrinado, setting in motion a tale of romance,
+          betrayal, and escape.
         </p>
       </div>
 
       {/* ── Characters ── */}
       <section>
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
-          Characters
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Characters</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {characters.map((char) => (
             <CharacterCard key={char.name} character={char} />
@@ -541,9 +525,7 @@ const HotAirBalloon: React.FC = () => {
 
       {/* ── Act I ── */}
       <section>
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
-          Act I
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Act I</h2>
         <div className="space-y-4">
           {act1.map((song, i) => (
             <StoryCard key={song.name} song={song} index={i} actLabel="Act I" />
@@ -553,9 +535,7 @@ const HotAirBalloon: React.FC = () => {
 
       {/* ── Act II ── */}
       <section>
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
-          Act II
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Act II</h2>
         <div className="space-y-4">
           {act2.map((song, i) => (
             <StoryCard key={song.name} song={song} index={i} actLabel="Act II" />

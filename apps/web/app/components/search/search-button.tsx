@@ -9,10 +9,7 @@ interface SearchButtonProps {
   showShortcut?: boolean;
 }
 
-export function SearchButton({
-  className,
-  showShortcut = true,
-}: SearchButtonProps) {
+export function SearchButton({ className, showShortcut = true }: SearchButtonProps) {
   const { open, setQuery, query } = useGlobalSearch();
   const [localQuery, setLocalQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,9 +43,9 @@ export function SearchButton({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
-    } else if (e.key === 'Escape' && localQuery) {
+    } else if (e.key === "Escape" && localQuery) {
       handleClear();
     }
   };
@@ -70,13 +67,7 @@ export function SearchButton({
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         placeholder="Search..."
-        className={cn(
-          "pl-9",
-          localQuery ? "pr-8" : "pr-16",
-          "bg-muted/50 border-muted",
-          "h-9",
-          "focus:bg-background"
-        )}
+        className={cn("pl-9", localQuery ? "pr-8" : "pr-16", "bg-muted/50 border-muted", "h-9", "focus:bg-background")}
       />
       {localQuery ? (
         <button

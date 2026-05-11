@@ -34,7 +34,7 @@ vi.mock("~/hooks/use-serialized-loader-data", () => ({
         slug: "akira-jam",
         // Real-world shape: indented paragraphs, HTML entities
         history:
-          '<p>For the 2nd set on New Years Eve, 1999, The Disco Biscuits played along to Katsuhiro Otomo&#x27;s anime masterpiece, Akira.</p>\n  \n  <p>&quot;When the 1988 dateline appears, the first note of the DJ spinning should start up.&quot;</p>',
+          "<p>For the 2nd set on New Years Eve, 1999, The Disco Biscuits played along to Katsuhiro Otomo&#x27;s anime masterpiece, Akira.</p>\n  \n  <p>&quot;When the 1988 dateline appears, the first note of the DJ spinning should start up.&quot;</p>",
       },
     ],
   })),

@@ -20,6 +20,7 @@ import { Prisma } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
+import { StatsService } from "../src/stats/stats-service";
 import { createTestLogger } from "../src/_shared/test-logger";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
@@ -168,8 +169,13 @@ export function matchVenue(
       (c.city ?? "").toLowerCase() === wantCity &&
       (c.state ?? "").toLowerCase() === wantState,
   );
+  if (matches.length === 0) return null;
   if (matches.length === 1) return matches[0]?.slug ?? null;
-  return null;
+  // True duplicates on prod (same name + city + state across multiple Venue
+  // rows, e.g. Higher Ground / South Burlington / VT). Tiebreak deterministically
+  // on lex-min slug — re-runs always pick the same canonical row, and any
+  // later prod-side dedupe just re-points us at the survivor.
+  return matches.map((c) => c.slug).sort()[0] ?? null;
 }
 
 export function buildShowCreateInput(
@@ -210,6 +216,51 @@ export function showNeedsUpdate(local: LocalShowAggregates, remote: McpShow): bo
   const ra = remote.averageRating;
   if (la === null || ra === null) return la !== ra;
   return Math.abs(la - ra) > AVERAGE_RATING_TOLERANCE;
+}
+
+// Shape-minimal local row for the drift-update path. Includes venueId so we
+// can detect shows that landed without a venue under an older sync version
+// and back-fill them once resolution succeeds.
+export interface LocalShowForDrift extends LocalShowAggregates {
+  venueId: string | null;
+}
+
+// Patch returned by buildShowDriftUpdate. Empty object means "skip" (handled
+// by returning null). venueId is only present when local was null and
+// resolution succeeded — we never overwrite an already-set venueId from the
+// drift path; rename/merge is a separate concern.
+export interface ShowDriftUpdate {
+  averageRating?: number | null;
+  ratingsCount?: number;
+  notes?: string | null;
+  relistenUrl?: string | null;
+  venueId?: string | null;
+}
+
+/**
+ * Compute the patch to apply to an already-local show row. Two independent
+ * triggers: aggregate drift (rating/notes/relistenUrl/ratingsCount) and venue
+ * back-fill (local venueId is null but the venue is now resolvable). Returns
+ * null when nothing changed so callers can skip the UPDATE entirely and keep
+ * re-runs idempotent.
+ */
+export function buildShowDriftUpdate(
+  local: LocalShowForDrift,
+  remote: McpShow,
+  resolvedVenueId: string | null,
+): ShowDriftUpdate | null {
+  const aggregatesDrift = showNeedsUpdate(local, remote);
+  const venueDrift = local.venueId === null && resolvedVenueId !== null;
+  if (!aggregatesDrift && !venueDrift) return null;
+  const update: ShowDriftUpdate = {};
+  if (aggregatesDrift) {
+    update.averageRating = remote.averageRating;
+    update.ratingsCount = remote.ratingsCount;
+    update.notes = remote.notes;
+    update.relistenUrl = remote.relistenUrl;
+  }
+  if (venueDrift) update.venueId = resolvedVenueId;
+  return update;
 }
 
 export function buildSongCreateInput(song: McpSong, now: Date): Prisma.SongUncheckedCreateInput {
@@ -325,11 +376,19 @@ async function syncMissingShows(): Promise<void> {
   const redis = redisUrl ? new RedisService(redisUrl, logger) : null;
   const cache = redis ? new CacheService(redis, logger) : null;
   const cacheInvalidation = cache ? new CacheInvalidationService(cache, logger) : null;
+  // StatsService is wired without a cache here — the script never reads
+  // cached aggregates, only triggers the post-batch gap rebuild.
+  const statsService = new StatsService(prisma, cache ?? undefined);
   if (redis) await redis.connect();
 
   // Track every show whose row materially changed this run — used at the end
   // to invalidate the per-slug show.data + setlist.data cache entries.
   const changedSlugs = new Set<string>();
+  // The earliest date of any show INSERTED this run (drift updates don't
+  // shift gap math). Scopes the post-batch gap rebuild — pre-this-date
+  // chains are unaffected. ISO YYYY-MM-DD strings compare lexicographically
+  // the same as chronologically, so `<` works directly.
+  let earliestInsertedDate: string | null = null;
   let songsChanged = false;
 
   const stats: SyncStats = {
@@ -391,64 +450,68 @@ async function syncMissingShows(): Promise<void> {
     }
     const remoteBySlug = new Map<string, McpShow>(remoteFullShows.map((s) => [s.slug, s]));
 
-    // Step 2c: partition into missing-locally vs already-local.
+    // Step 2c: partition into missing-locally vs already-local. We pull venueId
+    // for existing rows so the drift-update branch can back-fill venues that
+    // landed NULL under an older sync (caused 404s on /shows/:slug).
     const existingLocal = await db.show.findMany({
       where: { slug: { in: realSlugs } },
-      select: { id: true, slug: true, averageRating: true, ratingsCount: true, notes: true, relistenUrl: true },
+      select: {
+        id: true,
+        slug: true,
+        averageRating: true,
+        ratingsCount: true,
+        notes: true,
+        relistenUrl: true,
+        venueId: true,
+      },
     });
     const existingBySlug = new Map(existingLocal.map((s) => [s.slug, s]));
     stats.showsAlreadyLocal = existingBySlug.size;
     const missingShows = remoteFullShows.filter((s) => !existingBySlug.has(s.slug));
     const existingRemoteShows = remoteFullShows.filter((s) => existingBySlug.has(s.slug));
-    console.log(`📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present)`);
+    // Existing shows whose venue we still need to resolve so the drift loop
+    // can back-fill venueId. Their setlists MUST be fetched alongside missing
+    // shows so we know the (name, city, state) tuple to search by.
+    const needsVenueSlugs = existingLocal.filter((s) => s.venueId === null).map((s) => s.slug);
+    console.log(`📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`);
 
-    // Step 2d: drift-detection update loop for existing local shows. Only
-    // rewrites the four aggregate fields we mirror from prod; does NOT touch
-    // tracks, songs, or venues for already-local shows.
-    for (const remote of existingRemoteShows) {
-      const local = existingBySlug.get(remote.slug);
-      if (!local) continue;
-      if (!showNeedsUpdate(local, remote)) {
-        stats.showsUnchanged++;
-        continue;
+    if (missingShows.length === 0 && needsVenueSlugs.length === 0) {
+      // Pure aggregate-drift run: do the simple update loop and bail out.
+      for (const remote of existingRemoteShows) {
+        const local = existingBySlug.get(remote.slug);
+        if (!local) continue;
+        const patch = buildShowDriftUpdate(local, remote, local.venueId);
+        if (patch === null) {
+          stats.showsUnchanged++;
+          continue;
+        }
+        if (isDryRun) {
+          console.log(`  🔄 ${remote.slug} would update ${JSON.stringify(patch)} (dry run)`);
+          stats.showsUpdated++;
+          continue;
+        }
+        try {
+          await db.show.update({ where: { slug: remote.slug }, data: { ...patch, updatedAt: now } });
+          changedSlugs.add(remote.slug);
+          stats.showsUpdated++;
+          console.log(`  🔄 ${remote.slug} ${JSON.stringify(patch)}`);
+        } catch (err) {
+          console.error(`  ❌ failed to update show ${remote.slug}:`, err);
+          stats.errors++;
+        }
       }
-      if (isDryRun) {
-        console.log(`  🔄 ${remote.slug} would update (rating ${local.averageRating}→${remote.averageRating}, count ${local.ratingsCount}→${remote.ratingsCount}) (dry run)`);
-        stats.showsUpdated++;
-        continue;
-      }
-      try {
-        await db.show.update({
-          where: { slug: remote.slug },
-          data: {
-            averageRating: remote.averageRating,
-            ratingsCount: remote.ratingsCount,
-            notes: remote.notes,
-            relistenUrl: remote.relistenUrl,
-            updatedAt: now,
-          },
-        });
-        changedSlugs.add(remote.slug);
-        stats.showsUpdated++;
-        console.log(`  🔄 ${remote.slug} (rating ${local.averageRating}→${remote.averageRating}, count ${local.ratingsCount}→${remote.ratingsCount})`);
-      } catch (err) {
-        console.error(`  ❌ failed to update show ${remote.slug}:`, err);
-        stats.errors++;
-      }
-    }
-    console.log(`📊 Existing shows: ${stats.showsUpdated} updated, ${stats.showsUnchanged} unchanged`);
-
-    if (missingShows.length === 0) {
+      console.log(`📊 Existing shows: ${stats.showsUpdated} updated, ${stats.showsUnchanged} unchanged`);
       printSummary(stats, isDryRun);
       return;
     }
 
-    // Step 3: fetch setlists for the missing shows in a single batch.
-    const missingSlugs = missingShows.map((s) => s.slug);
+    // Step 3: fetch setlists for missing shows AND existing shows that need
+    // venue back-fill, in one batched call.
+    const setlistFetchSlugs = [...missingShows.map((s) => s.slug), ...needsVenueSlugs];
     const { setlists, errors: setlistErrors } = await mcpCall<{
       setlists: McpSetlist[];
       errors?: Array<{ slug: string; error: string }>;
-    }>("get_setlists", { showSlugs: missingSlugs });
+    }>("get_setlists", { showSlugs: setlistFetchSlugs });
     if (setlistErrors?.length) {
       console.warn(`⚠️  ${setlistErrors.length} setlist fetch errors:`, setlistErrors);
       stats.errors += setlistErrors.length;
@@ -515,6 +578,43 @@ async function syncMissingShows(): Promise<void> {
         }
       }
     }
+
+    // Step 5b: drift-update existing local shows. Runs AFTER venue resolution
+    // so shows that landed with venueId=NULL under an older sync version can
+    // self-heal — their patch will include venueId once the (name, city, state)
+    // tuple resolves. Aggregate-only drift (rating/notes/relistenUrl) lands
+    // here too.
+    for (const remote of existingRemoteShows) {
+      const local = existingBySlug.get(remote.slug);
+      if (!local) continue;
+      const setlist = setlistBySlug.get(remote.slug);
+      const venueKey = setlist?.venue?.name
+        ? `${setlist.venue.name}|${setlist.venue.city ?? ""}|${setlist.venue.state ?? ""}`
+        : null;
+      const venueSlug = venueKey ? venueKeyToSlug.get(venueKey) : null;
+      const resolvedVenueId = venueSlug ? venueSlugToId.get(venueSlug) ?? null : null;
+      const patch = buildShowDriftUpdate(local, remote, resolvedVenueId);
+      if (patch === null) {
+        stats.showsUnchanged++;
+        continue;
+      }
+      if (isDryRun) {
+        console.log(`  🔄 ${remote.slug} would update ${JSON.stringify(patch)} (dry run)`);
+        stats.showsUpdated++;
+        continue;
+      }
+      try {
+        await db.show.update({ where: { slug: remote.slug }, data: { ...patch, updatedAt: now } });
+        changedSlugs.add(remote.slug);
+        if (patch.venueId) stats.venuesLinked++;
+        stats.showsUpdated++;
+        console.log(`  🔄 ${remote.slug} ${JSON.stringify(patch)}`);
+      } catch (err) {
+        console.error(`  ❌ failed to update show ${remote.slug}:`, err);
+        stats.errors++;
+      }
+    }
+    console.log(`📊 Existing shows: ${stats.showsUpdated} updated, ${stats.showsUnchanged} unchanged`);
 
     // Step 6: resolve songs (local + remote) into an id map the track builder
     // can consume. Songs already in the DB reuse their existing id; new songs
@@ -589,6 +689,10 @@ async function syncMissingShows(): Promise<void> {
             }
           }
           changedSlugs.add(slug);
+          const showDate = String(show.date);
+          if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+            earliestInsertedDate = showDate;
+          }
           stats.showsCreated++;
           stats.tracksCreated += trackCount;
           console.log(`  ✅ ${slug} (${trackCount} tracks, venue=${venueId ? "✓" : "—"})`);
@@ -612,6 +716,20 @@ async function syncMissingShows(): Promise<void> {
       if (songsChanged) await cacheInvalidation.invalidateSongCaches();
     } else if (!isDryRun && !cacheInvalidation && (changedSlugs.size > 0 || songsChanged)) {
       console.warn("⚠️  REDIS_URL not set; skipping cache invalidation. Cached pages may show stale data until TTL expires or you restart the app.");
+    }
+
+    // Rebuild Track.gap + Song.* aggregates once for the whole batch. Bulk
+    // operation — a single rebuild covering the earliest inserted date is
+    // cheaper than N per-show rebuilds, and it captures every chain that
+    // could have shifted as a result of these inserts.
+    if (!isDryRun && earliestInsertedDate !== null) {
+      console.log(`📐 Rebuilding gaps + song stats since ${earliestInsertedDate}`);
+      try {
+        await statsService.rebuildGapsAndSongStatsSince(earliestInsertedDate);
+      } catch (err) {
+        console.error("  ❌ stats rebuild failed:", err);
+        stats.errors++;
+      }
     }
 
     printSummary(stats, isDryRun);

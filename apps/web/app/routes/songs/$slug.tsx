@@ -1,19 +1,20 @@
-import type { SongPageView } from "@bip/domain";
+import { compareByShowDate, type SongPageView } from "@bip/domain";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useSearchParams } from "react-router-dom";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
+import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { pickGapTier } from "~/lib/gap-tier";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -28,13 +29,13 @@ export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promi
 interface StatBoxProps {
   label: string;
   value: ReactNode;
-  sublabel?: string;
+  sublabel?: ReactNode;
   sublabel2?: string;
 }
 
 function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
   return (
-    <div className="glass-content p-2 sm:p-6 rounded-lg h-full">
+    <div className="glass-content p-2 sm:p-3 rounded-lg h-full">
       <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
       <dd className="mt-2">
         <span className="text-xl sm:text-3xl font-bold text-content-text-primary">{value}</span>
@@ -105,16 +106,48 @@ export function meta({ data }: { data: SongPageView }) {
  * at the most recent show, otherwise "N show(s) ago" with correct
  * pluralization. The backend's `showsSinceLastPlayed` is a strict count of
  * shows played AFTER this song's last performance, so 0 = last show.
+ *
+ * Colors the text by tier: amber when the current gap exceeds this song's
+ * average frequency, red when it exceeds the longest gap on record.
  */
-function lastPlayedSublabel(showsSince: number | null | undefined): string | undefined {
+function lastPlayedSublabel(
+  showsSince: number | null | undefined,
+  average: number | null,
+  longest: number | null,
+): ReactNode | undefined {
   if (showsSince === null || showsSince === undefined) return undefined;
   if (showsSince === 0) return "last show";
-  if (showsSince === 1) return "1 show ago";
-  return `${showsSince} shows ago`;
+
+  const text = showsSince === 1 ? "1 show ago" : `${showsSince} shows ago`;
+  const tier = pickGapTier({ showsSince, average, longest });
+  const tierClass =
+    tier === "danger" ? "text-red-500 font-semibold" : tier === "warn" ? "text-amber-500 font-medium" : "";
+
+  return tierClass ? <span className={tierClass}>{text}</span> : text;
+}
+
+const percentFormatter = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
+
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return percentFormatter.format(value);
+}
+
+function formatCount(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return value.toLocaleString();
+}
+
+function formatDecimal(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return value.toFixed(1);
 }
 
 export default function SongPage() {
-  const { song, performances: allPerformances } = useSerializedLoaderData<SongPageView>();
+  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<SongPageView>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
@@ -197,6 +230,44 @@ export default function SongPage() {
       {/* Stats Grid */}
       <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatBox label="Times Played" value={song.timesPlayed} />
+        <StatBox label="Average Gap" value={formatDecimal(song.averageShowsPerPlay)} />
+        {song.lastShowSlug ? (
+          <Link to={`/shows/${song.lastShowSlug}`} className="block">
+            <StatBox
+              label="Last Played"
+              value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
+              sublabel={
+                song.actualLastPlayedDate
+                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                  : undefined
+              }
+              sublabel2={
+                song.lastVenue
+                  ? song.lastVenue.city && song.lastVenue.state
+                    ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
+                    : song.lastVenue.name
+                  : undefined
+              }
+            />
+          </Link>
+        ) : (
+          <StatBox
+            label="Last Played"
+            value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
+            sublabel={
+              song.actualLastPlayedDate
+                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                : undefined
+            }
+            sublabel2={
+              song.lastVenue
+                ? song.lastVenue.city && song.lastVenue.state
+                  ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
+                  : song.lastVenue.name
+                : undefined
+            }
+          />
+        )}
         {song.firstShowSlug ? (
           <Link to={`/shows/${song.firstShowSlug}`} className="block">
             <StatBox
@@ -224,35 +295,12 @@ export default function SongPage() {
             }
           />
         )}
-        {song.lastShowSlug ? (
-          <Link to={`/shows/${song.lastShowSlug}`} className="block">
-            <StatBox
-              label="Last Played"
-              value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
-              sublabel={song.actualLastPlayedDate ? lastPlayedSublabel(song.showsSinceLastPlayed) : undefined}
-              sublabel2={
-                song.lastVenue
-                  ? song.lastVenue.city && song.lastVenue.state
-                    ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
-                    : song.lastVenue.name
-                  : undefined
-              }
-            />
-          </Link>
-        ) : (
-          <StatBox
-            label="Last Played"
-            value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
-            sublabel={song.actualLastPlayedDate ? lastPlayedSublabel(song.showsSinceLastPlayed) : undefined}
-            sublabel2={
-              song.lastVenue
-                ? song.lastVenue.city && song.lastVenue.state
-                  ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
-                  : song.lastVenue.name
-                : undefined
-            }
-          />
-        )}
+        <StatBox label="% of All Shows" value={formatPercent(song.percentOfAllShows)} />
+        <StatBox label="% Since Debut" value={formatPercent(song.percentSinceDebut)} />
+        <StatBox
+          label="Shows Before / Since Debut"
+          value={`${formatCount(song.showsBeforeDebut)} / ${formatCount(song.showsSinceDebut)}`}
+        />
         <StatBox label="Most Common Year" value={song.mostCommonYear || "—"} />
       </dl>
 
@@ -328,7 +376,7 @@ export default function SongPage() {
             )}
           >
             <BarChart3 className="h-4 w-4" />
-            Stats
+            Graphs
           </TabsTrigger>
           {song.history && (
             <TabsTrigger
@@ -375,9 +423,7 @@ export default function SongPage() {
           <TabsContent value="all-timers" className="mt-6 space-y-8">
             {/* Featured cards for performances with notes */}
             {(() => {
-              const withNotes = filteredAllTimers
-                .filter((p) => p.notes)
-                .sort((a, b) => new Date(b.show.date).getTime() - new Date(a.show.date).getTime());
+              const withNotes = filteredAllTimers.filter((p) => p.notes).sort((a, b) => compareByShowDate(b, a));
 
               return (
                 withNotes.length > 0 && (
@@ -428,48 +474,10 @@ export default function SongPage() {
         </TabsContent>
 
         <TabsContent value="stats" className="mt-6">
-          <div className="glass-content rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-content-text-primary mb-4">Times Played by Year</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={Object.entries(song.yearlyPlayData || {})
-                    .map(([year, count]) => ({
-                      year: Number.parseInt(year, 10),
-                      plays: count as number,
-                    }))
-                    .sort((a, b) => a.year - b.year)}
-                  margin={{
-                    top: 20,
-                    right: 30,
-                    left: 20,
-                    bottom: 20,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                  <XAxis dataKey="year" stroke="#9CA3AF" fontSize={12} />
-                  <YAxis stroke="#9CA3AF" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid #374151",
-                      borderRadius: "6px",
-                      color: "#F3F4F6",
-                    }}
-                    labelStyle={{ color: "#F3F4F6" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="plays"
-                    stroke="#8B5CF6"
-                    strokeWidth={2}
-                    dot={{ fill: "#8B5CF6", strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: "#8B5CF6", strokeWidth: 2 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <YearlyPlayChart
+            yearlyPlayData={(song.yearlyPlayData || {}) as Record<number, number>}
+            showsByYear={showsByYear}
+          />
         </TabsContent>
 
         {song.history && (

@@ -12,14 +12,19 @@ type DbTrackWithSongAndAnnotations = DbTrack & {
 };
 
 // Mapper functions
-function mapTrackToDomainEntity(dbTrack: DbTrack): Track {
-  const { slug, createdAt, updatedAt, ...rest } = dbTrack;
+function mapTrackToDomainEntity(
+  dbTrack: DbTrack & { previousPerformanceShow?: { date: string; slug: string | null } | null },
+): Track {
+  const { slug, createdAt, updatedAt, previousPerformanceShow, ...rest } = dbTrack;
 
   return {
     ...rest,
     slug: slug || "",
     createdAt: new Date(createdAt),
     updatedAt: new Date(updatedAt),
+    previousPerformanceShow: previousPerformanceShow?.slug
+      ? { date: String(previousPerformanceShow.date), slug: previousPerformanceShow.slug }
+      : null,
   };
 }
 

@@ -30,6 +30,7 @@ function makeShow(overrides: Partial<Show> = {}): Show {
     showPhotosCount: 0,
     showYoutubesCount: 0,
     reviewsCount: 0,
+    countForStats: true,
     venue: overrides.venue ?? {
       id: "venue-1",
       slug: "the-cap",
@@ -68,6 +69,13 @@ function makeSong(overrides: Partial<SongWithShows> = {}): SongWithShows {
     firstVenue: null,
     firstShowSlug: null,
     lastShowSlug: null,
+    showsBeforeDebut: null,
+    showsSinceDebut: null,
+    totalShows: 0,
+    percentOfAllShows: null,
+    percentSinceDebut: null,
+    averageShowsPerPlay: null,
+    longestGapShows: null,
     yearlyPlayData: {},
     longestGapsData: {},
     mostCommonYear: null,
@@ -509,6 +517,127 @@ describe("getSongsColumns", () => {
     const columns = getSongsColumns({ showFilteredPlays: false });
     const playsColumn = columns.find((column) => "accessorKey" in column && column.accessorKey === "timesPlayed");
     expect(playsColumn?.meta?.hideOnMobile).toBeFalsy();
+  });
+
+  // The Current Gap column shows shows-since-last-played (`showsSinceLastPlayed`)
+  // — same number that drives the "X shows ago" sublabel on the song detail
+  // page. It's the most-immediate "is this song missing right now?" signal.
+  test("Current Gap cell renders the integer when showsSinceLastPlayed is set", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ showsSinceLastPlayed: 12 })]} hideSearch hidePagination />,
+    );
+    expect(screen.getByText("12")).toBeInTheDocument();
+  });
+
+  // Songs that have never been played (or where the field hasn't been
+  // populated for any other reason) get the em-dash placeholder so the
+  // column stays readable instead of showing "0" (which would mean
+  // "played at the most recent show").
+  test("Current Gap cell renders em-dash when showsSinceLastPlayed is null", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ showsSinceLastPlayed: null })]} hideSearch hidePagination />,
+    );
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // % Since Debut formats `percentSinceDebut` (a 0–1 fraction) with
+  // Intl.NumberFormat percent style, max 1 decimal — matching the existing
+  // formatPercent helper on the song detail page so values are consistent
+  // across surfaces.
+  test("% Since Debut cell formats fraction as percentage with 1 decimal", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ percentSinceDebut: 0.197 })]} hideSearch hidePagination />,
+    );
+    expect(screen.getByText("19.7%")).toBeInTheDocument();
+  });
+
+  test("% Since Debut cell renders em-dash when percentSinceDebut is null", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ percentSinceDebut: null })]} hideSearch hidePagination />,
+    );
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // Avg Gap renders `averageShowsPerPlay` to one decimal — mirrors the
+  // "Average Gap" stat box on the song detail page. The number alone
+  // carries the meaning ("played every 5.7 shows since debut") because
+  // the column header sets the framing.
+  test("Avg Gap cell renders averageShowsPerPlay to one decimal", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ averageShowsPerPlay: 5.7 })]} hideSearch hidePagination />,
+    );
+    expect(screen.getByText("5.7")).toBeInTheDocument();
+  });
+
+  test("Avg Gap cell renders em-dash when averageShowsPerPlay is null", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ averageShowsPerPlay: null })]} hideSearch hidePagination />,
+    );
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // All three rarity columns are secondary signals — they hide on mobile
+  // so Title + Plays + Last Played stay legible at narrow widths, matching
+  // the existing Filtered Plays pattern.
+  test("Current Gap, % Since Debut, Avg Gap all carry meta.hideOnMobile", () => {
+    const columns = getSongsColumns({ showFilteredPlays: false });
+    const gap = columns.find((c) => "accessorKey" in c && c.accessorKey === "showsSinceLastPlayed");
+    const pct = columns.find((c) => "accessorKey" in c && c.accessorKey === "percentSinceDebut");
+    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "averageShowsPerPlay");
+    expect(gap?.meta?.hideOnMobile).toBe(true);
+    expect(pct?.meta?.hideOnMobile).toBe(true);
+    expect(avg?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // Column ordering: Current Gap sits immediately to the left of Last
+  // Played so the "X shows ago" number reads naturally next to the date
+  // it's measured against. % Since Debut and Avg Gap precede Current Gap
+  // as the broader rarity signals; Last Played + First Played remain
+  // rightmost.
+  test("rarity columns appear between Plays and Last Played in the expected order", () => {
+    const columns = getSongsColumns({ showFilteredPlays: false });
+    const keys = columns
+      .map((c) => ("accessorKey" in c ? (c.accessorKey as string) : null))
+      .filter((k): k is string => k !== null);
+    const playsIdx = keys.indexOf("timesPlayed");
+    const gapIdx = keys.indexOf("showsSinceLastPlayed");
+    const pctIdx = keys.indexOf("percentSinceDebut");
+    const avgIdx = keys.indexOf("averageShowsPerPlay");
+    const lastIdx = keys.indexOf("dateLastPlayed");
+    expect(playsIdx).toBeLessThan(pctIdx);
+    expect(pctIdx).toBeLessThan(avgIdx);
+    expect(avgIdx).toBeLessThan(gapIdx);
+    expect(gapIdx).toBeLessThan(lastIdx);
+  });
+
+  // Sorting Current Gap asc must put nulls (never-played / unpopulated
+  // songs) at the bottom — otherwise null-coercion-to-0 would surface
+  // them at the top, masking the smallest real gaps.
+  test("Current Gap sort puts nulls last on asc and first on desc", async () => {
+    const songs = [
+      makeSong({ id: "a", title: "Tractorbeam", slug: "tractorbeam", showsSinceLastPlayed: 5 }),
+      makeSong({ id: "b", title: "Above The Waves", slug: "above-the-waves", showsSinceLastPlayed: null }),
+      makeSong({ id: "c", title: "Tempest", slug: "tempest", showsSinceLastPlayed: 30 }),
+    ];
+    const { user } = await setupWithRouter(<DataTable columns={baseColumns} data={songs} hideSearch hidePagination />);
+
+    // Header text is the short "Gap"; the full "Current Gap" lives in the
+    // title attribute as hover tooltip. Find the button via title to fail
+    // loudly if the tooltip is ever dropped.
+    const sortHeader = screen.getAllByRole("button").find((b) => b.getAttribute("title") === "Current Gap");
+    if (!sortHeader) throw new Error("Current Gap header not found");
+    await user.click(sortHeader); // asc
+
+    const titlesAsc = screen
+      .getAllByRole("link")
+      .filter((el) => ["Tractorbeam", "Above The Waves", "Tempest"].includes(el.textContent ?? ""));
+    expect(titlesAsc.map((el) => el.textContent)).toEqual(["Tractorbeam", "Tempest", "Above The Waves"]);
+
+    await user.click(sortHeader); // desc
+    const titlesDesc = screen
+      .getAllByRole("link")
+      .filter((el) => ["Tractorbeam", "Above The Waves", "Tempest"].includes(el.textContent ?? ""));
+    expect(titlesDesc.map((el) => el.textContent)).toEqual(["Above The Waves", "Tempest", "Tractorbeam"]);
   });
 
   // The /songs page shows songs sorted by times played (most played first)

@@ -1,8 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { useEffect, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { useNavigate, useRouteLoaderData, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
 import { ForgotPasswordForm } from "~/components/forgot-password-form";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";

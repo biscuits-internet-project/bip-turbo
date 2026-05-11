@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -42,6 +43,7 @@ model Annotation {
   updatedAt DateTime @map("updated_at") @db.Timestamp(6)
   track     Track    @relation(fields: [trackId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_annotations_tracks_track_id")
 
+  @@index([trackId])
   @@map("annotations")
 }
 
@@ -327,6 +329,8 @@ model Show {
   showPhotosCount   Int                      @default(0) @map("show_photos_count")
   showYoutubesCount Int                      @default(0) @map("show_youtubes_count")
   reviewsCount      Int                      @default(0) @map("reviews_count")
+  countForStats     Boolean                  @default(true) @map("count_for_stats")
+  dayOrder          Int?                     @map("day_order")
   searchText        String?                  @map("search_text") @db.Text
   searchVector      Unsupported("tsvector")? @map("search_vector")
   attendances       Attendance[]
@@ -337,6 +341,7 @@ model Show {
   band              Band?                    @relation(fields: [bandId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_bands_band_id")
   venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_venues_venue_id")
   tracks            Track[]
+  previousPerformanceTracks Track[]            @relation("TrackPreviousPerformance")
   segueRuns         SegueRun[]
   files             ShowToFile[]
 
@@ -472,13 +477,19 @@ model Track {
   ratingsCount    Int                      @default(0) @map("ratings_count")
   searchText      String?                  @map("search_text") @db.Text
   searchVector    Unsupported("tsvector")? @map("search_vector")
+  gap                       Int?
+  previousPerformanceShowId String?         @map("previous_performance_show_id") @db.Uuid
   annotations     Annotation[]
   show            Show                     @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_shows_show_id")
   song            Song                     @relation(fields: [songId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_songs_song_id")
+  previousPerformanceShow   Show?           @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
 
   @@index([likesCount])
   @@index([nextTrackId])
   @@index([previousTrackId])
+  @@index([songId])
+  @@index([previousPerformanceShowId])
+  @@index([showId, set, position], map: "tracks_show_set_position_idx")
   @@map("tracks")
 }
 

@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { serialize } from "cookie";
 import { env } from "./env";
 
@@ -25,9 +25,7 @@ export const getServerClient = (request: Request) => {
       getAll: () => {
         // If Bearer token is present, create a fake cookie for Supabase auth
         if (bearerToken) {
-          return [
-            { name: "sb-access-token", value: bearerToken },
-          ];
+          return [{ name: "sb-access-token", value: bearerToken }];
         }
 
         const cookie = request.headers.get("Cookie") ?? "";

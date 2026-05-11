@@ -61,7 +61,7 @@ const acts = [
   {
     name: "The Meeting",
     content:
-      "The Meeting took place at the compound, which Amos was happy about, as any trip to the compound was more exciting then his average day, and considering that he helped build it, he knew the ins and outs of the place, which made him feel smart, which he liked a lot. The idea intrigued Lai and he liked the fact that a scientist was involved. Actually, his first thought was that the Doctor may be involved with the authorities, but he knew a quick background check would clear up any of his concerns. He figured that they could all make millions with his connections in China and Nicaragua, and the Doctor indicated that he could basically produce an endless supply of this as long as the \"research project\" continued. Lai was defiantly interested, as long as everything checked out okay. He insisted that the Doctor and Amos stick around for one of his patented shindigs, which was already going on outside the cabana at the pool. When the meeting adjourned, they allowed themselves the pleasure of a few drinks and some casual flirting with some of the local college girls.",
+      'The Meeting took place at the compound, which Amos was happy about, as any trip to the compound was more exciting then his average day, and considering that he helped build it, he knew the ins and outs of the place, which made him feel smart, which he liked a lot. The idea intrigued Lai and he liked the fact that a scientist was involved. Actually, his first thought was that the Doctor may be involved with the authorities, but he knew a quick background check would clear up any of his concerns. He figured that they could all make millions with his connections in China and Nicaragua, and the Doctor indicated that he could basically produce an endless supply of this as long as the "research project" continued. Lai was defiantly interested, as long as everything checked out okay. He insisted that the Doctor and Amos stick around for one of his patented shindigs, which was already going on outside the cabana at the pool. When the meeting adjourned, they allowed themselves the pleasure of a few drinks and some casual flirting with some of the local college girls.',
   },
   {
     name: "The Party",
@@ -391,7 +391,7 @@ const songs = [
   {
     name: "Confrontation",
     setting:
-      "This is the story of the end. This song explains why the Doctor had to take the life of Amos. It is among the Doctor's last moment alive. In the end chorus he claims, \"And for the moments time I wish I had the nerve.\" And in the next moment he finds the nerve, and with the pull of the trigger, the story ends.",
+      'This is the story of the end. This song explains why the Doctor had to take the life of Amos. It is among the Doctor\'s last moment alive. In the end chorus he claims, "And for the moments time I wish I had the nerve." And in the next moment he finds the nerve, and with the pull of the trigger, the story ends.',
     lyrics: [
       "I didn't mean no harm,",
       "I know there's no alarm,",
@@ -453,9 +453,7 @@ function CharacterCard({ character }: { character: (typeof characters)[number] }
       >
         {character.initial}
       </div>
-      <h4 className="text-lg font-bold text-purple-100 mb-2 font-[Rajdhani] tracking-wide">
-        {character.name}
-      </h4>
+      <h4 className="text-lg font-bold text-purple-100 mb-2 font-[Rajdhani] tracking-wide">{character.name}</h4>
       <p className="text-base text-content-text-secondary leading-relaxed">{character.description}</p>
     </div>
   );
@@ -483,9 +481,7 @@ function ActCard({ act, index }: { act: (typeof acts)[number]; index: number }) 
         <div className="p-6 md:p-8">
           {/* Header */}
           <div className="mb-4">
-            <span className="text-xs font-semibold tracking-[3px] text-purple-400/70 uppercase">
-              Act {index + 1}
-            </span>
+            <span className="text-xs font-semibold tracking-[3px] text-purple-400/70 uppercase">Act {index + 1}</span>
             <h3 className="text-2xl md:text-3xl font-bold text-purple-100 font-[Rajdhani] tracking-wide mt-0.5">
               {act.name}
             </h3>
@@ -522,17 +518,13 @@ function SongCard({ song, index }: { song: (typeof songs)[number]; index: number
         <div className="p-6 md:p-8">
           {/* Header */}
           <div className="mb-4">
-            <span className="text-xs font-semibold tracking-[3px] text-purple-400/70 uppercase">
-              Song {index + 1}
-            </span>
+            <span className="text-xs font-semibold tracking-[3px] text-purple-400/70 uppercase">Song {index + 1}</span>
             <h3 className="text-2xl md:text-3xl font-bold text-purple-100 font-[Rajdhani] tracking-wide mt-0.5">
               {song.name}
             </h3>
           </div>
           {/* Setting */}
-          <p className="text-content-text-secondary leading-relaxed text-base md:text-lg mb-4">
-            {song.setting}
-          </p>
+          <p className="text-content-text-secondary leading-relaxed text-base md:text-lg mb-4">{song.setting}</p>
           {/* Lyrics */}
           <blockquote className="border-l-4 border-purple-500/30 pl-4 italic text-content-text-secondary">
             {song.lyrics.map((line, i) =>
@@ -545,7 +537,7 @@ function SongCard({ song, index }: { song: (typeof songs)[number]; index: number
                   {line}
                   <br />
                 </span>
-              )
+              ),
             )}
           </blockquote>
         </div>
@@ -582,8 +574,8 @@ const ChemicalWarfareBrigade: React.FC = () => {
       {/* ── Introduction ── */}
       <div className="space-y-4 text-content-text-secondary leading-relaxed text-base md:text-lg">
         <p>
-          <strong className="text-content-text-primary">The Chemical Warfare Brigade</strong> is the
-          Disco Biscuits' second full-length rock opera, written by Marc Brownstein, and debuted on{" "}
+          <strong className="text-content-text-primary">The Chemical Warfare Brigade</strong> is the Disco Biscuits'
+          second full-length rock opera, written by Marc Brownstein, and debuted on{" "}
           <Link
             to="/shows/2000-12-30-vanderbilt-plainview-ny"
             className="text-brand-primary hover:text-brand-secondary"
@@ -593,17 +585,15 @@ const ChemicalWarfareBrigade: React.FC = () => {
           at the Vanderbilt on Long Island.
         </p>
         <p>
-          The story follows a complex plot involving a chemist, a construction worker, and an FBI agent,
-          centered around a dangerous chemical weapon and organized crime. Through themes of deception,
-          greed, and redemption, the opera weaves together multiple perspectives into a tragic tale.
+          The story follows a complex plot involving a chemist, a construction worker, and an FBI agent, centered around
+          a dangerous chemical weapon and organized crime. Through themes of deception, greed, and redemption, the opera
+          weaves together multiple perspectives into a tragic tale.
         </p>
       </div>
 
       {/* ── Characters ── */}
       <section>
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
-          Characters
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Characters</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {characters.map((char) => (
             <CharacterCard key={char.name} character={char} />
@@ -613,9 +603,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
 
       {/* ── The Story ── */}
       <section>
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
-          The Story
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">The Story</h2>
         <div className="space-y-4">
           {acts.map((act, i) => (
             <ActCard key={act.name} act={act} index={i} />
@@ -625,9 +613,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
 
       {/* ── Songs ── */}
       <section>
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
-          Songs
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Songs</h2>
         <div className="space-y-4">
           {songs.map((song, i) => (
             <SongCard key={song.name} song={song} index={i} />
@@ -637,14 +623,9 @@ const ChemicalWarfareBrigade: React.FC = () => {
 
       {/* ── Related Links ── */}
       <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5 md:p-8">
-        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">
-          Related
-        </h2>
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Related</h2>
         <div className="space-y-2">
-          <Link
-            to="/resources/hot-air-balloon"
-            className="text-brand-primary hover:text-brand-secondary block"
-          >
+          <Link to="/resources/hot-air-balloon" className="text-brand-primary hover:text-brand-secondary block">
             The Hot Air Balloon
           </Link>
           <a

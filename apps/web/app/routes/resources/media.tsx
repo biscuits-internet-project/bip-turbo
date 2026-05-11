@@ -21,8 +21,7 @@ export default function MediaResources(): ReactElement {
           const data = await response.json();
           setMedia(data);
         }
-      } catch (_error) {
-      }
+      } catch (_error) {}
     };
     fetchMedia();
   }, []);

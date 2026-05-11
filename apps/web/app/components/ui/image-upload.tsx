@@ -1,4 +1,4 @@
-import { IMAGE_MIME_TYPE_NAMES, type AllowedImageMimeType } from "@bip/domain";
+import { type AllowedImageMimeType, IMAGE_MIME_TYPE_NAMES } from "@bip/domain";
 import { ImageIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type UploadedImage, type UploadResult, useImageUpload } from "~/hooks/use-image-upload";
@@ -55,7 +55,13 @@ export function ImageUpload({
     });
   }, []);
 
-  const { upload, isUploading, error, maxFileSize: defaultMaxSize, allowedTypes: defaultAllowedTypes } = useImageUpload({
+  const {
+    upload,
+    isUploading,
+    error,
+    maxFileSize: defaultMaxSize,
+    allowedTypes: defaultAllowedTypes,
+  } = useImageUpload({
     endpoint,
     maxFileSize,
     allowedTypes,

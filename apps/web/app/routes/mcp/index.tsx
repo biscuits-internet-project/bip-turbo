@@ -213,10 +213,7 @@ const tools = [
   },
 ];
 
-async function handleToolCall(
-  name: string,
-  args: Record<string, unknown>,
-): Promise<unknown> {
+async function handleToolCall(name: string, args: Record<string, unknown>): Promise<unknown> {
   switch (name) {
     // Search tools
     case "search_shows": {
@@ -363,9 +360,10 @@ async function handleToolCall(
 
       const tracks = await services.tracks.findMany({
         filters: [{ field: "songId", operator: "eq", value: song.id }],
-        sort: sortBy === "rating"
-          ? [{ field: "averageRating", direction: "desc" }]
-          : [{ field: "createdAt", direction: "desc" }],
+        sort:
+          sortBy === "rating"
+            ? [{ field: "averageRating", direction: "desc" }]
+            : [{ field: "createdAt", direction: "desc" }],
         pagination: { page: 1, limit },
         includes: ["annotations"],
       });
@@ -377,10 +375,10 @@ async function handleToolCall(
           if (!show) return null;
           const venue = show.venueId ? await services.venues.findById(show.venueId) : null;
           return { showId, show, venue };
-        })
+        }),
       );
       const showMap = new Map(
-        showsData.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [d.showId, d])
+        showsData.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [d.showId, d]),
       );
 
       return {
@@ -413,9 +411,10 @@ async function handleToolCall(
 
       const shows = await services.shows.findMany({
         filters: [{ field: "venueId", operator: "eq", value: venue.id }],
-        sort: sortBy === "rating"
-          ? [{ field: "averageRating", direction: "desc" }]
-          : [{ field: "date", direction: "desc" }],
+        sort:
+          sortBy === "rating"
+            ? [{ field: "averageRating", direction: "desc" }]
+            : [{ field: "date", direction: "desc" }],
         pagination: { page: 1, limit },
       });
 
@@ -440,9 +439,8 @@ async function handleToolCall(
           { field: "date", operator: "gte", value: `${year}-01-01` },
           { field: "date", operator: "lt", value: `${year + 1}-01-01` },
         ],
-        sort: sortBy === "rating"
-          ? [{ field: "averageRating", direction: "desc" }]
-          : [{ field: "date", direction: "asc" }],
+        sort:
+          sortBy === "rating" ? [{ field: "averageRating", direction: "desc" }] : [{ field: "date", direction: "asc" }],
         pagination: { page: 1, limit },
         includes: ["venue"],
       });
@@ -611,7 +609,7 @@ function jsonRpcSuccess(id: string | number, result: unknown): JsonRpcResponse {
   return { jsonrpc: "2.0", id, result };
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader(_args: LoaderFunctionArgs) {
   return new Response(
     JSON.stringify({
       name: "discobiscuits",
@@ -634,19 +632,17 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     body = await request.json();
   } catch {
-    return new Response(
-      JSON.stringify(jsonRpcError(0, -32700, "Parse error")),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify(jsonRpcError(0, -32700, "Parse error")), {
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   const { jsonrpc, id, method, params } = body;
 
   if (jsonrpc !== "2.0") {
-    return new Response(
-      JSON.stringify(jsonRpcError(id, -32600, "Invalid Request")),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify(jsonRpcError(id, -32600, "Invalid Request")), {
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   let result: unknown;
@@ -685,10 +681,9 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     default:
-      return new Response(
-        JSON.stringify(jsonRpcError(id, -32601, "Method not found")),
-        { headers: { "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify(jsonRpcError(id, -32601, "Method not found")), {
+        headers: { "Content-Type": "application/json" },
+      });
   }
 
   return new Response(JSON.stringify(jsonRpcSuccess(id, result)), {

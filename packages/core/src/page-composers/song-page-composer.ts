@@ -1,7 +1,9 @@
 import type { AllTimersPageView, Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
+import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import type { SongService } from "../songs/song-service";
+import type { StatsService } from "../stats/stats-service";
 
 /**
  * Filters for querying performances. All fields are optional — only
@@ -30,6 +32,7 @@ export class SongPageComposer {
   constructor(
     private db: DbClient,
     private songService: SongService,
+    private statsService?: StatsService,
   ) {}
 
   async build(songSlug: string): Promise<SongPageView> {
@@ -37,15 +40,11 @@ export class SongPageComposer {
 
     if (!song) throw new Error("Song not found");
 
-    // Calculate shows since last played and get last venue
+    // Computed off the cached stats-show-dates array; cheap enough that
+    // recomputing below against `actualLastPlayedDate` is fine.
     let showsSinceLastPlayed: number | null = null;
-    if (song.dateLastPlayed) {
-      const showsAfterLastPlayed = await this.db.$queryRaw<[{ count: string }]>`
-        SELECT COUNT(*)::text as count
-        FROM shows
-        WHERE date::date > ${song.dateLastPlayed}::date
-      `;
-      showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
+    if (song.dateLastPlayed && this.statsService) {
+      showsSinceLastPlayed = await this.statsService.getShowsSinceLastPlayed(song.dateLastPlayed);
     }
 
     // Get actual last performance date, venue, and show slug
@@ -68,7 +67,8 @@ export class SongPageComposer {
       JOIN shows ON tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
       WHERE tracks.song_id = ${song.id}::uuid
-      ORDER BY shows.date DESC
+        AND ${statsShowsSql("shows")}
+      ORDER BY ${showOrderBySql("shows", "DESC")}
       LIMIT 1
     `;
 
@@ -99,7 +99,8 @@ export class SongPageComposer {
       JOIN shows ON tracks.show_id = shows.id
       LEFT JOIN venues ON shows.venue_id = venues.id
       WHERE tracks.song_id = ${song.id}::uuid
-      ORDER BY shows.date ASC
+        AND ${statsShowsSql("shows")}
+      ORDER BY ${showOrderBySql("shows", "ASC")}
       LIMIT 1
     `;
 
@@ -116,14 +117,11 @@ export class SongPageComposer {
       }
     }
 
-    // Recalculate shows since last played using the actual date
-    if (actualLastPlayedDate) {
-      const showsAfterLastPlayed = await this.db.$queryRaw<[{ count: string }]>`
-        SELECT COUNT(*)::text as count
-        FROM shows
-        WHERE date::date > ${actualLastPlayedDate}::date
-      `;
-      showsSinceLastPlayed = Number.parseInt(showsAfterLastPlayed[0].count, 10);
+    // Recompute against the stats-eligible actual-last-played date — may
+    // differ from song.dateLastPlayed if the most recent track sits on a
+    // count_for_stats=false show.
+    if (actualLastPlayedDate && this.statsService) {
+      showsSinceLastPlayed = await this.statsService.getShowsSinceLastPlayed(actualLastPlayedDate);
     }
 
     const result = await this.queryPerformances({
@@ -137,6 +135,25 @@ export class SongPageComposer {
     }));
     await this.enrichPerformances(performances);
 
+    const showsByYear = this.statsService ? await this.statsService.getShowsByYear() : {};
+    const rarity = computeRarityStats(
+      { dateFirstPlayed: song.dateFirstPlayed, timesPlayed: song.timesPlayed },
+      showsByYear,
+    );
+
+    // Longest historical gap (in shows) for this song, restricted to
+    // stats-eligible shows so non-stats sets (e.g., late-night side
+    // projects) don't pollute the maximum. Null when the song has only
+    // ever been played once — debuts have no gap recorded.
+    const longestGapResult = await this.db.$queryRaw<[{ longest: number | null }]>`
+      SELECT MAX(tracks.gap)::int as longest
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      WHERE tracks.song_id = ${song.id}::uuid
+        AND ${statsShowsSql("shows")}
+    `;
+    const longestGapShows = longestGapResult[0]?.longest ?? null;
+
     return {
       song: {
         ...song,
@@ -146,8 +163,11 @@ export class SongPageComposer {
         lastShowSlug,
         firstVenue,
         firstShowSlug,
+        ...rarity,
+        longestGapShows,
       },
       performances,
+      showsByYear,
     };
   }
 
@@ -156,7 +176,9 @@ export class SongPageComposer {
       SELECT COUNT(*)::text as count
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
-      WHERE tracks.all_timer = true AND shows.date LIKE ${`%-${monthDay}`}
+      WHERE tracks.all_timer = true
+        AND shows.date LIKE ${`%-${monthDay}`}
+        AND ${statsShowsSql("shows")}
     `;
     return Number.parseInt(result[0].count, 10);
   }
@@ -213,7 +235,9 @@ export class SongPageComposer {
    * Used by /songs to show per-song counts when toggle filters are active.
    */
   async buildSongPerformanceCounts(options?: PerformanceFilterOptions): Promise<Record<string, number>> {
-    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], options);
+    // Always exclude count_for_stats=false shows so the "filtered plays"
+    // column on /songs matches the global Song.timesPlayed semantic.
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([statsShowsSql("shows")], options);
 
     const whereClause = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}` : Prisma.empty;
 
@@ -338,6 +362,8 @@ export class SongPageComposer {
         shows.date,
         shows.venue_id,
         shows.slug,
+        shows.day_order,
+        shows.count_for_stats,
         venues.id as venue_id,
         venues.name as venue_name,
         venues.city as venue_city,
@@ -352,7 +378,11 @@ export class SongPageComposer {
         tracks.all_timer,
         tracks.average_rating,
         tracks.ratings_count,
-        tracks.note
+        tracks.note,
+        tracks.gap,
+        tracks.previous_performance_show_id,
+        prevShows.slug as previous_show_slug,
+        prevShows.date as previous_show_date
         ${songColumns},
         nextTracks.segue as next_track_segue,
         prevTracks.segue as prev_track_segue,
@@ -375,8 +405,9 @@ export class SongPageComposer {
         AND prevTracks.position = tracks.position - 1
         AND prevTracks.set = tracks.set
       LEFT JOIN songs prevSongs ON prevTracks.song_id = prevSongs.id
+      LEFT JOIN shows prevShows ON tracks.previous_performance_show_id = prevShows.id
       WHERE ${options.whereClause}
-      ORDER BY shows.date DESC, tracks.set, tracks.position
+      ORDER BY ${showOrderBySql("shows", "DESC")}, tracks.set, tracks.position
     `;
   }
 
@@ -510,6 +541,8 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
       slug: row.slug,
       date: row.date,
       venueId: row.venue_id,
+      dayOrder: row.day_order,
+      countForStats: row.count_for_stats,
     },
     venue:
       row.venue_id && row.venue_slug && row.venue_name
@@ -551,6 +584,64 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     position: row.position,
     cover: row.song_cover ?? undefined,
     authorId: row.song_author_id ?? null,
+    gap: row.gap,
+    previousPerformanceShowId: row.previous_performance_show_id,
+    previousShow:
+      row.previous_show_slug && row.previous_show_date
+        ? { slug: row.previous_show_slug, date: row.previous_show_date }
+        : undefined,
+  };
+}
+
+/**
+ * Compute the catalogue-relative rarity numbers shown on the song detail
+ * page. Pure function — no DB, no side effects. Year-bucket granularity
+ * matches the per-year show-count cache (`stats:shows-by-year`); the
+ * debut year is counted on the "since" side, so Before + Since always
+ * equals totalShows.
+ */
+export function computeRarityStats(
+  song: { dateFirstPlayed: Date | null; timesPlayed: number },
+  showsByYear: Record<number, number>,
+): {
+  totalShows: number;
+  showsBeforeDebut: number | null;
+  showsSinceDebut: number | null;
+  percentOfAllShows: number | null;
+  percentSinceDebut: number | null;
+  averageShowsPerPlay: number | null;
+} {
+  const totalShows = Object.values(showsByYear).reduce((sum, count) => sum + count, 0);
+  const percentOfAllShows = totalShows === 0 ? null : song.timesPlayed / totalShows;
+
+  if (!song.dateFirstPlayed) {
+    return {
+      totalShows,
+      showsBeforeDebut: null,
+      showsSinceDebut: null,
+      percentOfAllShows,
+      percentSinceDebut: null,
+      averageShowsPerPlay: null,
+    };
+  }
+
+  const debutYear = song.dateFirstPlayed.getUTCFullYear();
+  const showsSinceDebut = Object.entries(showsByYear)
+    .filter(([year]) => Number(year) >= debutYear)
+    .reduce((sum, [, count]) => sum + count, 0);
+  const showsBeforeDebut = totalShows - showsSinceDebut;
+  const percentSinceDebut = showsSinceDebut === 0 ? null : song.timesPlayed / showsSinceDebut;
+  // Inverse of percentSinceDebut, surfaced separately because "played every
+  // X shows" reads more naturally than a percentage for sparse songs.
+  const averageShowsPerPlay = song.timesPlayed === 0 ? null : showsSinceDebut / song.timesPlayed;
+
+  return {
+    totalShows,
+    showsBeforeDebut,
+    showsSinceDebut,
+    percentOfAllShows,
+    percentSinceDebut,
+    averageShowsPerPlay,
   };
 }
 
@@ -560,6 +651,8 @@ export type PerformanceDto = {
   date: string;
   venue_id: string;
   slug: string;
+  day_order: number | null;
+  count_for_stats: boolean;
 
   // Venue fields
   venue_name: string | null;
@@ -578,6 +671,10 @@ export type PerformanceDto = {
   average_rating: number;
   ratings_count: number;
   note: string | null;
+  gap: number | null;
+  previous_performance_show_id: string | null;
+  previous_show_slug: string | null;
+  previous_show_date: string | null;
 
   // Next/Prev track fields
   next_track_segue: string | null;

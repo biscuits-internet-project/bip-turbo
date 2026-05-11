@@ -52,8 +52,7 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
             const venue = await response.json();
             setCurrentVenue(venue);
           }
-        } catch (_error) {
-        }
+        } catch (_error) {}
       } else if (!value || value === "none") {
         setCurrentVenue(null);
       }
@@ -90,7 +89,10 @@ export function VenueSearch({ value, onValueChange, placeholder = "Search venues
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border" align="start">
+      <PopoverContent
+        className="p-0 bg-content-bg-primary/95 backdrop-blur-md border border-content-glass-border"
+        align="start"
+      >
         <Command className="bg-transparent" shouldFilter={false}>
           <CommandInput
             placeholder="Search venues..."

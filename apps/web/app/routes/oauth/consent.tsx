@@ -1,9 +1,9 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { Form, useLoaderData, redirect } from "react-router";
 import { Check } from "lucide-react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { Form, redirect, useLoaderData } from "react-router";
+import { ServerError } from "~/components/layout/errors";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { ServerError } from "~/components/layout/errors";
 import { getServerClient } from "~/server/supabase";
 
 export const ErrorBoundary = ServerError;
@@ -19,7 +19,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase } = getServerClient(request);
 
   // Check if user is logged in
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     // Redirect to login, then back here
     const returnUrl = encodeURIComponent(request.url);
@@ -84,11 +86,10 @@ export default function OAuthConsent() {
               Authorize Application
             </CardTitle>
             <CardDescription className="text-base text-content-text-secondary">
-              <strong className="text-content-text-primary">{client?.name || "An application"}</strong> wants to access your account
+              <strong className="text-content-text-primary">{client?.name || "An application"}</strong> wants to access
+              your account
             </CardDescription>
-            <p className="text-sm text-content-text-tertiary">
-              Signed in as {user.email}
-            </p>
+            <p className="text-sm text-content-text-tertiary">Signed in as {user.email}</p>
           </CardHeader>
 
           <CardContent className="relative space-y-6">

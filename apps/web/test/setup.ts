@@ -7,3 +7,10 @@ if (typeof Element.prototype.hasPointerCapture !== "function") {
 if (typeof Element.prototype.scrollIntoView !== "function") {
   Element.prototype.scrollIntoView = () => {};
 }
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}

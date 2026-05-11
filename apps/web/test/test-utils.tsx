@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { type Options, userEvent } from "@testing-library/user-event";
-import { expect } from "vitest";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { expect } from "vitest";
 
 type voidFunc = () => void;
 

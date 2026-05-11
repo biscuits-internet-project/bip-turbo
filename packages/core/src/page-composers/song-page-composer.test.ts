@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, test, vi } from "vitest";
 import {
   buildSetPositionKey,
+  computeRarityStats,
   computeTagsForPerformance,
   type PerformanceDto,
   SongPageComposer,
@@ -15,7 +16,14 @@ import {
 function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
   return {
     trackId: "track-1",
-    show: { id: "show-1", slug: "2024-06-15", date: "2024-06-15", venueId: "venue-1" },
+    show: {
+      id: "show-1",
+      slug: "2024-06-15",
+      date: "2024-06-15",
+      venueId: "venue-1",
+      dayOrder: null,
+      countForStats: true,
+    },
     set: "S1",
     position: 3,
     segue: null,
@@ -52,6 +60,8 @@ function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
     date: "2024-06-15",
     venue_id: "venue-1",
     slug: "2024-06-15",
+    day_order: null,
+    count_for_stats: true,
     // Venue fields
     venue_name: "The Capitol Theatre",
     venue_city: "Port Chester",
@@ -68,6 +78,10 @@ function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
     average_rating: 4.5,
     ratings_count: 12,
     note: null,
+    gap: null,
+    previous_performance_show_id: null,
+    previous_show_slug: null,
+    previous_show_date: null,
     // Next/Prev track segues
     next_track_segue: null,
     prev_track_segue: null,
@@ -231,6 +245,8 @@ describe("transformToSongPagePerformanceView", () => {
       slug: "2024-06-15",
       date: "2024-06-15",
       venueId: "venue-1",
+      dayOrder: null,
+      countForStats: true,
     });
     expect(view.venue).toEqual({
       id: "venue-1",
@@ -295,6 +311,22 @@ describe("transformToSongPagePerformanceView", () => {
   // current impl). Documented quirk: `|| undefined` means `0` values also
   // become `undefined`, which is fine for rating/ratingsCount but worth
   // pinning so the behavior is explicit.
+  // Phase 1 of the stats expansion denormalized gap onto Track. The
+  // composer must surface gap and previousPerformanceShowId on the view so
+  // the song-detail performances table can render the Gap column without
+  // an extra query per row.
+  test("maps gap and previous_performance_show_id through to the view", () => {
+    const debutView = transformToSongPagePerformanceView(makeDto({ gap: null, previous_performance_show_id: null }));
+    expect(debutView.gap).toBeNull();
+    expect(debutView.previousPerformanceShowId).toBeNull();
+
+    const subsequentView = transformToSongPagePerformanceView(
+      makeDto({ gap: 7, previous_performance_show_id: "prior-show-id" }),
+    );
+    expect(subsequentView.gap).toBe(7);
+    expect(subsequentView.previousPerformanceShowId).toBe("prior-show-id");
+  });
+
   test("null rating, ratings_count, and note all map to undefined", () => {
     const view = transformToSongPagePerformanceView(
       makeDto({ average_rating: null as never, ratings_count: null as never, note: null }),
@@ -491,5 +523,70 @@ describe("CacheKeys", () => {
   // show + all-timer counts for today's calendar day.
   test("onThisDayCounts includes the monthDay in the key", () => {
     expect(CacheKeys.shows.onThisDayCounts("04-08")).toBe("shows:on-this-day-counts:04-08");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeRarityStats — pure rarity math driven by the per-year show counts
+// ---------------------------------------------------------------------------
+
+describe("computeRarityStats", () => {
+  // Song that debuted in the catalogue's earliest year: all five fields
+  // populate, percentages compute against their proper denominators, and
+  // Before + Since must equal totalShows. That invariant is the whole
+  // reason we split the pair this way, so it gets its own assertion.
+  test("debut in earliest year yields complementary Before/Since and full percentages", () => {
+    const showsByYear = { 2000: 50, 2001: 60, 2002: 70, 2003: 80 };
+    const dateFirstPlayed = new Date(Date.UTC(2000, 5, 15));
+    const timesPlayed = 130;
+
+    const result = computeRarityStats({ dateFirstPlayed, timesPlayed }, showsByYear);
+
+    expect(result.totalShows).toBe(260);
+    expect(result.showsBeforeDebut).toBe(0);
+    expect(result.showsSinceDebut).toBe(260);
+    expect(result.percentOfAllShows).toBeCloseTo(0.5, 5);
+    expect(result.percentSinceDebut).toBeCloseTo(0.5, 5);
+    expect(result.averageShowsPerPlay).toBeCloseTo(2, 5);
+    expect((result.showsBeforeDebut ?? 0) + (result.showsSinceDebut ?? 0)).toBe(result.totalShows);
+  });
+
+  // Song that entered the rotation late: most of the catalogue precedes
+  // the debut year, and Since is the debut-year-onward sum (year cutoff
+  // is inclusive of the debut year). % Since Debut should be higher than
+  // % of All Shows for a song with these proportions.
+  test("recent debut puts most of the catalogue in Before and inclusively buckets the debut year into Since", () => {
+    const showsByYear = { 2000: 50, 2001: 60, 2002: 70, 2003: 80, 2024: 40, 2025: 20 };
+    const dateFirstPlayed = new Date(Date.UTC(2024, 2, 1));
+    const timesPlayed = 6;
+
+    const result = computeRarityStats({ dateFirstPlayed, timesPlayed }, showsByYear);
+
+    expect(result.totalShows).toBe(320);
+    expect(result.showsBeforeDebut).toBe(260);
+    expect(result.showsSinceDebut).toBe(60);
+    expect(result.percentOfAllShows).toBeCloseTo(6 / 320, 5);
+    expect(result.percentSinceDebut).toBeCloseTo(6 / 60, 5);
+    expect(result.averageShowsPerPlay).toBeCloseTo(60 / 6, 5);
+    // Sanity: scarcity reads stronger against the song's own era.
+    expect(result.percentSinceDebut).toBeGreaterThan(result.percentOfAllShows ?? 0);
+  });
+
+  // No debut date: Before/Since/% Since must all be null so the UI can
+  // render "—" without dividing by zero or producing NaN/Infinity.
+  // % of All Shows is 0 (real and meaningful: the song accounts for none
+  // of the catalogue). totalShows still populates because it's
+  // catalogue-level, not song-level.
+  test("never-played song nulls debut-relative fields and avoids divide-by-zero", () => {
+    const showsByYear = { 2000: 50, 2001: 60 };
+
+    const result = computeRarityStats({ dateFirstPlayed: null, timesPlayed: 0 }, showsByYear);
+
+    expect(result.totalShows).toBe(110);
+    expect(result.showsBeforeDebut).toBeNull();
+    expect(result.showsSinceDebut).toBeNull();
+    expect(result.percentSinceDebut).toBeNull();
+    expect(result.averageShowsPerPlay).toBeNull();
+    expect(result.percentOfAllShows).toBe(0);
   });
 });

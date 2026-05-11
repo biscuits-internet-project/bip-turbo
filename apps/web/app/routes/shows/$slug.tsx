@@ -23,6 +23,7 @@ import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
+import { useSetlistView } from "~/hooks/use-setlist-view";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { type Context, publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
@@ -152,6 +153,7 @@ export default function Show() {
   } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
+  const [setlistView, setSetlistView] = useSetlistView();
   const { userRatingMap } = useShowUserData([setlist.show.id]);
   const userRating = userRatingMap.get(setlist.show.id) ?? null;
 
@@ -254,17 +256,17 @@ export default function Show() {
       <div className="space-y-2">
         <div className="flex justify-start">
           <Link
-            to="/shows"
+            to={`/shows/year/${setlist.show.date.slice(0, 4)}`}
             className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
           >
             <ArrowLeft className="h-3 w-3" />
-            <span>Back to shows</span>
+            <span>Back to {setlist.show.date.slice(0, 4)} shows</span>
           </Link>
         </div>
         <div className="flex justify-between items-center gap-2">
           {adjacentShows.previous ? (
             <Link
-              to={`/shows/${adjacentShows.previous.slug}`}
+              to={`/shows/${adjacentShows.previous.slug}${setlistView === "gap-chart" ? "?view=gap-chart" : ""}`}
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0"
             >
               <ChevronLeft className="h-3 w-3 shrink-0" />
@@ -290,7 +292,7 @@ export default function Show() {
           </Link>
           {adjacentShows.next ? (
             <Link
-              to={`/shows/${adjacentShows.next.slug}`}
+              to={`/shows/${adjacentShows.next.slug}${setlistView === "gap-chart" ? "?view=gap-chart" : ""}`}
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0 justify-end"
             >
               <span className="truncate">
@@ -323,7 +325,18 @@ export default function Show() {
             userRating={userRating}
             showRating={setlist.show.averageRating}
             externalSources={externalSources}
+            defaultView={setlistView}
+            onViewChange={setSetlistView}
           />
+          {/* Note when count_for_stats=false (soundchecks, radio sessions,
+              cancelled stubs, late-night Tractorbeam sets). Yellow accent on
+              the left edge for attention, no full background so it doesn't
+              dominate the layout. */}
+          {setlist.show.countForStats === false && (
+            <p className="mt-3 border-l-2 border-amber-500 pl-3 py-1 text-sm text-content-text-secondary">
+              This performance does not count for stats purposes.
+            </p>
+          )}
         </div>
 
         {/* Right rail (mobile: sits between setlist and reviews) */}

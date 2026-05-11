@@ -2,8 +2,8 @@ import type { BlogPost, BlogPostState, BlogPostType, Logger } from "@bip/domain"
 import type { DbBlogPost, DbClient } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
-import { slugify } from "../_shared/utils/slugify";
 import type { RedisService } from "../_shared/redis";
+import { slugify } from "../_shared/utils/slugify";
 
 const BLOG_POSTS_CACHE_KEY = "blog-posts";
 
