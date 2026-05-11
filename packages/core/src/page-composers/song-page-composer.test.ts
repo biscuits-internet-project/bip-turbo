@@ -3,9 +3,11 @@ import { CacheKeys } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import { describe, expect, test, vi } from "vitest";
 import {
+  assignFilteredGaps,
   buildSetPositionKey,
   computeRarityStats,
   computeTagsForPerformance,
+  isNarrowingFilter,
   type PerformanceDto,
   SongPageComposer,
   transformToSongPagePerformanceView,
@@ -311,10 +313,9 @@ describe("transformToSongPagePerformanceView", () => {
   // current impl). Documented quirk: `|| undefined` means `0` values also
   // become `undefined`, which is fine for rating/ratingsCount but worth
   // pinning so the behavior is explicit.
-  // Phase 1 of the stats expansion denormalized gap onto Track. The
-  // composer must surface gap and previousPerformanceShowId on the view so
-  // the song-detail performances table can render the Gap column without
-  // an extra query per row.
+  // gap is denormalized on Track. The composer must surface gap and
+  // previousPerformanceShowId on the view so the song-detail performances
+  // table can render the Gap column without an extra query per row.
   test("maps gap and previous_performance_show_id through to the view", () => {
     const debutView = transformToSongPagePerformanceView(makeDto({ gap: null, previous_performance_show_id: null }));
     expect(debutView.gap).toBeNull();
@@ -485,6 +486,313 @@ describe("buildSongPerformanceCounts", () => {
 });
 
 // ---------------------------------------------------------------------------
+// isNarrowingFilter — gate for filteredGap computation
+// ---------------------------------------------------------------------------
+
+describe("isNarrowingFilter", () => {
+  // No options at all → nothing to narrow against. Callers skip filteredGap
+  // computation and the column stays hidden.
+  test("returns false when options is undefined", () => {
+    expect(isNarrowingFilter(undefined)).toBe(false);
+  });
+
+  // Empty options object → no active filter. Same outcome as undefined.
+  test("returns false for an empty options object", () => {
+    expect(isNarrowingFilter({})).toBe(false);
+  });
+
+  // Cover/author filters pick which songs appear on /songs but don't narrow
+  // which performances of a given song count — every performance of a cover
+  // song is still a cover. They must NOT trigger filteredGap.
+  test("returns false when only cover or author is set", () => {
+    expect(isNarrowingFilter({ cover: true })).toBe(false);
+    expect(isNarrowingFilter({ authorId: "author-1" })).toBe(false);
+  });
+
+  // Each narrowing axis on its own is sufficient. Parameterized so adding
+  // a new narrowing filter shows up here visibly.
+  test.each([
+    ["startDate", { startDate: new Date("2024-01-01") }],
+    ["endDate", { endDate: new Date("2024-12-31") }],
+    ["attendedUserId", { attendedUserId: "user-1" }],
+    ["encore", { encore: true }],
+    ["setOpener", { setOpener: true }],
+    ["setCloser", { setCloser: true }],
+    ["segueIn", { segueIn: true }],
+    ["segueOut", { segueOut: true }],
+    ["standalone", { standalone: true }],
+    ["inverted", { inverted: true }],
+    ["dyslexic", { dyslexic: true }],
+    ["allTimer", { allTimer: true }],
+    ["monthDay", { monthDay: "07-26" }],
+  ])("returns true when %s is set", (_label, options) => {
+    expect(isNarrowingFilter(options)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assignFilteredGaps — per-performance gap walk against the filtered universe
+// ---------------------------------------------------------------------------
+
+describe("assignFilteredGaps", () => {
+  // Helper: builds a minimal SongPagePerformance with the fields the gap
+  // walk reads (trackId, show.id, show.date, show.dayOrder, position).
+  // Other fields kept thin so the test focuses on gap semantics.
+  function perf(overrides: {
+    trackId: string;
+    showId: string;
+    date: string;
+    position?: number;
+    dayOrder?: number | null;
+  }): SongPagePerformance {
+    return {
+      trackId: overrides.trackId,
+      show: {
+        id: overrides.showId,
+        slug: overrides.date,
+        date: overrides.date,
+        venueId: "venue-1",
+        dayOrder: overrides.dayOrder ?? null,
+        countForStats: true,
+      },
+      position: overrides.position ?? 1,
+      set: "S1",
+      segue: null,
+      allTimer: false,
+      annotations: [],
+    };
+  }
+
+  // The very first filtered performance has no prior, so gap = null (★ debut
+  // of filtered set). Subsequent performances get a number.
+  test("first filtered performance has filteredGap null", () => {
+    const performances = [perf({ trackId: "t-confrontation-2024", showId: "s-2024", date: "2024-06-15" })];
+
+    assignFilteredGaps(performances, ["2024-06-15"]);
+
+    expect(performances[0].filteredGap).toBeNull();
+  });
+
+  // Two filtered performances over a four-show filter-matching universe:
+  // play #1 at index 0, play #2 at index 3 → exactly 2 matching shows
+  // strictly between (indices 1, 2). Mirrors the existing Track.gap math.
+  test("counts filter-matching shows strictly between consecutive performances", () => {
+    const performances = [
+      perf({ trackId: "t-basis-1", showId: "s-1", date: "2024-01-10" }),
+      perf({ trackId: "t-basis-2", showId: "s-4", date: "2024-04-10" }),
+    ];
+
+    // Filter-matching set: 4 shows ordered chronologically. The song was
+    // played at the first and the last; the 2 shows in the middle count.
+    assignFilteredGaps(performances, ["2024-01-10", "2024-02-15", "2024-03-20", "2024-04-10"]);
+
+    expect(performances[0].filteredGap).toBeNull();
+    expect(performances[1].filteredGap).toBe(2);
+  });
+
+  // Within-show repeat: two performances at the same show. The gap walk
+  // shares the same numeric gap across both — the icon (↺) in the cell
+  // distinguishes the repeat, not the gap value. Mirrors Track.gap.
+  test("within-show repeat shares the same filteredGap as the first occurrence", () => {
+    const performances = [
+      perf({ trackId: "t-aceetobee-pre", showId: "s-pre", date: "2024-01-10" }),
+      perf({ trackId: "t-spaga-1", showId: "s-repeat", date: "2024-05-01", position: 2 }),
+      perf({ trackId: "t-spaga-2", showId: "s-repeat", date: "2024-05-01", position: 7 }),
+    ];
+
+    assignFilteredGaps(performances, ["2024-01-10", "2024-03-01", "2024-05-01"]);
+
+    expect(performances[0].filteredGap).toBeNull();
+    // Both tracks at the repeat-show inherit the same gap value (1 show
+    // between 2024-01-10 and 2024-05-01 in the filtered set).
+    expect(performances[1].filteredGap).toBe(1);
+    expect(performances[2].filteredGap).toBe(1);
+  });
+
+  // An empty filter-matching universe (no shows match the filter at all)
+  // means even the song's own performances aren't in the universe. The
+  // first performance is still a "debut" of the filtered set; subsequent
+  // ones gap against the previous filtered performance — but the universe
+  // has no other shows in between, so gap is 0.
+  test("with no shows in matching universe between performances, gap is 0", () => {
+    const performances = [
+      perf({ trackId: "t-helicopters-1", showId: "s-a", date: "2024-01-10" }),
+      perf({ trackId: "t-helicopters-2", showId: "s-b", date: "2024-02-10" }),
+    ];
+
+    // Only the song's own two shows are in the matching universe — nothing
+    // else falls between them in the filtered set.
+    assignFilteredGaps(performances, ["2024-01-10", "2024-02-10"]);
+
+    expect(performances[0].filteredGap).toBeNull();
+    expect(performances[1].filteredGap).toBe(0);
+  });
+
+  // The helper sorts internally before walking — callers can pass
+  // performances in any order (e.g., a query that returned DESC) and the
+  // gap math still uses canonical chronological order.
+  test("walks chronologically even when input order is reversed", () => {
+    const performances = [
+      perf({ trackId: "t-late", showId: "s-late", date: "2024-04-10" }),
+      perf({ trackId: "t-early", showId: "s-early", date: "2024-01-10" }),
+    ];
+
+    assignFilteredGaps(performances, ["2024-01-10", "2024-02-15", "2024-04-10"]);
+
+    // Early track is the debut of the filtered set regardless of input order.
+    const early = performances.find((p) => p.trackId === "t-early");
+    const late = performances.find((p) => p.trackId === "t-late");
+    expect(early?.filteredGap).toBeNull();
+    expect(late?.filteredGap).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildFilteredSongRarity — per-song filtered analogs of /songs rarity columns
+// ---------------------------------------------------------------------------
+
+describe("buildFilteredSongRarity", () => {
+  // The helper sequences two queries: first `getFilterMatchingShowDates`
+  // (the matching universe), then a GROUP-BY-song aggregation (per-song
+  // first/last filtered show + count). Mock both responses by chaining
+  // `mockResolvedValueOnce`.
+  function createComposer(
+    matchingDates: Array<{ d: string }>,
+    songRows: Array<{ song_id: string; show_count: string; first_date: string; last_date: string }>,
+  ) {
+    const $queryRaw = vi.fn().mockResolvedValueOnce(matchingDates).mockResolvedValueOnce(songRows);
+    const mockDb = { $queryRaw };
+    return new SongPageComposer(mockDb as never, {} as never);
+  }
+
+  // Empty song id list → short-circuits before any queries fire. Used by the
+  // loader when the filter matched zero songs.
+  test("returns an empty map when songIds is empty", async () => {
+    const composer = createComposer([], []);
+
+    const result = await composer.buildFilteredSongRarity([], { encore: true });
+
+    expect(result.size).toBe(0);
+  });
+
+  // When the matching universe is empty (no shows fit the filter at all),
+  // there can be no per-song aggregates — return empty without firing the
+  // second query.
+  test("returns an empty map when no shows match the filter", async () => {
+    const composer = createComposer(
+      [],
+      [{ song_id: "above-the-waves", show_count: "0", first_date: "2024-01-01", last_date: "2024-01-01" }],
+    );
+
+    const result = await composer.buildFilteredSongRarity(["above-the-waves"], { encore: true });
+
+    expect(result.size).toBe(0);
+  });
+
+  // Core math: a song played at the first and last of 5 matching shows.
+  //  - filteredShowsSinceLastPlayed: shows strictly after last play  → 0
+  //    (the last play IS the latest matching show).
+  //  - showsOnOrAfterDebut: 5 (debut at index 0, inclusive).
+  //  - filteredPercentSinceDebut: 2 / 5 = 0.4.
+  //  - filteredAverageShowsPerPlay: shows-in-gaps / number-of-gaps =
+  //    (5 - 2) / (2 - 1) = 3.0 (3 matching shows fell between the 2 plays).
+  test("computes filteredShowsSinceLastPlayed, percentSinceDebut, averageShowsPerPlay against the matching universe", async () => {
+    const composer = createComposer(
+      [{ d: "2024-01-01" }, { d: "2024-02-01" }, { d: "2024-03-01" }, { d: "2024-04-01" }, { d: "2024-05-01" }],
+      [{ song_id: "above-the-waves", show_count: "2", first_date: "2024-01-01", last_date: "2024-05-01" }],
+    );
+
+    const result = await composer.buildFilteredSongRarity(["above-the-waves"], { encore: true });
+
+    const row = result.get("above-the-waves");
+    expect(row?.filteredShowsSinceLastPlayed).toBe(0);
+    expect(row?.filteredPercentSinceDebut).toBeCloseTo(0.4);
+    expect(row?.filteredAverageShowsPerPlay).toBeCloseTo(3);
+  });
+
+  // When the song's last filtered play is the earliest matching show and
+  // there are more matching shows after it → the gap is the number of
+  // shows after. Sanity check that `countShowsAfter` semantics propagate.
+  // A single play has no gaps to average, so filteredAverageShowsPerPlay
+  // must be null (em-dash in the UI), not a degenerate 1.0.
+  test("filteredShowsSinceLastPlayed counts matching shows strictly after the last filtered play", async () => {
+    const composer = createComposer(
+      [{ d: "2024-01-01" }, { d: "2024-02-01" }, { d: "2024-03-01" }, { d: "2024-04-01" }],
+      [{ song_id: "confrontation", show_count: "1", first_date: "2024-01-01", last_date: "2024-01-01" }],
+    );
+
+    const result = await composer.buildFilteredSongRarity(["confrontation"], { attendedUserId: "user-1" });
+
+    const row = result.get("confrontation");
+    // Three matching shows are strictly after the one filtered play.
+    expect(row?.filteredShowsSinceLastPlayed).toBe(3);
+    // One filtered play → no gaps → null average.
+    expect(row?.filteredAverageShowsPerPlay).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getFilterMatchingShowDates — denominator for filtered rarity columns
+// ---------------------------------------------------------------------------
+
+describe("getFilterMatchingShowDates", () => {
+  // The helper returns the set of stats-eligible shows that contain at least
+  // one track matching the active filters. It drives the "shows between" /
+  // "shows since" counts for the Filtered Gap column on song detail and the
+  // filtered rarity columns on /songs.
+  function createComposer(queryRawResult: Array<{ d: string }>) {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue(queryRawResult),
+    };
+    return { composer: new SongPageComposer(mockDb as never, {} as never), mockDb };
+  }
+
+  // The raw query returns dates as `YYYY-MM-DD` strings, already ORDER BY'd
+  // ascending. The method should pass them through as-is so callers can
+  // binary-search via `countShowsAfter`.
+  test("returns ISO date strings from raw query result rows", async () => {
+    const { composer } = createComposer([{ d: "2024-06-15" }, { d: "2024-07-26" }, { d: "2024-12-31" }]);
+
+    const result = await composer.getFilterMatchingShowDates({ encore: true });
+
+    expect(result).toEqual(["2024-06-15", "2024-07-26", "2024-12-31"]);
+  });
+
+  // No filter combination matches → empty array, not null. Callers treat
+  // empty as "no matching shows" and short-circuit downstream gap math.
+  test("returns empty array when no rows match", async () => {
+    const { composer } = createComposer([]);
+
+    const result = await composer.getFilterMatchingShowDates({ encore: true, segueIn: true });
+
+    expect(result).toEqual([]);
+  });
+
+  // Confirms the helper actually executes a query when called. SQL
+  // correctness is covered by buildFilterQuery tests; this just verifies
+  // the integration point fires.
+  test("executes a query through the db client", async () => {
+    const { composer, mockDb } = createComposer([{ d: "2024-06-15" }]);
+
+    await composer.getFilterMatchingShowDates({ attendedUserId: "user-1" });
+
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  // No filters at all → still queries (returns all stats-eligible shows).
+  // Callers may pass `{}` when there's no narrowing; the method must not
+  // throw or short-circuit before issuing the query.
+  test("executes a query even when no filter options are provided", async () => {
+    const { composer, mockDb } = createComposer([{ d: "2024-01-01" }]);
+
+    const result = await composer.getFilterMatchingShowDates({});
+
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(["2024-01-01"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // CacheKeys — on-this-day all-timers key
 // ---------------------------------------------------------------------------
 
@@ -547,7 +855,8 @@ describe("computeRarityStats", () => {
     expect(result.showsSinceDebut).toBe(260);
     expect(result.percentOfAllShows).toBeCloseTo(0.5, 5);
     expect(result.percentSinceDebut).toBeCloseTo(0.5, 5);
-    expect(result.averageShowsPerPlay).toBeCloseTo(2, 5);
+    // Mean gap between plays: shows-in-gaps / gaps = (260 - 130) / (130 - 1).
+    expect(result.averageShowsPerPlay).toBeCloseTo(130 / 129, 5);
     expect((result.showsBeforeDebut ?? 0) + (result.showsSinceDebut ?? 0)).toBe(result.totalShows);
   });
 
@@ -567,7 +876,9 @@ describe("computeRarityStats", () => {
     expect(result.showsSinceDebut).toBe(60);
     expect(result.percentOfAllShows).toBeCloseTo(6 / 320, 5);
     expect(result.percentSinceDebut).toBeCloseTo(6 / 60, 5);
-    expect(result.averageShowsPerPlay).toBeCloseTo(60 / 6, 5);
+    // Mean gap between plays: (60 - 6) / (6 - 1) = 54 / 5 = 10.8 — average
+    // 10.8 shows happened between consecutive plays of the song.
+    expect(result.averageShowsPerPlay).toBeCloseTo(54 / 5, 5);
     // Sanity: scarcity reads stronger against the song's own era.
     expect(result.percentSinceDebut).toBeGreaterThan(result.percentOfAllShows ?? 0);
   });
@@ -588,5 +899,18 @@ describe("computeRarityStats", () => {
     expect(result.percentSinceDebut).toBeNull();
     expect(result.averageShowsPerPlay).toBeNull();
     expect(result.percentOfAllShows).toBe(0);
+  });
+
+  // Single-play song has no gaps between plays to average — averageShowsPerPlay
+  // must be null, not 1.0 or any degenerate value. percentSinceDebut still
+  // computes (1 play out of the 1 show in the song's era = 100%).
+  test("single-play song nulls averageShowsPerPlay (no gaps to average)", () => {
+    const showsByYear = { 2024: 50 };
+    const dateFirstPlayed = new Date(Date.UTC(2024, 0, 1));
+
+    const result = computeRarityStats({ dateFirstPlayed, timesPlayed: 1 }, showsByYear);
+
+    expect(result.averageShowsPerPlay).toBeNull();
+    expect(result.percentSinceDebut).toBeCloseTo(1 / 50, 5);
   });
 });

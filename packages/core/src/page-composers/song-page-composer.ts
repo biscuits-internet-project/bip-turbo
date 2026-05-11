@@ -2,14 +2,24 @@ import type { AllTimersPageView, Annotation, SongPagePerformance, SongPageView }
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
 import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
+import { computeTrackGaps, sortTracksForGapWalk, type TrackForGapWalk } from "../_shared/track-gap";
 import type { SongService } from "../songs/song-service";
-import type { StatsService } from "../stats/stats-service";
+import { countShowsAfter, countShowsOnOrAfter, type StatsService } from "../stats/stats-service";
 
 /**
  * Filters for querying performances. All fields are optional — only
  * active filters produce SQL conditions. Used by buildAllTimers and
  * buildSongPerformances to construct dynamic WHERE clauses.
  */
+/** Per-song aggregates returned by `buildFilteredSongRarity`. */
+export interface FilteredSongRarity {
+  filteredShowsSinceLastPlayed: number | null;
+  filteredPercentSinceDebut: number | null;
+  filteredAverageShowsPerPlay: number | null;
+  dateFirstFilteredPlayed: Date;
+  dateLastFilteredPlayed: Date;
+}
+
 export interface PerformanceFilterOptions {
   startDate?: Date;
   endDate?: Date;
@@ -227,6 +237,11 @@ export class SongPageComposer {
     }));
     await this.enrichPerformances(performances);
 
+    if (isNarrowingFilter(options)) {
+      const matchingShowDates = await this.getFilterMatchingShowDates(options ?? {});
+      assignFilteredGaps(performances, matchingShowDates);
+    }
+
     return performances;
   }
 
@@ -261,6 +276,108 @@ export class SongPageComposer {
       result[row.song_id] = Number.parseInt(row.count, 10);
     }
     return result;
+  }
+
+  /**
+   * Per-song aggregates restricted to the active filter scope. Returns
+   * filtered-version analogs of the three rarity columns on /songs:
+   *   - filteredShowsSinceLastPlayed: matching-universe shows strictly
+   *     after this song's last filtered play
+   *   - filteredPercentSinceDebut: filteredTimesPlayed divided by the
+   *     count of matching-universe shows on or after this song's first
+   *     filtered play
+   *   - filteredAverageShowsPerPlay: same denominator over the numerator,
+   *     inverted — "matching-universe shows per filtered play"
+   *
+   * Only computed for the survivor set the loader already produced. Songs
+   * absent from the result map are left untouched by the caller; the UI
+   * renders em-dash for missing entries.
+   */
+  async buildFilteredSongRarity(
+    songIds: string[],
+    options: PerformanceFilterOptions,
+  ): Promise<Map<string, FilteredSongRarity>> {
+    if (songIds.length === 0) return new Map();
+
+    const matchingShowDates = await this.getFilterMatchingShowDates(options);
+    if (matchingShowDates.length === 0) return new Map();
+
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([statsShowsSql("shows")], options);
+    conditions.push(Prisma.sql`tracks.song_id = ANY(${songIds}::uuid[])`);
+
+    const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`;
+    const extraJoinsSql = extraJoins.length > 0 ? Prisma.sql`${Prisma.join(extraJoins, "\n      ")}` : Prisma.empty;
+
+    const rows = await this.db.$queryRaw<
+      Array<{ song_id: string; show_count: string; first_date: string; last_date: string }>
+    >`
+      SELECT
+        tracks.song_id,
+        COUNT(DISTINCT tracks.show_id)::text AS show_count,
+        to_char(MIN(shows.date::date), 'YYYY-MM-DD') AS first_date,
+        to_char(MAX(shows.date::date), 'YYYY-MM-DD') AS last_date
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      JOIN songs ON tracks.song_id = songs.id
+      ${extraJoinsSql}
+      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id
+        AND prevTracks.position = tracks.position - 1
+        AND prevTracks.set = tracks.set
+      ${whereClause}
+      GROUP BY tracks.song_id
+    `;
+
+    const out = new Map<string, FilteredSongRarity>();
+    for (const row of rows) {
+      const filteredTimesPlayed = Number.parseInt(row.show_count, 10);
+      const filteredShowsSinceLastPlayed = countShowsAfter(matchingShowDates, row.last_date);
+      const showsOnOrAfterDebut = countShowsOnOrAfter(matchingShowDates, row.first_date);
+      const filteredPercentSinceDebut = showsOnOrAfterDebut === 0 ? null : filteredTimesPlayed / showsOnOrAfterDebut;
+      // Same mean-gap semantic as computeRarityStats.averageShowsPerPlay:
+      // shows that fell in gaps divided by the number of gaps. Requires
+      // at least 2 plays — a single play has no gaps to average.
+      const filteredAverageShowsPerPlay =
+        filteredTimesPlayed < 2 ? null : (showsOnOrAfterDebut - filteredTimesPlayed) / (filteredTimesPlayed - 1);
+      out.set(row.song_id, {
+        filteredShowsSinceLastPlayed,
+        filteredPercentSinceDebut,
+        filteredAverageShowsPerPlay,
+        dateFirstFilteredPlayed: new Date(row.first_date),
+        dateLastFilteredPlayed: new Date(row.last_date),
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Returns sorted ISO date strings (`YYYY-MM-DD`) for the stats-eligible
+   * shows that contain at least one track matching the active filters.
+   * Drives the "shows between" denominator for the Filtered Gap column on
+   * song detail and the filtered rarity aggregates on /songs.
+   *
+   * The query reuses the same JOINs as `buildSongPerformanceCounts` so the
+   * filter SQL composes consistently — anything that affects which
+   * performances count also affects which shows qualify here.
+   */
+  async getFilterMatchingShowDates(options: PerformanceFilterOptions): Promise<string[]> {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([statsShowsSql("shows")], options);
+
+    const whereClause = conditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}` : Prisma.empty;
+    const extraJoinsSql = extraJoins.length > 0 ? Prisma.sql`${Prisma.join(extraJoins, "\n      ")}` : Prisma.empty;
+
+    const rows = await this.db.$queryRaw<Array<{ d: string }>>`
+      SELECT DISTINCT to_char(shows.date::date, 'YYYY-MM-DD') AS d
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      JOIN songs ON tracks.song_id = songs.id
+      ${extraJoinsSql}
+      LEFT JOIN tracks prevTracks ON tracks.show_id = prevTracks.show_id
+        AND prevTracks.position = tracks.position - 1
+        AND prevTracks.set = tracks.set
+      ${whereClause}
+      ORDER BY d
+    `;
+    return rows.map((row) => row.d);
   }
 
   /**
@@ -486,6 +603,74 @@ export function buildSetPositionKey(showId: string, set: string): string {
 }
 
 /**
+ * True when the active filter set actually narrows which performances
+ * count — i.e., would produce a meaningfully different result than the
+ * all-time view. `cover` and `authorId` are intentionally excluded:
+ * they pick which songs surface (on /songs) but every performance of a
+ * surfacing song still counts, so they don't change per-song gap math.
+ *
+ * Used to gate the per-row filteredGap computation in
+ * `buildSongPerformances` — skipping the work entirely when no narrowing
+ * filter is active.
+ */
+export function isNarrowingFilter(options: PerformanceFilterOptions | undefined): boolean {
+  if (!options) return false;
+  return Boolean(
+    options.startDate ||
+      options.endDate ||
+      options.attendedUserId ||
+      options.encore ||
+      options.setOpener ||
+      options.setCloser ||
+      options.segueIn ||
+      options.segueOut ||
+      options.standalone ||
+      options.inverted ||
+      options.dyslexic ||
+      options.allTimer ||
+      options.monthDay,
+  );
+}
+
+/**
+ * Mutates each performance in `performances` to set `filteredGap` against
+ * the supplied `matchingShowDates` (the canonical-ordered ISO dates of
+ * shows in the active filter's universe). Reuses the pure `computeTrackGaps`
+ * walk used for all-time `Track.gap` — same algorithm, different denominator.
+ * Within-show repeats share the gap of their show's first track.
+ *
+ * Called after `enrichPerformances` so the performances already have their
+ * `show` and `position` fields populated.
+ */
+export function assignFilteredGaps(performances: SongPagePerformance[], matchingShowDates: string[]): void {
+  if (performances.length === 0) return;
+
+  const walkInput: TrackForGapWalk[] = performances.map((performance) => ({
+    trackId: performance.trackId,
+    showId: performance.show.id,
+    showDate: performance.show.date,
+    dayOrder: performance.show.dayOrder ?? null,
+    // Every filtered performance participates in the filtered-universe walk.
+    // The filtered set is the universe, so each row advances the "last
+    // performance" cursor — no count_for_stats sub-distinction here.
+    showCountForStats: true,
+    position: performance.position ?? 0,
+  }));
+
+  const sorted = sortTracksForGapWalk(walkInput);
+  const results = computeTrackGaps(sorted, matchingShowDates);
+
+  const gapByTrackId = new Map<string, number | null>();
+  for (const result of results) {
+    gapByTrackId.set(result.trackId, result.gap);
+  }
+
+  for (const performance of performances) {
+    performance.filteredGap = gapByTrackId.get(performance.trackId) ?? null;
+  }
+}
+
+/**
  * Compute the performance tags (encore, opener/closer, segues, standalone,
  * inverted, dyslexic) for a single performance. Pure function — no DB,
  * no side effects.
@@ -631,9 +816,12 @@ export function computeRarityStats(
     .reduce((sum, [, count]) => sum + count, 0);
   const showsBeforeDebut = totalShows - showsSinceDebut;
   const percentSinceDebut = showsSinceDebut === 0 ? null : song.timesPlayed / showsSinceDebut;
-  // Inverse of percentSinceDebut, surfaced separately because "played every
-  // X shows" reads more naturally than a percentage for sparse songs.
-  const averageShowsPerPlay = song.timesPlayed === 0 ? null : showsSinceDebut / song.timesPlayed;
+  // Mean gap between consecutive plays of this song since its debut.
+  // (showsSinceDebut - timesPlayed) is the number of shows that fell in
+  // gaps between plays; dividing by (timesPlayed - 1) gives the mean per
+  // gap. Requires at least 2 plays — a single-play song has no gaps to
+  // average. Null also when the song has never been played.
+  const averageShowsPerPlay = song.timesPlayed < 2 ? null : (showsSinceDebut - song.timesPlayed) / (song.timesPlayed - 1);
 
   return {
     totalShows,

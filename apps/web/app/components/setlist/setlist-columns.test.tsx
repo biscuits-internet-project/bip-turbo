@@ -283,9 +283,9 @@ describe("createSetlistColumns", () => {
   });
 
   // Within-show repeat: same songId appears at an earlier position in the
-  // table. Phase 1 stores the same gap on both tracks of a within-show
-  // repeat, so the icon — not the value — is what distinguishes the repeat
-  // from its first occurrence.
+  // table. Both occurrences share the same gap value, so the icon — not
+  // the number — is what distinguishes the repeat from its first
+  // occurrence.
   test("renders ↺ This Show for a within-show repeat", async () => {
     await renderTable([
       makeTrack({

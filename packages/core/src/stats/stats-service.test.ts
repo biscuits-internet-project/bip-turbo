@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { countShowsAfter, songStatsChanged } from "./stats-service";
+import { countShowsAfter, countShowsOnOrAfter, songStatsChanged } from "./stats-service";
 
 const baseFresh = {
   timesPlayed: 3,
@@ -160,5 +160,36 @@ describe("countShowsAfter", () => {
     const binary = countShowsAfter(dates, target);
     const linear = dates.filter((d) => d > target).length;
     expect(binary).toBe(linear);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// countShowsOnOrAfter — inclusive variant for the filtered-debut denominator
+// ---------------------------------------------------------------------------
+
+describe("countShowsOnOrAfter", () => {
+  // Drives Filtered Since Debut / Filtered Avg Gap on /songs: the denominator
+  // is "matching-universe shows from the song's first filtered play onward",
+  // which must include the debut show itself — so this is `>=`, not `>`.
+
+  // Empty catalogue → nothing on or after anything.
+  test("returns 0 for empty input regardless of target", () => {
+    expect(countShowsOnOrAfter([], "2024-01-01")).toBe(0);
+  });
+
+  // Target before every date → every entry counts.
+  test("returns full length when target precedes all dates", () => {
+    expect(countShowsOnOrAfter(["2010-01-01", "2015-06-15", "2020-12-31"], "2000-01-01")).toBe(3);
+  });
+
+  // Target equal to a date → that date counts (this is the on-or-after
+  // variant). Distinguishes this helper from `countShowsAfter`.
+  test("inclusive: target equal to a date includes that date", () => {
+    expect(countShowsOnOrAfter(["2020-01-01", "2021-01-01", "2022-01-01"], "2021-01-01")).toBe(2);
+  });
+
+  // Target later than the latest date → nothing remains.
+  test("returns 0 when target follows every date", () => {
+    expect(countShowsOnOrAfter(["2010-01-01", "2015-06-15"], "2030-01-01")).toBe(0);
   });
 });

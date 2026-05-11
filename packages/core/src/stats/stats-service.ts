@@ -350,6 +350,24 @@ export function countShowsAfter(sortedDates: string[], target: string): number {
   return sortedDates.length - lo;
 }
 
+/**
+ * Counts entries on or after `target` in a sorted-ascending string array.
+ * Used as the denominator for Filtered Since Debut / Filtered Avg Gap on
+ * /songs — "matching-universe shows from this song's first filtered play
+ * onward", which includes the debut show itself.
+ */
+export function countShowsOnOrAfter(sortedDates: string[], target: string): number {
+  if (sortedDates.length === 0) return 0;
+  let lo = 0;
+  let hi = sortedDates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDates[mid] < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return sortedDates.length - lo;
+}
+
 function stableYearlyJson(value: unknown): string {
   if (!value || typeof value !== "object") return "[]";
   const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

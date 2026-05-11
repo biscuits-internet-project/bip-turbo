@@ -18,6 +18,14 @@ export const songSchema = z.object({
   // Absent when no filter is active; the UI uses its presence to decide whether to render
   // the "Filtered Plays" column alongside the all-time Plays column.
   filteredTimesPlayed: z.number().optional(),
+  // Filtered analogs of the rarity fields below — populated only when a narrowing
+  // filter is active. Drive the Filtered Current Gap / Filtered Since Debut /
+  // Filtered Avg Gap columns on /songs.
+  filteredShowsSinceLastPlayed: z.number().nullable().optional(),
+  filteredPercentSinceDebut: z.number().nullable().optional(),
+  filteredAverageShowsPerPlay: z.number().nullable().optional(),
+  dateFirstFilteredPlayed: z.date().nullable().optional(),
+  dateLastFilteredPlayed: z.date().nullable().optional(),
   dateLastPlayed: z.date().nullable(),
   dateFirstPlayed: z.date().nullable(),
   actualLastPlayedDate: z.date().nullable(),

@@ -97,6 +97,12 @@ This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime:
 - Never commit secrets or API keys
 - Use `doppler run --` prefix for commands that need environment variables
 
+## Show Ordering
+
+Any code that orders or filters shows/tracks chronologically MUST use the helpers in `packages/core/src/_shared/show-ordering.ts` (or `compareByShowDate` from `packages/domain/src/show-ordering.ts` for in-memory work). Never write `orderBy: { date: 'asc' }` directly — same-day shows have a `dayOrder` column (NULLS LAST) plus track-position tiebreakers, and the helpers centralize that logic so it stays consistent across SQL, Prisma, and JS.
+
+Use `SHOW_ORDER_ASC` / `SHOW_ORDER_DESC` for Prisma `orderBy`, `showOrderBySql` for raw SQL, `TRACK_BY_SHOW_ORDER_ASC` for ordering tracks by their show, `statsShowsSql` / `STATS_SHOWS_WHERE` for the count_for_stats=true predicate, and `compareByShowDate` for in-memory sorts.
+
 ## CRITICAL: Don't Guess
 
 **NEVER guess field names, function signatures, or code structure.** Always look at the actual files first. This applies to database fields, function parameters, API endpoints, file paths, configuration keys — anything with a definitive answer in the codebase.

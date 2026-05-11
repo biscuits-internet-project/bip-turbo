@@ -215,10 +215,10 @@ describe("computeMedianSongGap", () => {
 });
 
 describe("SetlistService.findByShowSlug", () => {
-  // The setlist payload powers the gap-chart view (Phase 5). It needs the
-  // prior-show date+slug for the "Last Played" column, so the query must
-  // include the previousPerformanceShow relation with date+slug only (no full
-  // show payload — keeps the response compact).
+  // The setlist payload powers the gap-chart view. It needs the prior-show
+  // date+slug for the "Last Played" column, so the query must include the
+  // previousPerformanceShow relation with date+slug only (no full show
+  // payload — keeps the response compact).
   test("includes previousPerformanceShow date+slug on tracks", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);
@@ -232,8 +232,8 @@ describe("SetlistService.findByShowSlug", () => {
   });
 
   // The setlist domain object exposes averageSongGap so SetlistTable can
-  // render the summary without recomputing client-side. Tracks come back from
-  // Prisma with `gap` already populated (Phase 1 denormalization).
+  // render the summary without recomputing client-side. Tracks come back
+  // from Prisma with the denormalized `gap` field already populated.
   test("returns averageSongGap derived from tracks", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never);

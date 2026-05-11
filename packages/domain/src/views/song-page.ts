@@ -29,6 +29,10 @@ export type SongPagePerformance = {
   cover?: boolean;
   authorId?: string | null;
   gap?: number | null;
+  // Gap measured against the previous performance of this song within the
+  // currently-applied filter scope. Populated server-side only when a
+  // narrowing filter is active.
+  filteredGap?: number | null;
   previousPerformanceShowId?: string | null;
   previousShow?: { slug: string; date: string };
   tags?: {

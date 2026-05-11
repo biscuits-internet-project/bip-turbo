@@ -141,7 +141,84 @@ describe("getSongsColumns", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /Filtered Plays/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Filtered\s*Plays/i })).not.toBeInTheDocument();
+  });
+
+  // The three filtered rarity columns ride on the same `showFilteredPlays`
+  // gate as Filtered Plays. They mirror Current Gap / Since Debut / Avg Gap,
+  // computed against the active filter scope. Hidden by default so they
+  // don't duplicate the all-time columns when no filter narrows the data.
+  test("showFilteredPlays=false: filtered rarity columns are not rendered", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={baseColumns}
+        data={[
+          makeSong({
+            filteredTimesPlayed: 3,
+            filteredShowsSinceLastPlayed: 9,
+            filteredPercentSinceDebut: 0.42,
+            filteredAverageShowsPerPlay: 2.4,
+          }),
+        ]}
+        hideSearch
+        hidePagination
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /Filtered Current Gap/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Filtered Since Debut/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Filtered Avg Gap/i })).not.toBeInTheDocument();
+  });
+
+  // When showFilteredPlays is true, each filtered column renders next to
+  // its all-time counterpart so the two read as a paired comparison.
+  test("showFilteredPlays=true: filtered rarity columns render their scoped values", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={filteredColumns}
+        data={[
+          makeSong({
+            filteredTimesPlayed: 3,
+            filteredShowsSinceLastPlayed: 9,
+            filteredPercentSinceDebut: 0.42,
+            filteredAverageShowsPerPlay: 2.4,
+          }),
+        ]}
+        hideSearch
+        hidePagination
+      />,
+    );
+
+    // Filtered Current Gap renders the raw integer.
+    expect(screen.getByText("9")).toBeInTheDocument();
+    // Filtered Since Debut renders as a percent (matches existing % formatter).
+    expect(screen.getByText("42%")).toBeInTheDocument();
+    // Filtered Avg Gap renders with one decimal place.
+    expect(screen.getByText("2.4")).toBeInTheDocument();
+  });
+
+  // When showFilteredPlays is true, Last Played and First Played drop the
+  // venue sublabel and shrink — the row is wider with the extra filtered
+  // columns, so we trade venue-on-row for horizontal room.
+  test("showFilteredPlays=true: Last Played and First Played cells omit the venue sublabel", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={filteredColumns}
+        data={[
+          makeSong({
+            lastPlayedShow: makeShow(),
+            firstPlayedShow: makeShow({ slug: "1995-07-04-some-venue" }),
+          }),
+        ]}
+        hideSearch
+        hidePagination
+      />,
+    );
+
+    // Venue text would appear under the date in the no-filter baseline
+    // (see "Last Played venue" test below). Under filtered columns it
+    // must NOT render — neither for Last Played nor for First Played.
+    expect(screen.queryByText(/The Capitol Theatre/)).not.toBeInTheDocument();
   });
 
   // When showFilteredPlays is true, the factory inserts a "Filtered Plays"
@@ -156,7 +233,7 @@ describe("getSongsColumns", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Filtered Plays/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Filtered\s*Plays/i })).toBeInTheDocument();
     // Both the all-time count (42) and the scoped count (7) are present.
     expect(screen.getByText("42")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
@@ -352,7 +429,7 @@ describe("getSongsColumns", () => {
       <DataTable columns={filteredColumns} data={songs} hideSearch hidePagination />,
     );
 
-    const sortHeader = screen.getByRole("button", { name: /Filtered Plays/i });
+    const sortHeader = screen.getByRole("button", { name: /Filtered\s*Plays/i });
     await user.click(sortHeader); // asc
 
     // asc: [filtered=2, timesPlayed=30 (Plan B)], [filtered=2, timesPlayed=80 (Crickets)], [filtered=5 (Home Again)]
@@ -399,7 +476,7 @@ describe("getSongsColumns", () => {
     );
 
     // First click: asc. Second click: desc.
-    const sortHeader = screen.getByRole("button", { name: /Filtered Plays/i });
+    const sortHeader = screen.getByRole("button", { name: /Filtered\s*Plays/i });
     await user.click(sortHeader);
 
     const titlesAsc = screen

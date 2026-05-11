@@ -37,7 +37,8 @@ describe("buildYearlyChartData", () => {
 
   // Defensive: if showsByYear is missing a year present in yearlyPlayData
   // (data drift, partial cache), render 0 in percent mode rather than
-  // dividing by zero or NaN. Per Phase 4 plan, we surface 0 not "no point".
+  // dividing by zero or NaN. Missing-denominator years surface as 0 — not
+  // dropped points — so the line stays continuous across the x-axis.
   test("percent mode renders 0 when showsByYear[year] is missing or zero", () => {
     const yearlyPlayData = { 2010: 5, 2011: 3, 2012: 7 };
     const showsByYear = { 2010: 50, 2011: 0 }; // 2011 is zero, 2012 is missing
