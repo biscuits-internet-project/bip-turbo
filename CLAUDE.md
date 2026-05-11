@@ -103,6 +103,12 @@ Any code that orders or filters shows/tracks chronologically MUST use the helper
 
 Use `SHOW_ORDER_ASC` / `SHOW_ORDER_DESC` for Prisma `orderBy`, `showOrderBySql` for raw SQL, `TRACK_BY_SHOW_ORDER_ASC` for ordering tracks by their show, `statsShowsSql` / `STATS_SHOWS_WHERE` for the count_for_stats=true predicate, and `compareByShowDate` for in-memory sorts.
 
+## Commit and PR Messages
+
+Describe the final before→after change as the user will see it, not the development process or intermediate iterations. Be pithy. Lead with the user-visible change.
+
+If a change involves a particularly tricky technical detail or a non-obvious design decision the reviewer should know about, put it in a separate section at the end of the PR description (not in the lead). Skip that section entirely when the change is straightforward.
+
 ## CRITICAL: Don't Guess
 
 **NEVER guess field names, function signatures, or code structure.** Always look at the actual files first. This applies to database fields, function parameters, API endpoints, file paths, configuration keys — anything with a definitive answer in the codebase.
