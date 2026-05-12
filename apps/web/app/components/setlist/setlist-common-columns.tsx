@@ -1,9 +1,76 @@
 import type { TrackLight } from "@bip/domain";
-import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
+import { type ColumnDef, createColumnHelper, type Row, type SortingFn } from "@tanstack/react-table";
+import { TrackRatingCell } from "~/components/performance/track-rating-cell";
 import { ShowDateLink } from "~/components/show-date-link";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { GapCell, type GapCellState } from "./gap-cell";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
+
+/**
+ * Wraps a value-compare with the canonical set/track tiebreaker so two
+ * rows with the same Gap, Rating, Song title, or Last-Played date still
+ * resolve to a stable canonical order ("S1 #3 before S1 #4" etc.). Used
+ * by every sortable column in the setlist views except Set/Track
+ * themselves (which already sort on set+position).
+ */
+function withSetPositionTiebreak<T extends TrackLight>(primary: (a: T, b: T) => number): SortingFn<T> {
+  return (rowA: Row<T>, rowB: Row<T>) => {
+    const cmp = primary(rowA.original, rowB.original);
+    if (cmp !== 0) return cmp;
+    return compareBySetThenPosition(rowA.original, rowB.original);
+  };
+}
+
+/**
+ * Per-row inputs the rating column needs that the row itself doesn't carry:
+ * the show slug (target of any rating mutation), the viewer's rating map
+ * (resolved from useTrackUserRatings at the table level), and the auth
+ * state. Identical between the catalog and personal column factories.
+ */
+export interface SetlistRatingContext {
+  showSlug: string;
+  userRatingMap: Map<string, number>;
+  isAuthenticated: boolean;
+}
+
+/**
+ * Rightmost column for both gap-chart views: an interactive rating badge
+ * per track. Reuses TrackRatingCell (compact RatingBadgeButton) so editing
+ * skips route revalidation. Hidden on phone-portrait — the badge is small
+ * but the row is already dense with Set / # / Song / Gap / Last X.
+ */
+export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingContext): ColumnDef<T, unknown> {
+  const columnHelper = createColumnHelper<T>();
+  // Sort by community average; unrated tracks (null) collapse to -Infinity
+  // so they cluster at the bottom on desc and the top on asc. First click
+  // sorts descending — "best rated first" matches the mental model when
+  // scanning a setlist for highlights.
+  return columnHelper.accessor((row) => row.averageRating ?? Number.NEGATIVE_INFINITY, {
+    id: "rating",
+    header: ({ column }) => <SortableHeader column={column} label="Rating" />,
+    meta: { width: "120px", hideOnMobile: true },
+    enableSorting: true,
+    // Ties resolve to canonical set+position so "all unrated tracks" still
+    // read top-to-bottom in the order they were played.
+    sortingFn: withSetPositionTiebreak<T>(
+      (a, b) => (a.averageRating ?? Number.NEGATIVE_INFINITY) - (b.averageRating ?? Number.NEGATIVE_INFINITY),
+    ),
+    sortDescFirst: true,
+    cell: (info) => {
+      const row = info.row.original;
+      return (
+        <TrackRatingCell
+          trackId={row.id}
+          showSlug={ctx.showSlug}
+          initialRating={row.averageRating ?? null}
+          ratingsCount={row.ratingsCount ?? null}
+          userRating={ctx.userRatingMap.get(row.id) ?? null}
+          isAuthenticated={ctx.isAuthenticated}
+        />
+      );
+    },
+  }) as ColumnDef<T, unknown>;
+}
 
 /**
  * Set, Track, and Song columns are identical across every SetlistCard
@@ -21,7 +88,7 @@ import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "
  * accessor → header → ShowDateLink cell shape so the two call sites
  * differ only in id/label/width/visibility.
  */
-export function createShowDateLinkColumn<T>(opts: {
+export function createShowDateLinkColumn<T extends TrackLight>(opts: {
   id: string;
   label: string;
   accessor: (row: T) => { date: string; slug: string | null } | null | undefined;
@@ -36,8 +103,13 @@ export function createShowDateLinkColumn<T>(opts: {
     enableSorting: true,
     // ISO YYYY-MM-DD strings sort lexicographically the same as
     // chronologically. Empty strings (no prior performance) sort first asc
-    // and last desc — matches what users expect for "—" rows.
-    sortingFn: "alphanumeric",
+    // and last desc — matches what users expect for "—" rows. Ties resolve
+    // to set+position so rows with the same prior date keep narrative order.
+    sortingFn: withSetPositionTiebreak<T>((a, b) => {
+      const aDate = opts.accessor(a)?.date ?? "";
+      const bDate = opts.accessor(b)?.date ?? "";
+      return aDate < bDate ? -1 : aDate > bDate ? 1 : 0;
+    }),
     cell: (info) => <ShowDateLink show={opts.accessor(info.row.original)} />,
   }) as ColumnDef<T, unknown>;
 }
@@ -50,7 +122,7 @@ export function createShowDateLinkColumn<T>(opts: {
  * tooltip labels; the column shape (header, width, sort, GapCell render)
  * is the same on both sides.
  */
-export function createGapColumn<T>(opts: {
+export function createGapColumn<T extends TrackLight>(opts: {
   id: string;
   label: string;
   width: string;
@@ -75,7 +147,15 @@ export function createGapColumn<T>(opts: {
       header: ({ column }) => <SortableHeader column={column} label={opts.label} />,
       meta: { width: opts.width },
       enableSorting: true,
-      sortingFn: "basic",
+      // Numeric compare with set+position tiebreaker — rows that share the
+      // same gap value still read in canonical narrative order.
+      sortingFn: withSetPositionTiebreak<T>((a, b) => {
+        const av = opts.state(a, []);
+        const bv = opts.state(b, []);
+        const an = av.kind === "count" ? av.value : Number.POSITIVE_INFINITY;
+        const bn = bv.kind === "count" ? bv.value : Number.POSITIVE_INFINITY;
+        return an - bn;
+      }),
       // First click sorts ascending — "smallest gap first" matches the
       // mental model "what was the rarest play."
       sortDescFirst: false,
@@ -99,7 +179,7 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
     columnHelper.accessor((row) => row.set, {
       id: "set",
       header: ({ column }) => <SortableHeader column={column} label="Set" />,
-      meta: { width: "48px" },
+      meta: { width: "36px" },
       enableSorting: true,
       sortingFn: (a, b) => compareBySetThenPosition(a.original, b.original),
       cell: (info) => {
@@ -125,7 +205,7 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
       header: ({ column }) => <SortableHeader column={column} label="Track" />,
       // Drops on narrow viewports — the Set column already orients the row,
       // and a tiny Track column would steal width from Song on mobile.
-      meta: { width: "56px", hideOnMobile: true },
+      meta: { width: "42px", hideOnMobile: true },
       enableSorting: true,
       // Track # = position-within-set, computed at render time from the
       // unsorted row model. The comparator falls through to the canonical
@@ -141,8 +221,17 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
     }) as ColumnDef<T, unknown>,
     columnHelper.accessor((row) => row.song?.title ?? "", {
       id: "song",
-      header: "Song",
-      enableSorting: false,
+      header: ({ column }) => <SortableHeader column={column} label="Song" />,
+      enableSorting: true,
+      // Alphabetical title compare with set+position tiebreaker so back-
+      // to-back same-name plays (rare but possible across two encores)
+      // still resolve in canonical order.
+      sortingFn: withSetPositionTiebreak<T>((a, b) => {
+        const at = a.song?.title ?? "";
+        const bt = b.song?.title ?? "";
+        return at.localeCompare(bt);
+      }),
+      sortDescFirst: false,
       cell: (info) => {
         const title = info.getValue() as string;
         const slug = info.row.original.song?.slug;

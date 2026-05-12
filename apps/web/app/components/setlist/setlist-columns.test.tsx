@@ -1,10 +1,20 @@
 import type { TrackLight } from "@bip/domain";
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
-import { setupWithRouter } from "@test/test-utils";
+import { expectAllMockedShallowComponent, mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test } from "vitest";
-import { createSetlistColumns, type SetlistTableRow } from "./setlist-columns";
+import { describe, expect, test, vi } from "vitest";
+
+// Stub TrackRatingCell so the rating column's cell renders a deterministic
+// node with the props the factory passed in — keeps these tests focused on
+// the column wiring, not on the RatingBadgeButton internals (covered in
+// rating-badge-button.test.tsx).
+vi.mock("~/components/performance/track-rating-cell", () => ({
+  TrackRatingCell: (props: object) => mockShallowComponent("TrackRatingCell", props),
+}));
+
+const { createSetlistColumns } = await import("./setlist-columns");
+type SetlistTableRow = TrackLight;
 
 function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: number }): SetlistTableRow {
   return {
@@ -17,8 +27,8 @@ function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: 
     likesCount: 0,
     note: null,
     allTimer: false,
-    averageRating: null,
-    ratingsCount: 0,
+    averageRating: overrides.averageRating ?? null,
+    ratingsCount: overrides.ratingsCount ?? 0,
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
     previousPerformanceShow: overrides.previousPerformanceShow ?? null,
@@ -28,12 +38,13 @@ function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: 
 
 // Renders the column definitions through a real table so we exercise the cell
 // callbacks against TanStack's row model — same render pattern the production
-// SetlistTable will use.
-async function renderTable(rows: SetlistTableRow[]) {
+// SetlistTable will use. Factory args default to empty/anonymous so tests
+// that don't care about rating wiring stay terse.
+async function renderTable(rows: SetlistTableRow[], factoryArgs?: Parameters<typeof createSetlistColumns>[0]) {
   function Harness() {
     const table = useReactTable({
       data: rows,
-      columns: createSetlistColumns(),
+      columns: createSetlistColumns(factoryArgs),
       getCoreRowModel: getCoreRowModel(),
       getSortedRowModel: getSortedRowModel(),
     });
@@ -62,29 +73,31 @@ async function renderTable(rows: SetlistTableRow[]) {
 }
 
 describe("createSetlistColumns", () => {
-  // Column order: Set, Track #, Song, Gap, Last Played. Track sits between
-  // Set and Song; Gap sits next to Song so the rarity number reads as
-  // "Song / Gap" before the user's eye jumps to the older Last Played
-  // date. Locking the order so a future rearrangement is a deliberate edit.
-  test("returns columns in order [Set, Track, Song, Gap, Last Played]", () => {
+  // Column order: Set, Track #, Song, Gap, Last Played, Rating. Track sits
+  // between Set and Song; Gap sits next to Song so the rarity number reads
+  // as "Song / Gap" before the user's eye jumps to the older Last Played
+  // date. Rating anchors the right edge — it's the action column (click to
+  // rate) so it lives where the eye lands at the end of the row scan.
+  test("returns columns in order [Set, Track, Song, Gap, Last Played, Rating]", () => {
     const columns = createSetlistColumns();
-    expect(columns.map((c) => c.id)).toEqual(["set", "track", "song", "gap", "lastPlayed"]);
+    expect(columns.map((c) => c.id)).toEqual(["set", "track", "song", "gap", "lastPlayed", "rating"]);
   });
 
-  // Sortable columns: Set, Track #, Gap, Last Played. Set and Track # share
-  // the canonical "set order then position" comparator (sorting either way
-  // produces the same render); Last Played sorts by previous-show date;
-  // Gap sorts numerically with debuts/repeats kept at the extremes. Song
-  // is intentionally not sortable (alphabetizing it would scramble the
-  // setlist's narrative).
-  test("Set, Track, Gap, and Last Played are sortable; Song is not", () => {
+  // Every column is sortable. Set and Track # share the canonical
+  // "set order then position" comparator (sorting either way produces the
+  // same render); Song sorts alphabetically; Gap sorts numerically with
+  // debuts/repeats kept at the extremes; Last Played sorts by previous-show
+  // date; Rating sorts by community average (unrated tracks cluster at the
+  // bottom on desc).
+  test("Set, Track, Song, Gap, Last Played, and Rating are all sortable", () => {
     const columns = createSetlistColumns();
     const sortable = new Map(columns.map((c) => [c.id, c.enableSorting]));
     expect(sortable.get("set")).toBe(true);
     expect(sortable.get("track")).toBe(true);
+    expect(sortable.get("song")).toBe(true);
     expect(sortable.get("gap")).toBe(true);
     expect(sortable.get("lastPlayed")).toBe(true);
-    expect(sortable.get("song")).toBe(false);
+    expect(sortable.get("rating")).toBe(true);
   });
 
   // When sorted by Set (the default), only the first row of each set group
@@ -102,7 +115,7 @@ describe("createSetlistColumns", () => {
     // the Set header puts the table into "sorted by set" mode.
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^Set$/i }));
-    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 0);
+    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 0);
     expect(setCells.map((c) => c.textContent)).toEqual(["1", "", "2", ""]);
   });
 
@@ -112,12 +125,24 @@ describe("createSetlistColumns", () => {
   test("shows the set label on every row when sorted by Gap", async () => {
     const user = userEvent.setup();
     await renderTable([
-      makeTrack({ songId: "a", position: 1, set: "S1", gap: 10, song: { id: "a", title: "Basis for a Day", slug: "x" } }),
-      makeTrack({ songId: "b", position: 2, set: "S1", gap: 5, song: { id: "b", title: "Above the Waves", slug: "y" } }),
+      makeTrack({
+        songId: "a",
+        position: 1,
+        set: "S1",
+        gap: 10,
+        song: { id: "a", title: "Basis for a Day", slug: "x" },
+      }),
+      makeTrack({
+        songId: "b",
+        position: 2,
+        set: "S1",
+        gap: 5,
+        song: { id: "b", title: "Above the Waves", slug: "y" },
+      }),
       makeTrack({ songId: "c", position: 3, set: "S2", gap: 20, song: { id: "c", title: "Confrontation", slug: "z" } }),
     ]);
     await user.click(screen.getByRole("button", { name: /Gap/i }));
-    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 0);
+    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 0);
     // After asc-by-gap: gap=5 (S1), gap=10 (S1), gap=20 (S2). Every row
     // displays its set label.
     expect(setCells.map((c) => c.textContent)).toEqual(["1", "1", "2"]);
@@ -152,7 +177,7 @@ describe("createSetlistColumns", () => {
       }),
     ]);
     await user.click(screen.getByRole("button", { name: /Last Played/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 2);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 2);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -183,7 +208,7 @@ describe("createSetlistColumns", () => {
       }),
     ]);
     await user.click(screen.getByRole("button", { name: /Gap/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 2);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 2);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -201,11 +226,11 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "d", position: 4, set: "E1", song: { id: "d", title: "Crickets", slug: "w" } }),
     ]);
     const cells = screen.getAllByRole("cell");
-    // Each row produces 5 cells; cells[1], cells[6], cells[11], cells[16] are Track #.
+    // Each row produces 6 cells; cells[1], cells[7], cells[13], cells[19] are Track #.
     expect(cells[1].textContent).toBe("1");
-    expect(cells[6].textContent).toBe("2");
-    expect(cells[11].textContent).toBe("1");
-    expect(cells[16].textContent).toBe("1");
+    expect(cells[7].textContent).toBe("2");
+    expect(cells[13].textContent).toBe("1");
+    expect(cells[19].textContent).toBe("1");
   });
 
   // Set column drops the "S" prefix (S1 → 1, S2 → 2, etc.) — the column
@@ -218,9 +243,9 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "b", position: 2, set: "S2", song: { id: "b", title: "Tempest", slug: "t" } }),
     ]);
     const cells = screen.getAllByRole("cell");
-    // 5 cells per row; cells[0] = Set of row 0, cells[5] = Set of row 1.
+    // 6 cells per row; cells[0] = Set of row 0, cells[6] = Set of row 1.
     expect(cells[0].textContent).toBe("1");
-    expect(cells[5].textContent).toBe("2");
+    expect(cells[6].textContent).toBe("2");
   });
 
   // Single encore collapses E1 → E because there's no second encore to
@@ -232,9 +257,9 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "b", position: 2, set: "E1", song: { id: "b", title: "Crickets", slug: "c" } }),
     ]);
     const singleCells = screen.getAllByRole("cell");
-    // 5 cells per row; cells[0] = Set row 0, cells[5] = Set row 1.
+    // 6 cells per row; cells[0] = Set row 0, cells[6] = Set row 1.
     expect(singleCells[0].textContent).toBe("1");
-    expect(singleCells[5].textContent).toBe("E");
+    expect(singleCells[6].textContent).toBe("E");
 
     // Re-render with two encores to confirm we keep the numbering.
     document.body.innerHTML = "";
@@ -244,7 +269,7 @@ describe("createSetlistColumns", () => {
     ]);
     const multiCells = screen.getAllByRole("cell");
     expect(multiCells[0].textContent).toBe("E1");
-    expect(multiCells[5].textContent).toBe("E2");
+    expect(multiCells[6].textContent).toBe("E2");
   });
 
   // Normal row: gap renders as the integer; Last Played renders the prior
@@ -351,5 +376,85 @@ describe("createSetlistColumns", () => {
     ]);
     const link = screen.getByRole("link", { name: "Confrontation" });
     expect(link).toHaveAttribute("href", "/songs/confrontation");
+  });
+
+  // Rating column hides on phones to keep the row legible — same pattern
+  // the "Last Seen" column uses on the personal table. Tablet+ shows it.
+  test("Rating column is marked hideOnMobile", () => {
+    const columns = createSetlistColumns();
+    const rating = columns.find((c) => c.id === "rating");
+    expect((rating?.meta as { hideOnMobile?: boolean } | undefined)?.hideOnMobile).toBe(true);
+  });
+
+  // Each row's Rating cell renders TrackRatingCell wired with the track's
+  // community average + count, the viewer's own rating from the supplied
+  // map (when present), and the auth + showSlug context. trackId is the
+  // setlist Track.id, not the songId — ratings are per-performance.
+  test("Rating cells receive per-row ratings, userRatings from map, and shared show/auth context", async () => {
+    const userRatingMap = new Map<string, number>([["t-1", 4]]);
+    await renderTable(
+      [
+        makeTrack({
+          songId: "song-basis",
+          position: 1,
+          averageRating: 4.2,
+          ratingsCount: 17,
+          song: { id: "song-basis", title: "Basis for a Day", slug: "basis-for-a-day" },
+        }),
+        makeTrack({
+          songId: "song-munchkin",
+          position: 2,
+          averageRating: null,
+          ratingsCount: 0,
+          song: { id: "song-munchkin", title: "Munchkin Invasion", slug: "munchkin-invasion" },
+        }),
+      ],
+      { showSlug: "2024-07-19-camden", userRatingMap, isAuthenticated: true },
+    );
+
+    expectAllMockedShallowComponent("TrackRatingCell", [
+      {
+        trackId: "t-1",
+        showSlug: "2024-07-19-camden",
+        initialRating: 4.2,
+        ratingsCount: 17,
+        userRating: 4,
+        isAuthenticated: true,
+      },
+      {
+        trackId: "t-2",
+        showSlug: "2024-07-19-camden",
+        initialRating: null,
+        ratingsCount: 0,
+        userRating: null,
+        isAuthenticated: true,
+      },
+    ]);
+  });
+
+  // Anonymous viewers still see ratings (display + login-prompt-on-click is
+  // handled inside RatingBadgeButton). The factory must forward
+  // isAuthenticated=false without crashing when no userRatingMap is given.
+  test("Rating cells render with anonymous viewer (no userRatingMap)", async () => {
+    await renderTable([
+      makeTrack({
+        songId: "song-crickets",
+        position: 1,
+        averageRating: 3.8,
+        ratingsCount: 5,
+        song: { id: "song-crickets", title: "Crickets", slug: "crickets" },
+      }),
+    ]);
+
+    expectAllMockedShallowComponent("TrackRatingCell", [
+      {
+        trackId: "t-1",
+        showSlug: "",
+        initialRating: 3.8,
+        ratingsCount: 5,
+        userRating: null,
+        isAuthenticated: false,
+      },
+    ]);
   });
 });

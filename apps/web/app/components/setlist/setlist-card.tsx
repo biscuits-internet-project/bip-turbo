@@ -320,13 +320,14 @@ function SetlistCardComponent({
                   summary={catalogSummary}
                   showPersonal={Boolean(user)}
                 />
-                <SetlistTable tracks={setlist.sets.flatMap((s) => s.tracks)} />
+                <SetlistTable showSlug={setlist.show.slug ?? ""} tracks={setlist.sets.flatMap((s) => s.tracks)} />
               </div>
             ) : view === "personal" && user ? (
               <div className="space-y-2">
                 <SetlistViewControl view={view} onChange={changeView} summary={personalSummaryView} showPersonal />
                 <SetlistTablePersonal
                   tracks={setlist.sets.flatMap((s) => s.tracks)}
+                  showSlug={setlist.show.slug ?? ""}
                   showDate={setlist.show.date}
                   onSummaryChange={setPersonalSummary}
                 />

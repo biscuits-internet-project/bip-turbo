@@ -2,11 +2,15 @@ import { average, median, type TrackLight } from "@bip/domain";
 import { useEffect, useMemo } from "react";
 import { DataTable } from "~/components/ui/data-table";
 import { usePersonalSongHistory } from "~/hooks/use-personal-song-history";
+import { useSession } from "~/hooks/use-session";
+import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { computePersonalRow, eligiblePersonalGaps, type PersonalSetlistRow } from "~/lib/personal-setlist-columns";
 import { createPersonalSetlistColumns, type PersonalSetlistTableRow } from "./setlist-columns-personal";
 
 interface SetlistTablePersonalProps {
   tracks: TrackLight[];
+  /** Target slug for rating mutations from the in-row rating cells. */
+  showSlug: string;
   showDate: string;
   onSummaryChange?: (summary: { average: number | null; median: number | null; debutCount: number }) => void;
 }
@@ -21,8 +25,12 @@ interface SetlistTablePersonalProps {
  * up to its SetlistViewControl so the summary text stays on the same row
  * as the toggle — matches the gap-chart layout.
  */
-export function SetlistTablePersonal({ tracks, showDate, onSummaryChange }: SetlistTablePersonalProps) {
+export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChange }: SetlistTablePersonalProps) {
   const { data, isLoading } = usePersonalSongHistory();
+  const { user } = useSession();
+  const isAuthenticated = !!user;
+  const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
+  const { userRatingMap } = useTrackUserRatings(trackIds);
 
   const setlistTracks = useMemo(
     () => tracks.map((t) => ({ id: t.id, songId: t.songId, set: t.set, position: t.position })),
@@ -42,7 +50,10 @@ export function SetlistTablePersonal({ tracks, showDate, onSummaryChange }: Setl
     });
   }, [tracks, data, setlistTracks, showDate]);
 
-  const columns = useMemo(() => createPersonalSetlistColumns(), []);
+  const columns = useMemo(
+    () => createPersonalSetlistColumns({ showSlug, userRatingMap, isAuthenticated }),
+    [showSlug, userRatingMap, isAuthenticated],
+  );
 
   // Hoist the summary up to the parent so it can render alongside the
   // toggle. useMemo + useEffect-like trigger via stable identity: compute

@@ -1,8 +1,26 @@
 import type { TrackLight } from "@bip/domain";
-import { setupWithRouter } from "@test/test-utils";
+import { mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
-import { SetlistTable } from "./setlist-table";
+import { describe, expect, test, vi } from "vitest";
+
+// Stub useSession + useTrackUserRatings so SetlistTable renders synchronously
+// without network calls. The auth state + rating map are wired through
+// vi.mocked() inside each test that cares; default is anonymous + empty.
+vi.mock("~/hooks/use-session", () => ({
+  useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
+}));
+vi.mock("~/hooks/use-track-user-ratings", () => ({
+  useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
+}));
+// Stub TrackRatingCell so the rating column emits a deterministic, prop-
+// dumping node — the rating cell internals are covered elsewhere.
+vi.mock("~/components/performance/track-rating-cell", () => ({
+  TrackRatingCell: (props: object) => mockShallowComponent("TrackRatingCell", props),
+}));
+
+const { useSession } = await import("~/hooks/use-session");
+const { useTrackUserRatings } = await import("~/hooks/use-track-user-ratings");
+const { SetlistTable } = await import("./setlist-table");
 
 function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: number }): TrackLight {
   return {
@@ -33,6 +51,7 @@ describe("SetlistTable", () => {
   test("default sort puts S1 before S2 before E1, with tracks in position order", async () => {
     await setupWithRouter(
       <SetlistTable
+        showSlug="2024-07-19-camden"
         tracks={[
           makeTrack({
             songId: "c",
@@ -61,7 +80,7 @@ describe("SetlistTable", () => {
         ]}
       />,
     );
-    const cells = screen.getAllByRole("cell").filter((_, i) => i % 5 === 2);
+    const cells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 2);
     expect(cells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -75,6 +94,7 @@ describe("SetlistTable", () => {
   test("renders a row per track", async () => {
     await setupWithRouter(
       <SetlistTable
+        showSlug="2024-07-19-camden"
         tracks={[
           makeTrack({
             songId: "a",
@@ -93,5 +113,44 @@ describe("SetlistTable", () => {
     );
     expect(screen.getByRole("link", { name: "Above the Waves" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Confrontation" })).toBeInTheDocument();
+  });
+
+  // SetlistTable threads the viewer's per-track ratings into the column
+  // factory so the rightmost Rating column knows which tracks the viewer
+  // has already rated. useTrackUserRatings is invoked with the row's
+  // trackIds; its userRatingMap shows up in each TrackRatingCell.
+  test("passes useTrackUserRatings map and auth state into rating cells", async () => {
+    vi.mocked(useSession).mockReturnValue({
+      // biome-ignore lint/suspicious/noExplicitAny: minimal mock; test only reads `user`
+      user: { id: "user-1" } as any,
+      // biome-ignore lint/suspicious/noExplicitAny: minimal mock
+      supabase: null as any,
+      loading: false,
+    });
+    vi.mocked(useTrackUserRatings).mockReturnValue({
+      userRatingMap: new Map([["t-1", 5]]),
+      isLoading: false,
+    });
+
+    await setupWithRouter(
+      <SetlistTable
+        showSlug="2024-07-19-camden"
+        tracks={[
+          makeTrack({
+            songId: "song-basis",
+            position: 1,
+            averageRating: 4.4,
+            ratingsCount: 22,
+            song: { id: "song-basis", title: "Basis for a Day", slug: "basis-for-a-day" },
+          }),
+        ]}
+      />,
+    );
+
+    expect(useTrackUserRatings).toHaveBeenCalledWith(["t-1"]);
+    expect(screen.getByTestId("TrackRatingCell")).toBeInTheDocument();
+    expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"showSlug":"2024-07-19-camden"');
+    expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"userRating":5');
+    expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"isAuthenticated":true');
   });
 });

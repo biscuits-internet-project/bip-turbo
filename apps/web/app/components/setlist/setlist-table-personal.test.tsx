@@ -1,7 +1,21 @@
 import type { TrackLight } from "@bip/domain";
-import { setupWithRouter } from "@test/test-utils";
+import { mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
+
+// Stub session + per-track user ratings so the rating column renders without
+// a real auth context or network call.
+vi.mock("~/hooks/use-session", () => ({
+  useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
+}));
+vi.mock("~/hooks/use-track-user-ratings", () => ({
+  useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
+}));
+// Stub the rating cell so the row's rating column has a deterministic
+// presence we can assert on without exercising RatingBadgeButton.
+vi.mock("~/components/performance/track-rating-cell", () => ({
+  TrackRatingCell: (props: object) => mockShallowComponent("TrackRatingCell", props),
+}));
 
 // Stub the React Query hook with a fixed payload so the table renders
 // synchronously with known per-song attendance data. This is the same
@@ -56,6 +70,7 @@ describe("SetlistTablePersonal", () => {
   test("renders ★ for personal debut, ↺ for within-show repeat, numeric gap otherwise", async () => {
     await setupWithRouter(
       <SetlistTablePersonal
+        showSlug="2024-07-19-camden"
         showDate="2024-07-19"
         tracks={[
           makeTrack({
@@ -100,6 +115,7 @@ describe("SetlistTablePersonal", () => {
     const onSummaryChange = vi.fn();
     await setupWithRouter(
       <SetlistTablePersonal
+        showSlug="2024-07-19-camden"
         showDate="2024-07-19"
         tracks={[
           makeTrack({

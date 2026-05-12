@@ -13,6 +13,12 @@ vi.mock("~/hooks/use-session", () => ({
 vi.mock("~/hooks/use-show-user-data", () => ({
   useAttendanceMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
+// SetlistTable mounts inside SetlistCard when the user toggles to gap-chart
+// view; that path calls useTrackUserRatings which needs a QueryClient. Stub
+// it so the table renders without any React Query setup.
+vi.mock("~/hooks/use-track-user-ratings", () => ({
+  useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
+}));
 
 // Stub heavy child components
 vi.mock("./track-rating-overlay", () => ({
