@@ -2,9 +2,11 @@ import type { SetlistLight } from "@bip/domain";
 import { expectMockedShallowComponent, mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock hooks used internally by SetlistCard
+import { useSession } from "~/hooks/use-session";
+
 vi.mock("~/hooks/use-session", () => ({
   useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
 }));
@@ -87,10 +89,22 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
     annotations: [],
     averageSongGap: null,
     medianSongGap: null,
+    debutCount: 0,
   };
 }
 
 describe("SetlistCard", () => {
+  // Each test starts with a logged-out viewer; the rating-badge tests below
+  // override per-test. Reset here so a `mockReturnValue` from a prior test
+  // doesn't leak into the next one.
+  beforeEach(() => {
+    vi.mocked(useSession).mockReturnValue({
+      user: null,
+      supabase: null as never,
+      loading: false,
+    } as never);
+  });
+
   // Passes the show date to AnniversaryBadge so it can decide whether to render
   test("passes showDate to AnniversaryBadge", async () => {
     await setupWithRouter(
@@ -242,6 +256,71 @@ describe("SetlistCard", () => {
     expect(screen.getByText("Basis for a Day")).toBeInTheDocument();
   });
 
+  // Rating-badge wiring: when the viewer is logged in and has rated the
+  // show, the rating button picks up the amber-rated chrome. The userRating
+  // prop accepts either a bare number or a Rating object, so both shapes
+  // must resolve to the same rendered state. Without this test, a regression
+  // in the Rating | number | null resolver inside SetlistCard would slip
+  // through — the RatingBadgeButton itself is rated tested in isolation,
+  // but the resolver lives here.
+  test("rating badge shows amber border when userRating is a bare number", async () => {
+    vi.mocked(useSession).mockReturnValue({
+      user: { id: "user-1" } as never,
+      supabase: null as never,
+      loading: false,
+    } as never);
+    const { container } = await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={5} showRating={null} />,
+    );
+    const buttons = container.querySelectorAll("button");
+    // The rating badge is the trailing rated-styled button in the header.
+    const ratingButton = Array.from(buttons).find((btn) => btn.className.includes("bg-amber-500/10"));
+    expect(ratingButton).toBeDefined();
+    expect(ratingButton?.className).toContain("border-amber-500");
+  });
+
+  test("rating badge shows amber border when userRating is a Rating object", async () => {
+    vi.mocked(useSession).mockReturnValue({
+      user: { id: "user-1" } as never,
+      supabase: null as never,
+      loading: false,
+    } as never);
+    const ratingObj = {
+      id: "rating-1",
+      userId: "user-1",
+      rateableId: "show-1",
+      rateableType: "Show",
+      value: 4,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never;
+    const { container } = await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={ratingObj} showRating={null} />,
+    );
+    const buttons = container.querySelectorAll("button");
+    const ratingButton = Array.from(buttons).find((btn) => btn.className.includes("bg-amber-500/10"));
+    expect(ratingButton).toBeDefined();
+    expect(ratingButton?.className).toContain("border-amber-500");
+  });
+
+  // The dashed (unrated) state is the default when the viewer is logged in
+  // but hasn't rated the show. Pinned because the resolver short-circuits on
+  // null and the rated-state derivation must follow.
+  test("rating badge shows dashed border when userRating is null and viewer is logged in", async () => {
+    vi.mocked(useSession).mockReturnValue({
+      user: { id: "user-1" } as never,
+      supabase: null as never,
+      loading: false,
+    } as never);
+    const { container } = await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+    );
+    const buttons = container.querySelectorAll("button");
+    const dashedButton = Array.from(buttons).find((btn) => btn.className.includes("border-dashed"));
+    expect(dashedButton).toBeDefined();
+    expect(dashedButton?.className).not.toContain("bg-amber-500/10");
+  });
+
   // Clicking "gap chart" swaps to the table view. Existence of the
   // SetlistTable column headers (Set/Song/Last Played/Gap) is the signal.
   test("clicking gap chart swaps to the table view", async () => {
@@ -257,7 +336,7 @@ describe("SetlistCard", () => {
     await user.click(screen.getByRole("button", { name: /gap chart/i }));
     // Average gap formats to one decimal place — terse, matches the rest
     // of the rarity stat presentation on the song-detail page.
-    expect(screen.getByText(/Average \/ Median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Last Played" })).toBeInTheDocument();
   });
 
@@ -273,7 +352,7 @@ describe("SetlistCard", () => {
         showRating={null}
       />,
     );
-    const summary = screen.getByText(/Average \/ Median song gap:\s*7\.5\s*\/\s*6\.0/);
+    const summary = screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/);
     const trackText = screen.getByText("Basis for a Day");
     // DOM order: track text comes before the summary line. compareDocumentPosition
     // returns DOCUMENT_POSITION_FOLLOWING (4) when `summary` follows `trackText`.

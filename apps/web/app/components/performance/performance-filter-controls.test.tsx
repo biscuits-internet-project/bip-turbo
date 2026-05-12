@@ -213,6 +213,26 @@ describe("PerformanceFilterControls", () => {
     expect(wrapper.className).not.toMatch(/(^|\s)hidden(\s|$)/);
   });
 
+  // Phone-landscape collapse: a rotated phone has the same vertical-space
+  // crunch as a narrow portrait phone. The toggle re-shows via `short:!flex`
+  // and the content wrapper re-collapses via `short:!hidden` when the user
+  // hasn't expanded it.
+  test("Filters toggle carries short:!flex so it re-shows on phone landscape", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
+
+    const toggle = screen.getByRole("button", { name: /^Filters/ });
+    expect(toggle.className).toContain("short:!flex");
+  });
+
+  test("collapsed filter content carries short:!hidden so it re-collapses on phone landscape", async () => {
+    const { container } = await setup(
+      <PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />,
+    );
+
+    const wrapper = container.querySelector("[data-testid='filter-content-wrapper']") as HTMLElement;
+    expect(wrapper.className).toContain("short:!hidden");
+  });
+
   // The Filters toggle shows an active-filter count when filters are
   // applied so users know there's state hidden behind the button without
   // having to expand it.

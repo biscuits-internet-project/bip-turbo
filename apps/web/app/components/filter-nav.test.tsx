@@ -57,4 +57,43 @@ describe("FilterNav", () => {
     expect(countSpan.className).toContain("hidden");
     expect(countSpan.className).toContain("sm:inline");
   });
+
+  // Phone-landscape collapse: a rotated phone has the same vertical-space
+  // crunch as a narrow portrait phone, so we re-show the mobile toggle
+  // button and re-hide the desktop heading when `short:` (max-height:
+  // 640px) matches. Without this, the filter chrome eats most of the
+  // landscape viewport.
+  test("mobile toggle re-shows on short viewports via short:!flex", async () => {
+    await setupWithRouter(<FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />);
+
+    const trigger = screen.getByRole("button", { name: /Filter by Year/ });
+    expect(trigger.className).toContain("short:!flex");
+  });
+
+  test("desktop heading re-hides on short viewports via short:hidden", async () => {
+    const { container } = await setupWithRouter(
+      <FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />,
+    );
+
+    const desktopHeading = container.querySelector("h2");
+    expect(desktopHeading?.className).toContain("short:hidden");
+  });
+
+  // Collapsed body carries the short:! overrides so a desktop-style force-
+  // open (sm:!max-h-[1000px]) doesn't keep the panel expanded on a phone
+  // in landscape. When the user has already expanded the panel, the
+  // overrides drop out so the panel stays open at any viewport size.
+  test("collapsed body re-collapses on short viewports via short:!max-h-0", async () => {
+    const { container } = await setupWithRouter(
+      <FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />,
+    );
+
+    // Body is the inner overflow-hidden + transition-all wrapper around the
+    // filter grid — distinct from the outer card-premium wrapper which also
+    // has overflow-hidden.
+    const body = container.querySelector("div.transition-all");
+    expect(body?.className).toContain("short:!max-h-0");
+    expect(body?.className).toContain("short:!opacity-0");
+    expect(body?.className).toContain("short:!pointer-events-none");
+  });
 });

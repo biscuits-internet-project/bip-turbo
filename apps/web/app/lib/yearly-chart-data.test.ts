@@ -2,53 +2,59 @@ import { describe, expect, test } from "vitest";
 import { buildYearlyChartData, expandPlayedYears, expandYearlyDataToRange } from "./yearly-chart-data";
 
 describe("buildYearlyChartData", () => {
-  // Count mode is the default rendering: each year's raw play count maps
-  // straight to `value`. Years are sorted ascending so the line chart reads
-  // left-to-right chronologically. Disco Biscuits' "Basis for a Day" — a
-  // long-running staple — exercises the multi-year case.
-  test("count mode returns sorted {year, value} pairs of raw play counts", () => {
+  // Each point carries `count` and `percent` alongside `value` so the chart's
+  // tooltip can show BOTH metrics regardless of which toggle is active. The
+  // `value` field still drives the visible line series. Count mode points
+  // `value` at the raw count; percent mode points it at the 0-1 decimal.
+  test("count mode returns sorted points with value=count and full count+percent fields", () => {
     const yearlyPlayData = { 2010: 12, 2008: 5, 2012: 8 };
-    const showsByYear = { 2008: 60, 2010: 70, 2012: 65 };
+    const showsByYear = { 2008: 50, 2010: 60, 2012: 80 };
 
     const result = buildYearlyChartData(yearlyPlayData, showsByYear, "count");
 
     expect(result).toEqual([
-      { year: 2008, value: 5 },
-      { year: 2010, value: 12 },
-      { year: 2012, value: 8 },
+      { year: 2008, value: 5, count: 5, percent: 0.1 },
+      { year: 2010, value: 12, count: 12, percent: 0.2 },
+      { year: 2012, value: 8, count: 8, percent: 0.1 },
     ]);
   });
 
-  // Percent mode normalizes by shows-played-that-year. Smooths year-over-year
-  // tour-volume variance so a "rare" song read isn't conflated with a light
-  // touring year. "Above the Waves" is the type of song you'd want to see
-  // normalized.
-  test("percent mode returns plays / showsByYear[year] as a 0-1 decimal", () => {
+  // Percent mode: value tracks the normalized decimal. count and percent are
+  // populated identically to count mode so the tooltip can pull both. "Above
+  // the Waves" is the kind of song where normalization tells a different
+  // story than raw counts.
+  test("percent mode returns value=percent with count+percent both populated", () => {
     const yearlyPlayData = { 2008: 5, 2010: 14 };
     const showsByYear = { 2008: 50, 2010: 70 };
 
     const result = buildYearlyChartData(yearlyPlayData, showsByYear, "percent");
 
     expect(result).toEqual([
-      { year: 2008, value: 0.1 },
-      { year: 2010, value: 0.2 },
+      { year: 2008, value: 0.1, count: 5, percent: 0.1 },
+      { year: 2010, value: 0.2, count: 14, percent: 0.2 },
     ]);
   });
 
-  // Defensive: if showsByYear is missing a year present in yearlyPlayData
-  // (data drift, partial cache), render 0 in percent mode rather than
-  // dividing by zero or NaN. Missing-denominator years surface as 0 — not
-  // dropped points — so the line stays continuous across the x-axis.
-  test("percent mode renders 0 when showsByYear[year] is missing or zero", () => {
+  // Defensive: missing or zero `showsByYear[year]` keeps `percent` at 0
+  // rather than NaN or Infinity. count is unaffected by the denominator. The
+  // tooltip uses this to suppress the percent line when the denominator is
+  // missing — confirmed by the chart's tooltip render behavior.
+  test("missing or zero showsByYear[year] keeps percent at 0; count still reflects raw plays", () => {
     const yearlyPlayData = { 2010: 5, 2011: 3, 2012: 7 };
-    const showsByYear = { 2010: 50, 2011: 0 }; // 2011 is zero, 2012 is missing
+    const showsByYear = { 2010: 50, 2011: 0 }; // 2011 zero, 2012 absent
 
-    const result = buildYearlyChartData(yearlyPlayData, showsByYear, "percent");
+    const countResult = buildYearlyChartData(yearlyPlayData, showsByYear, "count");
+    const percentResult = buildYearlyChartData(yearlyPlayData, showsByYear, "percent");
 
-    expect(result).toEqual([
-      { year: 2010, value: 0.1 },
-      { year: 2011, value: 0 },
-      { year: 2012, value: 0 },
+    expect(countResult).toEqual([
+      { year: 2010, value: 5, count: 5, percent: 0.1 },
+      { year: 2011, value: 3, count: 3, percent: 0 },
+      { year: 2012, value: 7, count: 7, percent: 0 },
+    ]);
+    expect(percentResult).toEqual([
+      { year: 2010, value: 0.1, count: 5, percent: 0.1 },
+      { year: 2011, value: 0, count: 3, percent: 0 },
+      { year: 2012, value: 0, count: 7, percent: 0 },
     ]);
   });
 

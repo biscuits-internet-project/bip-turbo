@@ -331,7 +331,11 @@ export default function UserProfile() {
       {/* Content Tabs — mobile shows a <select> dropdown (sm:hidden), sm+
           renders the horizontal tab strip. Mirrors the song-detail page so
           the long "Song Version Ratings" label doesn't clip on phones. */}
-      <Tabs value={activeTab} onValueChange={(value) => navigate(`?tab=${value}`)} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => navigate(`?tab=${value}`, { preventScrollReset: true })}
+        className="w-full"
+      >
         <div className="sm:hidden mb-4">
           <label htmlFor="user-profile-tab-select" className="sr-only">
             Profile view
@@ -339,7 +343,7 @@ export default function UserProfile() {
           <select
             id="user-profile-tab-select"
             value={activeTab}
-            onChange={(event) => navigate(`?tab=${event.target.value}`)}
+            onChange={(event) => navigate(`?tab=${event.target.value}`, { preventScrollReset: true })}
             className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
           >
             <option value="shows">Shows Attended ({attendanceCount})</option>
@@ -351,18 +355,27 @@ export default function UserProfile() {
         </div>
         <TabsList className="glass mb-6 hidden sm:flex">
           <TabsTrigger value="shows" asChild>
-            <Link to="?tab=shows" className="data-[state=active]:bg-brand-primary data-[state=active]:text-white">
+            <Link
+              to="?tab=shows"
+              preventScrollReset
+              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+            >
               Shows Attended ({attendanceCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="reviews" asChild>
-            <Link to="?tab=reviews" className="data-[state=active]:bg-brand-primary data-[state=active]:text-white">
+            <Link
+              to="?tab=reviews"
+              preventScrollReset
+              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+            >
               Reviews ({reviewCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="show-ratings" asChild>
             <Link
               to="?tab=show-ratings"
+              preventScrollReset
               className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
             >
               Show Ratings ({showRatingsCount})
@@ -371,6 +384,7 @@ export default function UserProfile() {
           <TabsTrigger value="track-ratings" asChild>
             <Link
               to="?tab=track-ratings"
+              preventScrollReset
               className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
             >
               Song Version Ratings ({trackRatingsCount})
@@ -378,7 +392,11 @@ export default function UserProfile() {
           </TabsTrigger>
           {blogPosts.length > 0 && (
             <TabsTrigger value="blog" asChild>
-              <Link to="?tab=blog" className="data-[state=active]:bg-brand-primary data-[state=active]:text-white">
+              <Link
+                to="?tab=blog"
+                preventScrollReset
+                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+              >
                 Blog Posts ({blogPosts.length})
               </Link>
             </TabsTrigger>

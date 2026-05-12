@@ -32,3 +32,33 @@ export function countDistinctEncores(rows: ReadonlyArray<{ set: string }>): numb
   }
   return encores.size;
 }
+
+/**
+ * Numeric sort key for a set label so callers can sort tracks by canonical
+ * narrative order: soundcheck first, then S1..S4, then E1..E3, unknowns
+ * last. Pairs with {@link compareBySetThenPosition} for full row ordering.
+ */
+export function setSortKey(label: string): number {
+  const upper = label.toUpperCase();
+  if (label.toLowerCase() === "soundcheck") return 0;
+  if (upper === "S1") return 10;
+  if (upper === "S2") return 20;
+  if (upper === "S3") return 30;
+  if (upper === "S4") return 40;
+  if (upper === "E1") return 50;
+  if (upper === "E2") return 60;
+  if (upper === "E3") return 70;
+  return 999;
+}
+
+/**
+ * Sort comparator for any track-like row: order by set bucket first, then
+ * by track position within the set. Generic over the row shape so it works
+ * for both `SetlistTableRow` (gap chart) and `PersonalSetlistTableRow`
+ * (personal gap chart) — anything with `{set, position}`.
+ */
+export function compareBySetThenPosition<T extends { set: string; position: number }>(a: T, b: T): number {
+  const setDiff = setSortKey(a.set) - setSortKey(b.set);
+  if (setDiff !== 0) return setDiff;
+  return a.position - b.position;
+}

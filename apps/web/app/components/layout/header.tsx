@@ -57,7 +57,7 @@ export function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-[hsl(240,10%,3.9%)] border-b border-border/10 overflow-hidden">
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 short:!h-12 bg-[hsl(240,10%,3.9%)] border-b border-border/10 overflow-hidden">
         <div className="flex h-full items-center justify-between px-4 sm:px-6 lg:px-8 max-w-full">
           {/* Logo */}
           <div className="flex items-center">
@@ -75,14 +75,18 @@ export function Header() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-2">
+          <nav className="hidden md:flex items-center space-x-2 short:!space-x-0">
             {navigation.slice(0, 6).map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                className="flex items-center rounded-md px-4 py-2 text-lg font-semibold text-content-text-primary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
+                // `whitespace-nowrap` keeps multi-word labels like "top
+                // rated" on a single line. Phone-landscape overrides drop
+                // padding + text size so the bar fits comfortably alongside
+                // the search box on a rotated phone.
+                className="flex items-center rounded-md px-4 py-2 text-lg font-semibold text-content-text-primary whitespace-nowrap transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass short:!px-2 short:!py-1 short:!text-sm"
               >
-                <item.icon className="h-4 w-4 mr-2" />
+                <item.icon className="h-4 w-4 mr-2 short:!mr-1" />
                 <span>{item.name}</span>
               </Link>
             ))}

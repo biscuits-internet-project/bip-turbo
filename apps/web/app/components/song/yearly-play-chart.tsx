@@ -68,19 +68,7 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
               fontSize={12}
               tickFormatter={isPercent ? (v: number) => `${Math.round(v * 100)}%` : undefined}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
-                borderRadius: "6px",
-                color: "#F3F4F6",
-              }}
-              labelStyle={{ color: "#F3F4F6" }}
-              formatter={(value: number | undefined) => {
-                const safe = value ?? 0;
-                return isPercent ? [`${Math.round(safe * 100)}%`, "% of Shows"] : [String(safe), "Plays"];
-              }}
-            />
+            <Tooltip content={<YearlyChartTooltip />} />
             <Line
               type="monotone"
               dataKey="value"
@@ -91,6 +79,41 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
             />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+interface YearlyChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload?: { year: number; count: number; percent: number } }>;
+  label?: number | string;
+}
+
+/**
+ * Custom recharts tooltip that always renders both raw count and percentage
+ * for the hovered year. The chart toggle still controls which series is
+ * drawn, but hovering surfaces both dimensions so users don't have to flip
+ * modes to compare them.
+ */
+export function YearlyChartTooltip({ active, payload }: YearlyChartTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const datum = payload[0]?.payload;
+  if (!datum) return null;
+
+  const { year, count, percent } = datum;
+  const playsLabel = count === 1 ? "play" : "plays";
+  const percentText = percent > 0 ? `${Math.round(percent * 100)}% of shows` : null;
+
+  return (
+    <div
+      className="rounded-md border px-3 py-2 text-sm"
+      style={{ backgroundColor: "#1F2937", borderColor: "#374151", color: "#F3F4F6" }}
+    >
+      <div className="font-medium">{year}</div>
+      <div>
+        {count} {playsLabel}
+        {percentText ? <span className="text-content-text-tertiary"> · {percentText}</span> : null}
       </div>
     </div>
   );

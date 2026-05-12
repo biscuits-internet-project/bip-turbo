@@ -28,6 +28,17 @@ describe("CacheInvalidationService.invalidateAttendanceCaches", () => {
     // user's attendance change.
     expect(cache.delPattern).toHaveBeenCalledTimes(2);
   });
+
+  // The SetlistCard "personal gap chart" view reads this user's song-history
+  // blob — toggling attendance changes its content and must wipe it.
+  test("wipes the per-user song-history blob", async () => {
+    const cache = makeCache();
+    const service = new CacheInvalidationService(cache as never, logger);
+
+    await service.invalidateAttendanceCaches("u-rynow");
+
+    expect(cache.del).toHaveBeenCalledWith(CacheKeys.users.songHistory("u-rynow"));
+  });
 });
 
 describe("CacheInvalidationService.invalidateShowListings", () => {
@@ -57,5 +68,17 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
     expect(cache.delPattern).toHaveBeenCalledWith("home:*");
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.stats.showsByYear());
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.stats.showDates());
+  });
+
+  // Per-user song-history embeds track-level data from every attended show,
+  // so any catalog-level show mutation can shift values. Wildcard wipe
+  // avoids tracking which users were affected.
+  test("wipes per-user song-history across all users", async () => {
+    const cache = makeCache();
+    const service = new CacheInvalidationService(cache as never, logger);
+
+    await service.invalidateShowListings();
+
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.users.allSongHistory());
   });
 });

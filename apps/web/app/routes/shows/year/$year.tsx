@@ -257,7 +257,10 @@ export default function ShowsByYear() {
                   onClick={() => setJumpToMonthOpen((open) => !open)}
                   aria-expanded={jumpToMonthOpen}
                   className={cn(
-                    "sm:hidden w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none",
+                    // Mobile-style toggle re-shows on phone-landscape
+                    // viewports so the month grid doesn't eat most of a
+                    // rotated phone's visible rows.
+                    "sm:hidden short:!flex w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none",
                     jumpToMonthOpen ? "mb-3" : "mb-0",
                   )}
                 >
@@ -272,7 +275,7 @@ export default function ShowsByYear() {
                     ▶
                   </span>
                 </button>
-                <h2 className="hidden sm:flex text-sm font-semibold text-white mb-3 items-center gap-2">
+                <h2 className="hidden sm:flex short:hidden text-sm font-semibold text-white mb-3 items-center gap-2">
                   Jump to Month
                   <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
                     {monthsWithShows.length} months
@@ -282,6 +285,10 @@ export default function ShowsByYear() {
                   className={cn(
                     "overflow-hidden transition-all duration-300 grid grid-cols-3 sm:grid-cols-12 gap-1.5 sm:!max-h-[1000px] sm:!opacity-100",
                     jumpToMonthOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0",
+                    // Re-collapse on phone-landscape viewports unless the
+                    // user has explicitly expanded — same density rationale
+                    // as the FilterNav short: override.
+                    !jumpToMonthOpen && "short:!max-h-0 short:!opacity-0",
                   )}
                 >
                   {months.map((month, index) => {

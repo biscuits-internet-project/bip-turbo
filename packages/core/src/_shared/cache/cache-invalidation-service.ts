@@ -51,10 +51,13 @@ export class CacheInvalidationService {
       this.cache.delPattern(CacheKeys.shows.allLists()),
       this.cache.delPattern("home:*"), // Invalidate all home page caches
       this.cache.del(CacheKeys.stats.showsByYear()), // shows-per-year aggregate is tied to the show catalog
-      this.cache.del(CacheKeys.stats.showDates()), // sorted stats-show-dates array backs Current Gap on /songs
+      this.cache.del(CacheKeys.stats.showDates()), // sorted stats-show-dates array backs Gap to Now on /songs
       // Per-user attended-setlists caches include each show's setlist + venue;
       // wipe them all when any show metadata moves.
       this.cache.delPattern(CacheKeys.users.allAttendedSetlists()),
+      // Per-user song-history embeds the catalog of tracks at each attended
+      // show; a show metadata or tracks change can shift values.
+      this.cache.delPattern(CacheKeys.users.allSongHistory()),
       this.cloudflareCache?.purgeYearListings(),
     ]);
   }
@@ -107,6 +110,8 @@ export class CacheInvalidationService {
       this.cache.delPattern(CacheKeys.songs.allFilteredForUser(userId)),
       // User profile's Shows Attended tab uses a per-user paginated setlists payload.
       this.cache.delPattern(CacheKeys.users.allAttendedSetlistsForUser(userId)),
+      // SetlistCard "personal" view reads this user's song-history blob.
+      this.cache.del(CacheKeys.users.songHistory(userId)),
     ]);
   }
 
