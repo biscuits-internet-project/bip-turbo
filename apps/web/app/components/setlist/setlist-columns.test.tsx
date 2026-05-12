@@ -78,9 +78,9 @@ describe("createSetlistColumns", () => {
   // as "Song / Gap" before the user's eye jumps to the older Last Played
   // date. Rating anchors the right edge — it's the action column (click to
   // rate) so it lives where the eye lands at the end of the row scan.
-  test("returns columns in order [Set, Track, Song, Gap, Last Played, Rating]", () => {
+  test("returns columns in order [Set, Track, All-timer, Song, Gap, Last Played, Rating]", () => {
     const columns = createSetlistColumns();
-    expect(columns.map((c) => c.id)).toEqual(["set", "track", "song", "gap", "lastPlayed", "rating"]);
+    expect(columns.map((c) => c.id)).toEqual(["set", "track", "allTimer", "song", "gap", "lastPlayed", "rating"]);
   });
 
   // Every column is sortable. Set and Track # share the canonical
@@ -115,7 +115,7 @@ describe("createSetlistColumns", () => {
     // the Set header puts the table into "sorted by set" mode.
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^Set$/i }));
-    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 0);
+    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 0);
     expect(setCells.map((c) => c.textContent)).toEqual(["1", "", "2", ""]);
   });
 
@@ -142,7 +142,7 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "c", position: 3, set: "S2", gap: 20, song: { id: "c", title: "Confrontation", slug: "z" } }),
     ]);
     await user.click(screen.getByRole("button", { name: /Gap/i }));
-    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 0);
+    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 0);
     // After asc-by-gap: gap=5 (S1), gap=10 (S1), gap=20 (S2). Every row
     // displays its set label.
     expect(setCells.map((c) => c.textContent)).toEqual(["1", "1", "2"]);
@@ -177,7 +177,7 @@ describe("createSetlistColumns", () => {
       }),
     ]);
     await user.click(screen.getByRole("button", { name: /Last Played/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 2);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -208,7 +208,7 @@ describe("createSetlistColumns", () => {
       }),
     ]);
     await user.click(screen.getByRole("button", { name: /Gap/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 2);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -226,11 +226,11 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "d", position: 4, set: "E1", song: { id: "d", title: "Crickets", slug: "w" } }),
     ]);
     const cells = screen.getAllByRole("cell");
-    // Each row produces 6 cells; cells[1], cells[7], cells[13], cells[19] are Track #.
+    // Each row produces 7 cells; cells[1], cells[8], cells[15], cells[22] are Track #.
     expect(cells[1].textContent).toBe("1");
-    expect(cells[7].textContent).toBe("2");
-    expect(cells[13].textContent).toBe("1");
-    expect(cells[19].textContent).toBe("1");
+    expect(cells[8].textContent).toBe("2");
+    expect(cells[15].textContent).toBe("1");
+    expect(cells[22].textContent).toBe("1");
   });
 
   // Set column drops the "S" prefix (S1 → 1, S2 → 2, etc.) — the column
@@ -243,9 +243,9 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "b", position: 2, set: "S2", song: { id: "b", title: "Tempest", slug: "t" } }),
     ]);
     const cells = screen.getAllByRole("cell");
-    // 6 cells per row; cells[0] = Set of row 0, cells[6] = Set of row 1.
+    // 7 cells per row; cells[0] = Set of row 0, cells[7] = Set of row 1.
     expect(cells[0].textContent).toBe("1");
-    expect(cells[6].textContent).toBe("2");
+    expect(cells[7].textContent).toBe("2");
   });
 
   // Single encore collapses E1 → E because there's no second encore to
@@ -257,9 +257,9 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "b", position: 2, set: "E1", song: { id: "b", title: "Crickets", slug: "c" } }),
     ]);
     const singleCells = screen.getAllByRole("cell");
-    // 6 cells per row; cells[0] = Set row 0, cells[6] = Set row 1.
+    // 7 cells per row; cells[0] = Set row 0, cells[7] = Set row 1.
     expect(singleCells[0].textContent).toBe("1");
-    expect(singleCells[6].textContent).toBe("E");
+    expect(singleCells[7].textContent).toBe("E");
 
     // Re-render with two encores to confirm we keep the numbering.
     document.body.innerHTML = "";
@@ -269,7 +269,7 @@ describe("createSetlistColumns", () => {
     ]);
     const multiCells = screen.getAllByRole("cell");
     expect(multiCells[0].textContent).toBe("E1");
-    expect(multiCells[6].textContent).toBe("E2");
+    expect(multiCells[7].textContent).toBe("E2");
   });
 
   // Normal row: gap renders as the integer; Last Played renders the prior

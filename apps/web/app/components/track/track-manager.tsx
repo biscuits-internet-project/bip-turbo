@@ -26,6 +26,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { SortableTrackItem } from "./sortable-track-item";
 
@@ -43,6 +44,7 @@ interface TrackFormData {
   note: string | null;
   song?: Track["song"];
   annotationDesc?: string | null;
+  allTimer: boolean;
 }
 
 const SET_OPTIONS = [
@@ -74,6 +76,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
     segue: "none",
     note: null,
     annotationDesc: null,
+    allTimer: false,
   });
 
   // Set up drag and drop sensors
@@ -246,6 +249,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       segue: "none",
       note: null,
       annotationDesc: null,
+      allTimer: false,
     });
   };
 
@@ -267,6 +271,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
       note: track.note,
       song: track.song,
       annotationDesc: annotationsText,
+      allTimer: track.allTimer ?? false,
     });
   };
 
@@ -457,6 +462,17 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           >
             <X className="h-4 w-4" />
           </Button>
+        </div>
+
+        <div className="md:col-span-7 flex items-center gap-2">
+          <Checkbox
+            id="track-all-timer"
+            checked={formData.allTimer}
+            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, allTimer: checked === true }))}
+          />
+          <label htmlFor="track-all-timer" className="text-sm font-medium text-content-text-secondary cursor-pointer">
+            All-timer
+          </label>
         </div>
       </div>
     );
