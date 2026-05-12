@@ -1,4 +1,14 @@
-import { type Annotation, average, median, type Setlist, type SetlistLight, type Show, type Track, type TrackLight, type Venue } from "@bip/domain";
+import {
+  type Annotation,
+  average,
+  median,
+  type Setlist,
+  type SetlistLight,
+  type Show,
+  type Track,
+  type TrackLight,
+  type Venue,
+} from "@bip/domain";
 import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 import { resolveShowOrderBy, SHOW_ORDER_ASC, SHOW_ORDER_DESC, STATS_SHOWS_WHERE } from "../_shared/show-ordering";
@@ -74,9 +84,7 @@ export function eligibleGapsForAggregation(
  * Surfaced alongside the avg/median gap because debuts are excluded from those
  * numbers but are themselves a strong rarity signal users want to see.
  */
-export function computeDebutCount(
-  tracks: ReadonlyArray<{ songId: string; gap: number | null }>,
-): number {
+export function computeDebutCount(tracks: ReadonlyArray<{ songId: string; gap: number | null }>): number {
   const debutSongIds = new Set<string>();
   for (const t of tracks) {
     if (t.gap === null) debutSongIds.add(t.songId);
@@ -170,7 +178,8 @@ function mapTrackToDomainEntity(
           totalShows: 0,
           percentOfAllShows: null,
           percentSinceDebut: null,
-          averageShowsPerPlay: null,
+          averageGapShows: null,
+          medianGapShows: null,
           longestGapShows: null,
           createdAt: new Date(dbTrack.song.createdAt),
           updatedAt: new Date(dbTrack.song.updatedAt),

@@ -133,6 +133,33 @@ export class StatsService {
   }
 
   /**
+   * Returns a `Map<songId, avgGap>` where `avgGap` is `AVG(tracks.gap)`
+   * restricted to count_for_stats=true tracks (`tracks.gap` is NULL on
+   * debuts, so the average naturally covers only closed gaps between
+   * consecutive plays). Drives the Avg Gap column on /songs.
+   *
+   * Songs with fewer than two stats plays have no closed gaps to average
+   * and are absent from the map; callers render em-dash.
+   */
+  async getAverageGapShowsBySongIds(songIds: string[]): Promise<Map<string, number>> {
+    if (songIds.length === 0) return new Map();
+    const rows = await this.db.$queryRaw<Array<{ song_id: string; avg_gap: number | null }>>`
+      SELECT tracks.song_id, AVG(tracks.gap)::float AS avg_gap
+      FROM tracks
+      JOIN shows ON tracks.show_id = shows.id
+      WHERE tracks.song_id = ANY(${songIds}::uuid[])
+        AND tracks.gap IS NOT NULL
+        AND ${statsShowsSql("shows")}
+      GROUP BY tracks.song_id
+    `;
+    const out = new Map<string, number>();
+    for (const row of rows) {
+      if (row.avg_gap !== null) out.set(row.song_id, row.avg_gap);
+    }
+    return out;
+  }
+
+  /**
    * Recompute Track.gap + Track.previousPerformanceShowId for every track
    * at a show on or after `sinceDate`, and Song.timesPlayed /
    * dateFirstPlayed / dateLastPlayed / yearlyPlayData for every song with
@@ -366,6 +393,33 @@ export function countShowsOnOrAfter(sortedDates: string[], target: string): numb
     else hi = mid;
   }
   return sortedDates.length - lo;
+}
+
+/**
+ * Counts entries strictly between `low` and `high` (both exclusive) in a
+ * sorted-ascending string array. Drives the "shows that fell in gaps
+ * between plays" denominator for filtered Avg Gap on /songs: we want the
+ * mean closed gap, so the trailing dry spell after the last filtered play
+ * and the period before the first filtered play must both be excluded.
+ */
+export function countShowsBetween(sortedDates: string[], low: string, high: string): number {
+  if (sortedDates.length === 0 || low >= high) return 0;
+  let lo = 0;
+  let hi = sortedDates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDates[mid] <= low) lo = mid + 1;
+    else hi = mid;
+  }
+  const startIdx = lo;
+  lo = startIdx;
+  hi = sortedDates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDates[mid] < high) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - startIdx;
 }
 
 function stableYearlyJson(value: unknown): string {

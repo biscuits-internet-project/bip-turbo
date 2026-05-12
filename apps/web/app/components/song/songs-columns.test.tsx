@@ -74,7 +74,8 @@ function makeSong(overrides: Partial<SongWithShows> = {}): SongWithShows {
     totalShows: 0,
     percentOfAllShows: null,
     percentSinceDebut: null,
-    averageShowsPerPlay: null,
+    averageGapShows: null,
+    medianGapShows: null,
     longestGapShows: null,
     yearlyPlayData: {},
     longestGapsData: {},
@@ -157,7 +158,7 @@ describe("getSongsColumns", () => {
             filteredTimesPlayed: 3,
             filteredShowsSinceLastPlayed: 9,
             filteredPercentSinceDebut: 0.42,
-            filteredAverageShowsPerPlay: 2.4,
+            filteredAverageGapShows: 2.4,
           }),
         ]}
         hideSearch
@@ -181,7 +182,7 @@ describe("getSongsColumns", () => {
             filteredTimesPlayed: 3,
             filteredShowsSinceLastPlayed: 9,
             filteredPercentSinceDebut: 0.42,
-            filteredAverageShowsPerPlay: 2.4,
+            filteredAverageGapShows: 2.4,
           }),
         ]}
         hideSearch
@@ -635,20 +636,20 @@ describe("getSongsColumns", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
-  // Avg Gap renders `averageShowsPerPlay` to one decimal — mirrors the
+  // Avg Gap renders `averageGapShows` to one decimal — mirrors the
   // "Average Gap" stat box on the song detail page. The number alone
   // carries the meaning ("played every 5.7 shows since debut") because
   // the column header sets the framing.
-  test("Avg Gap cell renders averageShowsPerPlay to one decimal", async () => {
+  test("Avg Gap cell renders averageGapShows to one decimal", async () => {
     await setupWithRouter(
-      <DataTable columns={baseColumns} data={[makeSong({ averageShowsPerPlay: 5.7 })]} hideSearch hidePagination />,
+      <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: 5.7 })]} hideSearch hidePagination />,
     );
     expect(screen.getByText("5.7")).toBeInTheDocument();
   });
 
-  test("Avg Gap cell renders em-dash when averageShowsPerPlay is null", async () => {
+  test("Avg Gap cell renders em-dash when averageGapShows is null", async () => {
     await setupWithRouter(
-      <DataTable columns={baseColumns} data={[makeSong({ averageShowsPerPlay: null })]} hideSearch hidePagination />,
+      <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: null })]} hideSearch hidePagination />,
     );
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
@@ -660,7 +661,7 @@ describe("getSongsColumns", () => {
     const columns = getSongsColumns({ showFilteredPlays: false });
     const gap = columns.find((c) => "accessorKey" in c && c.accessorKey === "showsSinceLastPlayed");
     const pct = columns.find((c) => "accessorKey" in c && c.accessorKey === "percentSinceDebut");
-    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "averageShowsPerPlay");
+    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "averageGapShows");
     expect(gap?.meta?.hideOnMobile).toBe(true);
     expect(pct?.meta?.hideOnMobile).toBe(true);
     expect(avg?.meta?.hideOnMobile).toBe(true);
@@ -679,7 +680,7 @@ describe("getSongsColumns", () => {
     const playsIdx = keys.indexOf("timesPlayed");
     const gapIdx = keys.indexOf("showsSinceLastPlayed");
     const pctIdx = keys.indexOf("percentSinceDebut");
-    const avgIdx = keys.indexOf("averageShowsPerPlay");
+    const avgIdx = keys.indexOf("averageGapShows");
     const lastIdx = keys.indexOf("dateLastPlayed");
     expect(playsIdx).toBeLessThan(pctIdx);
     expect(pctIdx).toBeLessThan(avgIdx);
