@@ -37,6 +37,45 @@ export const gapSortingFn = makeGapSortingFn("gap");
 export const filteredGapSortingFn = makeGapSortingFn("filteredGap");
 
 /**
+ * Sort comparator factory for the Song Before / Song After columns. The
+ * primary axis is the adjacent song's title (case-insensitive). The
+ * tiebreaker reads the relevant segue field — segue rows sort ahead of
+ * non-segue rows when titles tie so identical-title groups cluster
+ * segue-first. Rows missing the adjacent song (set openers / closers)
+ * sort last in ascending order.
+ */
+function makeAdjacentSongSortingFn(
+  pickAdjacent: (row: SongPagePerformance) => { songTitle?: string | null } | undefined,
+  pickSegue: (row: SongPagePerformance) => string | null | undefined,
+) {
+  return (a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number => {
+    const aTitle = pickAdjacent(a.original)?.songTitle ?? null;
+    const bTitle = pickAdjacent(b.original)?.songTitle ?? null;
+    if (aTitle === null && bTitle === null) return 0;
+    if (aTitle === null) return 1;
+    if (bTitle === null) return -1;
+    const titleCmp = aTitle.localeCompare(bTitle, undefined, { sensitivity: "base" });
+    if (titleCmp !== 0) return titleCmp;
+    const aSegue = !!pickSegue(a.original);
+    const bSegue = !!pickSegue(b.original);
+    if (aSegue === bSegue) return 0;
+    return aSegue ? -1 : 1;
+  };
+}
+
+export const songBeforeSortingFn = makeAdjacentSongSortingFn(
+  (row) => row.songBefore,
+  // The incoming segue lives on the prior track, surfaced via songBefore.segue.
+  (row) => row.songBefore?.segue,
+);
+export const songAfterSortingFn = makeAdjacentSongSortingFn(
+  (row) => row.songAfter,
+  // The outgoing segue lives on the CURRENT row — it describes whether
+  // the current track segued into the next one.
+  (row) => row.segue,
+);
+
+/**
  * Shared cell renderer for Gap and Filtered Gap. Same icon semantics: ★
  * for a debut (null), ↺ for the second occurrence within the same show,
  * tabular number otherwise.
@@ -77,7 +116,6 @@ interface PerformanceColumnOptions {
    * appears when the filtered set differs from all-time.
    */
   hasNarrowingFilter?: boolean;
-  songTitle?: string;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
 }
@@ -112,15 +150,8 @@ function SortableHeader({
 }
 
 export function createPerformanceColumns(options: PerformanceColumnOptions): ColumnDef<SongPagePerformance, unknown>[] {
-  const {
-    showSongColumn,
-    showAllTimerColumn,
-    showGapColumns,
-    hasNarrowingFilter,
-    songTitle,
-    userRatingMap,
-    isAuthenticated,
-  } = options;
+  const { showSongColumn, showAllTimerColumn, showGapColumns, hasNarrowingFilter, userRatingMap, isAuthenticated } =
+    options;
   const includeGapColumns = showGapColumns !== false;
   const columnHelper = createColumnHelper<SongPagePerformance>();
   const columns: ColumnDef<SongPagePerformance, unknown>[] = [];
@@ -135,17 +166,19 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         cell: (info) => {
           const title = info.getValue() as string;
           const slug = info.row.original.songSlug;
+          // Title relies on column width + `[overflow-wrap:anywhere]` for
+          // sizing. Setting `min-w` on the inner element would let it stick
+          // out of the table-fixed cell and trigger a horizontal scrollbar
+          // on the wrapping div at narrow widths.
           return slug ? (
             <a
               href={`/songs/${slug}`}
-              className="inline-block min-w-[10ch] text-base text-brand-primary hover:text-brand-secondary font-medium [overflow-wrap:anywhere]"
+              className="text-base text-brand-primary hover:text-brand-secondary font-medium [overflow-wrap:anywhere]"
             >
               {title}
             </a>
           ) : (
-            <span className="inline-block min-w-[10ch] text-content-text-secondary [overflow-wrap:anywhere]">
-              {title}
-            </span>
+            <span className="text-content-text-secondary [overflow-wrap:anywhere]">{title}</span>
           );
         },
       }) as ColumnDef<SongPagePerformance, unknown>,
@@ -157,12 +190,20 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       columnHelper.accessor((row) => row.allTimer ?? false, {
         id: "allTimer",
         header: "",
-        // Flame icon sits flush against the row edge at every viewport —
-        // the default cell padding (`px-1.5` on mobile, `sm:p-3` on
-        // desktop) doubles the visual width of the column for no benefit.
-        meta: { width: "24px", cellClassName: "px-0 sm:px-0" },
+        // Tightest possible slot: zero horizontal padding and a 16px
+        // width — just enough to hold the 14px flame icon — so the column
+        // takes the least space possible from its neighbors.
+        meta: { width: "16px", cellClassName: "px-0 sm:px-0" },
         enableSorting: false,
-        cell: (info) => (info.getValue() ? <Flame className="h-3.5 w-3.5 text-orange-500" /> : null),
+        cell: (info) =>
+          info.getValue() ? (
+            // h-6 matches the default text-base line-height in adjacent
+            // cells; items-center vertically centers the 14px icon so it
+            // sits on the same baseline as text-row content.
+            <div className="flex h-6 items-center justify-center">
+              <Flame className="h-3.5 w-3.5 text-orange-500" />
+            </div>
+          ) : null,
       }) as ColumnDef<SongPagePerformance, unknown>,
     );
   }
@@ -261,88 +302,48 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         return <span className="text-content-text-secondary">{formatSetLabel(set)}</span>;
       },
     }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor(
-      (row) => ({
-        before: row.songBefore,
-        after: row.songAfter,
-        currentSong: songTitle || row.songTitle || "",
-      }),
-      {
-        id: "sequence",
-        header: "Sequence",
-        enableSorting: false,
-        // Hidden on mobile only when there's a Song column already
-        // competing for room — the song-detail page (no Song column)
-        // has the slack to keep Sequence visible at narrow widths.
-        meta: { hideOnMobile: Boolean(showSongColumn) },
-        cell: (info) => {
-          const { before, after, currentSong } = info.getValue();
-          const parts = [];
-
-          if (before?.songTitle) {
-            parts.push(
-              <a
-                key="before"
-                href={`/songs/${before.songSlug}`}
-                className="text-content-text-secondary hover:text-brand-primary"
-              >
-                {before.songTitle}
-              </a>,
-            );
-            if (before.segue) {
-              parts.push(
-                <span key="segue1" className="text-content-text-tertiary mx-1">
-                  {" "}
-                  &gt;{" "}
-                </span>,
-              );
-            } else {
-              parts.push(
-                <span key="sep1" className="text-content-text-tertiary">
-                  ,&nbsp;
-                </span>,
-              );
-            }
-          }
-
-          parts.push(
-            <span key="current" className="font-bold" style={{ color: "#DDD6FE" }}>
-              {currentSong}
-            </span>,
-          );
-
-          if (after?.songTitle) {
-            if (info.row.original.segue) {
-              parts.push(
-                <span key="segue2" className="text-content-text-tertiary mx-1">
-                  {" "}
-                  &gt;{" "}
-                </span>,
-              );
-            } else {
-              parts.push(
-                <span key="sep2" className="text-content-text-tertiary">
-                  ,&nbsp;
-                </span>,
-              );
-            }
-            parts.push(
-              <a
-                key="after"
-                href={`/songs/${after.songSlug}`}
-                className="text-content-text-secondary hover:text-brand-primary"
-              >
-                {after.songTitle}
-              </a>,
-            );
-          }
-
-          return parts.length > 0 ? (
-            <div className="flex items-center flex-wrap [overflow-wrap:anywhere]">{parts}</div>
-          ) : null;
-        },
+    columnHelper.accessor((row) => row.songBefore, {
+      id: "songBefore",
+      header: ({ column }) => <SortableHeader column={column} label="Song Before" />,
+      enableSorting: true,
+      sortingFn: songBeforeSortingFn,
+      meta: { hideOnMobile: true },
+      cell: (info) => {
+        const before = info.getValue();
+        if (!before?.songTitle) return null;
+        // Inline text rather than flex items so the title wraps mid-word
+        // instead of pushing past the arrow onto a new line. Arrow renders
+        // only on segues; its absence implicitly signals a non-segue.
+        return (
+          <span className="[overflow-wrap:anywhere]">
+            <a href={`/songs/${before.songSlug}`} className="text-content-text-secondary hover:text-brand-primary">
+              {before.songTitle}
+            </a>
+            {before.segue && <span className="text-content-text-tertiary"> &gt;</span>}
+          </span>
+        );
       },
-    ) as ColumnDef<SongPagePerformance, unknown>,
+    }) as ColumnDef<SongPagePerformance, unknown>,
+    columnHelper.accessor((row) => row.songAfter, {
+      id: "songAfter",
+      header: ({ column }) => <SortableHeader column={column} label="Song After" />,
+      enableSorting: true,
+      sortingFn: songAfterSortingFn,
+      meta: { hideOnMobile: true },
+      cell: (info) => {
+        const after = info.getValue();
+        if (!after?.songTitle) return null;
+        const outgoingSegue = info.row.original.segue;
+        return (
+          <span className="[overflow-wrap:anywhere]">
+            {outgoingSegue && <span className="text-content-text-tertiary">&gt; </span>}
+            <a href={`/songs/${after.songSlug}`} className="text-content-text-secondary hover:text-brand-primary">
+              {after.songTitle}
+            </a>
+          </span>
+        );
+      },
+    }) as ColumnDef<SongPagePerformance, unknown>,
     columnHelper.accessor(
       (row) => ({
         annotations: row.annotations,
@@ -375,11 +376,17 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         },
       },
     ) as ColumnDef<SongPagePerformance, unknown>,
+    // Explicit width reserves enough room for the widest content (avg +
+    // count + user rating + dividers) so the cell doesn't grow when
+    // client-side user rating data arrives after hydration. Without
+    // this, the post-hydration widening triggers a phantom horizontal
+    // scrollbar on the table wrapper at narrow viewports.
     columnHelper.accessor((row) => row.rating ?? 0, {
       id: "rating",
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       enableSorting: true,
       sortingFn: "basic",
+      meta: { width: "118px", hideOnMobile: true },
       cell: (info) => {
         const rating = info.getValue();
         const ratingsCount = info.row.original.ratingsCount;

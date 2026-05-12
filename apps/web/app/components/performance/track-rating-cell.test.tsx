@@ -21,7 +21,7 @@ describe("TrackRatingCell", () => {
     );
 
     expect(screen.getByText("4.17")).toBeInTheDocument();
-    expect(screen.getByText("(3)")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.queryByText("Rate")).not.toBeInTheDocument();
   });
 

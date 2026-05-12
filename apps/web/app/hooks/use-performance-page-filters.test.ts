@@ -1,3 +1,4 @@
+import type { SongPagePerformance } from "@bip/domain";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -8,7 +9,7 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [mockSearchParams, mockSetSearchParams],
 }));
 
-import { usePerformancePageFilters } from "./use-performance-page-filters";
+import { searchPerformance, usePerformancePageFilters } from "./use-performance-page-filters";
 
 // Stable reference prevents the useEffect (which has initialData in its
 // deps) from re-running on every render. An inline `[]` creates a new array
@@ -271,5 +272,78 @@ describe("usePerformancePageFilters", () => {
     expect(nextParams.get("filters")).toBeNull();
     expect(nextParams.get("attended")).toBeNull();
     expect(nextParams.get("played")).toBeNull();
+  });
+});
+
+function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
+  return {
+    trackId: "track-1",
+    show: { id: "show-1", slug: "2024-06-15-the-cap", date: "2024-06-15", venueId: "venue-1", countForStats: true },
+    venue: {
+      id: "venue-1",
+      slug: "the-cap",
+      name: "The Capitol Theatre",
+      city: "Port Chester",
+      state: "NY",
+      country: "USA",
+    },
+    songTitle: "Munchkin Invasion",
+    songSlug: "munchkin-invasion",
+    songBefore: undefined,
+    songAfter: undefined,
+    rating: 4.5,
+    ratingsCount: 12,
+    notes: undefined,
+    allTimer: false,
+    segue: null,
+    annotations: [],
+    set: "S1",
+    position: 3,
+    gap: 5,
+    previousPerformanceShowId: "prev-show",
+    tags: {},
+    ...overrides,
+  };
+}
+
+describe("searchPerformance", () => {
+  // Baseline coverage: typing the song title matches. Pins the primary
+  // case so future expansions to the searchable-fields list don't
+  // accidentally regress it.
+  test("matches when query is a substring of songTitle", () => {
+    expect(searchPerformance(makePerformance(), "munchkin")).toBe(true);
+  });
+
+  // Venue search remains supported — users can type a club name to filter
+  // performances. Case-insensitive substring on name + city + state.
+  test("matches when query is a substring of venue name, city, or state", () => {
+    const performance = makePerformance();
+    expect(searchPerformance(performance, "capitol")).toBe(true);
+    expect(searchPerformance(performance, "port chester")).toBe(true);
+    expect(searchPerformance(performance, "ny")).toBe(true);
+  });
+
+  // Phase 10: typing a song title that's NEXT to the current song in the
+  // setlist should surface this row. Lets users answer "what was played
+  // after Tractorbeam" with text search.
+  test("matches when query is a substring of songBefore.songTitle", () => {
+    const performance = makePerformance({
+      songBefore: { id: "p1", songId: "s1", songSlug: "tractorbeam", songTitle: "Tractorbeam", segue: ">" },
+    });
+    expect(searchPerformance(performance, "tractorbeam")).toBe(true);
+  });
+
+  test("matches when query is a substring of songAfter.songTitle", () => {
+    const performance = makePerformance({
+      songAfter: { id: "n1", songId: "s2", songSlug: "above-the-waves", songTitle: "Above the Waves", segue: null },
+    });
+    expect(searchPerformance(performance, "above the waves")).toBe(true);
+  });
+
+  // No-match case: a query that doesn't appear in any searchable field
+  // returns false. Guards against an accidental "always true" bug if a
+  // future expansion uses the wrong default.
+  test("returns false when the query matches no searchable field", () => {
+    expect(searchPerformance(makePerformance(), "elephants of mars")).toBe(false);
   });
 });

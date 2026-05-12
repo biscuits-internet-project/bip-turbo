@@ -34,13 +34,27 @@ interface StatBoxProps {
 }
 
 function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
+  // On phone-landscape viewports the stat cards eat too much vertical
+  // space: 8 cards in a 4x2 grid push the rest of the page below the
+  // fold. Shrink padding, value font, and inter-element spacing so the
+  // grid stays legible at half its usual height.
   return (
-    <div className="glass-content p-2 sm:p-3 rounded-lg h-full">
-      <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
-      <dd className="mt-2">
-        <span className="text-xl sm:text-3xl font-bold text-content-text-primary">{value}</span>
-        {sublabel && <div className="mt-1 text-sm text-content-text-tertiary">{sublabel}</div>}
-        {sublabel2 && <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block">{sublabel2}</div>}
+    <div className="glass-content p-2 sm:p-3 short:!py-1 short:!px-2.5 rounded-lg h-full">
+      <dt className="text-sm short:!text-[11px] short:!leading-tight font-medium text-content-text-secondary">
+        {label}
+      </dt>
+      <dd className="mt-2 short:!mt-0.5">
+        <span className="text-xl sm:text-3xl short:!text-base short:!leading-tight font-bold text-content-text-primary">
+          {value}
+        </span>
+        {sublabel && (
+          <div className="mt-1 text-sm short:!text-[11px] short:!leading-tight short:!mt-0.5 text-content-text-tertiary">
+            {sublabel}
+          </div>
+        )}
+        {sublabel2 && (
+          <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block short:hidden">{sublabel2}</div>
+        )}
       </dd>
     </div>
   );
@@ -233,7 +247,7 @@ export default function SongPage() {
       </div>
 
       {/* Stats Grid */}
-      <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <dl className="grid grid-cols-2 lg:grid-cols-4 short:!grid-cols-4 gap-4 short:!gap-2">
         <StatBox label="Times Played" value={song.timesPlayed} />
         <StatBox label="Avg / Median Gap" value={formatAvgMedianGap(song.averageGapShows, song.medianGapShows)} />
         {song.lastShowSlug ? (
@@ -461,7 +475,6 @@ export default function SongPage() {
 
             <PerformanceTable
               performances={filteredAllTimers}
-              songTitle={song.title}
               isLoading={isLoading}
               hasNarrowingFilter={hasServerNarrowingFilter}
               headerContent={filterContent}
@@ -472,7 +485,6 @@ export default function SongPage() {
         <TabsContent value="performances" className="mt-6">
           <PerformanceTable
             performances={filteredPerformances}
-            songTitle={song.title}
             showAllTimerColumn
             isLoading={isLoading}
             hasNarrowingFilter={hasServerNarrowingFilter}

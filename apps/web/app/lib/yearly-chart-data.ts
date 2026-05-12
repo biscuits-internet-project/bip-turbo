@@ -1,11 +1,17 @@
 export type YearlyChartMode = "count" | "percent";
 
-export type YearlyChartPoint = { year: number; value: number };
+export type YearlyChartPoint = {
+  year: number;
+  value: number;
+  count: number;
+  percent: number;
+};
 
 /**
  * Builds the data series for the per-year plays chart on the song detail
- * page. "count" returns raw play counts; "percent" returns plays divided
- * by the total shows played that year, smoothing tour-volume variance.
+ * page. `value` follows the active mode (raw count or 0-1 percent) and
+ * drives the visible line; `count` and `percent` are always populated so
+ * the tooltip can show both regardless of which series is rendered.
  */
 /**
  * Returns a copy of `yearlyPlayData` extended to cover every year in
@@ -47,9 +53,10 @@ export function buildYearlyChartData(
   return Object.entries(yearlyPlayData)
     .map(([yearKey, plays]) => {
       const year = Number.parseInt(yearKey, 10);
-      if (mode === "count") return { year, value: plays };
       const denominator = showsByYear[year] ?? 0;
-      return { year, value: denominator > 0 ? plays / denominator : 0 };
+      const percent = denominator > 0 ? plays / denominator : 0;
+      const value = mode === "count" ? plays : percent;
+      return { year, value, count: plays, percent };
     })
     .sort((a, b) => a.year - b.year);
 }
