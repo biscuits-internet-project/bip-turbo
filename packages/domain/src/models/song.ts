@@ -23,7 +23,7 @@ export const songSchema = z.object({
   // Filtered Avg Gap columns on /songs.
   filteredShowsSinceLastPlayed: z.number().nullable().optional(),
   filteredPercentSinceDebut: z.number().nullable().optional(),
-  filteredAverageShowsPerPlay: z.number().nullable().optional(),
+  filteredAverageGapShows: z.number().nullable().optional(),
   dateFirstFilteredPlayed: z.date().nullable().optional(),
   dateLastFilteredPlayed: z.date().nullable().optional(),
   dateLastPlayed: z.date().nullable(),
@@ -51,7 +51,8 @@ export const songSchema = z.object({
   totalShows: z.number(),
   percentOfAllShows: z.number().nullable(),
   percentSinceDebut: z.number().nullable(),
-  averageShowsPerPlay: z.number().nullable(),
+  averageGapShows: z.number().nullable(),
+  medianGapShows: z.number().nullable(),
   longestGapShows: z.number().nullable(),
   yearlyPlayData: z.record(z.string(), z.unknown()).default({}),
   longestGapsData: z.record(z.string(), z.unknown()).default({}),

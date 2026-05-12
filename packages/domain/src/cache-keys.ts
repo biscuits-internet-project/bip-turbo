@@ -12,7 +12,7 @@ export const CacheKeys = {
    */
   show: {
     /** Complete show + setlist data for show page */
-    data: (slug: string) => `show:${slug}:data:v2`,
+    data: (slug: string) => `show:${slug}:data:v3`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
@@ -27,7 +27,7 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      return `shows:list:${filterHash}:v2`;
+      return `shows:list:${filterHash}:v3`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -42,7 +42,7 @@ export const CacheKeys = {
    */
   setlist: {
     /** Complete setlist data with tracks and annotations */
-    data: (slug: string) => `setlist:${slug}:data:v2`,
+    data: (slug: string) => `setlist:${slug}:data:v3`,
   },
 
   /**
@@ -64,21 +64,21 @@ export const CacheKeys = {
    */
   songs: {
     /** Full songs index page data */
-    index: () => "songs:index:full:v2",
+    index: () => "songs:index:full:v3",
     /** All-timers page data */
-    allTimers: () => "songs:all-timers:v2",
+    allTimers: () => "songs:all-timers:v3",
     /** Songs with history content */
-    histories: () => "songs:histories:v2",
+    histories: () => "songs:histories:v3",
     /** All-timers for a specific calendar day (On This Day page) */
-    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v2`,
+    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v3`,
     /** Filtered song results by era/author/cover/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
       const attendedUserId = filters.attended;
       if (attendedUserId) {
-        return `songs:filtered:user:${attendedUserId}:${filterHash}:v2`;
+        return `songs:filtered:user:${attendedUserId}:${filterHash}:v3`;
       }
-      return `songs:filtered:${filterHash}:v2`;
+      return `songs:filtered:${filterHash}:v3`;
     },
     /** All filtered song caches (for pattern deletion) */
     allFiltered: () => "songs:filtered:*",
@@ -96,7 +96,7 @@ export const CacheKeys = {
      * have 400+ attended shows and the un-paginated payload is large enough
      * to be slow to deserialize/transport even from Redis.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v2`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v3`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -117,7 +117,7 @@ export const CacheKeys = {
    */
   home: {
     /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v2`,
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v3`,
   },
 
   /**

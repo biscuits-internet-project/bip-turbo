@@ -141,9 +141,10 @@ function formatCount(value: number | null | undefined): string {
   return value.toLocaleString();
 }
 
-function formatDecimal(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return value.toFixed(1);
+function formatAvgMedianGap(avg: number | null | undefined, median: number | null | undefined): string {
+  const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v.toFixed(1));
+  if ((avg === null || avg === undefined) && (median === null || median === undefined)) return "—";
+  return `${fmt(avg)} / ${fmt(median)}`;
 }
 
 export default function SongPage() {
@@ -234,7 +235,7 @@ export default function SongPage() {
       {/* Stats Grid */}
       <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatBox label="Times Played" value={song.timesPlayed} />
-        <StatBox label="Average Gap" value={formatDecimal(song.averageShowsPerPlay)} />
+        <StatBox label="Avg / Median Gap" value={formatAvgMedianGap(song.averageGapShows, song.medianGapShows)} />
         {song.lastShowSlug ? (
           <Link to={`/shows/${song.lastShowSlug}`} className="block">
             <StatBox
@@ -242,7 +243,7 @@ export default function SongPage() {
               value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
               sublabel={
                 song.actualLastPlayedDate
-                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                   : undefined
               }
               sublabel2={
@@ -260,7 +261,7 @@ export default function SongPage() {
             value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
             sublabel={
               song.actualLastPlayedDate
-                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                 : undefined
             }
             sublabel2={
