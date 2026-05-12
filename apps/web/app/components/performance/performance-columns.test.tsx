@@ -1,5 +1,5 @@
 import type { SongPagePerformance } from "@bip/domain";
-import { mockShallowComponent, setup } from "@test/test-utils";
+import { mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { DataTable } from "~/components/ui/data-table";
@@ -53,7 +53,7 @@ describe("createPerformanceColumns", () => {
   // viewports stack venue beneath the date in the same column.
   test("default columns include Date, Set, Sequence, Notes, Rating headers (Venue is not a separate column)", async () => {
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     expect(screen.getByText("Date")).toBeInTheDocument();
     expect(screen.getByText("Set")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("createPerformanceColumns", () => {
   // is responsive (hidden sm:block) but still in the DOM for desktop users.
   test("Date cell renders venue name beneath the date", async () => {
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     expect(screen.getByText(/The Capitol Theatre, Port Chester, NY/)).toBeInTheDocument();
   });
@@ -158,7 +158,7 @@ describe("createPerformanceColumns", () => {
   test("Filtered Gap cell renders Star icon for filteredGap=null debut", async () => {
     const performances = [makePerformance({ trackId: "t-debut", filteredGap: null, position: 1 })];
     const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
-    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    const { container } = await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
     // Two stars expected: the all-time Gap column treats this row the same
     // way (its gap field defaulted to 5 from makePerformance, so the Gap
     // cell renders a number, not a star). Filtered Gap renders the star.
@@ -181,7 +181,7 @@ describe("createPerformanceColumns", () => {
       }),
     ];
     const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
-    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    const { container } = await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
     // Within-show repeats render ↺ in both Gap AND Filtered Gap columns on
     // the second row — two `.lucide-rotate-ccw` icons total.
     expect(container.querySelectorAll(".lucide-rotate-ccw").length).toBe(2);
@@ -190,7 +190,7 @@ describe("createPerformanceColumns", () => {
   test("Filtered Gap cell renders the numeric value when not a debut or repeat", async () => {
     const performances = [makePerformance({ trackId: "t-1", filteredGap: 7, position: 1 })];
     const columns = createPerformanceColumns({ ...defaultOptions, hasNarrowingFilter: true });
-    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
     // The Gap column renders 5 (from makePerformance default); Filtered Gap
     // renders 7. Looking for "7" is unambiguous since the all-time Gap is 5.
     expect(screen.getByText("7")).toBeInTheDocument();
@@ -202,12 +202,12 @@ describe("createPerformanceColumns", () => {
     const performances = [makePerformance({ songTitle: "Cassidy", songSlug: "cassidy" })];
 
     const withSong = createPerformanceColumns({ ...defaultOptions, showSongColumn: true });
-    const { unmount } = await setup(<DataTable columns={withSong} data={performances} hideSearch hidePagination />);
+    const { unmount } = await setupWithRouter(<DataTable columns={withSong} data={performances} hideSearch hidePagination />);
     expect(screen.getByText("Song")).toBeInTheDocument();
     unmount();
 
     const withoutSong = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={withoutSong} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={withoutSong} data={performances} hideSearch hidePagination />);
     expect(screen.queryByText("Song")).not.toBeInTheDocument();
   });
 
@@ -217,7 +217,7 @@ describe("createPerformanceColumns", () => {
   test("AllTimer flame column present when showAllTimerColumn is true", async () => {
     const performances = [makePerformance({ allTimer: true })];
     const columns = createPerformanceColumns({ ...defaultOptions, showAllTimerColumn: true });
-    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    const { container } = await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     expect(container.querySelectorAll(".lucide-flame").length).toBe(1);
   });
@@ -229,7 +229,7 @@ describe("createPerformanceColumns", () => {
   test("passes initialRating from performance.rating even when userRatingMap is empty", async () => {
     const performances = [makePerformance({ trackId: "t1", rating: 3.5, ratingsCount: 2 })];
     const columns = createPerformanceColumns({ ...defaultOptions, userRatingMap: new Map() });
-    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     const cell = screen.getByTestId("TrackRatingCell");
     // initialRating should be 3.5, not null
@@ -243,7 +243,7 @@ describe("createPerformanceColumns", () => {
   test("passes initialRating as null when performance.rating is undefined", async () => {
     const performances = [makePerformance({ trackId: "t1", rating: undefined, ratingsCount: undefined })];
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     const cell = screen.getByTestId("TrackRatingCell");
     expect(cell.textContent).toContain('"initialRating":null');
@@ -259,7 +259,7 @@ describe("createPerformanceColumns", () => {
       }),
     ];
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     // Date is formatted M/D/YYYY (formatDateShort) for visual consistency
     // with /shows listings and song-detail stat cards.
@@ -273,7 +273,7 @@ describe("createPerformanceColumns", () => {
   // render plain text headers with no icon.
   test("sortable columns show sort indicator, non-sortable columns do not", async () => {
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     // Sortable columns render a <button> with an SVG icon inside
     const dateHeader = screen.getByText("Date").closest("button");
@@ -300,7 +300,7 @@ describe("createPerformanceColumns", () => {
   // additions don't accidentally reshuffle this flow.
   test("column order is Date, Gap, Last Played, Set, Sequence", async () => {
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     const headers = Array.from(document.querySelectorAll("th"))
       .map((th) => th.textContent?.trim() ?? "")
@@ -322,7 +322,7 @@ describe("createPerformanceColumns", () => {
   test("Gap column renders integer for normal rows", async () => {
     const columns = createPerformanceColumns(defaultOptions);
     const performances = [makePerformance({ trackId: "t-cassidy", gap: 12, previousPerformanceShowId: "prev-1" })];
-    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     expect(screen.getByText("12")).toBeInTheDocument();
   });
@@ -341,7 +341,7 @@ describe("createPerformanceColumns", () => {
         previousPerformanceShowId: null,
       }),
     ];
-    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    const { container } = await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     expect(container.querySelectorAll(".lucide-star").length).toBe(1);
   });
@@ -364,7 +364,7 @@ describe("createPerformanceColumns", () => {
       makePerformance({ trackId: "t-first", show: sharedShow, position: 3, gap: 5, previousPerformanceShowId: "p" }),
       makePerformance({ trackId: "t-repeat", show: sharedShow, position: 8, gap: 5, previousPerformanceShowId: "p" }),
     ];
-    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    const { container } = await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     // Exactly one rotate-ccw icon — the second occurrence; the first
     // occurrence still renders the integer 5.
@@ -387,7 +387,7 @@ describe("createPerformanceColumns", () => {
         previousShow: { slug: "2018-02-14-bowery", date: "2018-02-14" },
       }),
     ];
-    await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     const link = screen.getByRole("link", { name: /2\/14\/2018/ });
     expect(link).toHaveAttribute("href", "/shows/2018-02-14-bowery");
@@ -405,7 +405,7 @@ describe("createPerformanceColumns", () => {
         previousShow: undefined,
       }),
     ];
-    const { container } = await setup(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+    const { container } = await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
 
     // The cell sits between Set and Gap in the header order, so we look up
     // the third td in the row (after Date and Set). Rather than rely on
@@ -417,7 +417,7 @@ describe("createPerformanceColumns", () => {
   // indicator icon, just like Date and Rating.
   test("Gap column is sortable", async () => {
     const columns = createPerformanceColumns(defaultOptions);
-    await setup(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
+    await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     const gapHeader = screen.getByText("Gap").closest("button");
     expect(gapHeader).not.toBeNull();

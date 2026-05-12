@@ -266,7 +266,7 @@ export default function Show() {
         <div className="flex justify-between items-center gap-2">
           {adjacentShows.previous ? (
             <Link
-              to={`/shows/${adjacentShows.previous.slug}${setlistView === "gap-chart" ? "?view=gap-chart" : ""}`}
+              to={`/shows/${adjacentShows.previous.slug}${setlistView === "setlist" ? "" : `?view=${setlistView}`}`}
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0"
             >
               <ChevronLeft className="h-3 w-3 shrink-0" />
@@ -292,7 +292,7 @@ export default function Show() {
           </Link>
           {adjacentShows.next ? (
             <Link
-              to={`/shows/${adjacentShows.next.slug}${setlistView === "gap-chart" ? "?view=gap-chart" : ""}`}
+              to={`/shows/${adjacentShows.next.slug}${setlistView === "setlist" ? "" : `?view=${setlistView}`}`}
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0 justify-end"
             >
               <span className="truncate">

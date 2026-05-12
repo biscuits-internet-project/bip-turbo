@@ -87,6 +87,7 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
     annotations: [],
     averageSongGap: null,
     medianSongGap: null,
+    debutCount: 0,
   };
 }
 
@@ -257,7 +258,7 @@ describe("SetlistCard", () => {
     await user.click(screen.getByRole("button", { name: /gap chart/i }));
     // Average gap formats to one decimal place — terse, matches the rest
     // of the rarity stat presentation on the song-detail page.
-    expect(screen.getByText(/Average \/ Median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Last Played" })).toBeInTheDocument();
   });
 
@@ -273,7 +274,7 @@ describe("SetlistCard", () => {
         showRating={null}
       />,
     );
-    const summary = screen.getByText(/Average \/ Median song gap:\s*7\.5\s*\/\s*6\.0/);
+    const summary = screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/);
     const trackText = screen.getByText("Basis for a Day");
     // DOM order: track text comes before the summary line. compareDocumentPosition
     // returns DOCUMENT_POSITION_FOLLOWING (4) when `summary` follows `trackText`.

@@ -4,6 +4,7 @@ import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, Flame, RotateCcw, Star
 import { GapIcon } from "~/components/gap-icon";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
+import { ShowDateLink } from "~/components/show-date-link";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -242,17 +243,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
         enableSorting: true,
         sortingFn: "alphanumeric",
-        cell: (info) => {
-          const previousShow = info.row.original.previousShow;
-          if (!previousShow) {
-            return <span className="text-content-text-tertiary">—</span>;
-          }
-          return (
-            <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
-              <ShowDate date={previousShow.date} />
-            </a>
-          );
-        },
+        cell: (info) => <ShowDateLink show={info.row.original.previousShow} />,
       }) as ColumnDef<SongPagePerformance, unknown>,
     );
   }

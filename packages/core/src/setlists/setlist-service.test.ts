@@ -1,5 +1,6 @@
+import { average, median } from "@bip/domain";
 import { describe, expect, test, vi } from "vitest";
-import { computeAverageSongGap, computeMedianSongGap, SetlistService } from "./setlist-service";
+import { computeDebutCount, eligibleGapsForAggregation, SetlistService } from "./setlist-service";
 
 // Minimal mock DbClient — only the paths used by tests
 function makeMockDb() {
@@ -125,92 +126,91 @@ describe("SetlistService.findManyLight", () => {
   });
 });
 
-describe("computeAverageSongGap", () => {
-  // Standard case: average of two real-gap tracks. Debut (gap=null) is
-  // excluded from both numerator and denominator so it doesn't drag the
+describe("eligibleGapsForAggregation", () => {
+  // Debuts (gap === null) are excluded so they don't drag the eventual
   // average down to "we never played this".
-  test("averages real gaps and ignores debuts", () => {
+  test("excludes debuts", () => {
     const tracks = [
       { songId: "a", position: 1, gap: null }, // Basis for a Day debut
       { songId: "b", position: 2, gap: 5 }, // Above the Waves
       { songId: "c", position: 3, gap: 10 }, // Confrontation
     ];
-    expect(computeAverageSongGap(tracks)).toBe(7.5);
+    expect(eligibleGapsForAggregation(tracks)).toEqual([5, 10]);
   });
 
-  // Within-show repeat: a song that appears twice in the same show carries the
-  // gap of its earlier in-show occurrence (recompute writes the same value to
-  // both rows). Including the repeat would double-count the same song's
-  // recency, so the second occurrence is excluded by (songId already seen).
-  test("excludes within-show repeats by songId", () => {
+  // Within-show repeats inherit their earlier occurrence's gap. Counting
+  // them would double-weight the same song's recency, so the second
+  // occurrence is dropped by songId.
+  test("excludes within-show repeats by songId (keeps the earliest position)", () => {
     const tracks = [
       { songId: "a", position: 1, gap: null }, // Munchkin Invasion debut
       { songId: "b", position: 2, gap: 5 }, // Tempest
       { songId: "c", position: 3, gap: 10 }, // Mindless Dribble
-      { songId: "b", position: 4, gap: 5 }, // Tempest reprise — same songId, drop
+      { songId: "b", position: 4, gap: 5 }, // Tempest reprise — drop
     ];
-    expect(computeAverageSongGap(tracks)).toBe(7.5);
+    expect(eligibleGapsForAggregation(tracks)).toEqual([5, 10]);
   });
 
-  // All debuts (or all repeats of debuts) means there's no meaningful gap to
-  // average — return null so the UI can hide the summary line entirely.
-  test("returns null when no eligible tracks remain", () => {
+  // End-to-end sanity: filter + `average`/`median` from `@bip/domain`
+  // produce the expected summary numbers (the same scenario as the old
+  // wrapper-based tests, just composed explicitly).
+  test("composes with average/median for typical summary numbers", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: null }, // Crickets debut
-      { songId: "b", position: 2, gap: null }, // Spaga debut
+      { songId: "a", position: 1, gap: 30 },
+      { songId: "b", position: 2, gap: 5 },
+      { songId: "c", position: 3, gap: 20 },
+      { songId: "d", position: 4, gap: 10 },
     ];
-    expect(computeAverageSongGap(tracks)).toBeNull();
+    const eligible = eligibleGapsForAggregation(tracks);
+    expect(average(eligible)).toBe(16.25);
+    expect(median(eligible)).toBe(15);
+  });
+
+  // All debuts → empty array. `average` / `median` from the math util
+  // turn that into a clean `null` at call sites so the UI hides the line.
+  test("returns an empty array when nothing is eligible", () => {
+    const tracks = [
+      { songId: "a", position: 1, gap: null },
+      { songId: "b", position: 2, gap: null },
+    ];
+    expect(eligibleGapsForAggregation(tracks)).toEqual([]);
+    expect(average(eligibleGapsForAggregation(tracks))).toBeNull();
+    expect(median(eligibleGapsForAggregation(tracks))).toBeNull();
   });
 });
 
-describe("computeMedianSongGap", () => {
-  // Odd-length eligible list: median is the middle value after sorting.
-  // 5 / 10 / 30 → median = 10. Surfaces "what's the typical gap" without
-  // an outlier dragging it like the average can.
-  test("returns the middle value for an odd-count eligible list", () => {
+describe("computeDebutCount", () => {
+  // Mixed setlist: only `gap === null` rows count as debuts. A song with
+  // a real gap value is a re-play, not a debut.
+  test("counts only tracks with gap === null", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: 30 }, // Basis for a Day
-      { songId: "b", position: 2, gap: 5 }, // Above the Waves
-      { songId: "c", position: 3, gap: 10 }, // Confrontation
+      { songId: "a", gap: null }, // Tractorbeam debut
+      { songId: "b", gap: 5 }, // Spaga, played before
+      { songId: "c", gap: null }, // Mr. Don debut
+      { songId: "d", gap: 0 }, // Helicopters back-to-back, not a debut
     ];
-    expect(computeMedianSongGap(tracks)).toBe(10);
+    expect(computeDebutCount(tracks)).toBe(2);
   });
 
-  // Even-length eligible list: median is the mean of the two middle values
-  // after sorting. 5 / 10 / 20 / 30 → middles are 10 and 20 → 15.
-  test("averages the two middle values for an even-count eligible list", () => {
+  // A song played twice in one show is still ONE debut — both tracks have
+  // gap=null (the within-show repeat inherits the first occurrence's gap)
+  // but it's the same song debuting.
+  test("dedupes within-show repeats by songId", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: 30 }, // Crickets
-      { songId: "b", position: 2, gap: 5 }, // Munchkin Invasion
-      { songId: "c", position: 3, gap: 20 }, // Spaga
-      { songId: "d", position: 4, gap: 10 }, // Tempest
+      { songId: "a", gap: null }, // Bombbasis debut, first occurrence
+      { songId: "a", gap: null }, // Bombbasis reprise — same debut song
     ];
-    expect(computeMedianSongGap(tracks)).toBe(15);
+    expect(computeDebutCount(tracks)).toBe(1);
   });
 
-  // Same exclusion rules as the average: debuts (gap=null) and within-show
-  // repeats (songId already seen at an earlier position) are dropped before
-  // sorting. Without this, a repeated song would distort the middle value.
-  test("excludes debuts and within-show repeats before computing", () => {
+  // All non-debut → 0. The UI uses this to skip the `· N debuts` suffix
+  // when there's nothing to surface.
+  test("returns 0 when no track is a debut", () => {
     const tracks = [
-      { songId: "a", position: 1, gap: null }, // Mindless Dribble debut — drop
-      { songId: "b", position: 2, gap: 5 }, // Tempest
-      { songId: "c", position: 3, gap: 10 }, // Spaga
-      { songId: "d", position: 4, gap: 30 }, // Crickets
-      { songId: "b", position: 5, gap: 5 }, // Tempest reprise — drop
+      { songId: "a", gap: 3 },
+      { songId: "b", gap: 12 },
     ];
-    // Eligible gaps after exclusions: [5, 10, 30] → median = 10.
-    expect(computeMedianSongGap(tracks)).toBe(10);
-  });
-
-  // No eligible tracks (all debuts or all repeats) → null, so the UI can
-  // hide the summary line entirely.
-  test("returns null when no eligible tracks remain", () => {
-    const tracks = [
-      { songId: "a", position: 1, gap: null }, // Basis for a Day debut
-      { songId: "b", position: 2, gap: null }, // Above the Waves debut
-    ];
-    expect(computeMedianSongGap(tracks)).toBeNull();
+    expect(computeDebutCount(tracks)).toBe(0);
   });
 });
 

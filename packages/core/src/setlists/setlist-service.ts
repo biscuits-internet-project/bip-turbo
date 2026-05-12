@@ -1,4 +1,4 @@
-import type { Annotation, Setlist, SetlistLight, Show, Track, TrackLight, Venue } from "@bip/domain";
+import { type Annotation, average, median, type Setlist, type SetlistLight, type Show, type Track, type TrackLight, type Venue } from "@bip/domain";
 import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 import { resolveShowOrderBy, SHOW_ORDER_ASC, SHOW_ORDER_DESC, STATS_SHOWS_WHERE } from "../_shared/show-ordering";
@@ -53,7 +53,7 @@ type DbTrackLight = {
  * Shared by the average and median computations so both apply identical
  * exclusion rules.
  */
-function eligibleGapsForAggregation(
+export function eligibleGapsForAggregation(
   tracks: ReadonlyArray<{ songId: string; position: number; gap: number | null }>,
 ): number[] {
   const seenSongIds = new Set<string>();
@@ -69,31 +69,19 @@ function eligibleGapsForAggregation(
 }
 
 /**
- * Arithmetic mean of `track.gap` across a setlist's tracks. Returns null
- * when no eligible tracks remain so the gap-chart UI can hide the summary.
+ * Count of distinct catalog debuts in a setlist — tracks with `gap === null`,
+ * deduped by songId so a song played twice in the show counts as one debut.
+ * Surfaced alongside the avg/median gap because debuts are excluded from those
+ * numbers but are themselves a strong rarity signal users want to see.
  */
-export function computeAverageSongGap(
-  tracks: ReadonlyArray<{ songId: string; position: number; gap: number | null }>,
-): number | null {
-  const eligible = eligibleGapsForAggregation(tracks);
-  if (eligible.length === 0) return null;
-  const sum = eligible.reduce((acc, v) => acc + v, 0);
-  return sum / eligible.length;
-}
-
-/**
- * Median of `track.gap` across a setlist's tracks. Resists outliers (one
- * very-high-gap rarity won't drag the typical-gap signal up the way the
- * average does), so it pairs with the average to give users both the
- * typical and the central-tendency view.
- */
-export function computeMedianSongGap(
-  tracks: ReadonlyArray<{ songId: string; position: number; gap: number | null }>,
-): number | null {
-  const sorted = eligibleGapsForAggregation(tracks).sort((a, b) => a - b);
-  if (sorted.length === 0) return null;
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+export function computeDebutCount(
+  tracks: ReadonlyArray<{ songId: string; gap: number | null }>,
+): number {
+  const debutSongIds = new Set<string>();
+  for (const t of tracks) {
+    if (t.gap === null) debutSongIds.add(t.songId);
+  }
+  return debutSongIds.size;
 }
 
 function previousPerformanceShowFromDb(
@@ -253,13 +241,15 @@ function mapSetlistToDomainEntity(
   // Sort sets by their sort order
   sets.sort((a, b) => a.sort - b.sort);
 
+  const eligible = eligibleGapsForAggregation(tracks);
   return {
     show: mapShowToDomainEntity(show),
     venue: mapVenueToDomainEntity(show.venue),
     sets,
     annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
-    averageSongGap: computeAverageSongGap(tracks),
-    medianSongGap: computeMedianSongGap(tracks),
+    averageSongGap: average(eligible),
+    medianSongGap: median(eligible),
+    debutCount: computeDebutCount(tracks),
   };
 }
 
@@ -314,13 +304,15 @@ function mapSetlistLightToDomainEntity(
 
   sets.sort((a, b) => a.sort - b.sort);
 
+  const eligible = eligibleGapsForAggregation(tracks);
   return {
     show: mapShowToDomainEntity(show),
     venue: mapVenueToDomainEntity(show.venue),
     sets,
     annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
-    averageSongGap: computeAverageSongGap(tracks),
-    medianSongGap: computeMedianSongGap(tracks),
+    averageSongGap: average(eligible),
+    medianSongGap: median(eligible),
+    debutCount: computeDebutCount(tracks),
   };
 }
 
