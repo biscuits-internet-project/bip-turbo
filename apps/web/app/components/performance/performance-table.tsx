@@ -11,7 +11,6 @@ const getShowId = (performance: SongPagePerformance) => performance.show.id;
 
 interface PerformanceTableProps {
   performances: SongPagePerformance[];
-  songTitle?: string;
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
   showGapColumns?: boolean;
@@ -33,7 +32,6 @@ interface PerformanceTableProps {
  */
 export function PerformanceTable({
   performances,
-  songTitle,
   showSongColumn,
   showAllTimerColumn,
   showGapColumns,
@@ -71,11 +69,10 @@ export function PerformanceTable({
         showAllTimerColumn,
         showGapColumns,
         hasNarrowingFilter,
-        songTitle,
         userRatingMap,
         isAuthenticated,
       }),
-    [showSongColumn, showAllTimerColumn, showGapColumns, hasNarrowingFilter, songTitle, userRatingMap, isAuthenticated],
+    [showSongColumn, showAllTimerColumn, showGapColumns, hasNarrowingFilter, userRatingMap, isAuthenticated],
   );
 
   return (

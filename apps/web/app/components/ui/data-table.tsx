@@ -106,7 +106,7 @@ export function DataTable<TData, TValue>({
   );
 
   return (
-    <div className="space-y-3 w-full max-w-full overflow-hidden">
+    <div className="space-y-3 w-full max-w-full min-w-0 overflow-hidden">
       {searchKey && !hideSearch && (
         <div className="flex flex-col gap-3">
           <div className="flex items-end flex-wrap gap-x-6 gap-y-3">
@@ -131,7 +131,7 @@ export function DataTable<TData, TValue>({
 
       {!hidePagination && paginationBlock}
 
-      <div className="overflow-x-auto w-full">
+      <div className="overflow-x-auto w-full min-w-0">
         <Table className="w-full table-auto sm:table-fixed">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

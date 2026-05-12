@@ -4,7 +4,7 @@ import type { DbClient } from "../_shared/database/models";
 import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import { computeTrackGaps, sortTracksForGapWalk, type TrackForGapWalk } from "../_shared/track-gap";
 import type { SongService } from "../songs/song-service";
-import { countShowsAfter, countShowsOnOrAfter, type StatsService } from "../stats/stats-service";
+import { countShowsAfter, countShowsBetween, countShowsOnOrAfter, type StatsService } from "../stats/stats-service";
 
 /**
  * Filters for querying performances. All fields are optional — only
@@ -15,7 +15,7 @@ import { countShowsAfter, countShowsOnOrAfter, type StatsService } from "../stat
 export interface FilteredSongRarity {
   filteredShowsSinceLastPlayed: number | null;
   filteredPercentSinceDebut: number | null;
-  filteredAverageShowsPerPlay: number | null;
+  filteredAverageGapShows: number | null;
   dateFirstFilteredPlayed: Date;
   dateLastFilteredPlayed: Date;
 }
@@ -151,18 +151,28 @@ export class SongPageComposer {
       showsByYear,
     );
 
-    // Longest historical gap (in shows) for this song, restricted to
-    // stats-eligible shows so non-stats sets (e.g., late-night side
-    // projects) don't pollute the maximum. Null when the song has only
-    // ever been played once — debuts have no gap recorded.
-    const longestGapResult = await this.db.$queryRaw<[{ longest: number | null }]>`
-      SELECT MAX(tracks.gap)::int as longest
+    // Aggregate the closed gaps between consecutive stats-eligible plays
+    // of this song. `tracks.gap` is NULL on debuts and populated for
+    // every later performance, so MAX/AVG/percentile cover only real
+    // closed intervals. Non-stats shows are excluded so late-night side
+    // projects don't pollute the numbers. All three are null when the
+    // song has been played at most once (no closed gap exists).
+    const gapAggregateResult = await this.db.$queryRaw<
+      [{ longest: number | null; average: number | null; median: number | null }]
+    >`
+      SELECT
+        MAX(tracks.gap)::int AS longest,
+        AVG(tracks.gap)::float AS average,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY tracks.gap)::float AS median
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
       WHERE tracks.song_id = ${song.id}::uuid
+        AND tracks.gap IS NOT NULL
         AND ${statsShowsSql("shows")}
     `;
-    const longestGapShows = longestGapResult[0]?.longest ?? null;
+    const longestGapShows = gapAggregateResult[0]?.longest ?? null;
+    const averageGapShows = gapAggregateResult[0]?.average ?? null;
+    const medianGapShows = gapAggregateResult[0]?.median ?? null;
 
     return {
       song: {
@@ -174,6 +184,8 @@ export class SongPageComposer {
         firstVenue,
         firstShowSlug,
         ...rarity,
+        averageGapShows,
+        medianGapShows,
         longestGapShows,
       },
       performances,
@@ -286,8 +298,9 @@ export class SongPageComposer {
    *   - filteredPercentSinceDebut: filteredTimesPlayed divided by the
    *     count of matching-universe shows on or after this song's first
    *     filtered play
-   *   - filteredAverageShowsPerPlay: same denominator over the numerator,
-   *     inverted — "matching-universe shows per filtered play"
+   *   - filteredAverageGapShows: mean closed gap within the filter scope —
+   *     matching shows strictly between first and last filtered plays
+   *     divided by (filteredTimesPlayed - 1)
    *
    * Only computed for the survivor set the loader already produced. Songs
    * absent from the result map are left untouched by the caller; the UI
@@ -333,15 +346,20 @@ export class SongPageComposer {
       const filteredShowsSinceLastPlayed = countShowsAfter(matchingShowDates, row.last_date);
       const showsOnOrAfterDebut = countShowsOnOrAfter(matchingShowDates, row.first_date);
       const filteredPercentSinceDebut = showsOnOrAfterDebut === 0 ? null : filteredTimesPlayed / showsOnOrAfterDebut;
-      // Same mean-gap semantic as computeRarityStats.averageShowsPerPlay:
-      // shows that fell in gaps divided by the number of gaps. Requires
-      // at least 2 plays — a single play has no gaps to average.
-      const filteredAverageShowsPerPlay =
-        filteredTimesPlayed < 2 ? null : (showsOnOrAfterDebut - filteredTimesPlayed) / (filteredTimesPlayed - 1);
+      // Mean closed gap within the filter scope. Numerator counts only
+      // matching shows strictly BETWEEN the first and last filtered plays,
+      // excluding the trailing dry spell after the last play and the
+      // pre-first-play stretch. Without that bracketing, an early-clustered
+      // song with a long quiet tail inside the filter would have its avg
+      // inflated by the tail. Requires ≥ 2 plays for a closed gap to exist.
+      const filteredAverageGapShows =
+        filteredTimesPlayed < 2
+          ? null
+          : countShowsBetween(matchingShowDates, row.first_date, row.last_date) / (filteredTimesPlayed - 1);
       out.set(row.song_id, {
         filteredShowsSinceLastPlayed,
         filteredPercentSinceDebut,
-        filteredAverageShowsPerPlay,
+        filteredAverageGapShows,
         dateFirstFilteredPlayed: new Date(row.first_date),
         dateLastFilteredPlayed: new Date(row.last_date),
       });
@@ -794,7 +812,6 @@ export function computeRarityStats(
   showsSinceDebut: number | null;
   percentOfAllShows: number | null;
   percentSinceDebut: number | null;
-  averageShowsPerPlay: number | null;
 } {
   const totalShows = Object.values(showsByYear).reduce((sum, count) => sum + count, 0);
   const percentOfAllShows = totalShows === 0 ? null : song.timesPlayed / totalShows;
@@ -806,7 +823,6 @@ export function computeRarityStats(
       showsSinceDebut: null,
       percentOfAllShows,
       percentSinceDebut: null,
-      averageShowsPerPlay: null,
     };
   }
 
@@ -816,12 +832,6 @@ export function computeRarityStats(
     .reduce((sum, [, count]) => sum + count, 0);
   const showsBeforeDebut = totalShows - showsSinceDebut;
   const percentSinceDebut = showsSinceDebut === 0 ? null : song.timesPlayed / showsSinceDebut;
-  // Mean gap between consecutive plays of this song since its debut.
-  // (showsSinceDebut - timesPlayed) is the number of shows that fell in
-  // gaps between plays; dividing by (timesPlayed - 1) gives the mean per
-  // gap. Requires at least 2 plays — a single-play song has no gaps to
-  // average. Null also when the song has never been played.
-  const averageShowsPerPlay = song.timesPlayed < 2 ? null : (showsSinceDebut - song.timesPlayed) / (song.timesPlayed - 1);
 
   return {
     totalShows,
@@ -829,7 +839,6 @@ export function computeRarityStats(
     showsSinceDebut,
     percentOfAllShows,
     percentSinceDebut,
-    averageShowsPerPlay,
   };
 }
 

@@ -88,7 +88,7 @@ export function TrackRatingOverlay({ track, children }: TrackRatingOverlayProps)
               <Skeleton className="h-4 w-20" />
             </div>
           ) : (
-            <RatingComponent rating={displayRating} ratingsCount={ratingCount} />
+            <RatingComponent rating={displayRating} ratingsCount={ratingCount} userRating={userRating} />
           )}
 
           {(data?.track.likesCount ?? track.likesCount) > 0 && (

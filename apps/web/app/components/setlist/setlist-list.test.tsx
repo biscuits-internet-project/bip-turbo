@@ -84,6 +84,7 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
     annotations: [],
     averageSongGap: null,
     medianSongGap: null,
+    debutCount: 0,
   };
 }
 

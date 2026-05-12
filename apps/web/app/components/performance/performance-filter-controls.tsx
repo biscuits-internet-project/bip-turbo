@@ -76,7 +76,10 @@ export function PerformanceFilterControls({
       <button
         type="button"
         onClick={() => setMobileOpen((open) => !open)}
-        className="sm:hidden w-full flex items-center justify-between px-3 py-2 rounded-md bg-glass-bg border border-glass-border text-sm font-medium text-content-text-primary"
+        // Mobile toggle re-shows on phone-landscape viewports — a
+        // rotated phone has the same vertical-space crunch as portrait,
+        // so the filter chrome collapses there too.
+        className="sm:hidden short:!flex w-full flex items-center justify-between px-3 py-2 rounded-md bg-glass-bg border border-glass-border text-sm font-medium text-content-text-primary"
         aria-expanded={mobileOpen}
       >
         <span className="flex items-center gap-2">
@@ -90,7 +93,17 @@ export function PerformanceFilterControls({
         </span>
         <ChevronDown className={cn("h-4 w-4 transition-transform", mobileOpen && "rotate-180")} />
       </button>
-      <div data-testid="filter-content-wrapper" className={cn("space-y-3 sm:block", mobileOpen ? "block" : "hidden")}>
+      <div
+        data-testid="filter-content-wrapper"
+        className={cn(
+          "space-y-3 sm:block",
+          mobileOpen ? "block" : "hidden",
+          // …but on phone-landscape viewports follow the toggle state
+          // instead of the sm: force-open. User can still expand by
+          // clicking the toggle button.
+          !mobileOpen && "short:!hidden",
+        )}
+      >
         <div className="flex items-end flex-wrap gap-x-3 gap-y-2">
           {searchValue !== undefined && onSearchChange && (
             <Input

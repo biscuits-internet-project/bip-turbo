@@ -302,3 +302,116 @@ describe("RatingService.findTrackRatingsByUserId", () => {
     expect(args.select.song.select).toEqual({ slug: true, title: true });
   });
 });
+
+describe("RatingService.clearForUser", () => {
+  // Clearing deletes the user's row for the rateable and returns the
+  // recomputed average/count. The denormalized averageRating + ratingsCount
+  // on the show/track row stays consistent because the same recompute path
+  // runs as on upsert.
+  test("deletes the user's rating row and recomputes the rateable's denormalized average", async () => {
+    const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const aggregate = vi.fn().mockResolvedValue({
+      _avg: { value: 4.2 },
+      _count: { id: 5 },
+    });
+    const showUpdate = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      rating: { deleteMany, aggregate },
+      show: { update: showUpdate },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    const result = await service.clearForUser({ rateableId: "show-1", rateableType: "Show", userId: "u1" });
+
+    expect(result).toEqual({ averageRating: 4.2, ratingsCount: 5 });
+    // The right row is targeted: user + rateable + type triple.
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { userId: "u1", rateableId: "show-1", rateableType: "Show" },
+    });
+    // Recompute path ran against the same rateable.
+    expect(aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { rateableId: "show-1", rateableType: "Show" } }),
+    );
+    // Denormalized fields on the Show row got the recomputed values.
+    expect(showUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "show-1" },
+        data: expect.objectContaining({ averageRating: 4.2, ratingsCount: 5 }),
+      }),
+    );
+  });
+
+  // When the cleared rating was the only one, the average drops to 0 and
+  // count to 0 (Prisma aggregate returns null for _avg.value on empty sets;
+  // the service coerces to 0 to match the upsert path).
+  test("returns 0/0 when the cleared rating was the only one for the rateable", async () => {
+    const db = {
+      rating: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        aggregate: vi.fn().mockResolvedValue({ _avg: { value: null }, _count: { id: 0 } }),
+      },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    const result = await service.clearForUser({ rateableId: "show-1", rateableType: "Show", userId: "u1" });
+
+    expect(result).toEqual({ averageRating: 0, ratingsCount: 0 });
+  });
+
+  // Track ratings hit the Track table for the denormalized recompute; the
+  // Show table stays untouched.
+  test("recomputes the track row when rateableType is Track", async () => {
+    const showUpdate = vi.fn();
+    const trackUpdate = vi.fn();
+    const db = {
+      rating: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 3.5 }, _count: { id: 2 } }),
+      },
+      show: { update: showUpdate },
+      track: { update: trackUpdate },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    await service.clearForUser({ rateableId: "track-1", rateableType: "Track", userId: "u1" });
+
+    expect(trackUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "track-1" },
+        data: expect.objectContaining({ averageRating: 3.5, ratingsCount: 2 }),
+      }),
+    );
+    expect(showUpdate).not.toHaveBeenCalled();
+  });
+
+  // Show-type clears invalidate the show's comprehensive cache the same
+  // way upsert does, so the next read of the show payload sees the new
+  // averageRating + ratingsCount.
+  test("invalidates the show cache when clearing a Show rating with a showSlug", async () => {
+    const invalidate = vi.fn();
+    const db = {
+      rating: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 4.0 }, _count: { id: 1 } }),
+      },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, {
+      invalidateAttendanceCaches: vi.fn(),
+      invalidateShowComprehensive: invalidate,
+    } as never);
+    await service.clearForUser({
+      rateableId: "show-1",
+      rateableType: "Show",
+      userId: "u1",
+      showSlug: "2024-08-12-cap-theatre",
+    });
+
+    expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre");
+  });
+});

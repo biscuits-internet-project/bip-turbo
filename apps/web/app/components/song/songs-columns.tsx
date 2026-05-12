@@ -85,11 +85,7 @@ function HeaderLabel({
   reserveIconRow: boolean;
   children: ReactNode;
 }) {
-  const iconRow = filtered ? (
-    <FilterMark />
-  ) : reserveIconRow ? (
-    <span className="block h-3" aria-hidden="true" />
-  ) : null;
+  const iconRow = filtered ? <FilterMark /> : reserveIconRow ? <span className="block h-3" aria-hidden="true" /> : null;
   return (
     <span className="flex flex-col leading-tight items-start">
       {iconRow}
@@ -101,7 +97,7 @@ function HeaderLabel({
 interface SortableColumnOptions {
   accessorKey: keyof SongWithShows;
   label: ReactNode;
-  /** Hover tooltip; used when `label` is a shorthand (e.g. "Gap" → "Current Gap"). */
+  /** Hover tooltip; used when the visible label needs disambiguation in prose. */
   title?: string;
   width?: string;
   hideOnMobile?: boolean;
@@ -201,7 +197,8 @@ interface GetSongsColumnsOptions {
  * counts.
  */
 export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): ColumnDef<SongWithShows>[] {
-  const titleColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const titleColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "title",
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Song</HeaderLabel>,
     width: showFilteredPlays ? "14%" : "26%",
@@ -215,7 +212,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     ),
   });
 
-  const playsColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const playsColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "timesPlayed",
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Plays</HeaderLabel>,
     width: showFilteredPlays ? "5%" : "8%",
@@ -230,7 +228,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       ),
   });
 
-  const filteredPlaysColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredPlaysColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "filteredTimesPlayed",
     label: (
       <HeaderLabel filtered reserveIconRow>
@@ -263,7 +262,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
   // at the same precision.
   const sinceDebutFormatter = showFilteredPlays ? wholePercentFormatter : percentFormatter;
 
-  const percentSinceDebutColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const percentSinceDebutColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "percentSinceDebut",
     label: (
       <HeaderLabel reserveIconRow={showFilteredPlays}>
@@ -283,7 +283,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     sortingFn: nullsLastNumericSort("percentSinceDebut"),
   });
 
-  const filteredPercentSinceDebutColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredPercentSinceDebutColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "filteredPercentSinceDebut",
     label: (
       <HeaderLabel filtered reserveIconRow>
@@ -303,8 +304,9 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     sortingFn: nullsLastNumericSort("filteredPercentSinceDebut"),
   });
 
-  const avgGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
-    accessorKey: "averageShowsPerPlay",
+  const avgGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
+    accessorKey: "averageGapShows",
     label: (
       <HeaderLabel reserveIconRow={showFilteredPlays}>
         <span>Avg</span>
@@ -313,12 +315,13 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     ),
     width: "7%",
     hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.averageShowsPerPlay !== null ? song.averageShowsPerPlay.toFixed(1) : null),
-    sortingFn: nullsLastNumericSort("averageShowsPerPlay"),
+    cell: (song) => dashOrSpan(song.averageGapShows !== null ? song.averageGapShows.toFixed(1) : null),
+    sortingFn: nullsLastNumericSort("averageGapShows"),
   });
 
-  const filteredAvgGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
-    accessorKey: "filteredAverageShowsPerPlay",
+  const filteredAvgGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
+    accessorKey: "filteredAverageGapShows",
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Avg</span>
@@ -328,29 +331,34 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     title: "Filtered Avg Gap",
     width: "7%",
     hideOnMobile: true,
-    cell: (song) =>
-      dashOrSpan(song.filteredAverageShowsPerPlay != null ? song.filteredAverageShowsPerPlay.toFixed(1) : null),
-    sortingFn: nullsLastNumericSort("filteredAverageShowsPerPlay"),
+    cell: (song) => dashOrSpan(song.filteredAverageGapShows != null ? song.filteredAverageGapShows.toFixed(1) : null),
+    sortingFn: nullsLastNumericSort("filteredAverageGapShows"),
   });
 
-  const currentGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const currentGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "showsSinceLastPlayed",
-    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap</HeaderLabel>,
-    title: "Current Gap",
+    // Spelled out vs. plain "Gap" so users can't confuse it with "Avg Gap"
+    // on a quick scan. "to Now" anchors that this is the count up to today
+    // (the filtered variant uses "to End" because its denominator stops
+    // at the filter boundary).
+    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap to Now</HeaderLabel>,
+    title: "Gap to Now",
     width: "7%",
     hideOnMobile: true,
     cell: (song) => dashOrSpan(song.showsSinceLastPlayed),
     sortingFn: nullsLastNumericSort("showsSinceLastPlayed"),
   });
 
-  const filteredCurrentGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredCurrentGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "filteredShowsSinceLastPlayed",
     label: (
       <HeaderLabel filtered reserveIconRow>
-        <span>Gap</span>
+        <span>Gap to End</span>
       </HeaderLabel>
     ),
-    title: "Filtered Current Gap",
+    title: "Filtered Gap to End",
     width: "7%",
     hideOnMobile: true,
     cell: (song) => dashOrSpan(song.filteredShowsSinceLastPlayed ?? null),
@@ -361,7 +369,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
   // sublabel and shrink the date columns to make room.
   const dateColumnWidth = showFilteredPlays ? "8%" : "22%";
 
-  const lastPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const lastPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateLastPlayed",
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Last Played</HeaderLabel>,
     width: dateColumnWidth,
@@ -375,7 +384,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     ),
   });
 
-  const filteredLastPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredLastPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateLastFilteredPlayed",
     label: (
       <HeaderLabel filtered reserveIconRow>
@@ -385,16 +395,12 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     title: "Filtered Last Played",
     width: dateColumnWidth,
     cell: (song) => (
-      <DateVenueCell
-        date={song.dateLastFilteredPlayed ?? null}
-        show={song.lastFilteredPlayedShow}
-        hideVenue
-        compact
-      />
+      <DateVenueCell date={song.dateLastFilteredPlayed ?? null} show={song.lastFilteredPlayedShow} hideVenue compact />
     ),
   });
 
-  const firstPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const firstPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateFirstPlayed",
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>First Played</HeaderLabel>,
     width: dateColumnWidth,
@@ -408,7 +414,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     ),
   });
 
-  const filteredFirstPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredFirstPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateFirstFilteredPlayed",
     label: (
       <HeaderLabel filtered reserveIconRow>

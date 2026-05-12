@@ -1,7 +1,7 @@
 import { setup } from "@test/test-utils";
-import { screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import { YearlyPlayChart } from "./yearly-play-chart";
+import { YearlyChartTooltip, YearlyPlayChart } from "./yearly-play-chart";
 
 // Recharts uses ResizeObserver + measured DOM sizes that jsdom doesn't
 // supply. ResponsiveContainer renders nothing under those conditions, which
@@ -108,5 +108,52 @@ describe("YearlyPlayChart", () => {
   test("renders the section heading", async () => {
     await setup(<YearlyPlayChart yearlyPlayData={yearlyPlayData} showsByYear={showsByYear} />);
     expect(screen.getByText(/played by year/i)).toBeInTheDocument();
+  });
+});
+
+describe("YearlyChartTooltip", () => {
+  // The tooltip must surface BOTH count and percent regardless of which
+  // toggle is active. Hovering a point gives the user the full picture
+  // (raw plays AND normalized share) without forcing them to flip modes.
+  test("active payload renders both raw count and percentage on a single hover", () => {
+    const payload = [
+      {
+        payload: { year: 2010, value: 12, count: 12, percent: 0.2 },
+      },
+    ];
+    render(<YearlyChartTooltip active payload={payload} label={2010} />);
+
+    expect(screen.getByText(/2010/)).toBeInTheDocument();
+    expect(screen.getByText(/12 plays/i)).toBeInTheDocument();
+    expect(screen.getByText(/20% of shows/i)).toBeInTheDocument();
+  });
+
+  // Singular "play" instead of "plays" when count is exactly 1 — a small
+  // grammar nicety since "1 plays · …" reads wrong.
+  test("uses singular 'play' when count is 1", () => {
+    const payload = [{ payload: { year: 2015, value: 1, count: 1, percent: 0.02 } }];
+    render(<YearlyChartTooltip active payload={payload} label={2015} />);
+
+    expect(screen.getByText(/^1 play\b/i)).toBeInTheDocument();
+  });
+
+  // Defensive: when the denominator was missing (showsByYear lacked the
+  // year), percent is 0 — we suppress the percent line entirely rather
+  // than show a misleading "0% of shows" reading. Count still renders.
+  test("suppresses percent line when percent is 0 (missing denominator)", () => {
+    const payload = [{ payload: { year: 2012, value: 7, count: 7, percent: 0 } }];
+    render(<YearlyChartTooltip active payload={payload} label={2012} />);
+
+    expect(screen.getByText(/7 plays/i)).toBeInTheDocument();
+    expect(screen.queryByText(/% of shows/i)).not.toBeInTheDocument();
+  });
+
+  // Recharts calls the content renderer in inactive states (mouse outside
+  // chart) and with empty payloads — return null so nothing renders.
+  test("renders null when inactive or payload empty", () => {
+    const { container: c1 } = render(<YearlyChartTooltip active={false} payload={[]} label={2010} />);
+    const { container: c2 } = render(<YearlyChartTooltip active payload={[]} label={2010} />);
+    expect(c1.firstChild).toBeNull();
+    expect(c2.firstChild).toBeNull();
   });
 });

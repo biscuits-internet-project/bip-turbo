@@ -44,6 +44,7 @@ const mockFindByEmail = vi.fn();
 const mockFindByUsername = vi.fn();
 const mockGetShowsByYear = vi.fn();
 const mockGetShowsSinceLastPlayedBySongIds = vi.fn();
+const mockGetAverageGapShowsBySongIds = vi.fn();
 
 vi.mock("~/server/services", () => ({
   services: {
@@ -69,6 +70,7 @@ vi.mock("~/server/services", () => ({
     stats: {
       getShowsByYear: (...args: unknown[]) => mockGetShowsByYear(...args),
       getShowsSinceLastPlayedBySongIds: (...args: unknown[]) => mockGetShowsSinceLastPlayedBySongIds(...args),
+      getAverageGapShowsBySongIds: (...args: unknown[]) => mockGetAverageGapShowsBySongIds(...args),
     },
   },
 }));
@@ -88,6 +90,7 @@ describe("fetchFilteredSongs", () => {
     mockFindManyByDates.mockResolvedValue([]);
     mockGetShowsByYear.mockResolvedValue({});
     mockGetShowsSinceLastPlayedBySongIds.mockResolvedValue(new Map());
+    mockGetAverageGapShowsBySongIds.mockResolvedValue(new Map());
   });
 
   // The unfiltered /songs path calls findMany({}) for the canonical all-time
@@ -200,13 +203,13 @@ describe("fetchFilteredSongs", () => {
     expect(result.map((s) => s.title)).not.toContain("Shelby Rose");
   });
 
-  // The rarity columns on /songs (Current Gap, % Since Debut, Avg Gap)
-  // read showsSinceLastPlayed, percentSinceDebut, and averageShowsPerPlay
+  // The rarity columns on /songs (Gap to Now, % Since Debut, Avg Gap)
+  // read showsSinceLastPlayed, percentSinceDebut, and averageGapShows
   // off each row. Verifies fetchFilteredSongs pulls showsByYear (cached
-  // catalogue-level data) + per-song current-gap counts and runs each
-  // song through computeRarityStats so the columns render real values
-  // rather than em-dashes.
-  test("rarity: populates showsSinceLastPlayed / percentSinceDebut / averageShowsPerPlay on returned rows", async () => {
+  // catalogue-level data), per-song current-gap counts, and per-song
+  // avg-gap aggregates (`AVG(tracks.gap)`) so the columns render real
+  // values rather than em-dashes.
+  test("rarity: populates showsSinceLastPlayed / percentSinceDebut / averageGapShows on returned rows", async () => {
     const helicopters = {
       id: "hel",
       title: "Helicopters",
@@ -223,15 +226,22 @@ describe("fetchFilteredSongs", () => {
     } as unknown as Song;
     mockFindMany.mockResolvedValueOnce([helicopters, aboveTheWaves]);
 
-    // 1995 + 2010 era totals: Helicopters debuted in 1995 and gets all 1000
-    // shows since debut → 200/1000 = 20%, mean-gap = (1000-200)/(200-1) ≈
-    // 4.02 shows. Above The Waves debuted in 2010 with 600 shows since →
-    // 50/600 ≈ 8.33%, mean-gap = (600-50)/(50-1) ≈ 11.22 shows.
+    // percentSinceDebut math: Helicopters debuted in 1995 with 1000 shows
+    // since → 200/1000 = 20%. Above The Waves debuted in 2010 with 600
+    // shows since → 50/600 ≈ 8.33%. averageGapShows is now sourced from
+    // StatsService.getAverageGapShowsBySongIds — the bulk AVG(tracks.gap)
+    // query — not from computeRarityStats, so we mock concrete values.
     mockGetShowsByYear.mockResolvedValueOnce({ 1995: 400, 2010: 600 });
     mockGetShowsSinceLastPlayedBySongIds.mockResolvedValueOnce(
       new Map([
         ["hel", 12],
         ["atw", 47],
+      ]),
+    );
+    mockGetAverageGapShowsBySongIds.mockResolvedValueOnce(
+      new Map([
+        ["hel", 4.02],
+        ["atw", 11.22],
       ]),
     );
 
@@ -241,16 +251,17 @@ describe("fetchFilteredSongs", () => {
     const atw = result.find((s) => s.id === "atw");
     expect(hel?.showsSinceLastPlayed).toBe(12);
     expect(hel?.percentSinceDebut).toBeCloseTo(0.2, 5);
-    expect(hel?.averageShowsPerPlay).toBeCloseTo(800 / 199, 5);
+    expect(hel?.averageGapShows).toBeCloseTo(4.02, 5);
     expect(atw?.showsSinceLastPlayed).toBe(47);
     expect(atw?.percentSinceDebut).toBeCloseTo(50 / 600, 5);
-    expect(atw?.averageShowsPerPlay).toBeCloseTo(550 / 49, 5);
+    expect(atw?.averageGapShows).toBeCloseTo(11.22, 5);
   });
 
-  // Songs with no debut date keep null rarity fields (computeRarityStats
-  // returns nulls for percentSinceDebut and averageShowsPerPlay) — the
-  // table cell renders em-dash instead of NaN/Infinity. showsSinceLastPlayed
-  // also stays null when the gap map has no entry for the song.
+  // Songs absent from the bulk gap aggregate map (no closed gaps to
+  // average — debut-only or never-played) and absent from the
+  // current-gap map render em-dashes via null `averageGapShows` and
+  // `showsSinceLastPlayed`. percentSinceDebut stays null when the song
+  // has no debut date.
   test("rarity: never-debuted song keeps null rarity fields", async () => {
     const neverPlayed = {
       id: "np",
@@ -259,19 +270,17 @@ describe("fetchFilteredSongs", () => {
       dateFirstPlayed: null,
       dateLastPlayed: null,
     } as unknown as Song;
-    // Played-but-never-played songs are filtered out without a scope, so
-    // we use the played-but-no-debut-date edge case (rare migration drift)
-    // by giving it timesPlayed > 0 so it survives the filter.
     const survivor = { ...neverPlayed, timesPlayed: 3 } as unknown as Song;
     mockFindMany.mockResolvedValueOnce([survivor]);
     mockGetShowsByYear.mockResolvedValueOnce({ 2000: 100 });
     mockGetShowsSinceLastPlayedBySongIds.mockResolvedValueOnce(new Map());
+    mockGetAverageGapShowsBySongIds.mockResolvedValueOnce(new Map());
 
     const result = await fetchFilteredSongs(new URL("http://test/songs"), ctx);
 
     expect(result[0].showsSinceLastPlayed).toBeNull();
     expect(result[0].percentSinceDebut).toBeNull();
-    expect(result[0].averageShowsPerPlay).toBeNull();
+    expect(result[0].averageGapShows).toBeNull();
   });
 
   // The cache wrapper keys off the URL params. Same URL → one upstream
