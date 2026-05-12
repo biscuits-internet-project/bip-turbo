@@ -80,7 +80,7 @@ describe("SetlistTable", () => {
         ]}
       />,
     );
-    const cells = screen.getAllByRole("cell").filter((_, i) => i % 6 === 2);
+    const cells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
     expect(cells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",

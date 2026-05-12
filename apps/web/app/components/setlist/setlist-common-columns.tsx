@@ -2,6 +2,7 @@ import type { TrackLight } from "@bip/domain";
 import { type ColumnDef, createColumnHelper, type Row, type SortingFn } from "@tanstack/react-table";
 import { TrackRatingCell } from "~/components/performance/track-rating-cell";
 import { ShowDateLink } from "~/components/show-date-link";
+import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { GapCell, type GapCellState } from "./gap-cell";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
@@ -218,6 +219,13 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
           allRows.filter((r) => r.original.set === row.set && r.original.position < row.position).length + 1;
         return <span className="text-content-text-secondary tabular-nums">{trackNumber}</span>;
       },
+    }) as ColumnDef<T, unknown>,
+    columnHelper.display({
+      id: "allTimer",
+      header: () => null,
+      meta: allTimerColumnMeta,
+      enableSorting: false,
+      cell: (info) => (info.row.original.allTimer ? <AllTimerCell /> : null),
     }) as ColumnDef<T, unknown>,
     columnHelper.accessor((row) => row.song?.title ?? "", {
       id: "song",

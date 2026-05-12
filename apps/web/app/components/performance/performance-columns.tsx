@@ -1,10 +1,11 @@
 import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, Flame, RotateCcw, Star } from "lucide-react";
+import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, RotateCcw, Star } from "lucide-react";
 import { GapIcon } from "~/components/gap-icon";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
 import { ShowDateLink } from "~/components/show-date-link";
+import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -190,20 +191,9 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       columnHelper.accessor((row) => row.allTimer ?? false, {
         id: "allTimer",
         header: "",
-        // Tightest possible slot: zero horizontal padding and a 16px
-        // width — just enough to hold the 14px flame icon — so the column
-        // takes the least space possible from its neighbors.
-        meta: { width: "16px", cellClassName: "px-0 sm:px-0" },
+        meta: allTimerColumnMeta,
         enableSorting: false,
-        cell: (info) =>
-          info.getValue() ? (
-            // h-6 matches the default text-base line-height in adjacent
-            // cells; items-center vertically centers the 14px icon so it
-            // sits on the same baseline as text-row content.
-            <div className="flex h-6 items-center justify-center">
-              <Flame className="h-3.5 w-3.5 text-orange-500" />
-            </div>
-          ) : null,
+        cell: (info) => (info.getValue() ? <AllTimerCell /> : null),
       }) as ColumnDef<SongPagePerformance, unknown>,
     );
   }
@@ -386,7 +376,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       enableSorting: true,
       sortingFn: "basic",
-      meta: { width: "118px", hideOnMobile: true },
+      meta: { width: "132px", hideOnMobile: true },
       cell: (info) => {
         const rating = info.getValue();
         const ratingsCount = info.row.original.ratingsCount;
