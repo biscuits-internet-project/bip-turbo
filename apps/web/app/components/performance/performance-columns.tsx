@@ -366,17 +366,12 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         },
       },
     ) as ColumnDef<SongPagePerformance, unknown>,
-    // Explicit width reserves enough room for the widest content (avg +
-    // count + user rating + dividers) so the cell doesn't grow when
-    // client-side user rating data arrives after hydration. Without
-    // this, the post-hydration widening triggers a phantom horizontal
-    // scrollbar on the table wrapper at narrow viewports.
     columnHelper.accessor((row) => row.rating ?? 0, {
       id: "rating",
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       enableSorting: true,
       sortingFn: "basic",
-      meta: { width: "132px", hideOnMobile: true },
+      meta: { hideOnMobile: true },
       cell: (info) => {
         const rating = info.getValue();
         const ratingsCount = info.row.original.ratingsCount;

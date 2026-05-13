@@ -41,9 +41,9 @@ export function StarRating({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState<RatingResponse | null>(
-    initialRating != null ? { userRating: initialRating, averageRating: null } : null,
+    initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null,
   );
-  const { user, loading: isSessionLoading } = useSession();
+  const { user } = useSession();
   const revalidator = useRevalidator();
   const queryClient = useQueryClient();
   const isMountedRef = useRef<boolean>(true);
@@ -57,9 +57,12 @@ export function StarRating({
     };
   }, []);
 
-  // Fetch rating if needed (only when user is logged in and no initial rating provided)
+  // Fetch rating if needed (only when user is logged in and the caller
+  // didn't pass an initial value). A `null` initialRating is treated as
+  // "caller knows the user has no rating yet" — skip the fetch. Pass
+  // `undefined` (or omit the prop) when the answer truly is unknown.
   useEffect(() => {
-    if (!user || isSessionLoading || initialRating != null || hasFetchedRef.current) {
+    if (!user || initialRating !== undefined || hasFetchedRef.current) {
       return;
     }
 
@@ -85,7 +88,7 @@ export function StarRating({
     };
 
     fetchRating();
-  }, [user, isSessionLoading, initialRating, rateableId, rateableType]);
+  }, [user, initialRating, rateableId, rateableType]);
 
   const submitRating = async (value: number) => {
     setIsSubmitting(true);

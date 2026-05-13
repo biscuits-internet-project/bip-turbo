@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { batchedPostFetch } from "~/lib/batched-fetch";
-import type { TrackUserRatingsResponse } from "~/routes/api/tracks/user-ratings";
+import { trackUserRatingsQueryKey } from "~/lib/query-keys";
+import type { TrackUserRatingsResponse } from "~/server/track-user-ratings";
 
 function mergeTrackUserRatings(results: TrackUserRatingsResponse[]): TrackUserRatingsResponse {
   const merged: TrackUserRatingsResponse = { userRatings: {} };
@@ -12,7 +13,7 @@ function mergeTrackUserRatings(results: TrackUserRatingsResponse[]): TrackUserRa
 }
 
 export function useTrackUserRatings(trackIds: string[]) {
-  const queryKey = useMemo(() => ["tracks", "user-ratings", [...trackIds].sort().join(",")], [trackIds]);
+  const queryKey = useMemo(() => trackUserRatingsQueryKey(trackIds), [trackIds]);
 
   const { data, isLoading } = useQuery({
     queryKey,

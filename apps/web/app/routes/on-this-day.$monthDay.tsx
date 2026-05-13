@@ -1,4 +1,5 @@
 import { CacheKeys, type SetlistLight, type SongPagePerformance } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { Link, redirect } from "react-router";
@@ -10,10 +11,13 @@ import type { ShowExternalSources } from "~/components/setlist/show-external-bad
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { addDaysYearAgnostic, formatMonthDay, formatMonthDayShort, isValidMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
-import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
+import { computeShowUserData } from "~/server/show-user-data";
+import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
 interface LoaderData {
   setlists: SetlistLight[];
@@ -23,7 +27,7 @@ interface LoaderData {
   previousMonthDay: string;
   nextMonthDay: string;
   externalSources: Record<string, ShowExternalSources>;
-  initialUserData: ShowUserDataResponse;
+  dehydratedState: DehydratedState;
 }
 
 export function headers(): Headers {
@@ -65,6 +69,30 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
   const previousMonthDay = addDaysYearAgnostic(monthDay, -1);
   const nextMonthDay = addDaysYearAgnostic(monthDay, 1);
 
+  const setlistShowIds = setlists.map((s) => s.show.id);
+  // Performance rows reference shows from any year that share this month-day,
+  // so they cover a different (and usually larger) id set than the setlists.
+  // PerformanceTable's useAttendanceRowHighlight calls useShowUserData with
+  // those ids, so we must prefetch that key in addition to the setlist key.
+  const performanceShowIds = [...new Set(allTimersResult.performances.map((p) => p.show.id))];
+  const trackIds = allTimersResult.performances.map((p) => p.trackId);
+
+  const queryClient = createPrefetchClient();
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: showUserDataQueryKey(setlistShowIds),
+      queryFn: () => computeShowUserData(context, setlistShowIds),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: showUserDataQueryKey(performanceShowIds),
+      queryFn: () => computeShowUserData(context, performanceShowIds),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: trackUserRatingsQueryKey(trackIds),
+      queryFn: () => computeTrackUserRatings(context, trackIds),
+    }),
+  ]);
+
   return {
     setlists,
     performances: allTimersResult.performances,
@@ -73,10 +101,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
     previousMonthDay,
     nextMonthDay,
     externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
-    initialUserData: await computeShowUserData(
-      context,
-      setlists.map((s) => s.show.id),
-    ),
+    dehydratedState: dehydrate(queryClient),
   };
 });
 
@@ -104,7 +129,6 @@ export default function OnThisDay() {
     previousMonthDay,
     nextMonthDay,
     externalSources,
-    initialUserData,
   } = useSerializedLoaderData<LoaderData>();
 
   const {
@@ -204,7 +228,6 @@ export default function OnThisDay() {
           <SetlistList
             setlists={setlists}
             externalSources={externalSources}
-            initialUserData={initialUserData}
             empty={
               <div className="text-center py-8">
                 <p className="text-content-text-secondary text-lg">No shows on {displayLabel}.</p>

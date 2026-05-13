@@ -1,4 +1,5 @@
 import { compareByShowDate, type SongPageView } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -15,15 +16,37 @@ import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-perfor
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { pickGapTier } from "~/lib/gap-tier";
+import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
+import { computeShowUserData } from "~/server/show-user-data";
+import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
-export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promise<SongPageView> => {
+type LoaderData = SongPageView & { dehydratedState: DehydratedState };
+
+export const loader = publicLoader(async ({ params, context }: LoaderFunctionArgs): Promise<LoaderData> => {
   const slug = params.slug;
   if (!slug) throw new Response("Not Found", { status: 404 });
 
-  return services.songPageComposer.build(slug);
+  const view = await services.songPageComposer.build(slug);
+
+  const trackIds = view.performances.map((p) => p.trackId);
+  const showIds = [...new Set(view.performances.map((p) => p.show.id))];
+  const queryClient = createPrefetchClient();
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: trackUserRatingsQueryKey(trackIds),
+      queryFn: () => computeTrackUserRatings(context, trackIds),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: showUserDataQueryKey(showIds),
+      queryFn: () => computeShowUserData(context, showIds),
+    }),
+  ]);
+
+  return { ...view, dehydratedState: dehydrate(queryClient) };
 });
 
 interface StatBoxProps {
@@ -108,7 +131,7 @@ function ReviewNote({ notes }: { notes: string }) {
   );
 }
 
-export function meta({ data }: { data: SongPageView }) {
+export function meta({ data }: { data: LoaderData }) {
   return getSongMeta({
     ...data.song,
     timesPlayed: data.song.timesPlayed,
@@ -162,7 +185,7 @@ function formatAvgMedianGap(avg: number | null | undefined, median: number | nul
 }
 
 export default function SongPage() {
-  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<SongPageView>();
+  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];

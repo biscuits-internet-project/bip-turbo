@@ -2,6 +2,7 @@ import type { Attendance } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { batchedPostFetch } from "~/lib/batched-fetch";
+import { showUserDataQueryKey } from "~/lib/query-keys";
 import type { ShowUserDataResponse } from "~/server/show-user-data";
 
 interface UseShowUserDataResult {
@@ -28,18 +29,8 @@ function mergeShowUserData(results: ShowUserDataResponse[]): ShowUserDataRespons
   return merged;
 }
 
-interface UseShowUserDataOptions {
-  /**
-   * Server-fetched initial data to seed React Query's cache so SetlistCards
-   * render attendance / rating badges on first paint. When present, the data
-   * is treated as fresh (no background refetch within the stale window).
-   */
-  initialData?: ShowUserDataResponse;
-}
-
-export function useShowUserData(showIds: string[], options?: UseShowUserDataOptions): UseShowUserDataResult {
-  // Create a stable key from sorted show IDs
-  const queryKey = useMemo(() => ["shows", "user-data", [...showIds].sort().join(",")], [showIds]);
+export function useShowUserData(showIds: string[]): UseShowUserDataResult {
+  const queryKey = useMemo(() => showUserDataQueryKey(showIds), [showIds]);
 
   const { data, isLoading, error } = useQuery({
     queryKey,
@@ -47,8 +38,6 @@ export function useShowUserData(showIds: string[], options?: UseShowUserDataOpti
       batchedPostFetch<ShowUserDataResponse>("/api/shows/user-data", showIds, "showIds", 200, mergeShowUserData),
     enabled: showIds.length > 0,
     staleTime: 30_000,
-    initialData: options?.initialData,
-    initialDataUpdatedAt: options?.initialData ? Date.now() : undefined,
   });
 
   // Transform response into Maps for O(1) lookup

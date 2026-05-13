@@ -2,8 +2,8 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { redirect } from "react-router-dom";
 import { logger } from "~/lib/logger";
+import { getRequestUser } from "~/server/request-user";
 import { services } from "~/server/services";
-import { getServerClient } from "~/server/supabase";
 
 interface User {
   id: string;
@@ -120,10 +120,7 @@ async function getUser(
   request: Request,
   options: { requireAuth: boolean; requireAdmin?: boolean },
 ): Promise<User | null> {
-  const { supabase } = getServerClient(request);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser(request);
 
   if (options?.requireAuth) {
     if (!user) {

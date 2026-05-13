@@ -1,4 +1,5 @@
 import { CacheKeys, compareByShowDate } from "@bip/domain";
+import { dehydrate } from "@tanstack/react-query";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
@@ -11,6 +12,8 @@ import { PaginationControls } from "~/components/ui/pagination-controls";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { formatDateLong } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -125,10 +128,12 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
 
   // Per-viewer overlay (attendance / rating badges) — not cached; depends on
   // the logged-in user, not the profile being viewed.
-  const attendedInitialUserData = await computeShowUserData(
-    context,
-    attendedSetlists.map((s) => s.show.id),
-  );
+  const attendedShowIds = attendedSetlists.map((s) => s.show.id);
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(attendedShowIds),
+    queryFn: () => computeShowUserData(context, attendedShowIds),
+  });
 
   return {
     user,
@@ -136,7 +141,7 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     blogPosts,
     attendedSetlists,
     attendedExternalSources,
-    attendedInitialUserData,
+    dehydratedState: dehydrate(queryClient),
     attendedPagination: {
       page: clampedAttendedPage,
       pageSize: ATTENDED_SHOWS_PAGE_SIZE,
@@ -190,7 +195,6 @@ export default function UserProfile() {
     blogPosts,
     attendedSetlists,
     attendedExternalSources,
-    attendedInitialUserData,
     attendedPagination,
     showRatings,
     trackRatings,
@@ -690,7 +694,6 @@ export default function UserProfile() {
           <SetlistList
             setlists={attendedSetlists}
             externalSources={attendedExternalSources}
-            initialUserData={attendedInitialUserData}
             collapsible
             empty={
               <Card className="card-premium">
