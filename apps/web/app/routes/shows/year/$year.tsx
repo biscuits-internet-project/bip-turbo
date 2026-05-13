@@ -1,4 +1,5 @@
 import { CacheKeys, type SetlistLight } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
@@ -12,6 +13,8 @@ import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getShowsMeta } from "~/lib/seo";
 import { parseTriState, type TriState, triStateToBoolean } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
@@ -19,7 +22,7 @@ import { applyExternalSourceFilters } from "~/server/apply-external-source-filte
 import { services } from "~/server/services";
 import { computeShowCountsByYear } from "~/server/show-counts-by-year";
 import { computeShowExternalSources } from "~/server/show-external-sources";
-import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
+import { computeShowUserData } from "~/server/show-user-data";
 
 interface LoaderData {
   setlists: SetlistLight[];
@@ -29,7 +32,7 @@ interface LoaderData {
   showCountsByYear: Record<number, number>;
   monthCounts: Record<number, number>;
   filters: { photos: TriState; youtube: TriState; nugs: TriState; archive: TriState };
-  initialUserData: ShowUserDataResponse;
+  dehydratedState: DehydratedState;
 }
 
 const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -91,6 +94,12 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
       setlists = await services.setlists.findManyByShowIds(showIds);
     }
 
+    const searchShowIds = setlists.map((s) => s.show.id);
+    const searchClient = createPrefetchClient();
+    await searchClient.prefetchQuery({
+      queryKey: showUserDataQueryKey(searchShowIds),
+      queryFn: () => computeShowUserData(context, searchShowIds),
+    });
     return {
       setlists,
       year: yearInt,
@@ -99,10 +108,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
       showCountsByYear: emptyCounts,
       monthCounts: emptyCounts,
       filters,
-      initialUserData: await computeShowUserData(
-        context,
-        setlists.map((s) => s.show.id),
-      ),
+      dehydratedState: dehydrate(searchClient),
     };
   }
 
@@ -146,6 +152,13 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
 
   logger.info(`Year ${yearInt} shows loaded: ${filteredSetlists.length} shows`);
 
+  const filteredShowIds = filteredSetlists.map((s) => s.show.id);
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(filteredShowIds),
+    queryFn: () => computeShowUserData(context, filteredShowIds),
+  });
+
   return {
     setlists: filteredSetlists,
     year: yearInt,
@@ -153,10 +166,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     showCountsByYear,
     monthCounts,
     filters,
-    initialUserData: await computeShowUserData(
-      context,
-      filteredSetlists.map((s) => s.show.id),
-    ),
+    dehydratedState: dehydrate(queryClient),
   };
 });
 
@@ -171,7 +181,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function ShowsByYear() {
-  const { setlists, year, searchQuery, externalSources, showCountsByYear, monthCounts, initialUserData } =
+  const { setlists, year, searchQuery, externalSources, showCountsByYear, monthCounts } =
     useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
@@ -333,7 +343,6 @@ export default function ShowsByYear() {
               <SetlistList
                 setlists={setlists}
                 externalSources={externalSources}
-                initialUserData={initialUserData}
                 groupByMonth={!searchQuery}
                 empty={
                   <div className="text-center py-8">

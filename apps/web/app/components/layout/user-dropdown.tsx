@@ -11,21 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import type { SessionUser } from "~/lib/session-user";
 import { cn } from "~/lib/utils";
 
 interface UserDropdownProps {
-  user: {
-    email?: string;
-    user_metadata?: {
-      username?: string;
-      avatar_url?: string;
-    };
-  };
+  user: Pick<SessionUser, "email" | "username" | "avatarUrl">;
   className?: string;
 }
 
 export function UserDropdown({ user, className }: UserDropdownProps) {
-  const username = user?.user_metadata?.username ?? user?.email?.split("@")[0];
+  const username = user.username ?? user.email?.split("@")[0];
   const initials = username?.slice(0, 2).toUpperCase() ?? "??";
 
   return (
@@ -42,11 +37,7 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
           )}
         >
           <Avatar className="h-8 w-8 ring-1 ring-brand-primary/20 transition-all duration-200 hover:ring-brand-primary/50">
-            <AvatarImage
-              src={user.user_metadata?.avatar_url}
-              alt={username || "User avatar"}
-              className="object-cover"
-            />
+            <AvatarImage src={user.avatarUrl ?? undefined} alt={username || "User avatar"} className="object-cover" />
             <AvatarFallback className="bg-brand-primary/10 text-brand-primary font-medium text-xs">
               {initials}
             </AvatarFallback>
@@ -70,11 +61,7 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
         <DropdownMenuLabel className="font-normal p-0">
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-brand-primary/5 border border-brand-primary/10">
             <Avatar className="h-10 w-10 ring-1 ring-brand-primary/30">
-              <AvatarImage
-                src={user.user_metadata?.avatar_url}
-                alt={username || "User avatar"}
-                className="object-cover"
-              />
+              <AvatarImage src={user.avatarUrl ?? undefined} alt={username || "User avatar"} className="object-cover" />
               <AvatarFallback className="bg-brand-primary/20 text-brand-primary font-medium">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col space-y-1">

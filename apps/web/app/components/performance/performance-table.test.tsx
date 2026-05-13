@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock hooks used internally by PerformanceTable.
 vi.mock("~/hooks/use-session", () => ({
-  useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
+  useSession: vi.fn(() => ({ user: null, supabase: null })),
 }));
 vi.mock("~/hooks/use-show-user-data", () => ({
   useShowUserData: vi.fn(() => ({
@@ -201,7 +201,6 @@ describe("PerformanceTable", () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "u1" } as never,
       supabase: null,
-      loading: false,
     });
 
     await setupWithRouter(<PerformanceTable performances={[makePerformance()]} />);

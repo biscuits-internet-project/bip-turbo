@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("~/hooks/use-session", () => ({
-  useSession: vi.fn(() => ({ user: { id: "user-1" }, supabase: null, loading: false })),
+  useSession: vi.fn(() => ({ user: { id: "user-1" }, supabase: null })),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -42,6 +42,33 @@ describe("StarRating clear affordance", () => {
       <StarRating rateableId="track-1" rateableType="Track" showSlug="show-1" initialRating={null} />,
     );
     expect(screen.queryByRole("button", { name: /clear rating/i })).not.toBeInTheDocument();
+  });
+
+  // A `null` initialRating means the caller already knows the user has
+  // no rating yet (e.g. data was prefetched into a route loader). Skip
+  // the on-mount GET — it would just round-trip the same null back.
+  test("does not fetch /api/ratings when initialRating is null", async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+    await setupWithRouter(<StarRating rateableId="show-1" rateableType="Show" initialRating={null} />);
+    // Wait a microtask in case the effect was queued.
+    await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // When the caller has no information, omit the prop (or pass
+  // undefined). StarRating falls back to fetching the rating itself so
+  // the badge still appears.
+  test("fetches /api/ratings when initialRating is undefined", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ userRating: 4, averageRating: 4.2, ratingsCount: 12 }),
+    });
+    globalThis.fetch = fetchMock;
+    await setupWithRouter(<StarRating rateableId="show-1" rateableType="Show" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/ratings?rateableId=show-1&rateableType=Show");
   });
 
   // With a rating present, the clear glyph appears to the left of the

@@ -7,7 +7,7 @@ import { describe, expect, test, vi } from "vitest";
 // without network calls. The auth state + rating map are wired through
 // vi.mocked() inside each test that cares; default is anonymous + empty.
 vi.mock("~/hooks/use-session", () => ({
-  useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
+  useSession: vi.fn(() => ({ user: null, supabase: null })),
 }));
 vi.mock("~/hooks/use-track-user-ratings", () => ({
   useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
@@ -125,7 +125,6 @@ describe("SetlistTable", () => {
       user: { id: "user-1" } as any,
       // biome-ignore lint/suspicious/noExplicitAny: minimal mock
       supabase: null as any,
-      loading: false,
     });
     vi.mocked(useTrackUserRatings).mockReturnValue({
       userRatingMap: new Map([["t-1", 5]]),

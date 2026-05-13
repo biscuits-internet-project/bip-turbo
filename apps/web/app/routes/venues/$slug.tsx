@@ -1,4 +1,5 @@
 import type { Setlist, Venue } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ArrowLeft, CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -9,10 +10,12 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getVenueMeta, getVenueStructuredData } from "~/lib/seo";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
-import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
+import { computeShowUserData } from "~/server/show-user-data";
 
 export const routeParam = "slug";
 
@@ -26,7 +29,7 @@ interface LoaderData {
     yearsPlayed: number[];
   };
   externalSources: Record<string, ShowExternalSources>;
-  initialUserData: ShowUserDataResponse;
+  dehydratedState: DehydratedState;
 }
 
 export const loader = publicLoader(async ({ params, context }): Promise<LoaderData> => {
@@ -55,9 +58,14 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
 
   const showIds = setlists.map((setlist) => setlist.show.id);
   const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
-  const initialUserData = await computeShowUserData(context, showIds);
 
-  return { venue, setlists, stats, externalSources, initialUserData };
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(showIds),
+    queryFn: () => computeShowUserData(context, showIds),
+  });
+
+  return { venue, setlists, stats, externalSources, dehydratedState: dehydrate(queryClient) };
 });
 
 interface StatBoxProps {
@@ -92,7 +100,7 @@ export function meta({ data }: { data: LoaderData }) {
 }
 
 export default function VenuePage() {
-  const { venue, setlists, stats, externalSources, initialUserData } = useSerializedLoaderData<LoaderData>();
+  const { venue, setlists, stats, externalSources } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div>
@@ -164,7 +172,6 @@ export default function VenuePage() {
           <SetlistList
             setlists={setlists}
             externalSources={externalSources}
-            initialUserData={initialUserData}
             empty={
               <div className="glass-content rounded-lg p-6 text-center text-content-text-secondary">
                 No shows found for this venue.

@@ -1,11 +1,7 @@
 import { publicAction } from "~/lib/base-loaders";
 import { badRequest } from "~/lib/errors";
 import { logger } from "~/lib/logger";
-import { services } from "~/server/services";
-
-export interface TrackUserRatingsResponse {
-  userRatings: Record<string, number | null>;
-}
+import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
 export const action = publicAction(async ({ request, context }) => {
   let trackIds: string[];
@@ -27,21 +23,8 @@ export const action = publicAction(async ({ request, context }) => {
     });
   }
 
-  const response: TrackUserRatingsResponse = {
-    userRatings: {},
-  };
-
   try {
-    if (context.currentUser) {
-      const user = await services.users.findByEmail(context.currentUser.email);
-      if (user) {
-        const ratings = await services.ratings.findManyByUserIdAndRateableIds(user.id, trackIds, "Track");
-        for (const rating of ratings) {
-          response.userRatings[rating.rateableId] = rating.value;
-        }
-      }
-    }
-
+    const response = await computeTrackUserRatings(context, trackIds);
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: { "Content-Type": "application/json" },

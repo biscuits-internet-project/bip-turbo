@@ -1,10 +1,13 @@
 import type { FilterCondition } from "@bip/core/_shared/database/types";
 import type { Setlist, Show } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import type { PublicContext } from "~/lib/base-loaders";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
-import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
+import { computeShowUserData } from "~/server/show-user-data";
 
 const MIN_SHOW_RATINGS = 10;
 const TOP_RATED_LIMIT = 100;
@@ -16,7 +19,7 @@ export interface TopRatedShowsLoaderData {
   countsByYear: Record<number, number>;
   allCount: number;
   externalSources: Record<string, ShowExternalSources>;
-  initialUserData: ShowUserDataResponse;
+  dehydratedState: DehydratedState;
 }
 
 export async function getTopRatedShows(
@@ -68,7 +71,12 @@ export async function getTopRatedShows(
   const setlists = showIds.map((id) => byShowId.get(id)).filter((s): s is Setlist => s !== undefined);
 
   const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
-  const initialUserData = await computeShowUserData(context, showIds);
+
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(showIds),
+    queryFn: () => computeShowUserData(context, showIds),
+  });
 
   // Per-year counts for the year picker, capped by the page's row limit so
   // the number matches what actually appears when the user clicks that year.
@@ -94,6 +102,6 @@ export async function getTopRatedShows(
     countsByYear,
     allCount,
     externalSources,
-    initialUserData,
+    dehydratedState: dehydrate(queryClient),
   };
 }

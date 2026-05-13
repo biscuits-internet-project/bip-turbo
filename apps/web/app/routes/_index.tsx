@@ -1,4 +1,5 @@
 import { type BlogPostWithUser, CacheKeys, type Setlist, type TourDate } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
@@ -9,10 +10,12 @@ import { DonationBanner } from "~/components/ui/donation-banner";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getHomeMeta } from "~/lib/seo";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
-import { computeShowUserData, type ShowUserDataResponse } from "~/server/show-user-data";
+import { computeShowUserData } from "~/server/show-user-data";
 
 interface AcastEpisode {
   id: string;
@@ -35,7 +38,7 @@ interface LoaderData {
   recentShows: Setlist[];
   onThisDayCounts: { showCount: number; allTimerCount: number };
   externalSources: Record<string, ShowExternalSources>;
-  initialUserData: ShowUserDataResponse;
+  dehydratedState: DehydratedState;
 }
 
 export const loader = publicLoader<LoaderData>(async ({ context }) => {
@@ -109,7 +112,11 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     ]),
   ];
 
-  const initialUserData = await computeShowUserData(context, allShowIds);
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(allShowIds),
+    queryFn: () => computeShowUserData(context, allShowIds),
+  });
 
   // Fetch latest podcast episode
   let latestEpisode: AcastEpisode | null = null;
@@ -149,7 +156,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     recentShows,
     onThisDayCounts,
     externalSources,
-    initialUserData,
+    dehydratedState: dehydrate(queryClient),
   };
 });
 
@@ -168,7 +175,6 @@ export default function Index() {
     recentShows = [],
     onThisDayCounts,
     externalSources,
-    initialUserData,
   } = useSerializedLoaderData<LoaderData>();
 
   return (
@@ -187,11 +193,7 @@ export default function Index() {
       <div className="md:hidden">
         <div className="mb-6">
           <div className="space-y-4">
-            <SetlistList
-              setlists={recentShows.slice(0, 2)}
-              externalSources={externalSources}
-              initialUserData={initialUserData}
-            />
+            <SetlistList setlists={recentShows.slice(0, 2)} externalSources={externalSources} />
           </div>
         </div>
 
@@ -243,7 +245,6 @@ export default function Index() {
               <SetlistList
                 setlists={desktopRecentShows}
                 externalSources={externalSources}
-                initialUserData={initialUserData}
                 empty={
                   <div className="text-center p-8 border border-dashed rounded-lg">
                     <p className="text-muted-foreground">No recent shows available</p>
@@ -488,7 +489,6 @@ export default function Index() {
             <SetlistList
               setlists={mobileRecentShows}
               externalSources={externalSources}
-              initialUserData={initialUserData}
               empty={
                 <div className="text-center p-8 border border-dashed rounded-lg">
                   <p className="text-muted-foreground">No recent shows available</p>

@@ -35,7 +35,7 @@ const baseLoaderData = {
     },
   ],
   attendedExternalSources: {},
-  attendedInitialUserData: { attendances: [], userRatings: [], averageRatings: [] },
+  dehydratedState: { mutations: [], queries: [] },
   attendedPagination: { page: 1, pageSize: 100, totalPages: 1, total: 1 },
   ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 0 },
   activeTab: "shows" as const,
@@ -67,7 +67,6 @@ vi.mock("~/components/setlist/setlist-list", () => ({
     setlists: Array<{ show: { id: string } }>;
     empty?: React.ReactNode;
     externalSources?: Record<string, unknown>;
-    initialUserData?: unknown;
   }) => {
     if (!props.setlists || props.setlists.length === 0) {
       return <div data-testid="SetlistList">{props.empty}</div>;
@@ -77,7 +76,6 @@ vi.mock("~/components/setlist/setlist-list", () => ({
         data-testid="SetlistList"
         data-setlists-count={props.setlists.length}
         data-first-show-id={props.setlists[0]?.show?.id ?? ""}
-        data-has-initial-user-data={props.initialUserData ? "yes" : "no"}
       >
         {mockShallowComponent("SetlistListShallow", { setlistsCount: props.setlists.length })}
       </div>
@@ -186,9 +184,10 @@ describe("UserProfile", () => {
   });
 
   // The route delegates rendering to SetlistList, passing through the
-  // loader-built setlists, external sources, and initial user-data payload.
-  // Load-bearing wiring test: if the loader keys are renamed without
-  // updating the JSX, this catches it via the stub's surfaced data-attrs.
+  // loader-built setlists and external sources. Load-bearing wiring test:
+  // if the loader keys are renamed without updating the JSX, this catches
+  // it via the stub's surfaced data-attrs. (SSR cache seeding now flows
+  // through the root HydrationBoundary, not a SetlistList prop.)
   test("renders SetlistList with the loader's attended-shows payload", () => {
     renderProfile();
 
@@ -196,7 +195,6 @@ describe("UserProfile", () => {
     expect(setlistList).toBeInTheDocument();
     expect(setlistList.getAttribute("data-setlists-count")).toBe("1");
     expect(setlistList.getAttribute("data-first-show-id")).toBe("show-1");
-    expect(setlistList.getAttribute("data-has-initial-user-data")).toBe("yes");
   });
 
   // Empty attended-shows list: SetlistList renders the `empty` slot when

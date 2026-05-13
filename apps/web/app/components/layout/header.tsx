@@ -37,7 +37,7 @@ const navigation = [
 
 export function Header() {
   const isMobile = useIsMobile();
-  const { user, loading } = useSession();
+  const { user } = useSession();
   const { open: _openSearch } = useGlobalSearch();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -53,7 +53,7 @@ export function Header() {
     };
   }, [mobileMenuOpen]);
 
-  const username = user?.user_metadata?.username ?? user?.email?.split("@")[0];
+  const username = user?.username ?? user?.email?.split("@")[0];
 
   return (
     <>
@@ -100,22 +100,20 @@ export function Header() {
           {/* User Profile/Auth & Mobile Menu */}
           <div className="flex items-center space-x-2">
             {/* User Profile/Auth */}
-            {!loading && (
-              <div className="hidden sm:flex items-center space-x-2">
-                {user ? (
-                  <UserDropdown user={user} />
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="glass-secondary hover:glass-content transition-all duration-200"
-                  >
-                    <Link to="/auth/login">Sign in</Link>
-                  </Button>
-                )}
-              </div>
-            )}
+            <div className="hidden sm:flex items-center space-x-2">
+              {user ? (
+                <UserDropdown user={user} />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="glass-secondary hover:glass-content transition-all duration-200"
+                >
+                  <Link to="/auth/login">Sign in</Link>
+                </Button>
+              )}
+            </div>
 
             {/* Mobile Menu Button */}
             <div className="md:hidden">
@@ -161,13 +159,12 @@ export function Header() {
 
             {/* Mobile Auth & User Menu */}
             <div className="border-t border-border/10 pt-4 mt-4">
-              {!loading &&
-                (user ? (
+              {user ? (
                   <div className="space-y-1">
                     {/* User Info */}
                     <div className="flex items-center space-x-3 px-4 py-3 rounded-md bg-brand-primary/5">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.user_metadata?.avatar_url} />
+                        <AvatarImage src={user.avatarUrl ?? undefined} />
                         <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-sm font-medium">
                           {username?.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
@@ -215,7 +212,7 @@ export function Header() {
                     <User className="h-5 w-5 mr-3" />
                     Sign in
                   </Link>
-                ))}
+                )}
             </div>
           </nav>
         </div>
