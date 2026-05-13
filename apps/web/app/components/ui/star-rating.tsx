@@ -15,7 +15,7 @@ interface StarRatingProps {
   rateableType: string;
   initialRating?: number | null;
   showSlug?: string;
-  onRatingChange?: (rating: number) => void;
+  onRatingChange?: (rating: number | null) => void;
   onAverageRatingChange?: (average: number, count: number) => void;
   skipRevalidation?: boolean;
 }
@@ -41,9 +41,9 @@ export function StarRating({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rating, setRating] = useState<RatingResponse | null>(
-    initialRating != null ? { userRating: initialRating, averageRating: null } : null,
+    initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null,
   );
-  const { user, loading: isSessionLoading } = useSession();
+  const { user } = useSession();
   const revalidator = useRevalidator();
   const queryClient = useQueryClient();
   const isMountedRef = useRef<boolean>(true);
@@ -57,9 +57,12 @@ export function StarRating({
     };
   }, []);
 
-  // Fetch rating if needed (only when user is logged in and no initial rating provided)
+  // Fetch rating if needed (only when user is logged in and the caller
+  // didn't pass an initial value). A `null` initialRating is treated as
+  // "caller knows the user has no rating yet" — skip the fetch. Pass
+  // `undefined` (or omit the prop) when the answer truly is unknown.
   useEffect(() => {
-    if (!user || isSessionLoading || initialRating != null || hasFetchedRef.current) {
+    if (!user || initialRating !== undefined || hasFetchedRef.current) {
       return;
     }
 
@@ -85,7 +88,7 @@ export function StarRating({
     };
 
     fetchRating();
-  }, [user, isSessionLoading, initialRating, rateableId, rateableType]);
+  }, [user, initialRating, rateableId, rateableType]);
 
   const submitRating = async (value: number) => {
     setIsSubmitting(true);
@@ -157,6 +160,73 @@ export function StarRating({
     }
   };
 
+  const clearRating = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/ratings", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rateableId,
+          rateableType,
+          showSlug,
+        }),
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/auth/login";
+        return;
+      }
+
+      if (!response.ok) throw new Error("Failed to clear rating");
+
+      const data = (await response.json()) as RatingResponse;
+
+      toast.success("Rating removed");
+      setRating({ userRating: null, averageRating: data.averageRating, ratingsCount: data.ratingsCount });
+
+      onRatingChange?.(null);
+
+      if (onAverageRatingChange && data.averageRating !== null && data.ratingsCount !== undefined) {
+        onAverageRatingChange(data.averageRating, data.ratingsCount);
+      }
+
+      // Same denormalized-cache update path as submitRating, with a null
+      // userRating so the badge drops the amber chrome without waiting for
+      // a route revalidation.
+      if (rateableType === "Show") {
+        queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            userRatings: {
+              ...oldData.userRatings,
+              [rateableId]: null,
+            },
+            averageRatings: {
+              ...oldData.averageRatings,
+              [rateableId]:
+                data.averageRating !== null && data.ratingsCount !== undefined
+                  ? { average: data.averageRating, count: data.ratingsCount }
+                  : oldData.averageRatings[rateableId],
+            },
+          };
+        });
+      }
+
+      if (!skipRevalidation) {
+        revalidator.revalidate();
+      }
+    } catch {
+      toast.error("Failed to remove rating. Please try again.");
+    } finally {
+      if (isMountedRef.current) {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement>, star: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -197,6 +267,7 @@ export function StarRating({
   };
 
   const displayRating = hoveredRating !== null ? hoveredRating : (rating?.userRating ?? initialRating ?? 0);
+  const hasExistingRating = (rating?.userRating ?? initialRating ?? 0) > 0;
 
   return (
     <fieldset
@@ -204,6 +275,36 @@ export function StarRating({
       onMouseLeave={handleMouseLeave}
     >
       <legend className="sr-only">Star rating</legend>
+      {hasExistingRating && (
+        <button
+          type="button"
+          aria-label="Clear rating"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (disabled || isSubmitting) return;
+            clearRating();
+          }}
+          disabled={disabled || isSubmitting}
+          className={cn(
+            "text-content-text-tertiary hover:text-red-400 transition-colors mr-0.5",
+            disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+          )}
+          title="Remove rating"
+        >
+          <svg
+            className="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <line x1="6" y1="18" x2="18" y2="6" />
+          </svg>
+        </button>
+      )}
       {[1, 2, 3, 4, 5].map((star) => {
         const filled = displayRating !== null && star <= displayRating;
         const half = displayRating !== null && star - 0.5 === displayRating;

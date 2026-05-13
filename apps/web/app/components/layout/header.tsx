@@ -37,7 +37,7 @@ const navigation = [
 
 export function Header() {
   const isMobile = useIsMobile();
-  const { user, loading } = useSession();
+  const { user } = useSession();
   const { open: _openSearch } = useGlobalSearch();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -53,11 +53,11 @@ export function Header() {
     };
   }, [mobileMenuOpen]);
 
-  const username = user?.user_metadata?.username ?? user?.email?.split("@")[0];
+  const username = user?.username ?? user?.email?.split("@")[0];
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-[hsl(240,10%,3.9%)] border-b border-border/10 overflow-hidden">
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 short:!h-12 bg-[hsl(240,10%,3.9%)] border-b border-border/10 overflow-hidden">
         <div className="flex h-full items-center justify-between px-4 sm:px-6 lg:px-8 max-w-full">
           {/* Logo */}
           <div className="flex items-center">
@@ -75,14 +75,18 @@ export function Header() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-2">
+          <nav className="hidden md:flex items-center space-x-2 short:!space-x-0">
             {navigation.slice(0, 6).map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
-                className="flex items-center rounded-md px-4 py-2 text-lg font-semibold text-content-text-primary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
+                // `whitespace-nowrap` keeps multi-word labels like "top
+                // rated" on a single line. Phone-landscape overrides drop
+                // padding + text size so the bar fits comfortably alongside
+                // the search box on a rotated phone.
+                className="flex items-center rounded-md px-4 py-2 text-lg font-semibold text-content-text-primary whitespace-nowrap transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass short:!px-2 short:!py-1 short:!text-sm"
               >
-                <item.icon className="h-4 w-4 mr-2" />
+                <item.icon className="h-4 w-4 mr-2 short:!mr-1" />
                 <span>{item.name}</span>
               </Link>
             ))}
@@ -96,22 +100,20 @@ export function Header() {
           {/* User Profile/Auth & Mobile Menu */}
           <div className="flex items-center space-x-2">
             {/* User Profile/Auth */}
-            {!loading && (
-              <div className="hidden sm:flex items-center space-x-2">
-                {user ? (
-                  <UserDropdown user={user} />
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="glass-secondary hover:glass-content transition-all duration-200"
-                  >
-                    <Link to="/auth/login">Sign in</Link>
-                  </Button>
-                )}
-              </div>
-            )}
+            <div className="hidden sm:flex items-center space-x-2">
+              {user ? (
+                <UserDropdown user={user} />
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className="glass-secondary hover:glass-content transition-all duration-200"
+                >
+                  <Link to="/auth/login">Sign in</Link>
+                </Button>
+              )}
+            </div>
 
             {/* Mobile Menu Button */}
             <div className="md:hidden">
@@ -157,13 +159,12 @@ export function Header() {
 
             {/* Mobile Auth & User Menu */}
             <div className="border-t border-border/10 pt-4 mt-4">
-              {!loading &&
-                (user ? (
+              {user ? (
                   <div className="space-y-1">
                     {/* User Info */}
                     <div className="flex items-center space-x-3 px-4 py-3 rounded-md bg-brand-primary/5">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.user_metadata?.avatar_url} />
+                        <AvatarImage src={user.avatarUrl ?? undefined} />
                         <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-sm font-medium">
                           {username?.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
@@ -211,7 +212,7 @@ export function Header() {
                     <User className="h-5 w-5 mr-3" />
                     Sign in
                   </Link>
-                ))}
+                )}
             </div>
           </nav>
         </div>

@@ -2,38 +2,13 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import { useRouteLoaderData } from "react-router";
+import type { SessionUser } from "~/lib/session-user";
+import { toSessionUser } from "~/lib/session-user";
 import type { RootData } from "~/root";
 
 const syncedUsers = new Set<string>();
 type SyncResult = { refreshedUser: User | null; internalUserId?: string };
 const inflightSyncs = new Map<string, Promise<SyncResult>>();
-
-function normalizeUser(user: User | null): User | null {
-  if (!user) {
-    return user;
-  }
-
-  const rawUsername = user.user_metadata?.username;
-  if (typeof rawUsername !== "string") {
-    return user;
-  }
-
-  const trimmedUsername = rawUsername.trim();
-  const shouldRemoveUsername = trimmedUsername.length === 0;
-  const shouldUpdateUsername = trimmedUsername !== rawUsername;
-
-  if (!shouldUpdateUsername && !shouldRemoveUsername) {
-    return user;
-  }
-
-  const { username: _ignored, ...restMetadata } = user.user_metadata ?? {};
-  const normalizedMetadata = shouldRemoveUsername ? restMetadata : { ...restMetadata, username: trimmedUsername };
-
-  return {
-    ...user,
-    user_metadata: normalizedMetadata,
-  };
-}
 
 async function requestSync(supabase: SupabaseClient): Promise<SyncResult> {
   const response = await fetch("/api/auth/sync", { method: "POST", credentials: "include" });
@@ -114,12 +89,22 @@ async function ensureUserSynced(user: User, supabase: SupabaseClient | null): Pr
   return user;
 }
 
-export function useSession() {
+/**
+ * Returns the current authenticated user (projected to the client-safe
+ * `SessionUser` shape) and the browser Supabase client.
+ *
+ * Initial state is seeded from the root loader's `sessionUser` field so the
+ * first client render already knows who the user is — no flicker on
+ * user-specific UI. The `onAuthStateChange` listener stays mounted to
+ * handle in-tab login / logout transitions.
+ */
+export function useSession(): { user: SessionUser | null; supabase: SupabaseClient | null } {
   const rootData = useRouteLoaderData("root") as RootData | undefined;
   const SUPABASE_URL = rootData?.env?.SUPABASE_URL;
   const SUPABASE_ANON_KEY = rootData?.env?.SUPABASE_ANON_KEY;
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const seededUser = rootData?.sessionUser ?? null;
+
+  const [user, setUser] = useState<SessionUser | null>(seededUser);
 
   // Create the Supabase client only once
   const supabase = useMemo(() => {
@@ -133,55 +118,33 @@ export function useSession() {
     });
   }, [SUPABASE_URL, SUPABASE_ANON_KEY]);
 
-  // Set up session and auth listener in useEffect
+  // Keep `user` in sync with in-tab login / logout. The SSR seed handles
+  // the initial paint; this listener picks up subsequent transitions.
   useEffect(() => {
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
+    if (!supabase) return;
 
     let isCancelled = false;
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const sessionUser = session?.user ?? null;
-      setUser(normalizeUser(sessionUser));
-      setLoading(false);
-
-      // Fallback: ensure user is synced to PostgreSQL
-      if (sessionUser) {
-        ensureUserSynced(sessionUser, supabase).then((syncedUser) => {
-          if (!isCancelled && syncedUser && syncedUser.id === sessionUser.id) {
-            setUser(normalizeUser(syncedUser));
-          }
-        });
-      }
-    });
-
-    // Set up auth listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const sessionUser = session?.user ?? null;
-      setUser(normalizeUser(sessionUser));
-      setLoading(false);
+      setUser(sessionUser ? toSessionUser(sessionUser) : null);
 
-      // Fallback: ensure user is synced to PostgreSQL on auth state change
       if (sessionUser) {
         ensureUserSynced(sessionUser, supabase).then((syncedUser) => {
           if (!isCancelled && syncedUser && syncedUser.id === sessionUser.id) {
-            setUser(normalizeUser(syncedUser));
+            setUser(toSessionUser(syncedUser));
           }
         });
       }
     });
 
-    // Cleanup subscription on unmount
     return () => {
       isCancelled = true;
       subscription.unsubscribe();
     };
   }, [supabase]);
 
-  return { user, supabase, loading };
+  return { user, supabase };
 }

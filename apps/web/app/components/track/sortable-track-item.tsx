@@ -1,7 +1,7 @@
 import type { Track } from "@bip/domain";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Edit2, GripVertical, Trash } from "lucide-react";
+import { Edit2, Flame, GripVertical, Trash } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
 
@@ -42,6 +42,11 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
 
           {/* Position Number - now just for display */}
           <span className="text-content-text-secondary font-mono text-sm w-8 mt-1">{track.position}</span>
+
+          {/* All-timer indicator (reserved column to keep alignment) */}
+          <span className="w-5 mt-1 flex justify-center">
+            {track.allTimer && <Flame className="h-4 w-4 text-orange-500" />}
+          </span>
 
           {/* Track Content */}
           <div className="flex-1">

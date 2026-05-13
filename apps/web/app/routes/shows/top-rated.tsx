@@ -23,7 +23,7 @@ export function meta({ params }: { params: { year?: string } }) {
 }
 
 export default function TopRated() {
-  const { setlists, year, minShowRatings, countsByYear, allCount, externalSources, initialUserData } =
+  const { setlists, year, minShowRatings, countsByYear, allCount, externalSources } =
     useSerializedLoaderData<TopRatedShowsLoaderData>();
 
   return (
@@ -41,13 +41,7 @@ export default function TopRated() {
           allCount={allCount}
         />
         <div className="space-y-1">
-          <SetlistList
-            setlists={setlists}
-            externalSources={externalSources}
-            initialUserData={initialUserData}
-            numbered
-            collapsible
-          />
+          <SetlistList setlists={setlists} externalSources={externalSources} numbered collapsible />
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { CacheKeys, compareByShowDate } from "@bip/domain";
+import { dehydrate } from "@tanstack/react-query";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
@@ -11,6 +12,8 @@ import { PaginationControls } from "~/components/ui/pagination-controls";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { formatDateLong } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -125,10 +128,12 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
 
   // Per-viewer overlay (attendance / rating badges) — not cached; depends on
   // the logged-in user, not the profile being viewed.
-  const attendedInitialUserData = await computeShowUserData(
-    context,
-    attendedSetlists.map((s) => s.show.id),
-  );
+  const attendedShowIds = attendedSetlists.map((s) => s.show.id);
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(attendedShowIds),
+    queryFn: () => computeShowUserData(context, attendedShowIds),
+  });
 
   return {
     user,
@@ -136,7 +141,7 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     blogPosts,
     attendedSetlists,
     attendedExternalSources,
-    attendedInitialUserData,
+    dehydratedState: dehydrate(queryClient),
     attendedPagination: {
       page: clampedAttendedPage,
       pageSize: ATTENDED_SHOWS_PAGE_SIZE,
@@ -190,7 +195,6 @@ export default function UserProfile() {
     blogPosts,
     attendedSetlists,
     attendedExternalSources,
-    attendedInitialUserData,
     attendedPagination,
     showRatings,
     trackRatings,
@@ -331,7 +335,11 @@ export default function UserProfile() {
       {/* Content Tabs — mobile shows a <select> dropdown (sm:hidden), sm+
           renders the horizontal tab strip. Mirrors the song-detail page so
           the long "Song Version Ratings" label doesn't clip on phones. */}
-      <Tabs value={activeTab} onValueChange={(value) => navigate(`?tab=${value}`)} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => navigate(`?tab=${value}`, { preventScrollReset: true })}
+        className="w-full"
+      >
         <div className="sm:hidden mb-4">
           <label htmlFor="user-profile-tab-select" className="sr-only">
             Profile view
@@ -339,7 +347,7 @@ export default function UserProfile() {
           <select
             id="user-profile-tab-select"
             value={activeTab}
-            onChange={(event) => navigate(`?tab=${event.target.value}`)}
+            onChange={(event) => navigate(`?tab=${event.target.value}`, { preventScrollReset: true })}
             className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
           >
             <option value="shows">Shows Attended ({attendanceCount})</option>
@@ -351,18 +359,27 @@ export default function UserProfile() {
         </div>
         <TabsList className="glass mb-6 hidden sm:flex">
           <TabsTrigger value="shows" asChild>
-            <Link to="?tab=shows" className="data-[state=active]:bg-brand-primary data-[state=active]:text-white">
+            <Link
+              to="?tab=shows"
+              preventScrollReset
+              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+            >
               Shows Attended ({attendanceCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="reviews" asChild>
-            <Link to="?tab=reviews" className="data-[state=active]:bg-brand-primary data-[state=active]:text-white">
+            <Link
+              to="?tab=reviews"
+              preventScrollReset
+              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+            >
               Reviews ({reviewCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="show-ratings" asChild>
             <Link
               to="?tab=show-ratings"
+              preventScrollReset
               className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
             >
               Show Ratings ({showRatingsCount})
@@ -371,6 +388,7 @@ export default function UserProfile() {
           <TabsTrigger value="track-ratings" asChild>
             <Link
               to="?tab=track-ratings"
+              preventScrollReset
               className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
             >
               Song Version Ratings ({trackRatingsCount})
@@ -378,7 +396,11 @@ export default function UserProfile() {
           </TabsTrigger>
           {blogPosts.length > 0 && (
             <TabsTrigger value="blog" asChild>
-              <Link to="?tab=blog" className="data-[state=active]:bg-brand-primary data-[state=active]:text-white">
+              <Link
+                to="?tab=blog"
+                preventScrollReset
+                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
+              >
                 Blog Posts ({blogPosts.length})
               </Link>
             </TabsTrigger>
@@ -672,7 +694,6 @@ export default function UserProfile() {
           <SetlistList
             setlists={attendedSetlists}
             externalSources={attendedExternalSources}
-            initialUserData={attendedInitialUserData}
             collapsible
             empty={
               <Card className="card-premium">

@@ -1,4 +1,5 @@
 import { compareByShowDate, type SongPageView } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -15,15 +16,37 @@ import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-perfor
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { pickGapTier } from "~/lib/gap-tier";
+import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
+import { computeShowUserData } from "~/server/show-user-data";
+import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
-export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promise<SongPageView> => {
+type LoaderData = SongPageView & { dehydratedState: DehydratedState };
+
+export const loader = publicLoader(async ({ params, context }: LoaderFunctionArgs): Promise<LoaderData> => {
   const slug = params.slug;
   if (!slug) throw new Response("Not Found", { status: 404 });
 
-  return services.songPageComposer.build(slug);
+  const view = await services.songPageComposer.build(slug);
+
+  const trackIds = view.performances.map((p) => p.trackId);
+  const showIds = [...new Set(view.performances.map((p) => p.show.id))];
+  const queryClient = createPrefetchClient();
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: trackUserRatingsQueryKey(trackIds),
+      queryFn: () => computeTrackUserRatings(context, trackIds),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: showUserDataQueryKey(showIds),
+      queryFn: () => computeShowUserData(context, showIds),
+    }),
+  ]);
+
+  return { ...view, dehydratedState: dehydrate(queryClient) };
 });
 
 interface StatBoxProps {
@@ -34,13 +57,27 @@ interface StatBoxProps {
 }
 
 function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
+  // On phone-landscape viewports the stat cards eat too much vertical
+  // space: 8 cards in a 4x2 grid push the rest of the page below the
+  // fold. Shrink padding, value font, and inter-element spacing so the
+  // grid stays legible at half its usual height.
   return (
-    <div className="glass-content p-2 sm:p-3 rounded-lg h-full">
-      <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
-      <dd className="mt-2">
-        <span className="text-xl sm:text-3xl font-bold text-content-text-primary">{value}</span>
-        {sublabel && <div className="mt-1 text-sm text-content-text-tertiary">{sublabel}</div>}
-        {sublabel2 && <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block">{sublabel2}</div>}
+    <div className="glass-content p-2 sm:p-3 short:!py-1 short:!px-2.5 rounded-lg h-full">
+      <dt className="text-sm short:!text-[11px] short:!leading-tight font-medium text-content-text-secondary">
+        {label}
+      </dt>
+      <dd className="mt-2 short:!mt-0.5">
+        <span className="text-xl sm:text-3xl short:!text-base short:!leading-tight font-bold text-content-text-primary">
+          {value}
+        </span>
+        {sublabel && (
+          <div className="mt-1 text-sm short:!text-[11px] short:!leading-tight short:!mt-0.5 text-content-text-tertiary">
+            {sublabel}
+          </div>
+        )}
+        {sublabel2 && (
+          <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block short:hidden">{sublabel2}</div>
+        )}
       </dd>
     </div>
   );
@@ -94,7 +131,7 @@ function ReviewNote({ notes }: { notes: string }) {
   );
 }
 
-export function meta({ data }: { data: SongPageView }) {
+export function meta({ data }: { data: LoaderData }) {
   return getSongMeta({
     ...data.song,
     timesPlayed: data.song.timesPlayed,
@@ -141,13 +178,14 @@ function formatCount(value: number | null | undefined): string {
   return value.toLocaleString();
 }
 
-function formatDecimal(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return value.toFixed(1);
+function formatAvgMedianGap(avg: number | null | undefined, median: number | null | undefined): string {
+  const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v.toFixed(1));
+  if ((avg === null || avg === undefined) && (median === null || median === undefined)) return "—";
+  return `${fmt(avg)} / ${fmt(median)}`;
 }
 
 export default function SongPage() {
-  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<SongPageView>();
+  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
@@ -232,9 +270,9 @@ export default function SongPage() {
       </div>
 
       {/* Stats Grid */}
-      <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <dl className="grid grid-cols-2 lg:grid-cols-4 short:!grid-cols-4 gap-4 short:!gap-2">
         <StatBox label="Times Played" value={song.timesPlayed} />
-        <StatBox label="Average Gap" value={formatDecimal(song.averageShowsPerPlay)} />
+        <StatBox label="Avg / Median Gap" value={formatAvgMedianGap(song.averageGapShows, song.medianGapShows)} />
         {song.lastShowSlug ? (
           <Link to={`/shows/${song.lastShowSlug}`} className="block">
             <StatBox
@@ -242,7 +280,7 @@ export default function SongPage() {
               value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
               sublabel={
                 song.actualLastPlayedDate
-                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                   : undefined
               }
               sublabel2={
@@ -260,7 +298,7 @@ export default function SongPage() {
             value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
             sublabel={
               song.actualLastPlayedDate
-                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                 : undefined
             }
             sublabel2={
@@ -460,7 +498,6 @@ export default function SongPage() {
 
             <PerformanceTable
               performances={filteredAllTimers}
-              songTitle={song.title}
               isLoading={isLoading}
               hasNarrowingFilter={hasServerNarrowingFilter}
               headerContent={filterContent}
@@ -471,7 +508,6 @@ export default function SongPage() {
         <TabsContent value="performances" className="mt-6">
           <PerformanceTable
             performances={filteredPerformances}
-            songTitle={song.title}
             showAllTimerColumn
             isLoading={isLoading}
             hasNarrowingFilter={hasServerNarrowingFilter}

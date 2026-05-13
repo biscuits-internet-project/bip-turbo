@@ -6,15 +6,11 @@ interface AdminOnlyProps {
 }
 
 export function AdminOnly({ children, fallback = null }: AdminOnlyProps) {
-  const { user, loading: isLoading } = useSession();
+  const { user } = useSession();
 
-  // If Supabase context is not loaded yet, render nothing
-  if (isLoading) {
-    return null;
-  }
-
-  // Check for admin flag in app_metadata (server-controlled, secure)
-  if (user?.app_metadata?.isAdmin === true) {
+  // app_metadata.isAdmin is server-controlled and surfaced into the
+  // SessionUser projection; trust it as the only admin signal here.
+  if (user?.isAdmin) {
     return <>{children}</>;
   }
 

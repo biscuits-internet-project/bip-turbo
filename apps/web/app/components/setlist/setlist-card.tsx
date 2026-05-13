@@ -2,21 +2,20 @@ import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
 import { Check, Flame } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { RatingComponent } from "~/components/rating";
+import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
 import { ShowDate } from "~/components/show-date";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
-import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
-import { StarRating } from "~/components/ui/star-rating";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { SetlistTable } from "./setlist-table";
-import { SetlistViewControl } from "./setlist-view-control";
+import { SetlistTablePersonal } from "./setlist-table-personal";
+import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-control";
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
-export type SetlistView = "setlist" | "gap-chart";
+export type SetlistView = "setlist" | "gap-chart" | "personal";
 
 interface SetlistCardProps {
   setlist: Setlist | SetlistLight;
@@ -60,64 +59,55 @@ function SetlistCardComponent({
     onViewChange?.(next);
   }
   const { user } = useSession();
-  const [displayedRating, setDisplayedRating] = useState<number>(showRating ?? setlist.show.averageRating ?? 0);
-  const [displayedCount, setDisplayedCount] = useState<number>(setlist.show.ratingsCount ?? 0);
-  const [isRatingAnimating, setIsRatingAnimating] = useState(false);
-  const [isRatingExpanded, setIsRatingExpanded] = useState(false);
+  const [personalSummary, setPersonalSummary] = useState<{
+    average: number | null;
+    median: number | null;
+    debutCount: number;
+  }>({ average: null, median: null, debutCount: 0 });
+
+  // Pre-build the two summary shapes so the SetlistViewControl call sites
+  // stay one-liners. The catalog summary is server-computed; the personal
+  // summary is hoisted from SetlistTablePersonal via onSummaryChange.
+  const catalogSummary: SetlistViewSummary = {
+    label: "Average / median song gap",
+    average: setlist.averageSongGap,
+    median: setlist.medianSongGap,
+    debutCount: setlist.debutCount,
+  };
+  const personalSummaryView: SetlistViewSummary = {
+    label: "Your average / median song gap",
+    average: personalSummary.average,
+    median: personalSummary.median,
+    debutCount: personalSummary.debutCount,
+  };
   const [isAttendanceAnimating, setIsAttendanceAnimating] = useState(false);
   const [localAttendance, setLocalAttendance] = useState<Attendance | null>(userAttendance);
-  const [localHasRated, setLocalHasRated] = useState(userRating !== null && userRating !== undefined);
   const [isOpen, setIsOpen] = useState(!collapsible);
 
   const attendanceMutation = useAttendanceMutation();
-  const ratingAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attendanceAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cleanup timeouts on unmount
+  // Cleanup attendance animation timeout on unmount. Rating animation +
+  // expand/collapse state live inside RatingBadgeButton.
   useEffect(() => {
     return () => {
-      if (ratingAnimationTimeoutRef.current) clearTimeout(ratingAnimationTimeoutRef.current);
       if (attendanceAnimationTimeoutRef.current) clearTimeout(attendanceAnimationTimeoutRef.current);
     };
   }, []);
-
-  // Update displayed rating when props change
-  useEffect(() => {
-    const newRating = showRating ?? setlist.show.averageRating ?? 0;
-    if (newRating !== displayedRating) {
-      // Wait for animation to reach peak before updating displayed value
-      const updateTimer = setTimeout(() => setDisplayedRating(newRating), 800);
-      return () => {
-        clearTimeout(updateTimer);
-      };
-    }
-  }, [showRating, setlist.show.averageRating, displayedRating]);
 
   // Sync attendance state with props
   useEffect(() => {
     setLocalAttendance(userAttendance);
   }, [userAttendance]);
 
-  // Sync rating state with props
-  useEffect(() => {
-    setLocalHasRated(userRating !== null && userRating !== undefined);
-  }, [userRating]);
-
   // Derived state for whether user is attending
   const isAttending = !!localAttendance;
 
-  // Callback to update rating display when user submits a rating
-  const handleAverageRatingChange = (average: number, count: number) => {
-    setIsRatingAnimating(true);
-    setDisplayedRating(average);
-    setDisplayedCount(count);
-    setLocalHasRated(true); // Mark as rated
-    // Collapse the rating picker and reset animation
-    setIsRatingExpanded(false);
-    // Clear any existing timeout and set new one
-    if (ratingAnimationTimeoutRef.current) clearTimeout(ratingAnimationTimeoutRef.current);
-    ratingAnimationTimeoutRef.current = setTimeout(() => setIsRatingAnimating(false), 600);
-  };
+  // Resolve the user's rating from either of the supported prop shapes
+  // (a Rating object or a bare number) into a single value for the badge.
+  const resolvedUserRating = typeof userRating === "number" ? userRating : (userRating?.value ?? null);
+  const displayedRating = showRating ?? setlist.show.averageRating ?? null;
+  const displayedCount = setlist.show.ratingsCount ?? null;
 
   // Toggle attendance using mutation
   const toggleAttendance = () => {
@@ -272,46 +262,27 @@ function SetlistCardComponent({
                   </span>
                 </button>
 
-                {/* Rating badge - clickable to expand */}
-                <button
-                  type="button"
-                  onClick={() => setIsRatingExpanded(!isRatingExpanded)}
-                  className={cn(
-                    "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
-                    "hover:brightness-110 cursor-pointer",
-                    localHasRated
-                      ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
-                      : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30",
-                    isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
-                  )}
-                >
-                  {isRatingExpanded ? (
-                    <StarRating
-                      rateableId={setlist.show.id}
-                      rateableType="Show"
-                      initialRating={typeof userRating === "number" ? userRating : (userRating?.value ?? null)}
-                      showSlug={setlist.show.slug}
-                      onAverageRatingChange={handleAverageRatingChange}
-                    />
-                  ) : (
-                    <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
-                  )}
-                </button>
+                <RatingBadgeButton
+                  rateableId={setlist.show.id}
+                  rateableType="Show"
+                  showSlug={setlist.show.slug}
+                  initialRating={displayedRating}
+                  ratingsCount={displayedCount}
+                  userRating={resolvedUserRating}
+                  isAuthenticated
+                />
               </div>
             )}
             {!user && (
-              <LoginPromptPopover message="Sign in to rate">
-                <button
-                  type="button"
-                  className={cn(
-                    "flex items-center justify-center gap-1 glass-secondary px-2 h-6 sm:px-3 sm:h-8 rounded-md",
-                    "cursor-pointer hover:brightness-110 border border-dashed border-glass-border hover:border-amber-500/30",
-                    isRatingAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
-                  )}
-                >
-                  <RatingComponent rating={displayedRating} ratingsCount={displayedCount} />
-                </button>
-              </LoginPromptPopover>
+              <RatingBadgeButton
+                rateableId={setlist.show.id}
+                rateableType="Show"
+                showSlug={setlist.show.slug}
+                initialRating={displayedRating}
+                ratingsCount={displayedCount}
+                userRating={null}
+                isAuthenticated={false}
+              />
             )}
             <div className="pr-2 sm:pr-3">
               <ShowExternalBadges
@@ -346,10 +317,20 @@ function SetlistCardComponent({
                 <SetlistViewControl
                   view={view}
                   onChange={changeView}
-                  averageSongGap={setlist.averageSongGap}
-                  medianSongGap={setlist.medianSongGap}
+                  summary={catalogSummary}
+                  showPersonal={Boolean(user)}
                 />
-                <SetlistTable tracks={setlist.sets.flatMap((s) => s.tracks)} />
+                <SetlistTable showSlug={setlist.show.slug ?? ""} tracks={setlist.sets.flatMap((s) => s.tracks)} />
+              </div>
+            ) : view === "personal" && user ? (
+              <div className="space-y-2">
+                <SetlistViewControl view={view} onChange={changeView} summary={personalSummaryView} showPersonal />
+                <SetlistTablePersonal
+                  tracks={setlist.sets.flatMap((s) => s.tracks)}
+                  showSlug={setlist.show.slug ?? ""}
+                  showDate={setlist.show.date}
+                  onSummaryChange={setPersonalSummary}
+                />
               </div>
             ) : (
               <>
@@ -411,8 +392,8 @@ function SetlistCardComponent({
                   <SetlistViewControl
                     view={view}
                     onChange={changeView}
-                    averageSongGap={setlist.averageSongGap}
-                    medianSongGap={setlist.medianSongGap}
+                    summary={catalogSummary}
+                    showPersonal={Boolean(user)}
                   />
                 </div>
               </>

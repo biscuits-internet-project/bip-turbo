@@ -16,6 +16,12 @@ export type Setlist = {
   annotations: Annotation[];
   averageSongGap: number | null;
   medianSongGap: number | null;
+  /**
+   * Number of distinct catalog debuts in this show (tracks with `gap === null`,
+   * counting each song once even if played twice). Shown alongside the avg/median
+   * because debuts are excluded from those numbers but still signal rarity.
+   */
+  debutCount: number;
 };
 
 export type SetLight = {
@@ -31,4 +37,10 @@ export type SetlistLight = {
   annotations: Annotation[];
   averageSongGap: number | null;
   medianSongGap: number | null;
+  /**
+   * Number of distinct catalog debuts in this show (tracks with `gap === null`,
+   * counting each song once even if played twice). Shown alongside the avg/median
+   * because debuts are excluded from those numbers but still signal rarity.
+   */
+  debutCount: number;
 };

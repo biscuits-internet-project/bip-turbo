@@ -97,6 +97,10 @@ This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime:
 - Never commit secrets or API keys
 - Use `doppler run --` prefix for commands that need environment variables
 
+## Cache Key Versioning
+
+When you change the shape of a value stored in Redis (rename a field, add/remove a field, change a type, or change the semantic of an existing field), bump the version suffix on every cache key that holds that value (e.g. `:v2` → `:v3`). Cache key constants live in [packages/domain/src/cache-keys.ts](packages/domain/src/cache-keys.ts). If multiple keys cache the same payload (`songs:index:full`, `songs:filtered:...`, `songs:all-timers`, etc.), bump them all in the same change. Otherwise deployed instances will serve stale-shape payloads written by the previous version until the TTL expires.
+
 ## Show Ordering
 
 Any code that orders or filters shows/tracks chronologically MUST use the helpers in `packages/core/src/_shared/show-ordering.ts` (or `compareByShowDate` from `packages/domain/src/show-ordering.ts` for in-memory work). Never write `orderBy: { date: 'asc' }` directly — same-day shows have a `dayOrder` column (NULLS LAST) plus track-position tiebreakers, and the helpers centralize that logic so it stays consistent across SQL, Prisma, and JS.

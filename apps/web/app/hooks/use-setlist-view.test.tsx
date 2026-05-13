@@ -17,6 +17,9 @@ function Harness() {
       <button type="button" onClick={() => setView("gap-chart")}>
         to-gap
       </button>
+      <button type="button" onClick={() => setView("personal")}>
+        to-personal
+      </button>
       <button type="button" onClick={() => setView("setlist")}>
         to-setlist
       </button>
@@ -55,5 +58,39 @@ describe("useSetlistView", () => {
 
     await user.click(screen.getByText("to-setlist"));
     expect(screen.getByTestId("search").textContent).toBe("");
+  });
+
+  // The personal view is a third toggle option (logged-in only) that needs
+  // the same URL round-trip behavior as gap-chart — shareable + persists
+  // across prev/next show navigation.
+  test("reads ?view=personal from the URL on mount", () => {
+    render(
+      <MemoryRouter initialEntries={["/shows/2024-07-26?view=personal"]}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("view").textContent).toBe("personal");
+  });
+
+  test("setting to personal writes ?view=personal; setting back to setlist drops it", async () => {
+    const user = userEvent.setup();
+    await setupWithRouter(<Harness />);
+
+    await user.click(screen.getByText("to-personal"));
+    expect(screen.getByTestId("search").textContent).toBe("?view=personal");
+
+    await user.click(screen.getByText("to-setlist"));
+    expect(screen.getByTestId("search").textContent).toBe("");
+  });
+
+  // Unknown ?view= values (typos, deprecated names) should fall back to
+  // the default rather than render a broken UI.
+  test("falls back to setlist for unrecognized ?view= values", () => {
+    render(
+      <MemoryRouter initialEntries={["/shows/2024-07-26?view=bogus"]}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("view").textContent).toBe("setlist");
   });
 });

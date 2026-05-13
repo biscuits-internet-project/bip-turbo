@@ -1,11 +1,11 @@
 import type { SongPagePerformance } from "@bip/domain";
-import { mockShallowComponent, setup } from "@test/test-utils";
+import { mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock hooks used internally by PerformanceTable.
 vi.mock("~/hooks/use-session", () => ({
-  useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
+  useSession: vi.fn(() => ({ user: null, supabase: null })),
 }));
 vi.mock("~/hooks/use-show-user-data", () => ({
   useShowUserData: vi.fn(() => ({
@@ -86,7 +86,7 @@ describe("PerformanceTable", () => {
         show: { ...makePerformance().show, id: "s2", date: "2024-07-20" },
       }),
     ];
-    await setup(<PerformanceTable performances={performances} />);
+    await setupWithRouter(<PerformanceTable performances={performances} />);
 
     expect(screen.getAllByTestId("TrackRatingCell")).toHaveLength(2);
     // Dates render via ShowDate (M/D/YYYY at sm+, M/D/YY on mobile); both
@@ -100,11 +100,11 @@ describe("PerformanceTable", () => {
   test("renders Song column when showSongColumn is true, omits it otherwise", async () => {
     const performances = [makePerformance({ songTitle: "Cassidy", songSlug: "cassidy" })];
 
-    const { unmount } = await setup(<PerformanceTable performances={performances} showSongColumn />);
+    const { unmount } = await setupWithRouter(<PerformanceTable performances={performances} showSongColumn />);
     expect(screen.getByRole("link", { name: "Cassidy" })).toBeInTheDocument();
     unmount();
 
-    await setup(<PerformanceTable performances={performances} />);
+    await setupWithRouter(<PerformanceTable performances={performances} />);
     expect(screen.queryByRole("link", { name: "Cassidy" })).not.toBeInTheDocument();
   });
 
@@ -122,7 +122,7 @@ describe("PerformanceTable", () => {
         show: { ...makePerformance().show, id: "s-not-stats", countForStats: false },
       }),
     ];
-    await setup(<PerformanceTable performances={performances} />);
+    await setupWithRouter(<PerformanceTable performances={performances} />);
 
     const rows = screen.getAllByRole("row");
     const greyedRow = rows.find((row) => row.className.includes("opacity-60"));
@@ -153,7 +153,7 @@ describe("PerformanceTable", () => {
         show: { ...makePerformance().show, id: "s-soundcheck", countForStats: false },
       }),
     ];
-    await setup(<PerformanceTable performances={performances} />);
+    await setupWithRouter(<PerformanceTable performances={performances} />);
 
     const row = screen.getAllByRole("row").find((r) => r.className.includes("opacity-60"));
     expect(row).toBeDefined();
@@ -176,7 +176,7 @@ describe("PerformanceTable", () => {
       makePerformance({ trackId: "t1", show: { ...makePerformance().show, id: "s-attended" } }),
       makePerformance({ trackId: "t2", show: { ...makePerformance().show, id: "s-other" } }),
     ];
-    await setup(<PerformanceTable performances={performances} />);
+    await setupWithRouter(<PerformanceTable performances={performances} />);
 
     const rows = screen.getAllByRole("row");
     // Attended row should have both the green background tint and the left
@@ -201,10 +201,9 @@ describe("PerformanceTable", () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "u1" } as never,
       supabase: null,
-      loading: false,
     });
 
-    await setup(<PerformanceTable performances={[makePerformance()]} />);
+    await setupWithRouter(<PerformanceTable performances={[makePerformance()]} />);
 
     const cell = screen.getByTestId("TrackRatingCell");
     expect(cell.textContent).toContain('"isAuthenticated":true');
@@ -214,7 +213,7 @@ describe("PerformanceTable", () => {
   // toggle chips, etc.) above the table. PerformanceTable passes it through
   // to DataTable's filterComponent slot.
   test("renders headerContent when provided", async () => {
-    await setup(
+    await setupWithRouter(
       <PerformanceTable
         performances={[makePerformance()]}
         headerContent={<div data-testid="filter-controls">Filter controls here</div>}
@@ -228,7 +227,7 @@ describe("PerformanceTable", () => {
   // When all performances fit on a single page, pagination nav controls
   // (Previous/Next) are hidden to avoid showing disabled "Page 1 of 1" UI.
   test("hides pagination nav when data fits on one page", async () => {
-    await setup(<PerformanceTable performances={[makePerformance()]} />);
+    await setupWithRouter(<PerformanceTable performances={[makePerformance()]} />);
 
     expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
