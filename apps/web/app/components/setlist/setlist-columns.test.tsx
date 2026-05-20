@@ -176,7 +176,8 @@ describe("createSetlistColumns", () => {
         song: { id: "b", title: "Above the Waves", slug: "y" },
       }),
     ]);
-    await user.click(screen.getByRole("button", { name: /Last Played/i }));
+    // Label is split into stacked spans; accessible name is "LastPlayed".
+    await user.click(screen.getByRole("button", { name: /LastPlayed/i }));
     const songCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
@@ -378,12 +379,16 @@ describe("createSetlistColumns", () => {
     expect(link).toHaveAttribute("href", "/songs/confrontation");
   });
 
-  // Rating column hides on phones to keep the row legible — same pattern
-  // the "Last Seen" column uses on the personal table. Tablet+ shows it.
-  test("Rating column is marked hideOnMobile", () => {
+  // Rating stays visible on phones too — the rating button is the
+  // primary action on the setlist row and dropping it hides a core
+  // affordance. The column shrinks to a fixed `mobileFixedWidth` so it
+  // still fits alongside Song / Gap / Last Played.
+  test("Rating column declares mobileFixedWidth and is NOT hidden on mobile", () => {
     const columns = createSetlistColumns();
     const rating = columns.find((c) => c.id === "rating");
-    expect((rating?.meta as { hideOnMobile?: boolean } | undefined)?.hideOnMobile).toBe(true);
+    const meta = rating?.meta as { hideOnMobile?: boolean; mobileFixedWidth?: string } | undefined;
+    expect(meta?.hideOnMobile).toBeFalsy();
+    expect(meta?.mobileFixedWidth).toBeTruthy();
   });
 
   // Each row's Rating cell renders TrackRatingCell wired with the track's

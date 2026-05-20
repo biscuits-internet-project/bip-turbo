@@ -35,7 +35,7 @@ export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): Colum
     createGapColumn<SetlistTableRow>({
       id: "gap",
       label: "Gap",
-      width: "64px",
+      weight: 0.8,
       state: (row, allRows) => buildGapCellState({ isRepeat: isWithinShowRepeat(allRows, row), gap: row.gap }),
       debutLabel: "Debut",
       thisShowLabel: "This Show",
@@ -44,7 +44,7 @@ export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): Colum
       id: "lastPlayed",
       label: "Last Played",
       accessor: (row) => row.previousPerformanceShow,
-      width: "140px",
+      fixedWidth: "7.5rem",
     }),
     createRatingColumn<SetlistTableRow>(ratingCtx),
   ];

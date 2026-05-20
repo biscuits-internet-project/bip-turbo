@@ -34,7 +34,7 @@ export function createPersonalSetlistColumns(
     createGapColumn<PersonalSetlistTableRow>({
       id: "yourGap",
       label: "Your Gap",
-      width: "60px",
+      weight: 0.8,
       state: (row) => row.personal.yourGap,
       debutLabel: "Your debut",
       thisShowLabel: "Earlier this show",
@@ -43,7 +43,7 @@ export function createPersonalSetlistColumns(
       id: "lastSeen",
       label: "Last Seen",
       accessor: (row) => row.personal.lastSeen,
-      width: "124px",
+      fixedWidth: "7.5rem",
       hideOnMobile: true,
     }),
     createSeenCountColumn(),
@@ -59,8 +59,21 @@ function createSeenCountColumn(): ColumnDef<PersonalSetlistTableRow, unknown> {
   const columnHelper = createColumnHelper<PersonalSetlistTableRow>();
   return columnHelper.accessor((row) => row.personal.totalTimesSeen, {
     id: "totalTimesSeen",
-    header: ({ column }) => <SortableHeader column={column} label="Seen Before" />,
-    meta: { width: "72px" },
+    header: ({ column }) => (
+      <SortableHeader
+        column={column}
+        label={
+          <span className="flex flex-col items-start leading-tight">
+            <span>Seen</span>
+            <span>Before</span>
+          </span>
+        }
+      />
+    ),
+    // Bounded content (1-3 digit count). Desktop fixedWidth holds the
+    // stacked "Seen / Before" header + sort arrow on its own line below
+    // without leaving any extra slack.
+    meta: { fixedWidth: "4.5rem", mobileFixedWidth: "3rem" },
     enableSorting: true,
     sortingFn: "basic",
     sortDescFirst: false,

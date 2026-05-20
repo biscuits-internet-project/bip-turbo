@@ -30,13 +30,16 @@ export function ShowDateLink({ show }: ShowDateLinkProps) {
   if (!show) return <span className="text-content-text-tertiary">—</span>;
   if (!show.slug) {
     return (
-      <span className="text-content-text-secondary">
+      <span className="@container/datecell text-content-text-secondary block">
         <ShowDate date={show.date} />
       </span>
     );
   }
   return (
-    <a href={`/shows/${show.slug}${suffix}`} className="text-base text-brand-primary hover:text-brand-secondary">
+    <a
+      href={`/shows/${show.slug}${suffix}`}
+      className="@container/datecell block text-base text-brand-primary hover:text-brand-secondary"
+    >
       <ShowDate date={show.date} />
     </a>
   );

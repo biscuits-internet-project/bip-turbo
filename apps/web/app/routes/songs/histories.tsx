@@ -108,7 +108,7 @@ function HistoryPreview({ text }: { text: string }) {
 const historiesColumns: ColumnDef<HistorySong>[] = [
   {
     accessorKey: "title",
-    meta: { width: "25%", cellClassName: "align-top" },
+    meta: { weight: 1, cellClassName: "align-top" },
     header: "Song",
     cell: ({ row }) => (
       <Link
@@ -121,7 +121,7 @@ const historiesColumns: ColumnDef<HistorySong>[] = [
   },
   {
     accessorKey: "history",
-    meta: { width: "75%", cellClassName: "align-top" },
+    meta: { weight: 3, cellClassName: "align-top" },
     header: "Preview",
     cell: ({ row }) => <HistoryPreview text={normalizeHistoryText(row.original.history)} />,
   },

@@ -343,7 +343,9 @@ describe("SetlistCard", () => {
     // Average gap formats to one decimal place — terse, matches the rest
     // of the rarity stat presentation on the song-detail page.
     expect(screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Last Played" })).toBeInTheDocument();
+    // Label is split into stacked <span>Last</span><span>Played</span>
+    // so the accessible name concatenates without whitespace.
+    expect(screen.getByRole("columnheader", { name: /LastPlayed/i })).toBeInTheDocument();
   });
 
   // The average gap summary lives BELOW the setlist text on the same row
@@ -383,7 +385,9 @@ describe("SetlistCard", () => {
     await user.click(screen.getByRole("button", { name: /gap chart/i }));
     // The card flipped views (table renders), but no callback was invoked
     // because none was passed — the only way list pages preserve local state.
-    expect(screen.getByRole("columnheader", { name: "Last Played" })).toBeInTheDocument();
+    // Label is split into stacked <span>Last</span><span>Played</span>
+    // so the accessible name concatenates without whitespace.
+    expect(screen.getByRole("columnheader", { name: /LastPlayed/i })).toBeInTheDocument();
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
