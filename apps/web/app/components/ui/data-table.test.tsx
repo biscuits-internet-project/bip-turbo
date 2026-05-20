@@ -2,7 +2,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { setup } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
-import { DataTable } from "./data-table";
+import { computeColumnWidths, DataTable } from "./data-table";
 
 type Row = { id: string; name: string; count: number };
 
@@ -208,11 +208,16 @@ describe("DataTable", () => {
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
-  // Columns marked `meta.hideOnMobile` get `hidden sm:table-cell` on both
-  // the header and body cells so they disappear at narrow viewports without
-  // needing a separate mobile column set. Used for the perf-table Notes
-  // column and other long-text columns that crowd phones.
-  test("hideOnMobile meta adds hidden sm:table-cell to header and body cells", async () => {
+  // Columns marked `meta.hideOnMobile` are dropped from rendering below the
+  // `sm` breakpoint — driven through TanStack's `columnVisibility` (not CSS
+  // `hidden sm:table-cell`) so the `<colgroup>` indices stay aligned with
+  // the actually-rendered TDs.
+  //
+  // jsdom doesn't fire ResizeObserver, so wrapperWidth stays 0 here. The
+  // gating treats unmeasured (wrapperWidth=0) as desktop — preferring a
+  // full render over preemptive hiding. So in this test the hideOnMobile
+  // column should still render.
+  test("hideOnMobile meta column renders by default (wrapper unmeasured)", async () => {
     const columnsWithHidden: ColumnDef<Row>[] = [
       { accessorKey: "name", header: "Name" },
       { accessorKey: "count", header: "Count", meta: { hideOnMobile: true } },
@@ -220,47 +225,83 @@ describe("DataTable", () => {
 
     await setup(<DataTable columns={columnsWithHidden} data={rows} hideSearch />);
 
-    const countHeader = screen.getByText("Count").closest("th");
-    expect(countHeader?.className).toContain("hidden");
-    expect(countHeader?.className).toContain("sm:table-cell");
-
-    const nameHeader = screen.getByText("Name").closest("th");
-    expect(nameHeader?.className ?? "").not.toContain("hidden");
-
-    const countCell = screen.getByText("3").closest("td");
-    expect(countCell?.className).toContain("hidden");
-    expect(countCell?.className).toContain("sm:table-cell");
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.getByText("Count")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
   });
 
-  // The table uses `table-auto` on mobile (lets columns size to content,
-  // avoiding header overlap) and `table-fixed` at sm+ (keeps the
-  // percentage-width sizing predictable on desktop).
-  test("table element uses table-auto on mobile and sm:table-fixed at sm+", async () => {
-    const { container } = await setup(<DataTable columns={basicColumns} data={rows} hideSearch />);
-
-    const tableEl = container.querySelector("table");
-    expect(tableEl?.className).toContain("table-auto");
-    expect(tableEl?.className).toContain("sm:table-fixed");
-  });
-
-  // `meta.width` is exposed as a CSS custom property and only takes effect
-  // at sm+ via a Tailwind class — on mobile the column sizes to content.
-  // Without this gating, desktop-tuned widths would starve other columns
-  // at phone widths (the bug observed on /songs/all-timers and /on-this-day).
-  test("honors meta.width via --col-w + sm:w-[var(--col-w)] on column defs", async () => {
-    const columnsWithWidths: ColumnDef<Row>[] = [
-      { accessorKey: "name", header: "Name", meta: { width: "60%" } },
-      { accessorKey: "count", header: "Count", meta: { width: "40%" } },
+  // Column widths come from a <colgroup>. Each column uses either a
+  // `fixedWidth` (CSS length, applied verbatim) or a `weight` (share of
+  // pixel space left after fixed-width columns claim theirs). The wrapper
+  // width is measured at runtime via ResizeObserver; on first paint
+  // (before measurement) widths fall back to relative percentages.
+  test("first-paint render uses percentage widths for flex columns", async () => {
+    const columnsWithWeights: ColumnDef<Row>[] = [
+      { accessorKey: "name", header: "Name", meta: { weight: 3 } },
+      { accessorKey: "count", header: "Count" /* default weight 1 */ },
     ];
 
-    await setup(<DataTable columns={columnsWithWidths} data={rows} hideSearch />);
+    const { container } = await setup(<DataTable columns={columnsWithWeights} data={rows} hideSearch />);
 
-    const nameHeader = screen.getByText("Name").closest("th");
-    const countHeader = screen.getByText("Count").closest("th");
+    const cols = container.querySelectorAll("colgroup col");
+    expect(cols).toHaveLength(2);
+    // 3 of 4 total weight = 75%; 1 of 4 = 25%. (jsdom doesn't fire
+    // ResizeObserver, so we stay on the percentage fallback path.)
+    expect((cols[0] as HTMLElement).style.width).toBe("75%");
+    expect((cols[1] as HTMLElement).style.width).toBe("25%");
+  });
 
-    expect(nameHeader?.style.getPropertyValue("--col-w")).toBe("60%");
-    expect(countHeader?.style.getPropertyValue("--col-w")).toBe("40%");
-    expect(nameHeader?.className).toContain("sm:w-[var(--col-w)]");
-    expect(countHeader?.className).toContain("sm:w-[var(--col-w)]");
+  // Fixed-width columns get their declared length verbatim regardless of
+  // measurement state — flex columns share whatever's left.
+  test("fixedWidth columns get their length verbatim", async () => {
+    const columns: ColumnDef<Row>[] = [
+      { accessorKey: "name", header: "Name" /* flex weight 1 */ },
+      { accessorKey: "count", header: "Count", meta: { fixedWidth: "3rem" } },
+    ];
+
+    const { container } = await setup(<DataTable columns={columns} data={rows} hideSearch />);
+
+    const cols = container.querySelectorAll("colgroup col");
+    expect((cols[0] as HTMLElement).style.width).toBe("100%");
+    expect((cols[1] as HTMLElement).style.width).toBe("3rem");
+  });
+});
+
+describe("computeColumnWidths", () => {
+  // The DOM render path is exercised in the DataTable tests above but
+  // only on the pre-measurement (percentage) branch — jsdom doesn't fire
+  // ResizeObserver. Drive the post-measurement branch directly so we
+  // catch regressions in the pixel math: fixedWidth columns get their
+  // declared length, the rest split the remainder by weight.
+  type R = { id: string };
+  const c = (
+    id: string,
+    meta?: { weight?: number; fixedWidth?: string },
+  ): { id: string; columnDef: ColumnDef<R, unknown> } => ({
+    id,
+    columnDef: { id, meta } as ColumnDef<R, unknown>,
+  });
+
+  test("with a measured wrapper, flex columns split leftover pixels by weight", () => {
+    const cols = [c("song", { weight: 3 }), c("date", { weight: 1 })];
+    const widths = computeColumnWidths<R, unknown>(cols, /* wrapperWidth */ 1000, /* rootFontSize */ 16);
+    // 100% goes to flex; song gets 3/4 = 750px, date gets 250px.
+    expect(widths).toEqual(["750px", "250px"]);
+  });
+
+  test("fixedWidth columns subtract from leftover; flex columns share the rest", () => {
+    const cols = [c("song", { weight: 3 }), c("plays", { fixedWidth: "4rem" }), c("date", { weight: 1 })];
+    // 4rem = 64px at 16px root; leftover = 1000-64 = 936; song gets 3/4 = 702, date 234.
+    const widths = computeColumnWidths<R, unknown>(cols, 1000, 16);
+    expect(widths).toEqual(["702px", "4rem", "234px"]);
+  });
+
+  test("wrapperWidth=0 (SSR / first paint) falls back to percentage shares for flex columns", () => {
+    const cols = [c("song", { weight: 3 }), c("plays", { fixedWidth: "4rem" }), c("date", { weight: 1 })];
+    const widths = computeColumnWidths<R, unknown>(cols, 0, 16);
+    // Pixel math is suppressed; flex shares fall back to percentages of the full container.
+    // Fixed col still applied. The shares ignore the fixedWidth and may sum > 100% for
+    // a single frame before measurement takes over — intentional, documented in the helper.
+    expect(widths).toEqual(["75%", "4rem", "25%"]);
   });
 });

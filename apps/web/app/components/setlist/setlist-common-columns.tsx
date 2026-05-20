@@ -49,7 +49,13 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
   return columnHelper.accessor((row) => row.averageRating ?? Number.NEGATIVE_INFINITY, {
     id: "rating",
     header: ({ column }) => <SortableHeader column={column} label="Rating" />,
-    meta: { width: "120px", hideOnMobile: true },
+    // Bounded content (star + "X.XX" + dot + count). The 5-star picker
+    // now floats in a popover instead of expanding the badge inline, so
+    // the column only needs to fit the compact badge. Desktop 7rem (~112px)
+    // gives ~96px content area (after 1rem horizontal padding) so the
+    // widest "★ 5.00 · 99" badge (~91px) sits with a few pixels of
+    // breathing room. Mobile 6rem fits the same compact rendering.
+    meta: { fixedWidth: "7rem", mobileFixedWidth: "6rem" },
     enableSorting: true,
     // Ties resolve to canonical set+position so "all unrated tracks" still
     // read top-to-bottom in the order they were played.
@@ -93,14 +99,41 @@ export function createShowDateLinkColumn<T extends TrackLight>(opts: {
   id: string;
   label: string;
   accessor: (row: T) => { date: string; slug: string | null } | null | undefined;
-  width: string;
+  /**
+   * Desktop column width. Date content is bounded ("MMM DD, YYYY" max
+   * ~100px), so callers should generally pass a fixedWidth here rather
+   * than relying on weight — flexing eats space the Song column wants.
+   */
+  fixedWidth: string;
   hideOnMobile?: boolean;
 }): ColumnDef<T, unknown> {
   const columnHelper = createColumnHelper<T>();
   return columnHelper.accessor((row) => opts.accessor(row)?.date ?? "", {
     id: opts.id,
-    header: ({ column }) => <SortableHeader column={column} label={opts.label} />,
-    meta: opts.hideOnMobile ? { width: opts.width, hideOnMobile: true } : { width: opts.width },
+    // Label words stack vertically so the header floor is the widest
+    // single word ("Played" / "Seen" ~ 50px) instead of the full phrase
+    // ("Last Played" ~ 76px). Combined with SortableHeader's flex-wrap,
+    // the sort arrow drops onto its own line below when the column is
+    // narrow, letting the date cells (~80px content) drive the column
+    // width instead of the header.
+    header: ({ column }) => (
+      <SortableHeader
+        column={column}
+        label={
+          <span className="flex flex-col leading-tight">
+            {opts.label.split(" ").map((word) => (
+              <span key={word}>{word}</span>
+            ))}
+          </span>
+        }
+      />
+    ),
+    // Mobile: 4.5rem locks the column to compact "M/D/YY" width — same
+    // pattern as the other date-only mobile cells — so the Rating column
+    // can sit alongside without crowding Song.
+    meta: opts.hideOnMobile
+      ? { fixedWidth: opts.fixedWidth, mobileFixedWidth: "4.5rem", hideOnMobile: true }
+      : { fixedWidth: opts.fixedWidth, mobileFixedWidth: "4.5rem" },
     enableSorting: true,
     // ISO YYYY-MM-DD strings sort lexicographically the same as
     // chronologically. Empty strings (no prior performance) sort first asc
@@ -126,7 +159,7 @@ export function createShowDateLinkColumn<T extends TrackLight>(opts: {
 export function createGapColumn<T extends TrackLight>(opts: {
   id: string;
   label: string;
-  width: string;
+  weight: number;
   /** Row-level state — must be stable per row so sort + cell agree. */
   state: (row: T, allRows: ReadonlyArray<T>) => GapCellState;
   debutLabel: string;
@@ -146,7 +179,10 @@ export function createGapColumn<T extends TrackLight>(opts: {
     {
       id: opts.id,
       header: ({ column }) => <SortableHeader column={column} label={opts.label} />,
-      meta: { width: opts.width },
+      // Gap content is bounded (debut icon, repeat icon, or up to 3
+      // digits) — fix both desktop (3rem) and mobile (2.5rem with the
+      // sort arrow wrapping onto its own line below the "Gap" label).
+      meta: { fixedWidth: "3rem", mobileFixedWidth: "2.5rem" },
       enableSorting: true,
       // Numeric compare with set+position tiebreaker — rows that share the
       // same gap value still read in canonical narrative order.
@@ -179,26 +215,61 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
   return [
     columnHelper.accessor((row) => row.set, {
       id: "set",
-      header: ({ column }) => <SortableHeader column={column} label="Set" />,
-      meta: { width: "36px" },
+      // "Set" label is sr-only on mobile — the column shrinks below the
+      // word's width, and "Set" + sort affordance are redundant when the
+      // cells themselves show "1", "2", "E1" right below.
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label={
+            <span>
+              <span className="sr-only sm:not-sr-only">Set</span>
+            </span>
+          }
+        />
+      ),
+      // Set values max out at "E2" (2 chars). Bounded content → fixed
+      // 3rem on desktop. On mobile the column also doubles as the home
+      // for the all-timer flame icon (standalone AllTimer column is
+      // hidden on mobile to save space), so it's wide enough for either
+      // the flame or "E1" stacked vertically.
+      meta: {
+        fixedWidth: "2.5rem",
+        mobileFixedWidth: "1.25rem",
+        cellClassName: "!px-0 sm:!px-2",
+        headerClassName: "!px-0 sm:!px-2",
+      },
       enableSorting: true,
       sortingFn: (a, b) => compareBySetThenPosition(a.original, b.original),
       cell: (info) => {
         const raw = info.getValue() as string;
+        const row = info.row.original;
         const encoresInSet = countDistinctEncores(info.table.getCoreRowModel().rows.map((r) => r.original));
         // Show the set label only on the first row of a same-set run when
         // sorted by Set — keeps the grouping visually obvious. Other sorts
         // interleave sets, so every row keeps its label.
         const sorting = info.table.getState().sorting;
         const groupBySet = sorting.length > 0 && sorting[0].id === "set";
+        let hideSetLabel = false;
         if (groupBySet) {
           const sortedRows = info.table.getSortedRowModel().rows;
           const idx = sortedRows.findIndex((r) => r.id === info.row.id);
-          if (idx > 0 && sortedRows[idx - 1].original.set === info.row.original.set) {
-            return null;
+          if (idx > 0 && sortedRows[idx - 1].original.set === row.set) {
+            hideSetLabel = true;
           }
         }
-        return <span className="text-content-text-secondary">{formatSetLabel(raw, { encoresInSet })}</span>;
+        return (
+          <div className="flex flex-col items-center sm:items-start gap-0.5">
+            {!hideSetLabel && (
+              <span className="text-content-text-secondary">{formatSetLabel(raw, { encoresInSet })}</span>
+            )}
+            {row.allTimer && (
+              <span className="sm:hidden">
+                <AllTimerCell />
+              </span>
+            )}
+          </div>
+        );
       },
     }) as ColumnDef<T, unknown>,
     columnHelper.display({
@@ -206,7 +277,10 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
       header: ({ column }) => <SortableHeader column={column} label="Track" />,
       // Drops on narrow viewports — the Set column already orients the row,
       // and a tiny Track column would steal width from Song on mobile.
-      meta: { width: "42px", hideOnMobile: true },
+      // Track # (position within set) — bounded to 3 digits max. 3.5rem
+      // accommodates the "Track" header word + sort arrow + tighter
+      // padding on desktop.
+      meta: { fixedWidth: "3.5rem", hideOnMobile: true },
       enableSorting: true,
       // Track # = position-within-set, computed at render time from the
       // unsorted row model. The comparator falls through to the canonical
@@ -223,7 +297,9 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
     columnHelper.display({
       id: "allTimer",
       header: () => null,
-      meta: allTimerColumnMeta,
+      // Hidden on mobile here — the setlist Set cell renders the flame
+      // inline on phones to recover the 16px this column would consume.
+      meta: { ...allTimerColumnMeta, hideOnMobile: true },
       enableSorting: false,
       cell: (info) => (info.row.original.allTimer ? <AllTimerCell /> : null),
     }) as ColumnDef<T, unknown>,

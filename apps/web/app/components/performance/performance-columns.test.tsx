@@ -47,16 +47,16 @@ const defaultOptions = {
 };
 
 describe("createPerformanceColumns", () => {
-  // The default column set renders Date, Set, Song Before, Song After,
+  // The default column set renders Date, Song Before, Song After,
   // Notes, and Rating headers. Each side of the setlist context is its own
   // searchable column. Venue isn't a separate column — it's folded into
-  // the Date cell via DateVenueCell.
-  test("default columns include Date, Set, Song Before, Song After, Notes, Rating headers", async () => {
+  // the Date cell via DateVenueCell. Set was removed since the set number
+  // isn't meaningful when scanning a single song across many shows.
+  test("default columns include Date, Song Before, Song After, Notes, Rating headers", async () => {
     const columns = createPerformanceColumns(defaultOptions);
     await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
     expect(screen.getByText("Date")).toBeInTheDocument();
-    expect(screen.getByText("Set")).toBeInTheDocument();
     expect(screen.getByText("Song Before")).toBeInTheDocument();
     expect(screen.getByText("Song After")).toBeInTheDocument();
     expect(screen.getByText("Notes")).toBeInTheDocument();
@@ -84,18 +84,20 @@ describe("createPerformanceColumns", () => {
     expect(notesColumn?.meta?.hideOnMobile).toBe(true);
   });
 
-  // Song Before / Song After are context columns: useful when scanning but
-  // not primary signal. They always hide on mobile to keep narrow rows
-  // focused on Date, Set, and Rating regardless of which surface is hosting
-  // the table.
-  test("Song Before and Song After columns hide on mobile regardless of showSongColumn", () => {
+  // Song Before / Song After visibility depends on the surface:
+  // - Single-song view (/songs/:slug, `showSongColumn` false): visible
+  //   on mobile — segue context is the primary reason users scan the
+  //   per-song table.
+  // - Cross-song view (/songs/all-timers, /on-this-day, `showSongColumn`
+  //   true): hidden on mobile — too many columns to fit alongside Song.
+  test("Song Before / Song After hide on mobile only on cross-song surfaces", () => {
     const detailColumns = createPerformanceColumns(defaultOptions);
     const allTimerColumns = createPerformanceColumns({ ...defaultOptions, showSongColumn: true });
 
     const findColumn = (cols: typeof detailColumns, id: string) => cols.find((c) => "id" in c && c.id === id);
 
-    expect(findColumn(detailColumns, "songBefore")?.meta?.hideOnMobile).toBe(true);
-    expect(findColumn(detailColumns, "songAfter")?.meta?.hideOnMobile).toBe(true);
+    expect(findColumn(detailColumns, "songBefore")?.meta?.hideOnMobile).toBeFalsy();
+    expect(findColumn(detailColumns, "songAfter")?.meta?.hideOnMobile).toBeFalsy();
     expect(findColumn(allTimerColumns, "songBefore")?.meta?.hideOnMobile).toBe(true);
     expect(findColumn(allTimerColumns, "songAfter")?.meta?.hideOnMobile).toBe(true);
   });
@@ -317,17 +319,19 @@ describe("createPerformanceColumns", () => {
     expect(screen.queryByText("Song")).not.toBeInTheDocument();
   });
 
-  // The AllTimer flame column marks standout performances. Only shown on
-  // the "All Performances" tab of /songs/$slug, not on /songs/all-timers
-  // (where every row is already an all-timer by definition).
-  test("AllTimer flame column present when showAllTimerColumn is true", async () => {
+  // The AllTimer flame marks standout performances. Renders twice in the
+  // DOM per all-timer row: once in the standalone AllTimer column (hidden
+  // on mobile via CSS), once inline in the Set cell (visible only on
+  // mobile via CSS). jsdom doesn't apply media queries so both instances
+  // appear in this test — the count of 2 is the contract.
+  test("AllTimer flame renders in both the standalone column and inline in the Set cell", async () => {
     const performances = [makePerformance({ allTimer: true })];
     const columns = createPerformanceColumns({ ...defaultOptions, showAllTimerColumn: true });
     const { container } = await setupWithRouter(
       <DataTable columns={columns} data={performances} hideSearch hidePagination />,
     );
 
-    expect(container.querySelectorAll(".lucide-flame").length).toBe(1);
+    expect(container.querySelectorAll(".lucide-flame").length).toBe(2);
   });
 
   // TrackRatingCell receives initialRating from the performance's rating
@@ -377,8 +381,8 @@ describe("createPerformanceColumns", () => {
 
   // Sortable columns (Date, Rating, Song Before, Song After) show an
   // up/down arrow icon even when not actively sorted, so users can see
-  // at a glance which columns support sorting. Non-sortable columns
-  // (Set, Notes) render plain text headers with no icon.
+  // at a glance which columns support sorting. Notes is the only non-
+  // sortable header in the default set.
   test("sortable columns show sort indicator, non-sortable columns do not", async () => {
     const columns = createPerformanceColumns(defaultOptions);
     await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
@@ -388,9 +392,9 @@ describe("createPerformanceColumns", () => {
     expect(dateHeader).not.toBeNull();
     expect(dateHeader?.querySelector("svg")).not.toBeNull();
 
-    // Set is not sortable — plain text header
-    const setHeader = screen.getByText("Set").closest("th");
-    expect(setHeader?.querySelector("button")).toBeNull();
+    // Notes is not sortable — plain text header
+    const notesHeader = screen.getByText("Notes").closest("th");
+    expect(notesHeader?.querySelector("button")).toBeNull();
 
     const ratingHeader = screen.getByText("Rating").closest("button");
     expect(ratingHeader).not.toBeNull();
@@ -408,10 +412,10 @@ describe("createPerformanceColumns", () => {
 
   // Column order on the song-detail performances table reads as a
   // narrative: when did this happen (Date) → how rare was it (Gap) → when
-  // was the last time before that (Last Played) → which set was it (Set) →
-  // what came before / after (Song Before, Song After). Pinning the order
-  // so future column additions don't accidentally reshuffle this flow.
-  test("column order is Date, Gap, Last Played, Set, Song Before, Song After", async () => {
+  // was the last time before that (Last Played) → what came before /
+  // after (Song Before, Song After). Pinning the order so future column
+  // additions don't accidentally reshuffle this flow.
+  test("column order is Date, Gap, Last Played, Song Before, Song After", async () => {
     const columns = createPerformanceColumns(defaultOptions);
     await setupWithRouter(<DataTable columns={columns} data={[makePerformance()]} hideSearch hidePagination />);
 
@@ -421,14 +425,12 @@ describe("createPerformanceColumns", () => {
     const dateIdx = headers.findIndex((h) => h.startsWith("Date"));
     const gapIdx = headers.findIndex((h) => h.startsWith("Gap"));
     const lastPlayedIdx = headers.findIndex((h) => h.startsWith("Last Played"));
-    const setIdx = headers.findIndex((h) => h.startsWith("Set"));
     const songBeforeIdx = headers.findIndex((h) => h.startsWith("Song Before"));
     const songAfterIdx = headers.findIndex((h) => h.startsWith("Song After"));
     expect(dateIdx).toBeGreaterThan(-1);
     expect(gapIdx).toBeGreaterThan(dateIdx);
     expect(lastPlayedIdx).toBeGreaterThan(gapIdx);
-    expect(setIdx).toBeGreaterThan(lastPlayedIdx);
-    expect(songBeforeIdx).toBeGreaterThan(setIdx);
+    expect(songBeforeIdx).toBeGreaterThan(lastPlayedIdx);
     expect(songAfterIdx).toBeGreaterThan(songBeforeIdx);
   });
 
@@ -659,16 +661,13 @@ describe("gapSortingFn", () => {
 });
 
 describe("createPerformanceColumns extras", () => {
-  // Columns that need constrained widths (like the narrow allTimer flame
-  // icon and the Set label) set explicit meta.width. Other columns auto-size
-  // to avoid wasted space.
-  test("allTimer and Set columns have explicit meta.width", () => {
+  // Icon-only / ultra-narrow columns declare `fixedWidth` so they never
+  // grow or shrink with the table — they hold a single glyph or 1-2
+  // chars. Other columns flex via `weight` to fill the remainder.
+  test("allTimer column is fixed-width", () => {
     const columns = createPerformanceColumns({ ...defaultOptions, showAllTimerColumn: true });
 
     const allTimerColumn = columns.find((column) => "id" in column && column.id === "allTimer");
-    expect(allTimerColumn?.meta?.width).toBe("16px");
-
-    const setColumn = columns.find((column) => "accessorKey" in column && column.accessorKey === "set");
-    expect(setColumn?.meta?.width).toBe("48px");
+    expect(allTimerColumn?.meta?.fixedWidth).toBeTruthy();
   });
 });
