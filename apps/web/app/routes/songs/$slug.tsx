@@ -11,6 +11,7 @@ import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
 import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
 import { Button } from "~/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -363,26 +364,29 @@ export default function SongPage() {
           clearFilters();
         }}
       >
-        <div className="sm:hidden mb-4">
-          <label htmlFor="song-view-select" className="sr-only">
-            Song view
-          </label>
-          <select
-            id="song-view-select"
+        <div className="sm:hidden mb-4" data-testid="mobile-song-view">
+          <Select
             value={activeTab}
-            onChange={(event) => {
-              setActiveTab(event.target.value);
+            onValueChange={(value) => {
+              setActiveTab(value);
               clearFilters();
             }}
-            className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
           >
-            <option value="performances">All Performances</option>
-            {hasAllTimers && <option value="all-timers">All-Timers</option>}
-            <option value="stats">Stats</option>
-            {song.history && <option value="history">History</option>}
-            {song.lyrics && <option value="lyrics">Lyrics</option>}
-            {(song.tabs || song.guitarTabsUrl) && <option value="guitar-tabs">Guitar Tabs</option>}
-          </select>
+            <SelectTrigger
+              aria-label="Song view"
+              className="w-full h-11 bg-glass-bg border border-glass-border text-content-text-primary hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
+              <SelectItem value="performances">All Performances</SelectItem>
+              {hasAllTimers && <SelectItem value="all-timers">All-Timers</SelectItem>}
+              <SelectItem value="stats">Stats</SelectItem>
+              {song.history && <SelectItem value="history">History</SelectItem>}
+              {song.lyrics && <SelectItem value="lyrics">Lyrics</SelectItem>}
+              {(song.tabs || song.guitarTabsUrl) && <SelectItem value="guitar-tabs">Guitar Tabs</SelectItem>}
+            </SelectContent>
+          </Select>
         </div>
         <TabsList className="w-full hidden sm:flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
           <TabsTrigger

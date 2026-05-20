@@ -1,12 +1,15 @@
 import type { Logger, SearchResult, SearchRowResult } from "@bip/domain";
 import type { DbClient } from "../_shared/database/models";
 import type { SearchHistoryService } from "./search-history-service";
+import { buildMixedSearchResults } from "./search-result-builder";
 import { SegueQueryParser } from "./segue-query-parser";
 
 type VenueResult = {
   venue_id: string;
   venue_name: string;
   venue_slug: string;
+  venue_city: string | null;
+  venue_state: string | null;
   match_score: number;
 };
 
@@ -114,62 +117,34 @@ export class PostgresSearchService {
       const mediumVenueIds = venueResults.filter((v) => v.match_score >= 10).map((v) => v.venue_id);
       const weakVenueIds = venueResults.filter((v) => v.match_score >= 1).map((v) => v.venue_id);
 
-      // Try strong matches first
-      if (strongSongIds.length > 0 || strongVenueIds.length > 0) {
-        const showResults = await this.performShowSearch(
-          searchQuery,
-          strongSongIds,
-          strongVenueIds,
-          options.limit,
-          dateFilter,
-        );
-        if (showResults.length > 0) {
-          return this.convertShowResultsToSearchResults(showResults);
-        }
-      }
+      // Run show search at the strongest tier that has any matches; fall back
+      // through medium/weak so the show list still gets populated for fuzzy
+      // queries.
+      const tieredShows = await this.runTieredShowSearch(
+        searchQuery,
+        { strongSongIds, mediumSongIds, weakSongIds },
+        { strongVenueIds, mediumVenueIds, weakVenueIds },
+        options.limit,
+        dateFilter,
+      );
 
-      // Try medium matches
-      if (mediumSongIds.length > 0 || mediumVenueIds.length > 0) {
-        const showResults = await this.performShowSearch(
-          searchQuery,
-          mediumSongIds,
-          mediumVenueIds,
-          options.limit,
-          dateFilter,
-        );
-        if (showResults.length > 0) {
-          return this.convertShowResultsToSearchResults(showResults);
-        }
-      }
+      // If we found no song/venue matches at all, do a general show text search
+      // as a last resort.
+      const showSearchResults =
+        tieredShows.length === 0 && songResults.length === 0 && venueResults.length === 0
+          ? this.convertShowResultsToSearchResults(
+              await this.performShowSearch(searchQuery, [], [], Math.min(options.limit, 10), dateFilter),
+            )
+          : tieredShows;
 
-      // Try weak matches
-      if (weakSongIds.length > 0 || weakVenueIds.length > 0) {
-        const showResults = await this.performShowSearch(
-          searchQuery,
-          weakSongIds,
-          weakVenueIds,
-          options.limit,
-          dateFilter,
-        );
-        if (showResults.length > 0) {
-          return this.convertShowResultsToSearchResults(showResults);
-        }
-      }
-
-      // Only do general search if no songs or venues found at all
-      if (songResults.length === 0 && venueResults.length === 0) {
-        const generalResults = await this.performShowSearch(
-          searchQuery,
-          [],
-          [],
-          Math.min(options.limit, 10),
-          dateFilter,
-        );
-        return this.convertShowResultsToSearchResults(generalResults);
-      }
-
-      // If we found songs/venues but no shows, return empty
-      return [];
+      // Mix in matching song-page and venue-page links so users can navigate
+      // directly to those entities (e.g. searching "Shadows" surfaces
+      // /songs/shadows above shows that played it).
+      return buildMixedSearchResults({
+        songs: songResults,
+        venues: venueResults,
+        shows: showSearchResults,
+      });
     } catch (error) {
       this.logger.error(`Search failed: ${error}`);
       throw error;
@@ -286,15 +261,18 @@ export class PostgresSearchService {
             OR LOWER(v.city) LIKE '%' || LOWER($1) || '%'
         )
         SELECT
-          venue_id,
-          venue_name,
-          venue_slug,
+          search_matches.venue_id,
+          search_matches.venue_name,
+          search_matches.venue_slug,
+          v2.city as venue_city,
+          v2.state as venue_state,
           GREATEST(
             exact_score * 200,  -- Double weight for exact matches
             fts_rank * 60,
             trgm_sim * 100
           )::INTEGER as match_score
         FROM search_matches
+        JOIN venues v2 ON v2.id = search_matches.venue_id
         ORDER BY match_score DESC
         LIMIT 100
       `,
@@ -344,6 +322,26 @@ export class PostgresSearchService {
 
     this.logger.debug(`Song search SQL for query "${query}"`);
     return this.db.$queryRawUnsafe<SongResult[]>(sql, query);
+  }
+
+  private async runTieredShowSearch(
+    searchQuery: string,
+    songTiers: { strongSongIds: string[]; mediumSongIds: string[]; weakSongIds: string[] },
+    venueTiers: { strongVenueIds: string[]; mediumVenueIds: string[]; weakVenueIds: string[] },
+    limit: number,
+    dateFilter: { year?: number; month?: number; day?: number; remainingQuery: string },
+  ): Promise<SearchResult[]> {
+    const tiers: Array<{ songIds: string[]; venueIds: string[] }> = [
+      { songIds: songTiers.strongSongIds, venueIds: venueTiers.strongVenueIds },
+      { songIds: songTiers.mediumSongIds, venueIds: venueTiers.mediumVenueIds },
+      { songIds: songTiers.weakSongIds, venueIds: venueTiers.weakVenueIds },
+    ];
+    for (const tier of tiers) {
+      if (tier.songIds.length === 0 && tier.venueIds.length === 0) continue;
+      const rows = await this.performShowSearch(searchQuery, tier.songIds, tier.venueIds, limit, dateFilter);
+      if (rows.length > 0) return this.convertShowResultsToSearchResults(rows);
+    }
+    return [];
   }
 
   private async performShowSearch(

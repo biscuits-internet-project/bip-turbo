@@ -5,7 +5,7 @@ import type {
   SegueRunMatchDetails,
   TrackMatchDetails,
 } from "@bip/domain";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, MapPin, Music, Search, X } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Input } from "~/components/ui/input";
@@ -35,6 +35,51 @@ function SearchResultItem({ result, onClose }: SearchResultItemProps) {
       onClose();
     }
   };
+
+  // Song-page result: link to /songs/<slug>, distinct icon and styling so
+  // users can tell at a glance it's a song page, not a specific performance.
+  if (result.entityType === "song") {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className="block w-full text-left p-3 hover:bg-purple-900/20 active:bg-purple-900/30 rounded-lg transition-colors group cursor-pointer"
+      >
+        <div className="flex items-center gap-3">
+          <Music className="h-4 w-4 text-purple-300 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-base text-gray-200 font-medium">{result.songTitle || result.displayText}</div>
+            <div className="text-xs text-purple-400 mt-0.5">Song page</div>
+          </div>
+          {result.score && <span className="text-xs text-purple-400 font-medium">{result.score}%</span>}
+        </div>
+      </button>
+    );
+  }
+
+  // Venue-page result: link to /venues/<slug>, separate from individual shows
+  // at that venue.
+  if (result.entityType === "venue") {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className="block w-full text-left p-3 hover:bg-purple-900/20 active:bg-purple-900/30 rounded-lg transition-colors group cursor-pointer"
+      >
+        <div className="flex items-center gap-3">
+          <MapPin className="h-4 w-4 text-purple-300 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-base text-gray-200 font-medium">
+              {result.venueName || result.displayText}
+              {result.venueLocation && <span className="text-gray-400 font-normal"> • {result.venueLocation}</span>}
+            </div>
+            <div className="text-xs text-purple-400 mt-0.5">Venue page</div>
+          </div>
+          {result.score && <span className="text-xs text-purple-400 font-medium">{result.score}%</span>}
+        </div>
+      </button>
+    );
+  }
 
   // Use displayText as fallback if individual fields aren't available
   const displayDate = result.date
