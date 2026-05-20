@@ -184,14 +184,15 @@ describe("PerformanceFilterControls", () => {
     expect(handleUpdateFilter).not.toHaveBeenCalled();
   });
 
-  // On mobile the entire filter block is collapsed behind a "Filters"
-  // toggle button so it doesn't eat the viewport before any results show.
-  // The wrapper carries `hidden` until expanded; sm+ breakpoints keep it
-  // visible regardless via `sm:flex`/`sm:block`.
-  test("renders a mobile-only Filters toggle button (sm:hidden)", async () => {
+  // On mobile the entire filter block is collapsed behind a "Search & Filters"
+  // toggle button so it doesn't eat the viewport before any results show, and
+  // the label hints that the search box lives inside the expansion. The wrapper
+  // carries `hidden` until expanded; sm+ breakpoints keep it visible regardless
+  // via `sm:flex`/`sm:block`.
+  test("renders a mobile-only Search & Filters toggle button (sm:hidden)", async () => {
     await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
 
-    const toggle = screen.getByRole("button", { name: /^Filters/ });
+    const toggle = screen.getByRole("button", { name: /^Search & Filters/ });
     expect(toggle.className).toContain("sm:hidden");
   });
 
@@ -207,7 +208,7 @@ describe("PerformanceFilterControls", () => {
     expect(wrapper.className).toContain("hidden");
     expect(wrapper.className).toContain("sm:block");
 
-    await user.click(screen.getByRole("button", { name: /^Filters/ }));
+    await user.click(screen.getByRole("button", { name: /^Search & Filters/ }));
 
     // After click, mobile-collapse should release.
     expect(wrapper.className).not.toMatch(/(^|\s)hidden(\s|$)/);
@@ -220,7 +221,7 @@ describe("PerformanceFilterControls", () => {
   test("Filters toggle carries short:!flex so it re-shows on phone landscape", async () => {
     await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
 
-    const toggle = screen.getByRole("button", { name: /^Filters/ });
+    const toggle = screen.getByRole("button", { name: /^Search & Filters/ });
     expect(toggle.className).toContain("short:!flex");
   });
 
@@ -248,7 +249,7 @@ describe("PerformanceFilterControls", () => {
       />,
     );
 
-    const toggle = screen.getByRole("button", { name: /^Filters/ });
+    const toggle = screen.getByRole("button", { name: /^Search & Filters/ });
     // Badge is the count of active filters (timeRange + 2 toggles = 3).
     expect(toggle.textContent).toMatch(/3/);
   });

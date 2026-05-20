@@ -84,7 +84,7 @@ export function PerformanceFilterControls({
       >
         <span className="flex items-center gap-2">
           <Filter className="h-4 w-4" aria-hidden="true" />
-          Filters
+          Search &amp; Filters
           {activeFilterCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-brand-primary/20 text-brand-primary text-xs">
               {activeFilterCount}

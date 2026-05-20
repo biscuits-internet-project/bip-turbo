@@ -164,18 +164,21 @@ describe("SongPage", () => {
 
   // The TabsList on song-detail clips at narrow widths because there can be
   // up to 6 tabs (All Performances, All-Timers, Stats, History, Lyrics,
-  // Guitar Tabs). Mobile gets a single <select> dropdown instead while sm+
-  // continues to use the horizontal tab strip.
-  test("song tabs render as a select on mobile (sm:hidden) and tab strip on sm+", () => {
+  // Guitar Tabs). Mobile gets a Radix Select instead — a native <select> was
+  // used before, but its OS-styling didn't look like a dropdown to users, so
+  // they didn't realize it was tappable. The Radix trigger renders as a
+  // styled button (role="combobox") with a visible chevron.
+  test("song tabs render as a Radix Select on mobile (sm:hidden) and tab strip on sm+", () => {
     renderSongPage();
 
     const tabList = screen.getByRole("tablist");
     expect(tabList.className).toContain("hidden");
     expect(tabList.className).toContain("sm:flex");
 
-    const select = screen.getByLabelText(/song view/i);
-    const wrapper = select.closest("div");
-    expect(wrapper?.className).toContain("sm:hidden");
+    const trigger = screen.getByRole("combobox", { name: /song view/i });
+    expect(trigger.textContent).toMatch(/All Performances/);
+    const wrapper = screen.getByTestId("mobile-song-view");
+    expect(wrapper.className).toContain("sm:hidden");
   });
 
   // The "last show" sublabel marks the song as having been played at the
