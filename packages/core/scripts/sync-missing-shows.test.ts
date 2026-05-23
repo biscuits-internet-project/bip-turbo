@@ -3,6 +3,10 @@ import {
   buildShowCreateInput,
   buildSongCreateInput,
   buildTrackCreateInputs,
+  buildTrackDriftUpdates,
+  diffTrackAnnotations,
+  buildSongDriftUpdate,
+  buildVenueDriftUpdate,
   buildShowDriftUpdate,
   buildVenueCreateInput,
   collectSongSlugs,
@@ -11,6 +15,7 @@ import {
   matchVenue,
   parseYearsArg,
   showNeedsUpdate,
+  type LocalTrackForDrift,
   type McpSearchVenueResult,
   type McpSetlist,
   type McpShow,
@@ -164,6 +169,8 @@ describe("buildShowCreateInput", () => {
       ratingsCount: 22,
       notes: "Festival opener",
       relistenUrl: "https://relisten.example/xyz",
+      countForStats: true,
+      dayOrder: null,
       venueId: null,
       bandId: null,
       createdAt: now,
@@ -212,6 +219,55 @@ describe("buildShowCreateInput", () => {
     );
     expect(input.venueId).toBe("venue-uc-uuid");
     expect(input.bandId).toBe("band-biscuits-uuid");
+  });
+
+  // countForStats and dayOrder are admin-controlled on prod and gate every
+  // downstream stat (countForStats → STATS_SHOWS_WHERE → gaps/timesPlayed;
+  // dayOrder → same-day tiebreak). They must mirror verbatim — local default
+  // of `countForStats=true`/`dayOrder=null` would mis-classify soundchecks
+  // and mis-order same-day pairs.
+  test("mirrors countForStats and dayOrder from MCP into the insert", () => {
+    const now = new Date("2026-04-23T12:00:00Z");
+    const input = buildShowCreateInput(
+      {
+        slug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+        date: "2026-02-06",
+        venueName: "Miami Beach Bandshell",
+        venueCity: "Miami Beach",
+        averageRating: null,
+        ratingsCount: 0,
+        notes: null,
+        relistenUrl: null,
+        countForStats: false,
+        dayOrder: 2,
+      },
+      now,
+    );
+    expect(input.countForStats).toBe(false);
+    expect(input.dayOrder).toBe(2);
+  });
+
+  // Older MCP responses (pre-deploy) won't include countForStats/dayOrder. The
+  // builder must tolerate undefined and fall back to schema defaults
+  // (countForStats=true, dayOrder=null) — otherwise the next sync would
+  // overwrite real values with `undefined` once the new fields ship.
+  test("defaults countForStats=true and dayOrder=null when MCP omits them", () => {
+    const now = new Date("2026-04-23T12:00:00Z");
+    const input = buildShowCreateInput(
+      {
+        slug: "2026-04-18-the-uc-theatre-berkeley-ca",
+        date: "2026-04-18",
+        venueName: "The UC Theatre",
+        venueCity: "Berkeley",
+        averageRating: null,
+        ratingsCount: 0,
+        notes: null,
+        relistenUrl: null,
+      },
+      now,
+    );
+    expect(input.countForStats).toBe(true);
+    expect(input.dayOrder).toBeNull();
   });
 });
 
@@ -303,6 +359,43 @@ describe("showNeedsUpdate", () => {
       showNeedsUpdate(
         { averageRating: 4.2, ratingsCount: 19, notes: null, relistenUrl: null },
         remoteWithNulls,
+      ),
+    ).toBe(false);
+  });
+
+  // countForStats drift is the headline reason for this whole change: admins
+  // flip soundcheck/radio shows to `false` on prod and the local copy stays
+  // `true` forever, inflating play counts and shrinking gaps. Must trip drift.
+  test("returns true when countForStats drifts", () => {
+    const remoteWithFlag: McpShow = { ...remote, countForStats: false };
+    expect(
+      showNeedsUpdate(
+        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: null },
+        remoteWithFlag,
+      ),
+    ).toBe(true);
+  });
+
+  // dayOrder drift is rarer but real — a same-day pair gets re-ordered on
+  // prod and local stays stale. Must trip drift.
+  test("returns true when dayOrder drifts", () => {
+    const remoteWithOrder: McpShow = { ...remote, dayOrder: 2 };
+    expect(
+      showNeedsUpdate(
+        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: 1 },
+        remoteWithOrder,
+      ),
+    ).toBe(true);
+  });
+
+  // Pre-deploy MCP responses omit the new fields entirely. When MCP doesn't
+  // report a value, drift detection must NOT compare against `undefined` and
+  // claim drift on every show. Treats missing remote field as "no opinion".
+  test("ignores countForStats/dayOrder when remote omits them", () => {
+    expect(
+      showNeedsUpdate(
+        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: false, dayOrder: 3 },
+        remote,
       ),
     ).toBe(false);
   });
@@ -511,6 +604,42 @@ describe("buildShowDriftUpdate", () => {
       relistenUrl: null,
     });
   });
+
+  // countForStats flip on an existing show is the primary stats divergence
+  // fix: prod reclassifies a show as a soundcheck, local mirrors the change,
+  // and the caller (orchestrator) feeds the show's date into the post-batch
+  // rebuild. The patch itself just contains the flipped flag.
+  test("emits countForStats when it drifts", () => {
+    const remoteWithFlag: McpShow = { ...remote, countForStats: false };
+    const localWithFlag = { ...localInSync, countForStats: true, dayOrder: null };
+    const patch = buildShowDriftUpdate(localWithFlag, remoteWithFlag, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({ countForStats: false });
+  });
+
+  // dayOrder drift — patch carries only the changed field, doesn't churn the
+  // aggregate block.
+  test("emits dayOrder when it drifts", () => {
+    const remoteWithOrder: McpShow = { ...remote, dayOrder: 2 };
+    const localWithOrder = { ...localInSync, countForStats: true, dayOrder: 1 };
+    const patch = buildShowDriftUpdate(localWithOrder, remoteWithOrder, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({ dayOrder: 2 });
+  });
+
+  // Combined drift: aggregate + flag + dayOrder all in one patch. Caller does
+  // a single UPDATE, not three.
+  test("combines aggregate, countForStats, and dayOrder drift into one patch", () => {
+    const remoteWith: McpShow = { ...remote, ratingsCount: 13, countForStats: false, dayOrder: 2 };
+    const localWith = { ...localInSync, ratingsCount: 12, countForStats: true, dayOrder: 1 };
+    const patch = buildShowDriftUpdate(localWith, remoteWith, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({
+      averageRating: 3.7,
+      ratingsCount: 13,
+      notes: null,
+      relistenUrl: null,
+      countForStats: false,
+      dayOrder: 2,
+    });
+  });
 });
 
 // buildVenueCreateInput maps an MCP venue record to a Prisma Venue insert.
@@ -537,9 +666,122 @@ describe("buildVenueCreateInput", () => {
       state: "CA",
       country: "US",
       timesPlayed: 3,
+      street: null,
+      postalCode: null,
+      phone: null,
+      website: null,
+      latitude: null,
+      longitude: null,
       createdAt: now,
       updatedAt: now,
     });
+  });
+
+  // Contact + geocode fields land on insert when MCP supplies them. Previously
+  // these were never written, so Venue pages on local sat blank even though
+  // prod had street/phone/website populated.
+  test("mirrors street/phone/website/lat-long/postalCode when MCP supplies them", () => {
+    const now = new Date("2026-04-23T12:00:00Z");
+    const input = buildVenueCreateInput(
+      {
+        slug: "red-rocks-amphitheatre",
+        name: "Red Rocks Amphitheatre",
+        city: "Morrison",
+        state: "CO",
+        country: "US",
+        timesPlayed: 7,
+        street: "18300 W Alameda Pkwy",
+        postalCode: "80465",
+        phone: "+1-720-865-2494",
+        website: "https://redrocksonline.com",
+        latitude: 39.6654,
+        longitude: -105.2057,
+      },
+      now,
+    );
+    expect(input).toMatchObject({
+      street: "18300 W Alameda Pkwy",
+      postalCode: "80465",
+      phone: "+1-720-865-2494",
+      website: "https://redrocksonline.com",
+      latitude: 39.6654,
+      longitude: -105.2057,
+    });
+  });
+});
+
+// buildVenueDriftUpdate mirrors prod's curated venue fields onto an existing
+// local row. Identity is the venue slug; diff covers every column except
+// `timesPlayed` (derived from Show count, not curated) and the search/legacy
+// columns. Returns null when nothing drifted.
+describe("buildVenueDriftUpdate", () => {
+  const local = {
+    name: "Red Rocks Amphitheatre",
+    city: "Morrison",
+    state: "CO",
+    country: "US",
+    street: "18300 W Alameda Pkwy",
+    postalCode: "80465",
+    phone: "+1-720-865-2494",
+    website: "https://redrocksonline.com",
+    latitude: 39.6654,
+    longitude: -105.2057,
+  };
+
+  // Identical local + remote: skip the UPDATE. Re-runs idempotent.
+  test("returns null when every mirrored field matches", () => {
+    expect(
+      buildVenueDriftUpdate(local, {
+        slug: "red-rocks-amphitheatre",
+        name: "Red Rocks Amphitheatre",
+        city: "Morrison",
+        state: "CO",
+        country: "US",
+        timesPlayed: 7,
+        street: "18300 W Alameda Pkwy",
+        postalCode: "80465",
+        phone: "+1-720-865-2494",
+        website: "https://redrocksonline.com",
+        latitude: 39.6654,
+        longitude: -105.2057,
+      }),
+    ).toBeNull();
+  });
+
+  // Website edit on prod — only `website` flows through.
+  test("emits only the drifted field", () => {
+    expect(
+      buildVenueDriftUpdate(local, {
+        slug: "red-rocks-amphitheatre",
+        name: "Red Rocks Amphitheatre",
+        city: "Morrison",
+        state: "CO",
+        country: "US",
+        timesPlayed: 7,
+        street: "18300 W Alameda Pkwy",
+        postalCode: "80465",
+        phone: "+1-720-865-2494",
+        website: "https://redrocksonline.com/new-path",
+        latitude: 39.6654,
+        longitude: -105.2057,
+      }),
+    ).toEqual({ website: "https://redrocksonline.com/new-path" });
+  });
+
+  // Pre-deploy MCP omits contact + geocode columns. Sparse remote must not
+  // claim drift on those fields — otherwise every existing venue would have
+  // its phone/website/lat-long clobbered to null on the next sync.
+  test("ignores contact and geocode fields when remote omits them", () => {
+    expect(
+      buildVenueDriftUpdate(local, {
+        slug: "red-rocks-amphitheatre",
+        name: "Red Rocks Amphitheatre",
+        city: "Morrison",
+        state: "CO",
+        country: "US",
+        timesPlayed: 7,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -570,8 +812,52 @@ describe("buildSongCreateInput", () => {
       timesPlayed: 412,
       dateFirstPlayed: new Date("1998-07-04"),
       dateLastPlayed: new Date("2026-02-06"),
+      cover: null,
+      legacyAuthor: null,
+      featuredLyric: null,
+      tabs: null,
+      notes: null,
+      history: null,
+      guitarTabsUrl: null,
       createdAt: now,
       updatedAt: now,
+    });
+  });
+
+  // Curated text fields (lyrics, tabs, notes, history, featuredLyric,
+  // guitarTabsUrl) and the `cover`/`legacyAuthor` admin flags must mirror
+  // verbatim on insert. These are the prod-curated columns the sync didn't
+  // previously write — leaving them null on first insert meant Song pages
+  // looked empty on local even though prod had content.
+  test("mirrors curated admin fields when MCP supplies them", () => {
+    const now = new Date("2026-04-23T12:00:00Z");
+    const input = buildSongCreateInput(
+      {
+        slug: "crystal-ball",
+        title: "Crystal Ball",
+        author: "Disco Biscuits",
+        lyrics: "And the sky lights up...",
+        timesPlayed: 188,
+        dateFirstPlayed: "2002-12-31",
+        dateLastPlayed: "2025-07-04",
+        cover: false,
+        legacyAuthor: "Disco Biscuits",
+        featuredLyric: "And the sky lights up",
+        tabs: "https://example/tabs",
+        notes: "Type II launches frequent",
+        history: "Debuted NYE 2002",
+        guitarTabsUrl: "https://example/guitar",
+      },
+      now,
+    );
+    expect(input).toMatchObject({
+      cover: false,
+      legacyAuthor: "Disco Biscuits",
+      featuredLyric: "And the sky lights up",
+      tabs: "https://example/tabs",
+      notes: "Type II launches frequent",
+      history: "Debuted NYE 2002",
+      guitarTabsUrl: "https://example/guitar",
     });
   });
 
@@ -625,9 +911,40 @@ describe("buildTrackCreateInputs", () => {
     ]);
     const tracks = buildTrackCreateInputs(setlist, "show-miami-uuid", songSlugToId);
     expect(tracks).toEqual([
-      { showId: "show-miami-uuid", songId: "song-basis-uuid", set: "S1", position: 1, segue: ">" },
-      { showId: "show-miami-uuid", songId: "song-aceetobee-uuid", set: "S1", position: 2, segue: null },
+      { showId: "show-miami-uuid", songId: "song-basis-uuid", set: "S1", position: 1, segue: ">", note: null, allTimer: false },
+      { showId: "show-miami-uuid", songId: "song-aceetobee-uuid", set: "S1", position: 2, segue: null, note: null, allTimer: false },
     ]);
+  });
+
+  // allTimer and note are admin-curated on prod (admins toggle the all-timer
+  // flag from track pages, and inline track annotations carry the `note`
+  // string). New MCP payloads include both per track; the builder must
+  // mirror them into the insert. Defaults: allTimer=false, note=null when MCP
+  // omits — keeps pre-deploy MCP responses parsing.
+  test("mirrors allTimer and note from MCP tracks into the insert", () => {
+    const setlist: McpSetlist = {
+      showSlug: "2025-07-04-red-rocks-morrison-co",
+      showDate: "2025-07-04",
+      venue: { name: "Red Rocks", city: "Morrison", state: "CO" },
+      sets: [
+        {
+          label: "S2",
+          tracks: [
+            // Curated all-timer with an inline note — a typical Red Rocks moment.
+            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: ">", allTimer: true, note: "Glow-stick war peak" },
+            // Vanilla track, defaults apply.
+            { position: 2, songTitle: "Helicopters", songSlug: "helicopters", segue: null },
+          ],
+        },
+      ],
+    };
+    const songSlugToId = new Map([
+      ["crystal-ball", "song-crystal-uuid"],
+      ["helicopters", "song-helicopters-uuid"],
+    ]);
+    const tracks = buildTrackCreateInputs(setlist, "show-rr-uuid", songSlugToId);
+    expect(tracks[0]).toMatchObject({ allTimer: true, note: "Glow-stick war peak" });
+    expect(tracks[1]).toMatchObject({ allTimer: false, note: null });
   });
 
   // If a song slug is missing from the map (upstream skipped or errored), we
@@ -652,5 +969,282 @@ describe("buildTrackCreateInputs", () => {
     const tracks = buildTrackCreateInputs(setlist, "show-uuid", songSlugToId);
     expect(tracks).toHaveLength(1);
     expect(tracks[0]?.songId).toBe("song-shem-uuid");
+  });
+});
+
+// buildTrackDriftUpdates computes per-track patches for existing local tracks
+// in a single show. The key is (showId, position) — within one show, position
+// is unique. Drift fields: segue, note, allTimer. Returns a list of {trackId,
+// patch} so the caller can issue scoped UPDATE statements without re-fetching.
+// Empty array means "nothing changed".
+describe("buildTrackDriftUpdates", () => {
+  // Canonical drift: prod marked track 3 (Crystal Ball) as an all-timer and
+  // added a note. Local row catches up on next sync. Other tracks unchanged
+  // → not in the result.
+  test("emits a patch only for the track whose fields drifted", () => {
+    const local: LocalTrackForDrift[] = [
+      { id: "track-1-uuid", position: 1, segue: ">", note: null, allTimer: false },
+      { id: "track-2-uuid", position: 2, segue: null, note: null, allTimer: false },
+      { id: "track-3-uuid", position: 3, segue: ">", note: null, allTimer: false },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "2025-07-04-red-rocks-morrison-co",
+      showDate: "2025-07-04",
+      venue: { name: "Red Rocks", city: "Morrison", state: "CO" },
+      sets: [
+        {
+          label: "S2",
+          tracks: [
+            { position: 1, songTitle: "Helicopters", songSlug: "helicopters", segue: ">" },
+            { position: 2, songTitle: "Munchkin Invasion", songSlug: "munchkin-invasion", segue: null },
+            { position: 3, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: ">", allTimer: true, note: "Glow-stick war peak" },
+          ],
+        },
+      ],
+    };
+    const patches = buildTrackDriftUpdates(local, remote);
+    expect(patches).toEqual([
+      { trackId: "track-3-uuid", patch: { allTimer: true, note: "Glow-stick war peak" } },
+    ]);
+  });
+
+  // Idempotency: when local already matches remote on every field, no patches.
+  // This is the no-op re-run path — the orchestrator must skip the UPDATE
+  // entirely so updatedAt doesn't churn.
+  test("returns an empty list when nothing drifted", () => {
+    const local: LocalTrackForDrift[] = [
+      { id: "track-1-uuid", position: 1, segue: ">", note: null, allTimer: false },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+      showDate: "2026-02-06",
+      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      sets: [
+        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: ">", allTimer: false, note: null }] },
+      ],
+    };
+    expect(buildTrackDriftUpdates(local, remote)).toEqual([]);
+  });
+
+  // Segue edits land too — sometimes prod fixes a `>` to `,` after the fact.
+  // (Tracks can drift segue independently of admin flags.)
+  test("emits a patch when segue drifts", () => {
+    const local: LocalTrackForDrift[] = [
+      { id: "track-1-uuid", position: 1, segue: ">", note: null, allTimer: false },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+      showDate: "2026-02-06",
+      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      sets: [
+        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: "," }] },
+      ],
+    };
+    expect(buildTrackDriftUpdates(local, remote)).toEqual([
+      { trackId: "track-1-uuid", patch: { segue: "," } },
+    ]);
+  });
+
+  // Pre-deploy MCP responses omit allTimer / note. Treat omission as "no
+  // opinion" — don't claim drift just because the remote payload is sparse,
+  // or every existing track would get its admin fields clobbered to defaults
+  // on the next sync.
+  test("ignores allTimer / note when remote omits them", () => {
+    const local: LocalTrackForDrift[] = [
+      { id: "track-1-uuid", position: 1, segue: null, note: "kept locally", allTimer: true },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+      showDate: "2026-02-06",
+      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      sets: [
+        // No allTimer / note keys at all — pre-deploy MCP shape.
+        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: null }] },
+      ],
+    };
+    expect(buildTrackDriftUpdates(local, remote)).toEqual([]);
+  });
+
+  // Position is the only stable key within a show — a track that appears in
+  // local but not in the remote setlist (e.g. removed upstream) gets skipped,
+  // not patched. Deletion is intentionally not handled by drift; it's a
+  // separate cleanup concern.
+  test("skips local tracks whose position is absent from the remote setlist", () => {
+    const local: LocalTrackForDrift[] = [
+      { id: "track-1-uuid", position: 1, segue: null, note: null, allTimer: false },
+      { id: "track-99-uuid", position: 99, segue: null, note: null, allTimer: true },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+      showDate: "2026-02-06",
+      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      sets: [
+        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: null }] },
+      ],
+    };
+    expect(buildTrackDriftUpdates(local, remote)).toEqual([]);
+  });
+});
+
+// diffTrackAnnotations replaces the local Annotation set for one track with
+// whatever prod's MCP reports. Sync semantics are replace-not-merge: an
+// annotation removed on prod must disappear locally on the next run.
+// Identity is by `desc` text (the only content column) so a desc edit shows
+// up as one delete + one create — the helper doesn't try to be clever about
+// updates because Annotation has no other mutable content.
+describe("diffTrackAnnotations", () => {
+  // Canonical case: prod has [a, b], local has [a, c]. Keep a, delete c,
+  // create b. The id of `c` is what the caller needs for the DELETE statement.
+  test("returns the create/delete delta to reach the remote set", () => {
+    const local = [
+      { id: "ann-a-uuid", desc: "patches on patches" },
+      { id: "ann-c-uuid", desc: "outdated annotation" },
+    ];
+    const remote = ["patches on patches", "tribal opener"];
+    expect(diffTrackAnnotations(local, remote)).toEqual({
+      toCreateDescs: ["tribal opener"],
+      toDeleteIds: ["ann-c-uuid"],
+    });
+  });
+
+  // No drift: identical sets in any order. No writes, no deletes — keeps
+  // re-runs free of updatedAt churn on the parent track row.
+  test("returns empty deltas when local and remote match (order-insensitive)", () => {
+    const local = [
+      { id: "ann-a-uuid", desc: "patches on patches" },
+      { id: "ann-b-uuid", desc: "tribal opener" },
+    ];
+    const remote = ["tribal opener", "patches on patches"];
+    expect(diffTrackAnnotations(local, remote)).toEqual({ toCreateDescs: [], toDeleteIds: [] });
+  });
+
+  // Pre-deploy MCP omits annotations entirely. `undefined` must mean "no
+  // opinion" — never wipe out the local set. (Versus an explicit empty
+  // array, which DOES mean "prod has zero annotations now; delete local".)
+  test("returns empty deltas when remote annotations are undefined", () => {
+    const local = [{ id: "ann-a-uuid", desc: "patches on patches" }];
+    expect(diffTrackAnnotations(local, undefined)).toEqual({ toCreateDescs: [], toDeleteIds: [] });
+  });
+
+  // Explicit empty array means "prod has zero" — local must be wiped.
+  test("deletes all local annotations when remote is explicitly empty", () => {
+    const local = [
+      { id: "ann-a-uuid", desc: "patches on patches" },
+      { id: "ann-b-uuid", desc: "tribal opener" },
+    ];
+    expect(diffTrackAnnotations(local, [])).toEqual({
+      toCreateDescs: [],
+      toDeleteIds: ["ann-a-uuid", "ann-b-uuid"],
+    });
+  });
+});
+
+// buildSongDriftUpdate diffs an existing local Song row against the latest
+// MCP response and returns a patch — only the curated admin fields (title,
+// lyrics, cover, legacyAuthor, featuredLyric, tabs, notes, history,
+// guitarTabsUrl). It intentionally does NOT touch the derived stats columns
+// (timesPlayed, dateFirstPlayed, dateLastPlayed, yearlyPlayData) — those are
+// owned by the post-sync rebuild and would otherwise race against it.
+describe("buildSongDriftUpdate", () => {
+  const localBase = {
+    title: "Crystal Ball",
+    lyrics: "And the sky lights up...",
+    cover: false,
+    legacyAuthor: "Disco Biscuits",
+    featuredLyric: "And the sky lights up",
+    tabs: null,
+    notes: null,
+    history: null,
+    guitarTabsUrl: null,
+  };
+
+  // No drift across every mirrored field: skip the UPDATE. Re-runs stay
+  // idempotent — updatedAt doesn't churn on unchanged songs.
+  test("returns null when every curated field matches", () => {
+    expect(
+      buildSongDriftUpdate(localBase, {
+        slug: "crystal-ball",
+        title: "Crystal Ball",
+        author: "Disco Biscuits",
+        lyrics: "And the sky lights up...",
+        timesPlayed: 188,
+        dateFirstPlayed: null,
+        dateLastPlayed: null,
+        cover: false,
+        legacyAuthor: "Disco Biscuits",
+        featuredLyric: "And the sky lights up",
+      }),
+    ).toBeNull();
+  });
+
+  // Lyrics edit on prod (typo fix or expansion) mirrors locally. Patch
+  // contains only the lyrics field — no churn on the rest of the row.
+  test("emits only the lyrics field when lyrics drifts", () => {
+    const patch = buildSongDriftUpdate(localBase, {
+      slug: "crystal-ball",
+      title: "Crystal Ball",
+      author: "Disco Biscuits",
+      lyrics: "And the sky lights up (extended)",
+      timesPlayed: 188,
+      dateFirstPlayed: null,
+      dateLastPlayed: null,
+    });
+    expect(patch).toEqual({ lyrics: "And the sky lights up (extended)" });
+  });
+
+  // Multi-field drift: title rename + new featuredLyric + cover flag flip
+  // bundle into one patch — one UPDATE round-trip instead of three.
+  test("combines multiple drifted fields into one patch", () => {
+    const patch = buildSongDriftUpdate(localBase, {
+      slug: "crystal-ball",
+      title: "Crystal Ball (Reprise)",
+      author: "Disco Biscuits",
+      lyrics: "And the sky lights up...",
+      timesPlayed: 188,
+      dateFirstPlayed: null,
+      dateLastPlayed: null,
+      cover: true,
+      featuredLyric: "Glow stick crescendo",
+    });
+    expect(patch).toEqual({
+      title: "Crystal Ball (Reprise)",
+      cover: true,
+      featuredLyric: "Glow stick crescendo",
+    });
+  });
+
+  // Pre-deploy MCP omits the new curated fields. Sparse remote payload must
+  // never claim drift on `cover` / `legacyAuthor` / `featuredLyric` / `tabs`
+  // / `notes` / `history` / `guitarTabsUrl` — otherwise every existing song
+  // would have those fields clobbered to null on the next sync.
+  test("ignores curated fields when remote omits them", () => {
+    expect(
+      buildSongDriftUpdate(localBase, {
+        slug: "crystal-ball",
+        title: "Crystal Ball",
+        author: "Disco Biscuits",
+        lyrics: "And the sky lights up...",
+        timesPlayed: 188,
+        dateFirstPlayed: null,
+        dateLastPlayed: null,
+      }),
+    ).toBeNull();
+  });
+
+  // Patch never touches the derived stats columns even when the MCP payload
+  // includes new play data. Stats are owned by the post-sync rebuild.
+  test("never emits derived stats columns even when remote reports new values", () => {
+    const patch = buildSongDriftUpdate(localBase, {
+      slug: "crystal-ball",
+      title: "Crystal Ball",
+      author: "Disco Biscuits",
+      lyrics: "Lyrics edit",
+      timesPlayed: 999,
+      dateFirstPlayed: "1999-01-01",
+      dateLastPlayed: "2026-05-22",
+    });
+    expect(patch).not.toHaveProperty("timesPlayed");
+    expect(patch).not.toHaveProperty("dateFirstPlayed");
+    expect(patch).not.toHaveProperty("dateLastPlayed");
   });
 });

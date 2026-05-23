@@ -11,6 +11,8 @@ export const songSchema = z.object({
   notes: z.string().nullable(),
   cover: z.boolean().nullable().default(false),
   authorId: z.string().uuid().nullable(),
+  // Optional — mirrors prod's legacy_author column, surfaced via sync.
+  legacyAuthor: z.string().nullable().optional(),
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   timesPlayed: z.number().default(0),
