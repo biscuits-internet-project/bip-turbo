@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { formInputClass } from "~/lib/form-styles";
 
 export const authorFormSchema = z.object({
   name: z.string().min(1, "Author name is required"),
@@ -48,11 +49,7 @@ export function AuthorForm({ defaultValues, submitLabel, cancelHref }: AuthorFor
             <FormItem>
               <FormLabel className="text-content-text-secondary">Author Name</FormLabel>
               <FormControl>
-                <Input
-                  placeholder="Enter author name"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
-                />
+                <Input placeholder="Enter author name" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -63,7 +60,7 @@ export function AuthorForm({ defaultValues, submitLabel, cancelHref }: AuthorFor
           <Button type="submit" onClick={form.handleSubmit(onSubmit)}>
             {submitLabel}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate(cancelHref)}>
+          <Button type="button" variant="cancel" onClick={() => navigate(cancelHref)}>
             Cancel
           </Button>
         </div>

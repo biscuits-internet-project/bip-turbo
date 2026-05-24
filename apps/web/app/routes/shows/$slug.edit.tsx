@@ -147,6 +147,7 @@ export default function EditShow() {
               submitLabel="Update Show"
               cancelHref={`/shows/${show.slug}`}
               bands={bands}
+              showId={show.id}
             />
           </CardContent>
         </Card>

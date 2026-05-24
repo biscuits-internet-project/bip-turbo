@@ -86,7 +86,7 @@ export function createServices(container: ServiceContainer): Services {
     tourDatesService: new TourDatesService(container.redis),
     nugs: new NugsService(container.redis, container.logger),
     archiveDotOrg: new ArchiveDotOrgService(container.redis, container.logger),
-    youtube: new YoutubeService(container.db),
+    youtube: new YoutubeService(container.db, container.cacheInvalidation),
     files: new FileService(container.db, container.logger, {
       accountId: container.env.CLOUDFLARE_ACCOUNT_ID,
       apiToken: container.env.CLOUDFLARE_IMAGES_API_TOKEN,

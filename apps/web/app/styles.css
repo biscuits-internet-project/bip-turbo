@@ -58,6 +58,18 @@
   --color-rating-gold: hsl(38 95% 62%);
 }
 
+/* Radix Popover/Select sets `body[data-scroll-locked]` and adds a
+   margin-right matching the scrollbar width on open. In this app the
+   scroll lives on <html> rather than <body>, so that compensation
+   visually narrows the body and every page-width container (most
+   noticeably the show edit Card) snaps inward when a dropdown opens.
+   Force margin-right to 0 to keep layout stable. The `html` prefix is
+   load-bearing — it raises specificity above Radix's runtime-injected
+   `body[data-scroll-locked] { margin-right: 15px !important }` rule. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 @layer base {
   /* Design Token System - Premium Purple & Vibrant Green Palette */
   :root {
