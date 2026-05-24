@@ -1,7 +1,14 @@
+import type { CacheInvalidationService } from "../_shared/cache";
 import type { DbClient } from "../_shared/database/models";
 
 function videoUrl(videoId: string): string {
   return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+export interface ShowYoutubeEntry {
+  id: string;
+  videoId: string;
+  url: string;
 }
 
 /**
@@ -12,7 +19,10 @@ function videoUrl(videoId: string): string {
  * data is local.
  */
 export class YoutubeService {
-  constructor(private readonly db: DbClient) {}
+  constructor(
+    private readonly db: DbClient,
+    private readonly cacheInvalidation?: CacheInvalidationService,
+  ) {}
 
   /**
    * Return every curated video URL for a show in insertion order, so the
@@ -48,5 +58,66 @@ export class YoutubeService {
       if (!result[row.showId]) result[row.showId] = videoUrl(row.videoId);
     }
     return result;
+  }
+
+  /**
+   * Lists curated videos for a show with their row ids, so the admin editor
+   * can render a list and target individual rows for deletion.
+   */
+  async listEntriesForShow(showId: string): Promise<ShowYoutubeEntry[]> {
+    const rows = await this.db.showYoutube.findMany({
+      where: { showId },
+      select: { id: true, videoId: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((row) => ({ id: row.id, videoId: row.videoId, url: videoUrl(row.videoId) }));
+  }
+
+  /**
+   * Adds a curated video to a show. Also bumps the denormalized
+   * `Show.showYoutubesCount` so the `hasYoutube` filter sees the new row, and
+   * invalidates the show's cached pages.
+   */
+  async createForShow(showId: string, videoId: string): Promise<ShowYoutubeEntry> {
+    const now = new Date();
+    const created = await this.db.showYoutube.create({
+      data: { showId, videoId, createdAt: now, updatedAt: now },
+      select: { id: true, videoId: true },
+    });
+    await this.db.show.update({
+      where: { id: showId },
+      data: { showYoutubesCount: { increment: 1 } },
+    });
+    await this.invalidateShowCaches(showId);
+    return { id: created.id, videoId: created.videoId, url: videoUrl(created.videoId) };
+  }
+
+  /**
+   * Removes a curated video by row id. Decrements the show's count and
+   * invalidates the show's cached pages.
+   */
+  async deleteEntry(id: string): Promise<void> {
+    const existing = await this.db.showYoutube.findUnique({
+      where: { id },
+      select: { showId: true },
+    });
+    if (!existing) return;
+    await this.db.showYoutube.delete({ where: { id } });
+    await this.db.show.update({
+      where: { id: existing.showId },
+      data: { showYoutubesCount: { decrement: 1 } },
+    });
+    await this.invalidateShowCaches(existing.showId);
+  }
+
+  private async invalidateShowCaches(showId: string): Promise<void> {
+    if (!this.cacheInvalidation) return;
+    const show = await this.db.show.findUnique({
+      where: { id: showId },
+      select: { slug: true },
+    });
+    if (show?.slug) {
+      await this.cacheInvalidation.invalidateShowComprehensive(showId, show.slug);
+    }
   }
 }

@@ -10,6 +10,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // The project's primary CTA — purple brand bg with the darker
+        // `hover-accent` token on hover. Used for "Save", "Update",
+        // "Add Track", etc. across the admin forms.
+        brand: "bg-brand-primary text-content-text-primary hover:bg-hover-accent",
+        // Secondary "Cancel / back / dismiss" CTA — outlined dark-theme
+        // border with a fill-on-hover transition. Paired with `variant="brand"`
+        // submits across the admin forms.
+        cancel:
+          "border border-content-bg-secondary bg-transparent text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",

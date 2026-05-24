@@ -3,13 +3,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { ControllerRenderProps } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { ShowYoutubeManager } from "~/components/show/show-youtube-manager";
 import { Button } from "~/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
+import { GlassSelect } from "~/components/ui/glass-select";
 import { Input } from "~/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import { VenueSearch } from "~/components/venue/venue-search";
+import { formInputClass } from "~/lib/form-styles";
+import { cn } from "~/lib/utils";
 
 const showFormSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -28,9 +31,10 @@ interface ShowFormProps {
   submitLabel?: string;
   cancelHref?: string;
   bands?: Band[];
+  showId?: string;
 }
 
-export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", cancelHref }: ShowFormProps) {
+export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", cancelHref, showId }: ShowFormProps) {
   const form = useForm<ShowFormValues>({
     resolver: zodResolver(showFormSchema),
     defaultValues: defaultValues || {
@@ -53,11 +57,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
             <FormItem>
               <FormLabel className="text-content-text-secondary">Date</FormLabel>
               <FormControl>
-                <Input
-                  type="date"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
-                />
+                <Input type="date" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -89,22 +89,18 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
           render={({ field }: { field: ControllerRenderProps<ShowFormValues, "bandId"> }) => (
             <FormItem>
               <FormLabel className="text-content-text-secondary">Band</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
-                    <SelectValue placeholder="Select a band" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="bg-content-bg-secondary border-content-bg-secondary">
-                  <SelectItem value="none">No band</SelectItem>
-                  <SelectItem
-                    value="db7f2c5d-2727-41fd-bd6f-e91c74164f09"
-                    className="text-content-text-primary hover:bg-content-bg-secondary"
-                  >
-                    The Disco Biscuits
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <GlassSelect
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  placeholder="Select a band"
+                  className="w-full"
+                  options={[
+                    { value: "none", label: "No band" },
+                    { value: "db7f2c5d-2727-41fd-bd6f-e91c74164f09", label: "The Disco Biscuits" },
+                  ]}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -117,16 +113,14 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
             <FormItem>
               <FormLabel className="text-content-text-secondary">Notes</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Enter show notes"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary min-h-[100px]"
-                />
+                <Textarea placeholder="Enter show notes" {...field} className={cn(formInputClass, "min-h-[100px]")} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
+
+        {showId && <ShowYoutubeManager showId={showId} />}
 
         <FormField
           control={form.control}
@@ -135,11 +129,7 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
             <FormItem>
               <FormLabel className="text-content-text-secondary">Relisten URL</FormLabel>
               <FormControl>
-                <Input
-                  placeholder="Enter Relisten URL"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
-                />
+                <Input placeholder="Enter Relisten URL" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -166,16 +156,11 @@ export function ShowForm({ defaultValues, onSubmit, submitLabel = "Submit", canc
         />
 
         <div className="flex gap-4 pt-2">
-          <Button type="submit" className="bg-brand-primary hover:bg-hover-accent text-content-text-primary">
+          <Button type="submit" variant="brand">
             {submitLabel}
           </Button>
           {cancelHref && (
-            <Button
-              type="button"
-              variant="outline"
-              asChild
-              className="border-content-bg-secondary text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary"
-            >
+            <Button type="button" variant="cancel" asChild>
               <a href={cancelHref}>Cancel</a>
             </Button>
           )}

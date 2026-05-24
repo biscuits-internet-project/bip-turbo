@@ -7,8 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
+import { GlassSelect } from "~/components/ui/glass-select";
 import { Input } from "~/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { formInputClass } from "~/lib/form-styles";
 
 // Create a schema for venue form (omitting auto-generated fields)
 export const venueFormSchema = z
@@ -100,11 +101,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                 Venue Name <span className="text-error">*</span>
               </FormLabel>
               <FormControl>
-                <Input
-                  placeholder="Enter venue name"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
-                />
+                <Input placeholder="Enter venue name" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage className="text-error" />
             </FormItem>
@@ -120,11 +117,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                 City <span className="text-error">*</span>
               </FormLabel>
               <FormControl>
-                <Input
-                  placeholder="Enter city"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
-                />
+                <Input placeholder="Enter city" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage className="text-error" />
             </FormItem>
@@ -151,30 +144,20 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                 </FormLabel>
                 <FormControl>
                   {isUSOrCanada ? (
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value && stateOptions.includes(field.value) ? field.value : ""}
+                    <GlassSelect
                       key={selectedCountry}
-                    >
-                      <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
-                        <SelectValue
-                          placeholder={`Select ${selectedCountry === "United States" ? "state" : "province"}`}
-                        />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px] overflow-y-auto bg-dropdown border border-border">
-                        {stateOptions.map((option) => (
-                          <SelectItem key={option} value={option} className="text-dropdown hover:bg-dropdown-hover">
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      value={field.value && stateOptions.includes(field.value) ? field.value : ""}
+                      onValueChange={field.onChange}
+                      options={stateOptions.map((option) => ({ value: option, label: option }))}
+                      placeholder={`Select ${selectedCountry === "United States" ? "state" : "province"}`}
+                      className="w-full"
+                    />
                   ) : (
                     <Input
                       placeholder="Enter state or province (optional)"
                       {...field}
                       value={field.value || ""}
-                      className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
+                      className={formInputClass}
                     />
                   )}
                 </FormControl>
@@ -192,35 +175,25 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
               <FormLabel className="text-content-text-primary">
                 Country <span className="text-error">*</span>
               </FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
-                <FormControl>
-                  <SelectTrigger className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary">
-                    <SelectValue placeholder="Select a country" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="max-h-[200px] overflow-y-auto bg-dropdown border border-border">
-                  {COUNTRIES.map((country) => (
-                    <SelectItem key={country} value={country} className="text-dropdown hover:bg-dropdown-hover">
-                      {country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <GlassSelect
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={COUNTRIES.map((country) => ({ value: country, label: country }))}
+                  placeholder="Select a country"
+                  className="w-full"
+                />
+              </FormControl>
               <FormMessage className="text-error" />
             </FormItem>
           )}
         />
 
         <div className="flex gap-4 pt-2">
-          <Button type="submit" className="bg-brand-primary hover:bg-hover-accent text-content-text-primary">
+          <Button type="submit" variant="brand">
             {submitLabel}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(cancelHref)}
-            className="border-border text-foreground hover:bg-accent hover:text-accent-foreground"
-          >
+          <Button type="button" variant="cancel" onClick={() => navigate(cancelHref)}>
             Cancel
           </Button>
         </div>

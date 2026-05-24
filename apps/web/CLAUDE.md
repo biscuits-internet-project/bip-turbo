@@ -27,6 +27,16 @@ If a route component references a runtime value from a `.ts` helper under `app/r
 - Feature components are organized by domain (e.g., `review/`, `setlist/`, `show/`)
 - Form components use React Hook Form with Zod validation
 
+## Keep components and CSS DRY
+
+Before writing markup, grep the className you're about to type. If it's already somewhere, you owe an extraction.
+
+- **Use existing primitives.** Bare `<input>`/`<textarea>` → [Input](app/components/ui/input.tsx)/[Textarea](app/components/ui/textarea.tsx). Hand-rolled selects → [GlassSelect](app/components/ui/glass-select.tsx) (finite options) or [SearchPicker](app/components/ui/search-picker.tsx) (async search). Don't inline `bg-*`/`hover:bg-*` on [Button](app/components/ui/button.tsx) when a `variant` covers the intent.
+- **2+ duplications → className constant** in [form-styles.ts](app/lib/form-styles.ts) (form chrome) or a domain module. See `formInputClass`, `formLabelClass`.
+- **2+ Button (or Badge / Card / …) className overrides → add a `variant`** to the existing CVA. See `variant="brand"`. Don't create `<MyButton>`.
+- **No thin wrappers to hide a className.** `<PremiumCard>` for `<Card className="card-premium">` is indirection, not abstraction. Use a constant or variant.
+- **Don't bake project styling into shadcn defaults.** Auth/search/etc. use the upstream primitive. Project looks → constant or variant.
+
 ## Package-Specific Commands
 
 ```bash

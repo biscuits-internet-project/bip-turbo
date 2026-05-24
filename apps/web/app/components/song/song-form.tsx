@@ -9,6 +9,8 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import { formInputClass } from "~/lib/form-styles";
+import { cn } from "~/lib/utils";
 
 // Create a schema for song form (omitting auto-generated fields)
 export const songFormSchema = z.object({
@@ -66,7 +68,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
 
   return (
     <Form {...form}>
-      <div className="space-y-6 max-w-2xl" onSubmit={form.handleSubmit(onSubmit)}>
+      <form className="space-y-6 max-w-2xl" onSubmit={form.handleSubmit(onSubmit)}>
         <FormField
           control={form.control}
           name="title"
@@ -74,11 +76,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
             <FormItem>
               <FormLabel className="text-content-text-secondary">Song Title</FormLabel>
               <FormControl>
-                <Input
-                  placeholder="Enter song title"
-                  {...field}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
-                />
+                <Input placeholder="Enter song title" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -117,7 +115,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary min-h-[200px]"
+                  className={cn(formInputClass, "min-h-[200px]")}
                 />
               </FormControl>
               <FormMessage />
@@ -137,7 +135,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary min-h-[200px] font-mono"
+                  className={cn(formInputClass, "min-h-[200px] font-mono")}
                 />
               </FormControl>
               <FormMessage />
@@ -157,7 +155,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
+                  className={formInputClass}
                 />
               </FormControl>
               <FormMessage />
@@ -177,7 +175,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
+                  className={formInputClass}
                 />
               </FormControl>
               <FormMessage />
@@ -197,7 +195,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
+                  className={formInputClass}
                 />
               </FormControl>
               <FormMessage />
@@ -217,7 +215,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="bg-content-bg-secondary border-content-bg-secondary text-content-text-primary"
+                  className={formInputClass}
                 />
               </FormControl>
               <FormMessage />
@@ -244,23 +242,14 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
         />
 
         <div className="flex gap-4 pt-2">
-          <Button
-            type="button"
-            onClick={form.handleSubmit(onSubmit)}
-            className="bg-brand-primary hover:bg-hover-accent text-content-text-primary"
-          >
+          <Button type="submit" variant="brand">
             {submitLabel}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate(cancelHref)}
-            className="border-content-bg-secondary text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary"
-          >
+          <Button type="button" variant="cancel" onClick={() => navigate(cancelHref)}>
             Cancel
           </Button>
         </div>
-      </div>
+      </form>
     </Form>
   );
 }

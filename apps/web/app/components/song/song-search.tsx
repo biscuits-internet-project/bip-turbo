@@ -1,10 +1,5 @@
 import type { Song } from "@bip/domain";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { Button } from "~/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "~/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
-import { cn } from "~/lib/utils";
+import { SearchPicker } from "~/components/ui/search-picker";
 
 interface SongSearchProps {
   value?: string;
@@ -14,6 +9,13 @@ interface SongSearchProps {
   initialSong?: Song;
 }
 
+/**
+ * Song picker used in the track-edit form. Requires 2+ chars of input
+ * before searching — there are too many songs in the catalog to load up
+ * front. The form layer uses the sentinel value "none" rather than null
+ * because it threads through react-hook-form as a plain string; the
+ * wrapper translates between "none" ↔ null at the boundary.
+ */
 export function SongSearch({
   value,
   onValueChange,
@@ -21,111 +23,32 @@ export function SongSearch({
   className,
   initialSong,
 }: SongSearchProps) {
-  const [open, setOpen] = useState(false);
-  const [songs, setSongs] = useState<Song[]>(initialSong ? [initialSong] : []);
-  const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const selectedSong = songs.find((song) => song.id === value) || initialSong;
-
-  const searchSongs = useCallback(
-    async (query: string) => {
-      if (!query || query.length < 2) {
-        setSongs(initialSong ? [initialSong] : []);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/songs?q=${encodeURIComponent(query)}`);
-        if (response.ok) {
-          const data = await response.json();
-
-          // Ensure the initialSong is included if it's not in the search results
-          const songsToSet = [...data];
-          if (initialSong && !data.find((song: Song) => song.id === initialSong.id)) {
-            songsToSet.unshift(initialSong);
-          }
-
-          setSongs(songsToSet);
-        } else {
-        }
-      } catch (_error) {
-      } finally {
-        setLoading(false);
-      }
-    },
-    [initialSong],
-  );
-
-  useEffect(() => {
-    const delayedSearch = setTimeout(() => {
-      searchSongs(searchQuery);
-    }, 300); // Debounce search
-
-    return () => clearTimeout(delayedSearch);
-  }, [searchQuery, searchSongs]);
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            "justify-between bg-content-bg-secondary border-content-bg-secondary text-white hover:bg-gray-700",
-            className,
-          )}
-        >
-          {selectedSong ? selectedSong.title : placeholder}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 bg-content-bg-secondary border-content-bg-secondary" align="start">
-        <Command className="bg-content-bg-secondary" shouldFilter={false}>
-          <CommandInput
-            placeholder="Search songs..."
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            className="text-white"
-          />
-          <CommandList>
-            <CommandEmpty>
-              {loading ? "Searching..." : searchQuery.length < 2 ? "Type to search songs" : "No songs found."}
-            </CommandEmpty>
-            <CommandGroup>
-              {/* Option to clear selection */}
-              <CommandItem
-                value="none"
-                onSelect={() => {
-                  onValueChange("none");
-                  setOpen(false);
-                }}
-                className="text-white hover:bg-gray-700"
-              >
-                <Check className={cn("mr-2 h-4 w-4", value === "none" ? "opacity-100" : "opacity-0")} />
-                No song
-              </CommandItem>
-
-              {songs.map((song) => (
-                <CommandItem
-                  key={song.id}
-                  value={song.id}
-                  onSelect={() => {
-                    onValueChange(song.id);
-                    setOpen(false);
-                  }}
-                  className="text-white hover:bg-gray-700"
-                >
-                  <Check className={cn("mr-2 h-4 w-4", value === song.id ? "opacity-100" : "opacity-0")} />
-                  {song.title}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <SearchPicker<Song>
+      value={value && value !== "none" ? value : null}
+      onValueChange={(v) => onValueChange(v ?? "none")}
+      className={className}
+      placeholder={placeholder}
+      searchPlaceholder="Search songs..."
+      emptyMessage={(q) => (q.length < 2 ? "Type to search songs" : "No songs found.")}
+      loadingMessage="Searching..."
+      itemId={(s) => s.id}
+      itemLabel={(s) => s.title}
+      noneLabel="No song"
+      initialItem={initialSong}
+      fetchResults={async (query) => {
+        if (!query || query.length < 2) return initialSong ? [initialSong] : [];
+        const response = await fetch(`/api/songs?q=${encodeURIComponent(query)}`);
+        if (!response.ok) return [];
+        const data = (await response.json()) as Song[];
+        // Keep the initial song visible in results even when it doesn't
+        // match the query, so the user can re-select the current value
+        // without clearing the field first.
+        if (initialSong && !data.find((song) => song.id === initialSong.id)) {
+          return [initialSong, ...data];
+        }
+        return data;
+      }}
+    />
   );
 }
