@@ -201,6 +201,24 @@ function dashOrSpan(content: ReactNode | null | undefined, className = "text-con
   return <span className={className}>{content}</span>;
 }
 
+/**
+ * Right-aligns digits inside an inline-block sized to the column's widest
+ * realistic value, so 1 / 10 / 100 stack with their ones digit aligned and
+ * larger numbers extend further left. The block itself sits flush-left in
+ * the cell (cells are left-aligned), so the whole column reads as
+ * "left-anchored numbers with right-aligned digits" rather than as a
+ * right-aligned column. `width` is the min-width of the slot in `ch`
+ * units; tabular-nums makes every digit the same `0`-glyph width so the
+ * digit columns actually align.
+ */
+function NumberCell({ width, className, children }: { width: string; className?: string; children: ReactNode }) {
+  return (
+    <span className={`inline-block text-right tabular-nums ${className ?? ""}`} style={{ minWidth: width }}>
+      {children}
+    </span>
+  );
+}
+
 interface GetSongsColumnsOptions {
   showFilteredPlays: boolean;
 }
@@ -215,17 +233,14 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
   const titleColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
     accessorKey: "title",
-    // Dense view (filtered + 4 date cols competing): Song needs a healthy
-    // share so single-word titles like "Shem-Rah Boo" fit on one line.
-    // Sparse view (2 date cols): Song should yield space to the date
-    // columns so their venue sublabels read on 1–2 lines instead of being
-    // squeezed to 3+.
+    // Dense view (filtered cols competing): Song needs a healthy share so
+    // single-word titles like "Shem-Rah Boo" fit on one line. Sparse view
+    // (2 date cols): Song should yield space to the date columns so their
+    // venue sublabels read on 1-2 lines instead of being squeezed to 3+.
     weight: showFilteredPlays ? 3 : 1.5,
-    // On dense-view mobile the 4-up date columns and Filtered Plays
-    // already exceed the viewport at their fixedWidths — give Song its
-    // own mobile fixedWidth so it can't collapse to 0 leftover and the
-    // body clips overflow on the right (matches the prod behavior).
-    mobileFixedWidth: showFilteredPlays ? "7rem" : undefined,
+    // No mobileFixedWidth: on dense mobile the all-time pair columns are
+    // hidden, so Song claims whatever leftover the 4 numeric + 2 date
+    // filter cols leave. Single-word titles fit one line; multi-word wrap.
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Song</HeaderLabel>,
     cell: (song) => (
       <Link to={`/songs/${song.slug}`} className="text-base text-brand-primary hover:text-brand-secondary font-medium">
@@ -244,7 +259,9 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     hideOnMobile: showFilteredPlays,
     cell: (song) =>
       song.timesPlayed > 0 ? (
-        <span className="text-content-text-primary font-semibold">{song.timesPlayed}</span>
+        <NumberCell width="3ch" className="text-content-text-primary font-semibold">
+          {song.timesPlayed}
+        </NumberCell>
       ) : (
         <span className="text-content-text-tertiary text-sm italic">Never performed</span>
       ),
@@ -254,9 +271,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "filteredTimesPlayed",
     fixedWidth: "4rem",
-    // Mobile shrinks — filtered counts on the all-timer view top out at
-    // ~36 plays, no need for the desktop 4rem.
-    mobileFixedWidth: "3rem",
+    // Mobile dense view fits 4 numeric filter cols + 2 date filter cols
+    // alongside Song. 2.5rem matches the other numeric filter cols so the
+    // row reads as a consistent block, and filtered counts top out at ~36.
+    mobileFixedWidth: "2.5rem",
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Plays</span>
@@ -266,7 +284,9 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     cell: (song) => {
       const plays = song.filteredTimesPlayed ?? 0;
       return plays > 0 ? (
-        <span className="text-content-text-primary font-medium">{plays}</span>
+        <NumberCell width="3ch" className="text-content-text-primary font-medium">
+          {plays}
+        </NumberCell>
       ) : (
         <span className="text-content-text-tertiary text-sm">—</span>
       );
@@ -302,7 +322,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     cell: (song) =>
       dashOrSpan(
         song.percentSinceDebut !== null ? (
-          <span className="whitespace-nowrap">{sinceDebutFormatter.format(song.percentSinceDebut)}</span>
+          <NumberCell width="6ch">{sinceDebutFormatter.format(song.percentSinceDebut)}</NumberCell>
         ) : null,
       ),
     sortingFn: nullsLastNumericSort("percentSinceDebut"),
@@ -312,6 +332,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "filteredPercentSinceDebut",
     fixedWidth: "4rem",
+    // Hidden on mobile: the dense layout already crams Plays + Avg Gap
+    // + Gap to End + 2 date cols next to Song; this is the first filter
+    // col to drop because it's a derivable summary (plays / total shows).
+    hideOnMobile: true,
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Since</span>
@@ -319,11 +343,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       </HeaderLabel>
     ),
     title: "Filtered Since First",
-    hideOnMobile: true,
     cell: (song) =>
       dashOrSpan(
         song.filteredPercentSinceDebut != null ? (
-          <span className="whitespace-nowrap">{sinceDebutFormatter.format(song.filteredPercentSinceDebut)}</span>
+          <NumberCell width="5ch">{sinceDebutFormatter.format(song.filteredPercentSinceDebut)}</NumberCell>
         ) : null,
       ),
     sortingFn: nullsLastNumericSort("filteredPercentSinceDebut"),
@@ -340,7 +363,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       </HeaderLabel>
     ),
     hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.averageGapShows !== null ? song.averageGapShows.toFixed(1) : null),
+    cell: (song) =>
+      dashOrSpan(
+        song.averageGapShows !== null ? <NumberCell width="4ch">{song.averageGapShows.toFixed(1)}</NumberCell> : null,
+      ),
     sortingFn: nullsLastNumericSort("averageGapShows"),
   });
 
@@ -348,6 +374,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "filteredAverageGapShows",
     fixedWidth: "4rem",
+    mobileFixedWidth: "2.5rem",
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Avg</span>
@@ -355,8 +382,12 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       </HeaderLabel>
     ),
     title: "Filtered Avg Gap",
-    hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.filteredAverageGapShows != null ? song.filteredAverageGapShows.toFixed(1) : null),
+    cell: (song) =>
+      dashOrSpan(
+        song.filteredAverageGapShows != null ? (
+          <NumberCell width="4ch">{song.filteredAverageGapShows.toFixed(1)}</NumberCell>
+        ) : null,
+      ),
     sortingFn: nullsLastNumericSort("filteredAverageGapShows"),
   });
 
@@ -371,7 +402,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap to Now</HeaderLabel>,
     title: "Gap to Now",
     hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.showsSinceLastPlayed),
+    cell: (song) =>
+      dashOrSpan(
+        song.showsSinceLastPlayed != null ? <NumberCell width="4ch">{song.showsSinceLastPlayed}</NumberCell> : null,
+      ),
     sortingFn: nullsLastNumericSort("showsSinceLastPlayed"),
   });
 
@@ -379,14 +413,19 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "filteredShowsSinceLastPlayed",
     fixedWidth: "4rem",
+    mobileFixedWidth: "2.5rem",
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Gap to End</span>
       </HeaderLabel>
     ),
     title: "Filtered Gap to End",
-    hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.filteredShowsSinceLastPlayed ?? null),
+    cell: (song) =>
+      dashOrSpan(
+        song.filteredShowsSinceLastPlayed != null ? (
+          <NumberCell width="3ch">{song.filteredShowsSinceLastPlayed}</NumberCell>
+        ) : null,
+      ),
     sortingFn: nullsLastNumericSort("filteredShowsSinceLastPlayed"),
   });
 
@@ -397,18 +436,23 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
   // so the weight stays higher to keep each date legible.
   const dateColumnWeight = showFilteredPlays ? 1.4 : 1.0;
 
-  // Date columns on mobile lock to 4.5rem — wide enough for the compact
-  // "M/D/YY" rendered by ShowDate below its 6rem CQ threshold, no wider.
-  // Same width on sparse (2 dates) and dense (4 dates); on dense the
-  // table extends past the viewport and body's overflow-x:hidden clips
-  // the rightmost ("Filtered First") column — matches prod.
-  const dateColumnMobileWidth = "4.5rem";
+  // All-time date columns only render on mobile in the sparse view (no
+  // filters). 4.5rem comfortably fits the compact "M/D/YY" form ShowDate
+  // produces below its 6rem container-query threshold.
+  const allTimeDateMobileWidth = "4.5rem";
+
+  // Filtered date columns share mobile space with Song + 4 numeric filter
+  // cols, so they tighten to 4rem. Still above the compact-form CQ
+  // threshold; M/D/YY (max 8 chars) fits with text-xs and cell padding.
+  const filteredDateMobileWidth = "4rem";
 
   const lastPlayedColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
     accessorKey: "dateLastPlayed",
     weight: dateColumnWeight,
-    mobileFixedWidth: dateColumnMobileWidth,
+    mobileFixedWidth: allTimeDateMobileWidth,
+    // Hidden on mobile in dense view so the filtered date pair has room.
+    hideOnMobile: showFilteredPlays,
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Last Played</HeaderLabel>,
     cell: (song) => <DateVenueCell date={song.dateLastPlayed} show={song.lastPlayedShow} />,
   });
@@ -417,7 +461,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "dateLastFilteredPlayed",
     weight: dateColumnWeight,
-    mobileFixedWidth: dateColumnMobileWidth,
+    mobileFixedWidth: filteredDateMobileWidth,
     label: (
       <HeaderLabel filtered reserveIconRow>
         Last
@@ -431,7 +475,8 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "dateFirstPlayed",
     weight: dateColumnWeight,
-    mobileFixedWidth: dateColumnMobileWidth,
+    mobileFixedWidth: allTimeDateMobileWidth,
+    hideOnMobile: showFilteredPlays,
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>First Played</HeaderLabel>,
     cell: (song) => <DateVenueCell date={song.dateFirstPlayed} show={song.firstPlayedShow} />,
   });
@@ -440,7 +485,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     reservesIconRow: showFilteredPlays,
     accessorKey: "dateFirstFilteredPlayed",
     weight: dateColumnWeight,
-    mobileFixedWidth: dateColumnMobileWidth,
+    mobileFixedWidth: filteredDateMobileWidth,
     label: (
       <HeaderLabel filtered reserveIconRow>
         First
