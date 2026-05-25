@@ -647,6 +647,67 @@ describe("getSongsColumns", () => {
     expect(avg?.meta?.hideOnMobile).toBe(true);
   });
 
+  // Dense filtered view on mobile drops the all-time date pair so the
+  // filtered date pair (which is the user's relevant signal under an
+  // active filter) has room. Desktop continues to show both pairs.
+  test("Last Played + First Played hide on mobile when showFilteredPlays is true", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const last = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateLastPlayed");
+    const first = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateFirstPlayed");
+    expect(last?.meta?.hideOnMobile).toBe(true);
+    expect(first?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // Sparse view (no filter) keeps both date columns on mobile. They're
+  // the primary "when did this song happen?" signal when no filtered pair
+  // exists to take their place.
+  test("Last Played + First Played stay visible on mobile when showFilteredPlays is false", () => {
+    const columns = getSongsColumns({ showFilteredPlays: false });
+    const last = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateLastPlayed");
+    const first = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateFirstPlayed");
+    expect(last?.meta?.hideOnMobile).toBeFalsy();
+    expect(first?.meta?.hideOnMobile).toBeFalsy();
+  });
+
+  // Filtered Since First is the first filter column to drop on mobile
+  // because it's a derivable summary (filtered plays / shows in scope).
+  // The remaining 5 filter cols + Song fit; with Since First the row is
+  // too cramped.
+  test("Filtered Since First carries meta.hideOnMobile", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const col = columns.find((c) => "accessorKey" in c && c.accessorKey === "filteredPercentSinceDebut");
+    expect(col?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // Filtered Avg Gap and Filtered Gap to End must NOT hide on mobile.
+  // They're part of the "Song + filter columns" mobile layout the user
+  // explicitly chose. Pinning so a future cleanup doesn't accidentally
+  // re-hide them along with their unconditionally-hidden all-time
+  // counterparts.
+  test("Filtered Avg Gap + Filtered Gap to End stay visible on mobile", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "filteredAverageGapShows");
+    const gap = columns.find((c) => "accessorKey" in c && c.accessorKey === "filteredShowsSinceLastPlayed");
+    expect(avg?.meta?.hideOnMobile).toBeFalsy();
+    expect(gap?.meta?.hideOnMobile).toBeFalsy();
+  });
+
+  // Numeric cells wrap their value in an inline-block sized with `ch`
+  // units, right-aligned, with tabular-nums so digit widths are uniform.
+  // The effect is that 1 / 10 / 100 stack with their ones digit aligned
+  // and larger numbers extend further left, without right-aligning the
+  // whole cell. Locks the alignment technique against silent regressions.
+  test("numeric cells render as right-aligned inline-block slots with tabular-nums", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: 5.7 })]} hideSearch hidePagination />,
+    );
+    const slot = screen.getByText("5.7");
+    expect(slot.className).toContain("inline-block");
+    expect(slot.className).toContain("text-right");
+    expect(slot.className).toContain("tabular-nums");
+    expect(slot.style.minWidth).toBe("4ch");
+  });
+
   // Column ordering: Gap to Now sits immediately to the left of Last
   // Played so the "X shows ago" number reads naturally next to the date
   // it's measured against. % Since Debut and Avg Gap precede Gap to Now
