@@ -4,6 +4,20 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+// Mock `useNavigate` + `useParams` to drive the URL-syncing tab logic
+// without needing a Routes definition. Other react-router exports
+// (MemoryRouter, Link, etc.) keep their real implementations.
+const mockNavigate = vi.fn();
+const mockParams: { slug?: string; tab?: string } = { slug: "basis-for-a-day" };
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useParams: () => mockParams,
+  };
+});
+
 // Mock server-side modules
 vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
@@ -91,6 +105,51 @@ function renderSongPage() {
 describe("SongPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset URL params to the default (no :tab) between tests so each
+    // test starts on the "All Performances" tab.
+    mockParams.slug = "basis-for-a-day";
+    mockParams.tab = undefined;
+  });
+
+  // The :tab URL segment is the source of truth for the active tab —
+  // back/forward and shareable links should land on the right pane.
+  test("activates the tab specified by the URL :tab segment", () => {
+    mockParams.tab = "stats";
+    renderSongPage();
+
+    const statsTab = screen.getByRole("tab", { name: /graphs/i });
+    expect(statsTab).toHaveAttribute("data-state", "active");
+  });
+
+  // A typo'd or unknown :tab segment falls back to "All Performances"
+  // instead of rendering nothing — guards against broken inbound links.
+  test("falls back to the All Performances tab when :tab is unknown", () => {
+    mockParams.tab = "definitely-not-a-tab";
+    renderSongPage();
+
+    const performancesTab = screen.getByRole("tab", { name: /all performances/i });
+    expect(performancesTab).toHaveAttribute("data-state", "active");
+  });
+
+  // Clicking a non-default tab navigates to the nested URL so the new
+  // URL can be bookmarked / shared / used by the back button.
+  test("clicking a tab navigates to /songs/:slug/:tab", async () => {
+    const user = userEvent.setup();
+    renderSongPage();
+
+    await user.click(screen.getByRole("tab", { name: /graphs/i }));
+    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day/stats");
+  });
+
+  // The default ("performances") tab navigates back to the bare song
+  // URL so there's no redundant `/performances` suffix in the URL.
+  test("clicking the All Performances tab navigates to bare /songs/:slug", async () => {
+    mockParams.tab = "stats";
+    const user = userEvent.setup();
+    renderSongPage();
+
+    await user.click(screen.getByRole("tab", { name: /all performances/i }));
+    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day");
   });
 
   // The All-Timers tab visibility should be based on the unfiltered data,

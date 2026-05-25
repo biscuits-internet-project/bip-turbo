@@ -9,8 +9,6 @@ import { cn } from "~/lib/utils";
 
 const ALL_TOGGLE_FILTERS = TOGGLE_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
 
-const TOGGLE_FILTERS_WITHOUT_ALL_TIMER = ALL_TOGGLE_FILTERS.filter((filter) => filter.key !== "allTimer");
-
 const labelClass =
   "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 
@@ -22,6 +20,14 @@ interface PerformanceFilterControlsProps {
   clearFilters: () => void;
   extraSelectFilters?: ReactNode;
   showAllTimerToggle?: boolean;
+  /**
+   * When false, hide the "Jam Chart" toggle chip. Set on the dedicated
+   * Jam Charts page (the whole result set is already jam-charts there)
+   * and on the All-Timers page (same reasoning as why "All-Timer" is
+   * hidden there) so toggle filters within those views express
+   * additional narrowing rather than redundant scope.
+   */
+  showJamChartToggle?: boolean;
   hideTimeRange?: boolean;
   coverFilter?: string;
   selectedAuthor?: string | null;
@@ -39,6 +45,7 @@ export function PerformanceFilterControls({
   clearFilters,
   extraSelectFilters,
   showAllTimerToggle = true,
+  showJamChartToggle = true,
   hideTimeRange = false,
   coverFilter,
   selectedAuthor,
@@ -47,7 +54,11 @@ export function PerformanceFilterControls({
   onSearchChange,
   hasActiveFilters = false,
 }: PerformanceFilterControlsProps) {
-  const toggleFilters = showAllTimerToggle ? ALL_TOGGLE_FILTERS : TOGGLE_FILTERS_WITHOUT_ALL_TIMER;
+  const toggleFilters = ALL_TOGGLE_FILTERS.filter((filter) => {
+    if (!showAllTimerToggle && filter.key === "allTimer") return false;
+    if (!showJamChartToggle && filter.key === "jamChart") return false;
+    return true;
+  });
   const showPlayedFilter =
     playedFilter !== undefined &&
     (hideTimeRange ||

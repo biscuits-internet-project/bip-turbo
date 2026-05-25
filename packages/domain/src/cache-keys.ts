@@ -67,6 +67,8 @@ export const CacheKeys = {
     index: () => "songs:index:full:v3",
     /** All-timers page data */
     allTimers: () => "songs:all-timers:v3",
+    /** Jam Charts page data (tracks that are all-timers OR carry a curated note) */
+    jamCharts: () => "songs:jam-charts:v4",
     /** Songs with history content */
     histories: () => "songs:histories:v3",
     /** All-timers for a specific calendar day (On This Day page) */

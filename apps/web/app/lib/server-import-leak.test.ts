@@ -93,20 +93,31 @@ function valueImports(sourceFile: ts.SourceFile): ValueImport[] {
 
 /**
  * Build a set of spans (start/end offsets) that belong to server-only exports
- * — the code inside `export const loader = ...` and friends. A reference to
- * an imported identifier inside these spans is stripped from the client
- * bundle by React Router's vite plugin and is therefore safe.
+ * — the code inside `export const loader = ...`, `export async function
+ * action(...)`, and friends. A reference to an imported identifier inside
+ * these spans is stripped from the client bundle by React Router's vite
+ * plugin and is therefore safe.
+ *
+ * Recognizes both export forms because route authors mix them freely: the
+ * variable form (`export const loader = publicLoader(...)`) and the
+ * function-declaration form (`export async function action(args) {...}`).
  */
 function serverOnlySpans(sourceFile: ts.SourceFile): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
   for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    const hasExport = statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+    const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
+    const hasExport = modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
     if (!hasExport) continue;
-    for (const decl of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(decl.name)) continue;
-      if (!SERVER_ONLY_EXPORT_NAMES.has(decl.name.text)) continue;
-      if (decl.initializer) spans.push([decl.initializer.getStart(sourceFile), decl.initializer.getEnd()]);
+
+    if (ts.isVariableStatement(statement)) {
+      for (const decl of statement.declarationList.declarations) {
+        if (!ts.isIdentifier(decl.name)) continue;
+        if (!SERVER_ONLY_EXPORT_NAMES.has(decl.name.text)) continue;
+        if (decl.initializer) spans.push([decl.initializer.getStart(sourceFile), decl.initializer.getEnd()]);
+      }
+    } else if (ts.isFunctionDeclaration(statement) && statement.name && statement.body) {
+      if (!SERVER_ONLY_EXPORT_NAMES.has(statement.name.text)) continue;
+      spans.push([statement.body.getStart(sourceFile), statement.body.getEnd()]);
     }
   }
   return spans;
@@ -144,10 +155,13 @@ describe("loader helper modules must not leak server code into the client bundle
   // References inside the default component or at module top level trigger a
   // violation — those would pull the helper into the client bundle.
   test("route .tsx files reference server-helper imports only in server-only exports", async () => {
-    const helperFiles = await fg("**/*.ts", {
-      cwd: ROUTES_ROOT,
+    // Scan helpers under both `app/routes/` (per the original PR #58
+    // failure mode) and `app/lib/` — both are common places to put
+    // loader plumbing that route components import.
+    const helperFiles = await fg(["routes/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"], {
+      cwd: APP_ROOT,
       absolute: true,
-      ignore: ["**/*.test.ts"],
+      ignore: ["**/*.test.ts", "**/*.test.tsx"],
     });
     const serverHelpers = new Set(helperFiles.filter((f) => directlyImportsServerCode(parse(f))));
 

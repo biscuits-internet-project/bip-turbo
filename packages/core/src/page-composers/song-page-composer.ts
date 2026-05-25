@@ -34,6 +34,8 @@ export interface PerformanceFilterOptions {
   standalone?: boolean;
   inverted?: boolean;
   dyslexic?: boolean;
+  /** Narrow to tracks carrying a curated jam-chart note (non-empty). */
+  jamChart?: boolean;
   allTimer?: boolean;
   monthDay?: string;
 }
@@ -142,6 +144,11 @@ export class SongPageComposer {
       ...this.transformToSongPagePerformanceView(row),
       cover: song.cover ?? undefined,
       authorId: song.authorId ?? null,
+      // Single-song rows skip the song join; fill in title/slug from the
+      // page's song context so cross-song renderers (e.g. the
+      // noteworthy-track popover header) see a populated title.
+      songTitle: song.title,
+      songSlug: song.slug,
     }));
     await this.enrichPerformances(performances);
 
@@ -207,11 +214,34 @@ export class SongPageComposer {
 
   /** Build the all-timers page view, optionally filtered by date range, cover, author, attendance, and performance tags. */
   async buildAllTimers(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
-    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(
-      [Prisma.sql`tracks.all_timer = true`],
+    return this.buildCrossSongPerformanceView(Prisma.sql`tracks.all_timer = true`, options);
+  }
+
+  /**
+   * Build the Jam Charts page view. Includes any track that is either an
+   * all-timer OR carries a curated note — the union of the two
+   * noteworthy categories surfaced throughout the app. The note column
+   * historically allows empty strings as well as NULL for "no note", so
+   * both are filtered out to match what the UI treats as a real note.
+   */
+  async buildJamCharts(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
+    return this.buildCrossSongPerformanceView(
+      Prisma.sql`(tracks.all_timer = true OR (tracks.note IS NOT NULL AND tracks.note <> ''))`,
       options,
     );
+  }
 
+  /**
+   * Shared body of the cross-song page views (all-timers, jam-charts).
+   * The two endpoints differ only in their base WHERE condition; this
+   * helper composes the rest of the pipeline — filter merging, the
+   * cross-song SELECT with song title/slug, and per-track enrichment.
+   */
+  private async buildCrossSongPerformanceView(
+    baseCondition: Prisma.Sql,
+    options?: PerformanceFilterOptions,
+  ): Promise<AllTimersPageView> {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([baseCondition], options);
     const whereClause = Prisma.join(conditions, " AND ");
     const result = await this.queryPerformances({
       whereClause,
@@ -246,6 +276,13 @@ export class SongPageComposer {
       ...this.transformToSongPagePerformanceView(row),
       cover: song.cover ?? undefined,
       authorId: song.authorId ?? null,
+      // The per-song composer queries without a song join (the song is
+      // already known), so the raw rows don't carry song_title/song_slug.
+      // Fill them in from the page's song context so downstream renderers
+      // (e.g. the noteworthy-track popover header) don't see an empty
+      // title when this projection lands in a cross-song UI component.
+      songTitle: song.title,
+      songSlug: song.slug,
     }));
     await this.enrichPerformances(performances);
 
@@ -443,6 +480,7 @@ export class SongPageComposer {
           }
         : null,
     allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
+    jamChart: (o) => (o.jamChart ? { condition: Prisma.sql`tracks.note IS NOT NULL AND tracks.note <> ''` } : null),
     monthDay: (o) => (o.monthDay ? { condition: Prisma.sql`shows.date LIKE ${`%-${o.monthDay}`}` } : null),
     inverted: (o) =>
       o.inverted
@@ -645,6 +683,7 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.standalone ||
       options.inverted ||
       options.dyslexic ||
+      options.jamChart ||
       options.allTimer ||
       options.monthDay,
   );
