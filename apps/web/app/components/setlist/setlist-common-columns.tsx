@@ -263,11 +263,9 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
             {!hideSetLabel && (
               <span className="text-content-text-secondary">{formatSetLabel(raw, { encoresInSet })}</span>
             )}
-            {row.allTimer && (
-              <span className="sm:hidden">
-                <AllTimerCell />
-              </span>
-            )}
+            <span className="sm:hidden">
+              <AllTimerCell track={row} />
+            </span>
           </div>
         );
       },
@@ -301,7 +299,7 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
       // inline on phones to recover the 16px this column would consume.
       meta: { ...allTimerColumnMeta, hideOnMobile: true },
       enableSorting: false,
-      cell: (info) => (info.row.original.allTimer ? <AllTimerCell /> : null),
+      cell: (info) => <AllTimerCell track={info.row.original} />,
     }) as ColumnDef<T, unknown>,
     columnHelper.accessor((row) => row.song?.title ?? "", {
       id: "song",

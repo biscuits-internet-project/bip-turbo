@@ -3,13 +3,14 @@ import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
 import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
+import { isNoteworthy } from "~/components/track/noteworthy-marker";
 import { Button } from "~/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -185,13 +186,21 @@ function formatAvgMedianGap(avg: number | null | undefined, median: number | nul
   return `${fmt(avg)} / ${fmt(median)}`;
 }
 
+// Allowlist used to validate the `:tab` URL segment so a typo'd path
+// like /songs/triumph/foo falls back to the default tab instead of
+// rendering nothing. Order is informational only.
+const VALID_TABS = ["performances", "jam-charts", "all-timers", "stats", "history", "lyrics", "guitar-tabs"] as const;
+type TabValue = (typeof VALID_TABS)[number];
+
 export default function SongPage() {
   const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<LoaderData>();
-  const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
-  const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const params = useParams<{ tab?: string }>();
+  const navigate = useNavigate();
+  // The :tab segment is the source of truth — Tabs renders whatever
+  // the URL says, and clicking a tab navigates so back/forward and
+  // shareable links work.
+  const activeTab: TabValue =
+    params.tab && (VALID_TABS as readonly string[]).includes(params.tab) ? (params.tab as TabValue) : "performances";
   const {
     filteredData: filteredPerformances,
     isLoading,
@@ -209,14 +218,31 @@ export default function SongPage() {
     extraParams: useMemo(() => ({ slug: song.slug }), [song.slug]),
     searchFilter: searchPerformance,
   });
+  const handleTabChange = (value: string) => {
+    clearFilters();
+    // "performances" is the default; navigate to bare /songs/:slug so
+    // the URL doesn't carry a redundant /performances suffix.
+    navigate(value === "performances" ? `/songs/${song.slug}` : `/songs/${song.slug}/${value}`);
+  };
 
   const hasAllTimers = useMemo(() => allPerformances.some((p) => p.allTimer), [allPerformances]);
   const filteredAllTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
+  // Jam Charts: all-timer OR any track with a curated note (non-empty).
+  // Superset of all-timers; the tab only appears when the song has at
+  // least one such performance.
+  const hasJamCharts = useMemo(() => allPerformances.some(isNoteworthy), [allPerformances]);
+  const filteredJamCharts = useMemo(() => filteredPerformances.filter(isNoteworthy), [filteredPerformances]);
   // Server-narrowing filter active = any UI filter that affects the
   // performance set the server returned. Excludes `searchText` (client-only).
   // Used to render the Filtered Gap column in the performances table.
   const hasServerNarrowingFilter = selectedTimeRange !== "all" || activeToggleSet.size > 0;
-  const filterContent = (
+  // Tab-specific noteworthy-toggle suppression: when the active tab is
+  // already scoped to "all-timers" or "jam-charts", the matching chip
+  // (and the chip that strictly subsets it) shouldn't reappear in the
+  // filter row because toggling it would either be a no-op or
+  // contradict the tab's scope. Mirrors how the global pages hide
+  // those chips on their own routes.
+  const renderFilterContent = (overrides?: { hideAllTimerToggle?: boolean; hideJamChartToggle?: boolean }) => (
     <PerformanceFilterControls
       selectedTimeRange={selectedTimeRange}
       activeToggleSet={activeToggleSet}
@@ -226,6 +252,8 @@ export default function SongPage() {
       searchValue={searchText}
       onSearchChange={setSearchText}
       hasActiveFilters={hasActiveFilters}
+      showAllTimerToggle={!overrides?.hideAllTimerToggle}
+      showJamChartToggle={!overrides?.hideJamChartToggle}
     />
   );
 
@@ -356,22 +384,9 @@ export default function SongPage() {
         </div>
       )}
 
-      <Tabs
-        value={activeTab}
-        className="w-full"
-        onValueChange={(value) => {
-          setActiveTab(value);
-          clearFilters();
-        }}
-      >
+      <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
         <div className="sm:hidden mb-4" data-testid="mobile-song-view">
-          <Select
-            value={activeTab}
-            onValueChange={(value) => {
-              setActiveTab(value);
-              clearFilters();
-            }}
-          >
+          <Select value={activeTab} onValueChange={handleTabChange}>
             <SelectTrigger
               aria-label="Song view"
               className="w-full h-11 bg-glass-bg border border-glass-border text-content-text-primary hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
@@ -380,6 +395,7 @@ export default function SongPage() {
             </SelectTrigger>
             <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
               <SelectItem value="performances">All Performances</SelectItem>
+              {hasJamCharts && <SelectItem value="jam-charts">Jam Charts</SelectItem>}
               {hasAllTimers && <SelectItem value="all-timers">All-Timers</SelectItem>}
               <SelectItem value="stats">Stats</SelectItem>
               {song.history && <SelectItem value="history">History</SelectItem>}
@@ -400,6 +416,19 @@ export default function SongPage() {
             <ListMusic className="h-4 w-4" />
             All Performances
           </TabsTrigger>
+          {hasJamCharts && (
+            <TabsTrigger
+              value="jam-charts"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
+              )}
+            >
+              <Flame className="h-4 w-4" />
+              Jam Charts
+            </TabsTrigger>
+          )}
           {hasAllTimers && (
             <TabsTrigger
               value="all-timers"
@@ -465,6 +494,18 @@ export default function SongPage() {
           )}
         </TabsList>
 
+        {hasJamCharts && (
+          <TabsContent value="jam-charts" className="mt-6">
+            <PerformanceTable
+              performances={filteredJamCharts}
+              isLoading={isLoading}
+              showAllTimerColumn
+              hasNarrowingFilter={hasServerNarrowingFilter}
+              headerContent={renderFilterContent({ hideJamChartToggle: true })}
+            />
+          </TabsContent>
+        )}
+
         {hasAllTimers && (
           <TabsContent value="all-timers" className="mt-6 space-y-8">
             {/* Featured cards for performances with notes */}
@@ -504,7 +545,7 @@ export default function SongPage() {
               performances={filteredAllTimers}
               isLoading={isLoading}
               hasNarrowingFilter={hasServerNarrowingFilter}
-              headerContent={filterContent}
+              headerContent={renderFilterContent({ hideAllTimerToggle: true, hideJamChartToggle: true })}
             />
           </TabsContent>
         )}
@@ -515,7 +556,7 @@ export default function SongPage() {
             showAllTimerColumn
             isLoading={isLoading}
             hasNarrowingFilter={hasServerNarrowingFilter}
-            headerContent={filterContent}
+            headerContent={renderFilterContent()}
           />
         </TabsContent>
 

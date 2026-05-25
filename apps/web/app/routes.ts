@@ -92,11 +92,17 @@ export default [
     ...prefix("songs", [
       index("routes/songs/_index.tsx"),
       route("all-timers", "routes/songs/all-timers.tsx"),
+      route("jam-charts", "routes/songs/jam-charts.tsx"),
       route("histories", "routes/songs/histories.tsx"),
       route("recent", "routes/songs/recent.tsx"),
       route("this-year", "routes/songs/this-year.tsx"),
       route("new", "routes/songs/new.tsx"),
       route(":slug", "routes/songs/$slug.tsx"),
+      // Same file backs `/songs/:slug/:tab` (jam-charts, all-timers,
+      // stats, history, lyrics, guitar-tabs) so the in-song tabs are
+      // shareable URLs. A unique `id` is required because RR v7 keys
+      // routes by module path.
+      route(":slug/:tab", "routes/songs/$slug.tsx", { id: "song-tab" }),
       route(":slug/edit", "routes/songs/$slug.edit.tsx"),
     ]),
   ]),
@@ -115,6 +121,7 @@ export default [
     route("venues", "routes/api/venues.tsx"),
     route("venues/:id", "routes/api/venues/$id.tsx"),
     route("all-timers", "routes/api/all-timers.tsx"),
+    route("jam-charts", "routes/api/jam-charts.tsx"),
     route("songs", "routes/api/songs.tsx"),
     route("songs/performances", "routes/api/songs/performances.tsx"),
     route("songs/:id", "routes/api/songs/$id.tsx"),

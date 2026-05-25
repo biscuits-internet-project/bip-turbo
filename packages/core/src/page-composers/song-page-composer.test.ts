@@ -486,6 +486,125 @@ describe("buildSongPerformanceCounts", () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildJamCharts — all-timers ∪ tracks-with-notes
+// ---------------------------------------------------------------------------
+
+describe("buildJamCharts", () => {
+  // Flattens a $queryRaw mock call (TemplateStringsArray + Prisma.Sql
+  // interpolations) into a single SQL string so the test can assert the
+  // base WHERE clause is composed of the right two conditions. Prisma.Sql
+  // exposes its raw template parts under `.strings`.
+  function flattenSqlFromMockCall(call: unknown[]): string {
+    const [templateStrings, ...interpolations] = call as [readonly string[], ...unknown[]];
+    const interpolated = interpolations
+      .map((v) => {
+        if (v && typeof v === "object" && Array.isArray((v as { strings?: unknown[] }).strings)) {
+          return (v as { strings: string[] }).strings.join(" ");
+        }
+        return "";
+      })
+      .join(" ");
+    return `${[...templateStrings].join(" ")} ${interpolated}`;
+  }
+
+  function createComposer(rows: Array<Partial<PerformanceDto>>) {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue(rows.map((r) => makeDto(r as Partial<PerformanceDto>))),
+      // enrichPerformances looks up annotations + previous-show data per
+      // returned track. Stub both to empty so the test focuses on the
+      // base WHERE composition and the result shape.
+      annotation: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const mockSongService = {} as never;
+    return { composer: new SongPageComposer(mockDb as never, mockSongService), mockDb };
+  }
+
+  // The whole point of the jam-charts page: include tracks flagged as
+  // all-timers AND tracks that carry a curated note, in a single result.
+  // The WHERE clause must OR the two conditions so neither set is
+  // dropped on the way to the UI.
+  test("base WHERE clause unions all_timer with note IS NOT NULL", async () => {
+    const { composer, mockDb } = createComposer([]);
+    await composer.buildJamCharts();
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/tracks\.all_timer\s*=\s*true/);
+    expect(sql).toMatch(/tracks\.note\s+IS\s+NOT\s+NULL/);
+    // Empty-string notes must be filtered out too — the note column
+    // historically allows '' as well as NULL for "no note", and the UI
+    // treats both as absent.
+    expect(sql).toMatch(/tracks\.note\s*<>\s*''/);
+    // Both branches must be ORed together (otherwise note-only tracks
+    // get filtered out when all_timer is false).
+    expect(sql).toMatch(/all_timer.*OR.*note/s);
+  });
+
+  // The method returns the standard AllTimersPageView shape so the route
+  // can drop it straight into PerformanceTable without bespoke wiring.
+  test("returns AllTimersPageView shape (performances array) populated from rows", async () => {
+    const { composer } = createComposer([
+      { track_id: "t-allTimer", all_timer: true, note: null, song_id: "song-1" },
+      { track_id: "t-note", all_timer: false, note: "Big Type II Spaga." },
+    ]);
+    const result = await composer.buildJamCharts();
+    expect(result.performances).toHaveLength(2);
+    const ids = result.performances.map((p) => p.trackId).sort();
+    expect(ids).toEqual(["t-allTimer", "t-note"]);
+  });
+
+  // Filter options compose: jam-charts plus, say, a year range or cover
+  // filter, should AND together. Verifies the call still goes through and
+  // the additional filter shows up in the SQL.
+  test("forwards filter options through buildFilterQuery", async () => {
+    const { composer, mockDb } = createComposer([]);
+    await composer.buildJamCharts({ monthDay: "07-26" });
+    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/shows\.date\s+LIKE/);
+  });
+});
+
+describe("buildSongPerformances populates songTitle/songSlug", () => {
+  // The single-song composer queries without a song join (the song is
+  // already known in context). The cross-song UI components that
+  // consume `SongPagePerformance` (TrackRatingOverlay's popover header,
+  // for instance) read `songTitle` / `songSlug` directly — so the
+  // composer must fill those fields from the page's song context, or
+  // the popover renders with an empty title.
+  test("propagates the page song's title and slug onto every returned performance", async () => {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue([makeDto({ track_id: "t-1" }), makeDto({ track_id: "t-2" })]),
+      annotation: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const mockSongService = {
+      findBySlug: vi.fn().mockResolvedValue({
+        id: "song-1",
+        title: "King of the World",
+        slug: "king-of-the-world",
+        cover: false,
+        authorId: null,
+      }),
+    };
+    const composer = new SongPageComposer(mockDb as never, mockSongService as never);
+
+    const performances = await composer.buildSongPerformances("king-of-the-world");
+
+    expect(performances).toHaveLength(2);
+    for (const p of performances) {
+      expect(p.songTitle).toBe("King of the World");
+      expect(p.songSlug).toBe("king-of-the-world");
+    }
+  });
+});
+
+describe("CacheKeys.songs.jamCharts", () => {
+  // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
+  // bumped together with the rest of the songs cache family.
+  test("returns a stable, versioned key string", () => {
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v4");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isNarrowingFilter — gate for filteredGap computation
 // ---------------------------------------------------------------------------
 

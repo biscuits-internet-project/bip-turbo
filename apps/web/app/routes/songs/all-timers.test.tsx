@@ -6,7 +6,16 @@ import { describe, expect, test, vi } from "vitest";
 // Mock server-side modules
 vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
-vi.mock("@bip/domain", () => ({}));
+vi.mock("@bip/domain", () => ({
+  // Loader imports CacheKeys.songs.allTimers() at module top level.
+  CacheKeys: { songs: { allTimers: () => "test-key" } },
+}));
+vi.mock("~/lib/noteworthy-performance-loader", () => ({
+  createNoteworthyLoader: vi.fn(),
+}));
+vi.mock("~/lib/noteworthy-performance-page", () => ({
+  NoteworthyPerformancePage: (props: object) => mockShallowComponent("NoteworthyPerformancePage", props),
+}));
 
 // Mock hooks
 vi.mock("~/hooks/use-serialized-loader-data", () => ({
@@ -64,12 +73,17 @@ describe("AllTimersPage", () => {
     expect(screen.queryByRole("link", { name: /back to songs/i })).not.toBeInTheDocument();
   });
 
-  // The PerformanceTable should still render as the main content.
-  test("renders the PerformanceTable with showSongColumn", () => {
+  // The page delegates to NoteworthyPerformancePage with the
+  // all-timers-specific endpoint and both noteworthy toggle chips
+  // hidden (All-Timer because the whole page is all-timers, Jam Chart
+  // for the same scope-redundancy reason).
+  test("renders NoteworthyPerformancePage with the all-timers API url and both toggles hidden", () => {
     renderAllTimers();
 
-    const table = screen.getByTestId("PerformanceTable");
-    expect(table).toBeInTheDocument();
-    expect(table.textContent).toContain('"showSongColumn":true');
+    const page = screen.getByTestId("NoteworthyPerformancePage");
+    expect(page).toBeInTheDocument();
+    expect(page.textContent).toContain('"apiUrl":"/api/all-timers"');
+    expect(page.textContent).toContain('"hideAllTimerToggle":true');
+    expect(page.textContent).toContain('"hideJamChartToggle":true');
   });
 });

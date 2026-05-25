@@ -1,7 +1,8 @@
 import type { Track } from "@bip/domain";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Edit2, Flame, GripVertical, Trash } from "lucide-react";
+import { Edit2, GripVertical, Trash } from "lucide-react";
+import { TrackIcon } from "~/components/track/track-icon";
 import { Button } from "~/components/ui/button";
 import { listRowClass } from "~/lib/form-styles";
 import { cn } from "~/lib/utils";
@@ -45,7 +46,7 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
             {/* Title + inline markers */}
             <div className="flex items-center gap-2 md:gap-3 flex-wrap flex-1 min-w-0">
               <span className="text-white font-medium">{track.song?.title || "Unknown Song"}</span>
-              {track.allTimer && <Flame className="h-4 w-4 text-orange-500 shrink-0" />}
+              <TrackIcon track={track} iconClassName="h-4 w-4" />
               {track.segue && <span className="text-content-text-secondary text-sm">{track.segue}</span>}
             </div>
           </div>

@@ -1,88 +1,64 @@
-import type { Setlist } from "@bip/domain";
-import { FileText, Flame } from "lucide-react";
-import { Link } from "react-router";
+import type { Setlist, TrackLight } from "@bip/domain";
+import { Link } from "react-router-dom";
+import { TrackIcon } from "~/components/track/track-icon";
+import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
 
 interface SetlistHighlightsProps {
   setlist: Setlist;
 }
 
+/**
+ * Right-rail panel listing every track from the show that is either an
+ * all-timer or carries a curated jam-chart note, in canonical show order.
+ * Each row shows the position label (printed only on the first row of
+ * each set group), a flame (orange for all-timer, off-white for
+ * jam-chart), a song-page link, and the note text underneath when
+ * present. Hidden entirely when no track is noteworthy.
+ */
 export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
-  // Collect all tracks that are all-timers or have notes
-  const allTimerTracks = [];
-  const tracksWithNotes = [];
+  const highlights = setlist.sets.flatMap((set) => set.tracks).filter((track) => track.allTimer || hasNote(track));
+  if (highlights.length === 0) return null;
 
-  for (const set of setlist.sets) {
-    for (const track of set.tracks) {
-      if (track.allTimer) {
-        allTimerTracks.push({ ...track, set: set.label });
-      }
-
-      if (track.note && track.note.trim() !== "") {
-        tracksWithNotes.push({ ...track, set: set.label });
-      }
-    }
-  }
-
-  // If there are no highlights, don't render the component
-  if (allTimerTracks.length === 0 && tracksWithNotes.length === 0) {
-    return null;
-  }
+  const encoresInSet = countDistinctEncores(highlights);
+  const ordered = [...highlights].sort(compareBySetThenPosition);
 
   return (
     <div className="card-premium rounded-lg px-3 py-2 space-y-3">
       <h3 className="text-sm font-medium text-content-text-secondary">Show Highlights</h3>
-      {allTimerTracks.length > 0 && (
-        <div>
-          <h4 className="text-sm font-medium text-content-text-primary flex items-center gap-2 mb-1.5">
-            <Flame className="h-4 w-4 text-orange-500 shrink-0" />
-            <span>All-Timers</span>
-          </h4>
-          <ul className="space-y-0.5 pl-6">
-            {allTimerTracks.map((track) => (
-              <li key={track.id} className="text-content-text-secondary text-sm">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-content-text-tertiary font-medium">{track.set}</span>
-                  <Link
-                    to={`/songs/${track.song?.slug}`}
-                    className="text-brand-tertiary hover:text-brand-primary hover:underline transition-colors"
-                  >
-                    {track.song?.title}
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {tracksWithNotes.length > 0 && (
-        <div>
-          <h4 className="text-sm font-medium text-content-text-primary flex items-center gap-2 mb-1.5">
-            <FileText className="h-4 w-4 text-info shrink-0" />
-            <span>Track Notes</span>
-          </h4>
-          <ul className="space-y-2 pl-6">
-            {tracksWithNotes.map((track) => (
-              <li key={track.id} className="text-content-text-secondary text-sm">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-content-text-tertiary font-medium">{track.set}</span>
-                  <div className="flex-1">
+      <ul className="space-y-2">
+        {ordered.map((track, idx) => {
+          const showSetLabel = idx === 0 || ordered[idx - 1].set !== track.set;
+          return (
+            <li key={track.id} className="text-sm">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs text-content-text-tertiary font-medium w-5 shrink-0">
+                  {showSetLabel ? formatSetLabel(track.set, { encoresInSet }) : ""}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    <TrackIcon track={track} iconClassName="h-3.5 w-3.5" />
                     <Link
                       to={`/songs/${track.song?.slug}`}
                       className="text-brand-primary hover:text-brand-secondary hover:underline transition-colors"
                     >
                       {track.song?.title}
                     </Link>
-                    <p className="text-xs text-content-text-tertiary mt-0.5 pl-2 border-l-2 border-glass-border">
-                      {track.note}
+                  </span>
+                  {hasNote(track) && (
+                    <p className="text-xs text-content-text-secondary mt-0.5 pl-2 border-l-2 border-glass-border">
+                      {track.note?.trim()}
                     </p>
-                  </div>
+                  )}
                 </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
+}
+
+function hasNote(track: Pick<TrackLight, "note">): boolean {
+  return !!track.note?.trim();
 }

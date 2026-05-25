@@ -1,9 +1,10 @@
 import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
-import { Check, Flame } from "lucide-react";
+import { Check } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
 import { ShowDate } from "~/components/show-date";
+import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
@@ -351,9 +352,10 @@ function SetlistCardComponent({
                                   track.allTimer && "font-medium",
                                 )}
                               >
-                                {track.allTimer && (
-                                  <Flame className="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5 text-orange-500" />
-                                )}
+                                <NoteworthyMarker
+                                  track={track}
+                                  iconClassName="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5"
+                                />
                                 <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
                                 {trackAnnotationMap.has(track.id) && (
                                   <sup className="text-brand-secondary ml-0.5 font-medium text-xs">

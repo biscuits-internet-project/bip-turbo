@@ -15,6 +15,7 @@ const VALID_FILTER_KEYS = new Set([
   "standalone",
   "inverted",
   "dyslexic",
+  "jamChart",
   "allTimer",
 ]);
 

@@ -38,6 +38,27 @@ export const gapSortingFn = makeGapSortingFn("gap");
 export const filteredGapSortingFn = makeGapSortingFn("filteredGap");
 
 /**
+ * Adapt a SongPagePerformance row to the minimal Track-like shape the
+ * shared AllTimerCell + TrackRatingOverlay expect. The performance DTO
+ * uses `notes` (plural) for the note field and exposes the song title
+ * at the top level rather than under `song.title`; this normalizes both.
+ * Returns a structural subset of TrackLight — only the fields the
+ * overlay actually reads — since fabricating a full TrackLight with
+ * never-read defaults would be misleading.
+ */
+function trackFromPerformance(row: SongPagePerformance) {
+  return {
+    id: row.trackId,
+    allTimer: row.allTimer ?? null,
+    note: row.notes ?? null,
+    song: { title: row.songTitle ?? "", slug: row.songSlug ?? "" },
+    averageRating: row.rating ?? null,
+    ratingsCount: row.ratingsCount ?? null,
+    likesCount: 0,
+  };
+}
+
+/**
  * Sort comparator factory for the Song Before / Song After columns. The
  * primary axis is the adjacent song's title (case-insensitive). The
  * tiebreaker reads the relevant segue field — segue rows sort ahead of
@@ -107,6 +128,13 @@ interface PerformanceColumnOptions {
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
   /**
+   * When true (and `showAllTimerColumn` is on), keep the flame column
+   * visible on mobile and instead hide the Set column there — the
+   * noteworthy marker is the critical signal on jam-charts surfaces,
+   * while the set number is secondary in that context.
+   */
+  mobileFlamePriority?: boolean;
+  /**
    * Gap + Last Played are per-song signals. On surfaces that mix songs
    * (all-timers, on-this-day), pass `false` to hide both. Defaults true.
    */
@@ -151,11 +179,39 @@ function SortableHeader({
 }
 
 export function createPerformanceColumns(options: PerformanceColumnOptions): ColumnDef<SongPagePerformance, unknown>[] {
-  const { showSongColumn, showAllTimerColumn, showGapColumns, hasNarrowingFilter, userRatingMap, isAuthenticated } =
-    options;
+  const {
+    showSongColumn,
+    showAllTimerColumn,
+    mobileFlamePriority,
+    showGapColumns,
+    hasNarrowingFilter,
+    userRatingMap,
+    isAuthenticated,
+  } = options;
   const includeGapColumns = showGapColumns !== false;
   const columnHelper = createColumnHelper<SongPagePerformance>();
   const columns: ColumnDef<SongPagePerformance, unknown>[] = [];
+
+  // AllTimer column comes first so the flame anchors the leftmost slot
+  // on the surfaces that show it (jam-charts, song-detail jam-charts +
+  // all-performances tabs) — the visual hierarchy reads "noteworthy
+  // marker → song/date → context columns" left to right.
+  if (showAllTimerColumn) {
+    columns.push(
+      columnHelper.accessor((row) => row.allTimer ?? false, {
+        id: "allTimer",
+        header: "",
+        // Hidden on mobile by default — the Set cell renders the flame
+        // inline on phones to recover the 16px this column would
+        // otherwise consume. `mobileFlamePriority` flips that on
+        // jam-charts surfaces where the marker is the critical signal
+        // and the Set column hides on mobile instead.
+        meta: { ...allTimerColumnMeta, hideOnMobile: !mobileFlamePriority },
+        enableSorting: false,
+        cell: (info) => <AllTimerCell track={trackFromPerformance(info.row.original)} />,
+      }) as ColumnDef<SongPagePerformance, unknown>,
+    );
+  }
 
   if (showSongColumn) {
     columns.push(
@@ -183,20 +239,6 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
     );
   }
 
-  if (showAllTimerColumn) {
-    columns.push(
-      columnHelper.accessor((row) => row.allTimer ?? false, {
-        id: "allTimer",
-        header: "",
-        // Hidden on mobile here — the Set cell renders the flame inline
-        // on phones to recover the 16px this column would otherwise consume.
-        meta: { ...allTimerColumnMeta, hideOnMobile: true },
-        enableSorting: false,
-        cell: (info) => (info.getValue() ? <AllTimerCell /> : null),
-      }) as ColumnDef<SongPagePerformance, unknown>,
-    );
-  }
-
   columns.push(
     columnHelper.accessor("show.date", {
       id: "date",
@@ -213,7 +255,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         const date = info.getValue();
         const showSlug = info.row.original.show.slug;
         const venue = info.row.original.venue;
-        const isAllTimer = info.row.original.allTimer;
+        const track = trackFromPerformance(info.row.original);
         return (
           <div className="flex flex-col gap-0.5">
             <a href={`/shows/${showSlug}`} className="text-base text-brand-primary hover:text-brand-secondary block">
@@ -222,9 +264,9 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
                 venue={{ name: venue?.name, city: venue?.city, state: venue?.state }}
               />
             </a>
-            {isAllTimer && !showSongColumn && (
+            {!showSongColumn && (
               <span className="sm:hidden">
-                <AllTimerCell align="start" />
+                <AllTimerCell track={track} align="start" />
               </span>
             )}
           </div>
@@ -301,7 +343,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       columnHelper.accessor("set", {
         id: "set",
         header: "Set",
-        meta: { fixedWidth: "2.5rem" },
+        meta: { fixedWidth: "2.5rem", hideOnMobile: mobileFlamePriority },
         enableSorting: false,
         cell: (info) => {
           const set = info.getValue();
