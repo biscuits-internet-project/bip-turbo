@@ -1,7 +1,7 @@
 import { CacheKeys } from "@bip/domain";
 import type { CacheService } from "../_shared/cache/cache-service";
 import type { DbClient } from "../_shared/database/models";
-import { STATS_SHOWS_WHERE, statsShowsSql, TRACK_BY_SHOW_ORDER_ASC } from "../_shared/show-ordering";
+import { nonStubShowsSql, STATS_SHOWS_WHERE, statsShowsSql, TRACK_BY_SHOW_ORDER_ASC } from "../_shared/show-ordering";
 import {
   computeSongStats,
   computeTrackGaps,
@@ -55,6 +55,7 @@ export class StatsService {
           FROM shows
           WHERE date IS NOT NULL
             AND ${statsShowsSql("shows")}
+            AND ${nonStubShowsSql("shows")}
           GROUP BY 1
           ORDER BY 1
         `;
@@ -87,6 +88,7 @@ export class StatsService {
           FROM shows
           WHERE date IS NOT NULL
             AND ${statsShowsSql("shows")}
+            AND ${nonStubShowsSql("shows")}
           ORDER BY date
         `;
         return rows.map((r) => r.d);

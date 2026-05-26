@@ -20,6 +20,7 @@ import { Prisma } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
+import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
 import { createTestLogger } from "../src/_shared/test-logger";
 
@@ -135,21 +136,43 @@ export function isStubSlug(slug: string | null): boolean {
   return !!slug && /^\d{4}-\d{2}-\d{2}$/.test(slug);
 }
 
+/**
+ * Parse `--years=` into a deduplicated, sorted year list. Accepts single
+ * years, ranges (`2010-2026`), and comma-separated mixes of the two
+ * (`2010-2015,2020,2025`). Range bounds are inclusive on both ends.
+ */
 export function parseYearsArg(argv: string[], now: Date): number[] {
   const flag = argv.find((a) => a.startsWith("--years="));
   if (!flag) return [now.getUTCFullYear()];
   const raw = flag.slice("--years=".length);
-  const years = raw
+  const pieces = raw
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((s) => {
-      const n = Number(s);
-      if (!Number.isInteger(n)) throw new Error(`Invalid year in --years: ${s}`);
-      return n;
-    });
-  if (years.length === 0) throw new Error("--years must contain at least one year");
-  return years;
+    .filter((s) => s.length > 0);
+  const collected = new Set<number>();
+  for (const piece of pieces) {
+    if (piece.includes("-")) {
+      const [startStr, endStr, ...rest] = piece.split("-");
+      if (rest.length > 0 || !startStr || !endStr) {
+        throw new Error(`Invalid year range in --years: ${piece}`);
+      }
+      const start = Number(startStr);
+      const end = Number(endStr);
+      if (!Number.isInteger(start) || !Number.isInteger(end)) {
+        throw new Error(`Invalid year in range: ${piece}`);
+      }
+      if (end < start) {
+        throw new Error(`Year range end before start: ${piece}`);
+      }
+      for (let y = start; y <= end; y++) collected.add(y);
+      continue;
+    }
+    const n = Number(piece);
+    if (!Number.isInteger(n)) throw new Error(`Invalid year in --years: ${piece}`);
+    collected.add(n);
+  }
+  if (collected.size === 0) throw new Error("--years must contain at least one year");
+  return Array.from(collected).sort((a, b) => a - b);
 }
 
 export function collectSongSlugs(setlists: McpSetlist[]): string[] {
@@ -238,6 +261,7 @@ export function buildShowCreateInput(
 // Shape-minimal view of a local Show row (only the aggregate fields we mirror)
 // — used as the left operand to showNeedsUpdate.
 export interface LocalShowAggregates {
+  date: string;
   averageRating: number | null;
   ratingsCount: number;
   notes: string | null;
@@ -249,6 +273,7 @@ export interface LocalShowAggregates {
 const AVERAGE_RATING_TOLERANCE = 1e-6;
 
 export function showNeedsUpdate(local: LocalShowAggregates, remote: McpShow): boolean {
+  if (local.date !== remote.date) return true;
   if (local.ratingsCount !== remote.ratingsCount) return true;
   if (local.notes !== remote.notes) return true;
   if (local.relistenUrl !== remote.relistenUrl) return true;
@@ -276,6 +301,7 @@ export interface LocalShowForDrift extends LocalShowAggregates {
 // resolution succeeded — we never overwrite an already-set venueId from the
 // drift path; rename/merge is a separate concern.
 export interface ShowDriftUpdate {
+  date?: string;
   averageRating?: number | null;
   ratingsCount?: number;
   notes?: string | null;
@@ -301,6 +327,7 @@ export function buildShowDriftUpdate(
   remote: McpShow,
   resolvedVenueId: string | null,
 ): ShowDriftUpdate | null {
+  const dateDrift = local.date !== remote.date;
   const aggregatesDrift =
     local.ratingsCount !== remote.ratingsCount ||
     local.notes !== remote.notes ||
@@ -311,8 +338,9 @@ export function buildShowDriftUpdate(
   const dayOrderDrift =
     remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder;
   const venueDrift = local.venueId === null && resolvedVenueId !== null;
-  if (!aggregatesDrift && !countForStatsDrift && !dayOrderDrift && !venueDrift) return null;
+  if (!dateDrift && !aggregatesDrift && !countForStatsDrift && !dayOrderDrift && !venueDrift) return null;
   const update: ShowDriftUpdate = {};
+  if (dateDrift) update.date = remote.date;
   if (aggregatesDrift) {
     update.averageRating = remote.averageRating;
     update.ratingsCount = remote.ratingsCount;
@@ -484,82 +512,176 @@ export function buildVenueDriftUpdate(local: LocalVenueCurated, remote: McpVenue
   return Object.keys(patch).length === 0 ? null : patch;
 }
 
-export function buildTrackCreateInputs(
-  setlist: McpSetlist,
-  showId: string,
-  songSlugToId: Map<string, string>,
-): Prisma.TrackCreateManyInput[] {
-  const tracks: Prisma.TrackCreateManyInput[] = [];
-  for (const set of setlist.sets) {
-    for (const track of set.tracks) {
-      const songId = songSlugToId.get(track.songSlug);
-      if (!songId) continue;
-      tracks.push({
-        showId,
-        songId,
-        set: set.label,
-        position: track.position,
-        segue: track.segue,
-        // Defaults mirror the Prisma schema so a pre-deploy MCP (no allTimer
-        // / note in payload) still produces explicit, predictable inserts.
-        note: track.note ?? null,
-        allTimer: track.allTimer ?? false,
-      });
-    }
-  }
-  return tracks;
-}
-
-// Shape-minimal local Track row used by the drift-update path. Keyed by
-// (showId, position) at the call site — `id` is the primary key we patch.
-export interface LocalTrackForDrift {
+// Shape-minimal local Track row used by the setlist reconciliation path.
+// Annotations are inlined so the per-track annotation diff can run in the same
+// pass without a second query.
+export interface LocalTrackForReconcile {
   id: string;
+  set: string;
   position: number;
+  songId: string;
   segue: string | null;
   note: string | null;
   allTimer: boolean | null;
+  annotations: Array<{ id: string; desc: string | null }>;
 }
 
-export interface TrackDriftPatch {
+export interface TrackPatch {
+  songId?: string;
   segue?: string | null;
   note?: string | null;
   allTimer?: boolean;
 }
 
+export interface TrackInsertOp {
+  set: string;
+  position: number;
+  songId: string;
+  segue: string | null;
+  note: string | null;
+  allTimer: boolean;
+  annotationDescs: string[];
+}
+
+export interface TrackUpdateOp {
+  trackId: string;
+  patch: TrackPatch;
+  annotationDiff: { toCreateDescs: string[]; toDeleteIds: string[] };
+}
+
+export interface TrackDeleteOp {
+  trackId: string;
+  annotationIds: string[];
+}
+
+export interface SetlistReconciliation {
+  toInsert: TrackInsertOp[];
+  toUpdate: TrackUpdateOp[];
+  toDelete: TrackDeleteOp[];
+  /**
+   * True when an insert, delete, or songId change happened — i.e. the show's
+   * setlist shape moved. Drives cache invalidation, SegueRun regen, and
+   * stats-rebuild window expansion. Pure segue/note/allTimer/annotation drift
+   * doesn't count as structural.
+   */
+  structurallyChanged: boolean;
+  /** True when annotations, segue, note, or allTimer changed. */
+  cosmeticallyChanged: boolean;
+  /** Remote songSlugs we couldn't resolve to a local song id. Reported, not inserted. */
+  unresolvedSongSlugs: string[];
+}
+
 /**
- * Diff the local tracks of a single show against the remote setlist payload
- * and return one {trackId, patch} per drifted track. Drift fields: segue,
- * note, allTimer. Pre-deploy MCP omits allTimer/note entirely — those keys
- * are treated as "no opinion" and never produce a patch, so an older upstream
- * can't clobber admin-set values.
+ * Diff a show's local tracks against the remote setlist and emit per-track
+ * insert/update/delete ops. The match key is (set, position) because position
+ * is unique only within a set — a show with three sets will reuse position 1
+ * three times, so any position-only key collapses across sets.
+ *
+ * Same-key match: patch songId / segue / note / allTimer if drifted, and
+ * compute the annotation delta. Remote-only key: insert a new track + its
+ * annotations. Local-only key: delete the track and its annotations.
+ *
+ * `undefined` on remote.note / remote.allTimer / remote.annotations still means
+ * "no opinion" (pre-deploy MCP) so admin-set values aren't clobbered.
  */
-export function buildTrackDriftUpdates(
-  local: LocalTrackForDrift[],
+export function buildSetlistReconciliation(
+  local: LocalTrackForReconcile[],
   remote: McpSetlist,
-): Array<{ trackId: string; patch: TrackDriftPatch }> {
-  const remoteByPosition = new Map<number, McpSetlistTrack>();
+  songSlugToId: Map<string, string>,
+): SetlistReconciliation {
+  const keyOf = (set: string, position: number): string => `${set}|${position}`;
+
+  const remoteByKey = new Map<string, { set: string; track: McpSetlistTrack }>();
   for (const set of remote.sets) {
     for (const track of set.tracks) {
-      remoteByPosition.set(track.position, track);
+      remoteByKey.set(keyOf(set.label, track.position), { set: set.label, track });
     }
   }
-  const out: Array<{ trackId: string; patch: TrackDriftPatch }> = [];
-  for (const localTrack of local) {
-    const remoteTrack = remoteByPosition.get(localTrack.position);
-    if (!remoteTrack) continue;
-    const patch: TrackDriftPatch = {};
-    if (localTrack.segue !== remoteTrack.segue) patch.segue = remoteTrack.segue;
-    if (remoteTrack.note !== undefined && localTrack.note !== remoteTrack.note) {
-      patch.note = remoteTrack.note;
+  const localByKey = new Map(local.map((t) => [keyOf(t.set, t.position), t]));
+
+  const toInsert: TrackInsertOp[] = [];
+  const toUpdate: TrackUpdateOp[] = [];
+  const toDelete: TrackDeleteOp[] = [];
+  const unresolvedSongSlugs: string[] = [];
+  let structurallyChanged = false;
+  let cosmeticallyChanged = false;
+
+  for (const [key, { set, track }] of remoteByKey) {
+    const localTrack = localByKey.get(key);
+    if (!localTrack) {
+      const songId = songSlugToId.get(track.songSlug);
+      if (!songId) {
+        unresolvedSongSlugs.push(track.songSlug);
+        continue;
+      }
+      toInsert.push({
+        set,
+        position: track.position,
+        songId,
+        segue: track.segue,
+        note: track.note ?? null,
+        allTimer: track.allTimer ?? false,
+        annotationDescs: track.annotations ?? [],
+      });
+      structurallyChanged = true;
+      continue;
     }
-    if (remoteTrack.allTimer !== undefined) {
+    const patch: TrackPatch = {};
+    const remoteSongId = songSlugToId.get(track.songSlug);
+    if (remoteSongId === undefined) {
+      // We have a local track at this slot but can't resolve the prod songId.
+      // Don't drop the track; report and leave songId alone.
+      unresolvedSongSlugs.push(track.songSlug);
+    } else if (remoteSongId !== localTrack.songId) {
+      patch.songId = remoteSongId;
+      structurallyChanged = true;
+    }
+    if (localTrack.segue !== track.segue) {
+      patch.segue = track.segue;
+      cosmeticallyChanged = true;
+    }
+    if (track.note !== undefined && localTrack.note !== track.note) {
+      patch.note = track.note;
+      cosmeticallyChanged = true;
+    }
+    if (track.allTimer !== undefined) {
       const localFlag = localTrack.allTimer ?? false;
-      const remoteFlag = remoteTrack.allTimer ?? false;
-      if (localFlag !== remoteFlag) patch.allTimer = remoteFlag;
+      const remoteFlag = track.allTimer ?? false;
+      if (localFlag !== remoteFlag) {
+        patch.allTimer = remoteFlag;
+        cosmeticallyChanged = true;
+      }
     }
-    if (Object.keys(patch).length > 0) out.push({ trackId: localTrack.id, patch });
+    const annotationDiff = diffTrackAnnotations(localTrack.annotations, track.annotations);
+    if (annotationDiff.toCreateDescs.length > 0 || annotationDiff.toDeleteIds.length > 0) {
+      cosmeticallyChanged = true;
+    }
+    if (Object.keys(patch).length > 0 || annotationDiff.toCreateDescs.length > 0 || annotationDiff.toDeleteIds.length > 0) {
+      toUpdate.push({
+        trackId: localTrack.id,
+        patch,
+        annotationDiff,
+      });
+    }
   }
-  return out;
+
+  for (const [key, localTrack] of localByKey) {
+    if (remoteByKey.has(key)) continue;
+    toDelete.push({
+      trackId: localTrack.id,
+      annotationIds: localTrack.annotations.map((a) => a.id),
+    });
+    structurallyChanged = true;
+  }
+
+  return {
+    toInsert,
+    toUpdate,
+    toDelete,
+    structurallyChanged,
+    cosmeticallyChanged,
+    unresolvedSongSlugs,
+  };
 }
 
 /**
@@ -623,20 +745,70 @@ interface SyncStats {
   showsCreated: number;
   songsFetched: number;
   songsCreated: number;
+  songsOrphanedDeleted: number;
+  songsOrphanedWithTracks: number;
+  showsOrphanedDeleted: number;
+  showsOrphanedWithUserData: number;
   venuesCreated: number;
   venuesLinked: number;
   venuesUnmatched: number;
+  setlistsReconciled: number;
+  setlistsStructurallyChanged: number;
   tracksCreated: number;
+  tracksUpdated: number;
+  tracksDeleted: number;
+  annotationsCreated: number;
+  annotationsDeleted: number;
+  segueRunsRegenerated: number;
+  unresolvedSongSlugs: number;
   errors: number;
 }
 
+function printUsage(): void {
+  console.log(`Usage: bun run scripts/sync-missing-shows.ts [options]
+
+Pull Disco Biscuits shows/setlists/songs from prod (${MCP_URL}) into the local DB.
+Mirrors every in-scope show's full setlist: inserts new tracks, deletes tracks
+prod removed, patches songId/segue/note/allTimer drift, and replaces
+annotations. Idempotent — re-running only writes the rows that drifted.
+
+Options:
+  --years=SPEC             Years to sync, as a comma-separated list of single
+                           years and/or inclusive ranges. Default: current
+                           calendar year (UTC). Examples:
+                             --years=2025
+                             --years=2024,2025
+                             --years=2010-2026
+                             --years=2010-2015,2020,2024-2026
+  --dry-run                Log every change without writing to the DB or Redis.
+  --prune-ghost-shows      Cascade-delete local shows in synced years that prod
+                           no longer has, even when attendance / favorite /
+                           review / photo / youtube / rating rows are attached
+                           (those are dump-frozen prod data; the equivalent
+                           shows on prod under the new slug still carry them).
+                           Without this flag, ghost shows with user data are
+                           logged and skipped.
+  --help, -h               Show this message and exit.
+
+Examples:
+  bun run scripts/sync-missing-shows.ts --years=2025
+  bun run scripts/sync-missing-shows.ts --years=2010-2026 --dry-run
+  bun run scripts/sync-missing-shows.ts --years=2010-2026 --prune-ghost-shows
+`);
+}
+
 async function syncMissingShows(): Promise<void> {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    printUsage();
+    return;
+  }
   const isDryRun = process.argv.includes("--dry-run");
-  // --full-track-sync: fetch setlists for every existing local show in scope,
-  // not just missing-or-needs-venue. Catches Track.allTimer / Track.note /
-  // Track.segue / annotation edits on shows that haven't otherwise changed.
-  // Default run stays fast; opt in for periodic catch-up.
-  const isFullTrackSync = process.argv.includes("--full-track-sync");
+  // --prune-ghost-shows: delete local shows in synced years that prod
+  // doesn't have, even when user data (attendance, favorite, review, photo,
+  // youtube) is attached. Default skip-with-user-data is safe for shared
+  // DBs but blocks cleanup on dev DBs seeded from a prod dump (every old
+  // show carries prod's user data, which then prevents rename cleanup).
+  const pruneGhostShows = process.argv.includes("--prune-ghost-shows");
   const years = parseYearsArg(process.argv.slice(2), new Date());
   const now = new Date();
   const db = prisma;
@@ -654,6 +826,10 @@ async function syncMissingShows(): Promise<void> {
   // StatsService is wired without a cache here — the script never reads
   // cached aggregates, only triggers the post-batch gap rebuild.
   const statsService = new StatsService(prisma, cache ?? undefined);
+  // SegueRun rows reference Track ids in a non-FK String[] array. When the
+  // setlist reconcile inserts or deletes a track, those arrays go stale; we
+  // call generateSegueRunsForShow per structurally-changed show to rebuild.
+  const segueRunService = new SegueRunGeneratorService(prisma, logger);
   if (redis) await redis.connect();
 
   // Track every show whose row materially changed this run — used at the end
@@ -676,10 +852,22 @@ async function syncMissingShows(): Promise<void> {
     showsCreated: 0,
     songsFetched: 0,
     songsCreated: 0,
+    songsOrphanedDeleted: 0,
+    songsOrphanedWithTracks: 0,
+    showsOrphanedDeleted: 0,
+    showsOrphanedWithUserData: 0,
     venuesCreated: 0,
     venuesLinked: 0,
     venuesUnmatched: 0,
+    setlistsReconciled: 0,
+    setlistsStructurallyChanged: 0,
     tracksCreated: 0,
+    tracksUpdated: 0,
+    tracksDeleted: 0,
+    annotationsCreated: 0,
+    annotationsDeleted: 0,
+    segueRunsRegenerated: 0,
+    unresolvedSongSlugs: 0,
     errors: 0,
   };
 
@@ -696,11 +884,13 @@ async function syncMissingShows(): Promise<void> {
     }
     stats.showsRemote = remoteShows.length;
 
-    // Step 2a: drop prod stub rows (bare YYYY-MM-DD slug). These are orphan
-    // duplicates that coexist with the real show on the same date — they have
-    // no venue and no setlist, so we don't mirror them locally.
+    // Step 2a: drop prod stub rows that have a bare YYYY-MM-DD slug AND no
+    // venue — those are placeholder rows for unhappened/unconfirmed dates.
+    // A bare-date slug WITH a venue (e.g. 2009-03-08 Langerado Festival) is a
+    // real prod show; admins skipped the venue-suffix slug for historical
+    // reasons. Mirror those so per-year counts stay aligned with prod.
     const realShows = remoteShows.filter((s) => {
-      if (isStubSlug(s.slug)) {
+      if (isStubSlug(s.slug) && !s.venueName) {
         stats.stubsSkipped++;
         return false;
       }
@@ -723,7 +913,6 @@ async function syncMissingShows(): Promise<void> {
       console.warn(`⚠️  ${fullShowErrors.length} get_shows fetch errors:`, fullShowErrors);
       stats.errors += fullShowErrors.length;
     }
-    const remoteBySlug = new Map<string, McpShow>(remoteFullShows.map((s) => [s.slug, s]));
 
     // Step 2c: partition into missing-locally vs already-local. We pull venueId
     // for existing rows so the drift-update branch can back-fill venues that
@@ -753,75 +942,15 @@ async function syncMissingShows(): Promise<void> {
     const needsVenueSlugs = existingLocal.filter((s) => s.venueId === null).map((s) => s.slug);
     console.log(`📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`);
 
-    if (missingShows.length === 0 && needsVenueSlugs.length === 0 && !isFullTrackSync) {
-      // Pure aggregate-drift run: do the simple update loop and bail out.
-      // (When --full-track-sync is set we fall through to the full pipeline so
-      // every existing show's setlist gets diffed for Track / Annotation drift.)
-      for (const remote of existingRemoteShows) {
-        const local = existingBySlug.get(remote.slug);
-        if (!local) continue;
-        const patch = buildShowDriftUpdate(local, remote, local.venueId);
-        if (patch === null) {
-          stats.showsUnchanged++;
-          continue;
-        }
-        if (isDryRun) {
-          console.log(`  🔄 ${remote.slug} would update ${JSON.stringify(patch)} (dry run)`);
-          stats.showsUpdated++;
-          continue;
-        }
-        try {
-          await db.show.update({ where: { slug: remote.slug }, data: { ...patch, updatedAt: now } });
-          changedSlugs.add(remote.slug);
-          // countForStats flip on an existing show invalidates the gap chain
-          // from that show's date forward — feed the date into the rebuild
-          // trigger so the post-batch stats sweep picks it up. (Aggregate
-          // drift alone doesn't shift gap math.)
-          if (patch.countForStats !== undefined) {
-            const showDate = String(local.date);
-            if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
-              earliestInsertedDate = showDate;
-            }
-          }
-          stats.showsUpdated++;
-          console.log(`  🔄 ${remote.slug} ${JSON.stringify(patch)}`);
-        } catch (err) {
-          console.error(`  ❌ failed to update show ${remote.slug}:`, err);
-          stats.errors++;
-        }
-      }
-      console.log(`📊 Existing shows: ${stats.showsUpdated} updated, ${stats.showsUnchanged} unchanged`);
-      // Even a pure aggregate-drift run can trip the rebuild trigger if a
-      // countForStats flip was observed above.
-      if (!isDryRun && earliestInsertedDate !== null) {
-        console.log(`📐 Rebuilding gaps + song stats since ${earliestInsertedDate} (countForStats flip)`);
-        try {
-          await statsService.rebuildGapsAndSongStatsSince(earliestInsertedDate);
-        } catch (err) {
-          console.error("  ❌ stats rebuild failed:", err);
-          stats.errors++;
-        }
-      }
-      printSummary(stats, isDryRun);
-      return;
-    }
-
-    // Step 3: fetch setlists for missing shows AND existing shows that need
-    // venue back-fill, in one batched call. --full-track-sync adds every
-    // remaining existing-local slug so Track / Annotation drift can be diffed
-    // against the latest prod state, not just the inserts + venue back-fills.
-    const fullTrackSyncSlugs = isFullTrackSync
-      ? existingLocal.filter((s) => s.venueId !== null).map((s) => s.slug)
-      : [];
-    const setlistFetchSlugs = [
-      ...missingShows.map((s) => s.slug),
-      ...needsVenueSlugs,
-      ...fullTrackSyncSlugs,
-    ];
+    // Step 3: fetch the full setlist for EVERY in-scope show in one batched
+    // call. Drives both the missing-show inserts and the per-existing-show
+    // setlist reconciliation below. Prod admins can add / remove / swap
+    // tracks on already-local shows, so every show in scope needs its setlist
+    // fetched, not just the inserts.
     const { setlists, errors: setlistErrors } = await mcpCall<{
       setlists: McpSetlist[];
       errors?: Array<{ slug: string; error: string }>;
-    }>("get_setlists", { showSlugs: setlistFetchSlugs });
+    }>("get_setlists", { showSlugs: realSlugs });
     if (setlistErrors?.length) {
       console.warn(`⚠️  ${setlistErrors.length} setlist fetch errors:`, setlistErrors);
       stats.errors += setlistErrors.length;
@@ -960,6 +1089,17 @@ async function syncMissingShows(): Promise<void> {
             earliestInsertedDate = showDate;
           }
         }
+        // date drift shifts the show's chronological position. Expand the
+        // rebuild window to the EARLIER of (old date, new date) so the gap
+        // chain gets recomputed in both directions.
+        if (patch.date !== undefined) {
+          const oldDate = String(local.date);
+          const newDate = patch.date;
+          const earlier = oldDate < newDate ? oldDate : newDate;
+          if (earliestInsertedDate === null || earlier < earliestInsertedDate) {
+            earliestInsertedDate = earlier;
+          }
+        }
         stats.showsUpdated++;
         console.log(`  🔄 ${remote.slug} ${JSON.stringify(patch)}`);
       } catch (err) {
@@ -1047,8 +1187,10 @@ async function syncMissingShows(): Promise<void> {
       }
     }
 
-    // Step 7: per-show transaction — insert Show (with venueId + bandId resolved),
-    // then its Tracks.
+    // Step 7: insert missing show rows (no tracks yet — those land in step 8).
+    // Splitting insert-show from insert-tracks lets step 8 run one unified
+    // reconcile loop over every in-scope show, missing or existing, using the
+    // same buildSetlistReconciliation helper.
     for (const show of missingShows) {
       const slug = show.slug;
       const setlist = setlistBySlug.get(slug);
@@ -1059,140 +1201,383 @@ async function syncMissingShows(): Promise<void> {
       const venueId = venueSlug ? venueSlugToId.get(venueSlug) ?? null : null;
       if (venueId) stats.venuesLinked++;
 
-      try {
-        if (isDryRun) {
-          const trackCount = setlist ? buildTrackCreateInputs(setlist, "dry-run-show", songSlugToId).length : 0;
-          console.log(`  🆕 show ${slug} (${trackCount} tracks, venue=${venueId ? "✓" : "—"}) (dry run)`);
-          stats.showsCreated++;
-          stats.tracksCreated += trackCount;
-          continue;
-        }
-        await db.$transaction(async (tx) => {
-          const createdShow = await tx.show.create({
-            data: buildShowCreateInput(show, now, { venueId, bandId: band?.id ?? null }),
-          });
-          let trackCount = 0;
-          if (setlist) {
-            const trackInputs = buildTrackCreateInputs(setlist, createdShow.id, songSlugToId);
-            if (trackInputs.length > 0) {
-              const result = await tx.track.createMany({ data: trackInputs });
-              trackCount = result.count;
-            }
-          }
-          changedSlugs.add(slug);
-          const showDate = String(show.date);
-          if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
-            earliestInsertedDate = showDate;
-          }
-          stats.showsCreated++;
-          stats.tracksCreated += trackCount;
-          console.log(`  ✅ ${slug} (${trackCount} tracks, venue=${venueId ? "✓" : "—"})`);
+      if (isDryRun) {
+        console.log(`  🆕 show ${slug} (venue=${venueId ? "✓" : "—"}) (dry run)`);
+        stats.showsCreated++;
+        // Synthesize an existingLocal entry so the reconcile loop below also
+        // logs the would-be track inserts for this slug.
+        existingBySlug.set(slug, {
+          id: `dry-run-show-${slug}`,
+          slug,
+          date: show.date,
+          averageRating: show.averageRating,
+          ratingsCount: show.ratingsCount,
+          notes: show.notes,
+          relistenUrl: show.relistenUrl,
+          venueId,
+          countForStats: show.countForStats ?? true,
+          dayOrder: show.dayOrder ?? null,
         });
+        const showDate = String(show.date);
+        if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+          earliestInsertedDate = showDate;
+        }
+        continue;
+      }
+      try {
+        const createdShow = await db.show.create({
+          data: buildShowCreateInput(show, now, { venueId, bandId: band?.id ?? null }),
+        });
+        existingBySlug.set(slug, {
+          id: createdShow.id,
+          slug,
+          date: createdShow.date,
+          averageRating: createdShow.averageRating,
+          ratingsCount: createdShow.ratingsCount,
+          notes: createdShow.notes,
+          relistenUrl: createdShow.relistenUrl,
+          venueId: createdShow.venueId,
+          countForStats: createdShow.countForStats,
+          dayOrder: createdShow.dayOrder,
+        });
+        changedSlugs.add(slug);
+        const showDate = String(show.date);
+        if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+          earliestInsertedDate = showDate;
+        }
+        stats.showsCreated++;
+        console.log(`  🆕 show ${slug} (venue=${venueId ? "✓" : "—"})`);
       } catch (err) {
         console.error(`  ❌ failed to insert show ${slug}:`, err);
         stats.errors++;
       }
     }
 
-    // Step 8: track + annotation drift for existing shows whose setlists
-    // were fetched (venue back-fill + --full-track-sync). Catches admin edits
-    // to Track.allTimer / Track.note / Track.segue and the per-track
-    // Annotation set without re-doing the show row itself. countForStats is
-    // pulled in so we know whether a flip should expand the rebuild window.
-    const driftShowSlugs = Array.from(new Set([...needsVenueSlugs, ...fullTrackSyncSlugs]));
-    if (driftShowSlugs.length > 0) {
-      const driftShows = await db.show.findMany({
-        where: { slug: { in: driftShowSlugs } },
+    // Step 8: reconcile every in-scope show's setlist against prod. One DB
+    // query pulls the local track + annotation graph for every show; the pure
+    // buildSetlistReconciliation helper diffs against the remote setlist
+    // matched on (set, position) and emits insert / update / delete ops. The
+    // SegueRun regen + stats-rebuild-window expansion fire only for shows
+    // whose setlist shape actually moved (insert / delete / songId change),
+    // not for cosmetic-only diffs.
+    const showIdsToReconcile = Array.from(existingBySlug.values())
+      .filter((s) => !String(s.id).startsWith("dry-run-show-"))
+      .map((s) => s.id);
+    const localTracksByShowId = new Map<string, LocalTrackForReconcile[]>();
+    if (showIdsToReconcile.length > 0) {
+      const localTrackRows = await db.track.findMany({
+        where: { showId: { in: showIdsToReconcile } },
         select: {
-          slug: true,
-          date: true,
-          countForStats: true,
-          tracks: {
-            select: {
-              id: true,
-              position: true,
-              segue: true,
-              note: true,
-              allTimer: true,
-              annotations: { select: { id: true, desc: true } },
-            },
-          },
+          id: true,
+          showId: true,
+          set: true,
+          position: true,
+          songId: true,
+          segue: true,
+          note: true,
+          allTimer: true,
+          annotations: { select: { id: true, desc: true } },
         },
       });
-      for (const show of driftShows) {
-        const setlist = setlistBySlug.get(show.slug);
-        if (!setlist) continue;
-        const trackPatches = buildTrackDriftUpdates(show.tracks, setlist);
-        // Map track-id → its remote annotation list for the per-track annotation diff.
-        const remoteAnnotationsByPosition = new Map<number, string[] | undefined>();
-        for (const set of setlist.sets) {
-          for (const track of set.tracks) {
-            remoteAnnotationsByPosition.set(track.position, track.annotations);
-          }
+      for (const row of localTrackRows) {
+        const arr = localTracksByShowId.get(row.showId);
+        const tr: LocalTrackForReconcile = {
+          id: row.id,
+          set: row.set,
+          position: row.position,
+          songId: row.songId,
+          segue: row.segue,
+          note: row.note,
+          allTimer: row.allTimer,
+          annotations: row.annotations,
+        };
+        if (arr) arr.push(tr);
+        else localTracksByShowId.set(row.showId, [tr]);
+      }
+    }
+
+    for (const [slug, local] of existingBySlug) {
+      const setlist = setlistBySlug.get(slug);
+      if (!setlist) continue;
+      const localTracks = localTracksByShowId.get(local.id) ?? [];
+      const recon = buildSetlistReconciliation(localTracks, setlist, songSlugToId);
+      if (recon.unresolvedSongSlugs.length > 0) {
+        stats.unresolvedSongSlugs += recon.unresolvedSongSlugs.length;
+        console.warn(
+          `⚠️  ${slug}: ${recon.unresolvedSongSlugs.length} unresolved songSlug(s): ${recon.unresolvedSongSlugs.join(", ")}`,
+        );
+      }
+      if (recon.toInsert.length === 0 && recon.toUpdate.length === 0 && recon.toDelete.length === 0) {
+        continue;
+      }
+      stats.setlistsReconciled++;
+      if (recon.structurallyChanged) stats.setlistsStructurallyChanged++;
+      const showDate = String(local.date);
+
+      if (isDryRun) {
+        if (recon.toInsert.length > 0) {
+          console.log(`  ➕ ${slug}: +${recon.toInsert.length} track(s) (dry run)`);
         }
-        let touchedShow = false;
-        for (const { trackId, patch } of trackPatches) {
-          if (isDryRun) {
-            console.log(`  🔄 track ${trackId} would update ${JSON.stringify(patch)} (dry run)`);
-            touchedShow = true;
-            continue;
-          }
-          try {
-            await db.track.update({ where: { id: trackId }, data: { ...patch, updatedAt: now } });
-            touchedShow = true;
-            console.log(`  🔄 track ${trackId} ${JSON.stringify(patch)}`);
-          } catch (err) {
-            console.error(`  ❌ failed to update track ${trackId}:`, err);
-            stats.errors++;
-          }
+        if (recon.toUpdate.length > 0) {
+          console.log(`  🔄 ${slug}: ~${recon.toUpdate.length} track(s) (dry run)`);
         }
-        // Annotation set replace: for each local track, compare to the remote
-        // annotation strings and apply the minimal create/delete delta.
-        for (const localTrack of show.tracks) {
-          const remoteAnnotations = remoteAnnotationsByPosition.get(localTrack.position);
-          const diff = diffTrackAnnotations(localTrack.annotations, remoteAnnotations);
-          if (diff.toCreateDescs.length === 0 && diff.toDeleteIds.length === 0) continue;
-          if (isDryRun) {
-            console.log(
-              `  🔄 track ${localTrack.id} annotations: +${diff.toCreateDescs.length} -${diff.toDeleteIds.length} (dry run)`,
-            );
-            touchedShow = true;
-            continue;
+        if (recon.toDelete.length > 0) {
+          console.log(`  ➖ ${slug}: -${recon.toDelete.length} track(s) (dry run)`);
+        }
+        // Match the live counters: only count an update when the track row
+        // itself has a non-empty patch. Annotation-only updates are reflected
+        // in the annotation counters, not tracksUpdated.
+        stats.tracksCreated += recon.toInsert.length;
+        stats.tracksUpdated += recon.toUpdate.filter((u) => Object.keys(u.patch).length > 0).length;
+        stats.tracksDeleted += recon.toDelete.length;
+        for (const ins of recon.toInsert) stats.annotationsCreated += ins.annotationDescs.length;
+        for (const upd of recon.toUpdate) {
+          stats.annotationsCreated += upd.annotationDiff.toCreateDescs.length;
+          stats.annotationsDeleted += upd.annotationDiff.toDeleteIds.length;
+        }
+        for (const del of recon.toDelete) stats.annotationsDeleted += del.annotationIds.length;
+        changedSlugs.add(slug);
+        if (recon.structurallyChanged && local.countForStats && (earliestInsertedDate === null || showDate < earliestInsertedDate)) {
+          earliestInsertedDate = showDate;
+        }
+        continue;
+      }
+
+      try {
+        await db.$transaction(async (tx) => {
+          for (const ins of recon.toInsert) {
+            await tx.track.create({
+              data: {
+                showId: local.id,
+                songId: ins.songId,
+                set: ins.set,
+                position: ins.position,
+                segue: ins.segue,
+                note: ins.note,
+                allTimer: ins.allTimer,
+                createdAt: now,
+                updatedAt: now,
+                annotations: ins.annotationDescs.length > 0
+                  ? {
+                      create: ins.annotationDescs.map((desc) => ({ desc, createdAt: now, updatedAt: now })),
+                    }
+                  : undefined,
+              },
+            });
+            stats.tracksCreated++;
+            stats.annotationsCreated += ins.annotationDescs.length;
           }
-          try {
-            if (diff.toDeleteIds.length > 0) {
-              await db.annotation.deleteMany({ where: { id: { in: diff.toDeleteIds } } });
+          for (const upd of recon.toUpdate) {
+            if (Object.keys(upd.patch).length > 0) {
+              await tx.track.update({
+                where: { id: upd.trackId },
+                data: { ...upd.patch, updatedAt: now },
+              });
+              stats.tracksUpdated++;
             }
-            if (diff.toCreateDescs.length > 0) {
-              await db.annotation.createMany({
-                data: diff.toCreateDescs.map((desc) => ({
-                  trackId: localTrack.id,
+            if (upd.annotationDiff.toDeleteIds.length > 0) {
+              await tx.annotation.deleteMany({ where: { id: { in: upd.annotationDiff.toDeleteIds } } });
+              stats.annotationsDeleted += upd.annotationDiff.toDeleteIds.length;
+            }
+            if (upd.annotationDiff.toCreateDescs.length > 0) {
+              await tx.annotation.createMany({
+                data: upd.annotationDiff.toCreateDescs.map((desc) => ({
+                  trackId: upd.trackId,
                   desc,
                   createdAt: now,
                   updatedAt: now,
                 })),
               });
+              stats.annotationsCreated += upd.annotationDiff.toCreateDescs.length;
             }
-            touchedShow = true;
-            console.log(
-              `  🔄 track ${localTrack.id} annotations: +${diff.toCreateDescs.length} -${diff.toDeleteIds.length}`,
-            );
+          }
+          for (const del of recon.toDelete) {
+            if (del.annotationIds.length > 0) {
+              await tx.annotation.deleteMany({ where: { id: { in: del.annotationIds } } });
+              stats.annotationsDeleted += del.annotationIds.length;
+            }
+            await tx.track.delete({ where: { id: del.trackId } });
+            stats.tracksDeleted++;
+          }
+        });
+        changedSlugs.add(slug);
+        console.log(
+          `  📝 ${slug}: +${recon.toInsert.length} ~${recon.toUpdate.length} -${recon.toDelete.length} track(s)`,
+        );
+        if (recon.structurallyChanged) {
+          try {
+            const showWithTracks = await db.show.findUnique({
+              where: { id: local.id },
+              include: { tracks: { include: { song: true }, orderBy: [{ set: "asc" }, { position: "asc" }] } },
+            });
+            if (showWithTracks) {
+              const count = await segueRunService.generateSegueRunsForShow(showWithTracks);
+              stats.segueRunsRegenerated += count;
+            }
           } catch (err) {
-            console.error(`  ❌ failed to sync annotations for track ${localTrack.id}:`, err);
+            console.error(`  ❌ SegueRun regen failed for ${slug}:`, err);
             stats.errors++;
           }
+          if (local.countForStats && (earliestInsertedDate === null || showDate < earliestInsertedDate)) {
+            earliestInsertedDate = showDate;
+          }
         }
-        if (touchedShow) {
-          changedSlugs.add(show.slug);
-          // Track / annotation drift on a stats-counting show shifts the gap
-          // chain (e.g. an all-timer flag change is cosmetic, but a segue
-          // change affects ordering; play it safe and expand the window).
-          if (show.countForStats) {
-            const showDate = String(show.date);
-            if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
-              earliestInsertedDate = showDate;
+      } catch (err) {
+        console.error(`  ❌ failed to reconcile setlist for ${slug}:`, err);
+        stats.errors++;
+      }
+    }
+
+    // Step 8b: ghost-show detection. Local shows in the synced years whose
+    // slug isn't in prod's per-year list are renames / merges / deletes
+    // upstream — the step 8 reconcile loop never touches them because it
+    // only iterates prod's shows. Cascade-delete the sync-managed rows
+    // (annotations → tracks → segueRuns → showYoutubes → show) when no
+    // user data references the show; log + skip otherwise.
+    const yearSet = new Set(years);
+    const prodSlugSet = new Set(realSlugs);
+    const inYearLocalShows = await db.show.findMany({
+      where: {
+        OR: years.map((y) => ({
+          AND: [
+            { date: { gte: `${y}-01-01` } },
+            { date: { lte: `${y}-12-31` } },
+          ],
+        })),
+      },
+      select: {
+        id: true,
+        slug: true,
+        date: true,
+        _count: {
+          select: {
+            tracks: true,
+            attendances: true,
+            favorites: true,
+            reviews: true,
+            showPhotos: true,
+            showYoutubes: true,
+          },
+        },
+      },
+    });
+    const ghostShows = inYearLocalShows.filter((s) => {
+      if (!s.slug) return false;
+      if (!prodSlugSet.has(s.slug)) {
+        const showYear = Number(s.date.slice(0, 4));
+        return yearSet.has(showYear);
+      }
+      return false;
+    });
+    if (ghostShows.length > 0) {
+      console.log(`👻 ${ghostShows.length} ghost show(s) found in synced years (local but not on prod)`);
+    }
+    for (const ghost of ghostShows) {
+      const userDataCount =
+        ghost._count.attendances +
+        ghost._count.favorites +
+        ghost._count.reviews +
+        ghost._count.showPhotos +
+        ghost._count.showYoutubes;
+      if (userDataCount > 0 && !pruneGhostShows) {
+        stats.showsOrphanedWithUserData++;
+        console.warn(
+          `  ⚠️  show ${ghost.slug} (${ghost._count.tracks} tracks, ${userDataCount} user-data row(s)); skipping — re-run with --prune-ghost-shows to delete`,
+        );
+        continue;
+      }
+      if (isDryRun) {
+        console.log(`  🗑️  show ${ghost.slug} (${ghost._count.tracks} tracks) would be deleted (not on prod) (dry run)`);
+        stats.showsOrphanedDeleted++;
+        continue;
+      }
+      try {
+        await db.$transaction(async (tx) => {
+          const localTrackRows = await tx.track.findMany({
+            where: { showId: ghost.id },
+            select: { id: true },
+          });
+          const trackIds = localTrackRows.map((t) => t.id);
+          if (trackIds.length > 0) {
+            // Ratings are polymorphic — drop Show + Track ratings for this show.
+            await tx.rating.deleteMany({
+              where: { rateableType: "Track", rateableId: { in: trackIds } },
+            });
+            await tx.annotation.deleteMany({ where: { trackId: { in: trackIds } } });
+            await tx.track.deleteMany({ where: { showId: ghost.id } });
+          }
+          // Other Tracks may still reference the ghost as previousPerformanceShow.
+          // Null those out — rebuildGapsAndSongStatsSince at end of run rebuilds.
+          await tx.track.updateMany({
+            where: { previousPerformanceShowId: ghost.id },
+            data: { previousPerformanceShowId: null },
+          });
+          await tx.segueRun.deleteMany({ where: { showId: ghost.id } });
+          // User-data tables: only present when --prune-ghost-shows opted in
+          // (without the flag, the loop already `continue`d above). All five
+          // tables have NoAction onDelete so we have to wipe them manually.
+          await tx.attendance.deleteMany({ where: { showId: ghost.id } });
+          await tx.favorite.deleteMany({ where: { showId: ghost.id } });
+          await tx.review.deleteMany({ where: { showId: ghost.id } });
+          await tx.showPhoto.deleteMany({ where: { showId: ghost.id } });
+          await tx.showYoutube.deleteMany({ where: { showId: ghost.id } });
+          await tx.rating.deleteMany({
+            where: { rateableType: "Show", rateableId: ghost.id },
+          });
+          await tx.show.delete({ where: { id: ghost.id } });
+        });
+        changedSlugs.add(ghost.slug ?? "");
+        songsChanged = true;
+        if (earliestInsertedDate === null || ghost.date < earliestInsertedDate) {
+          earliestInsertedDate = ghost.date;
+        }
+        stats.showsOrphanedDeleted++;
+        console.log(`  🗑️  show ${ghost.slug} (${ghost._count.tracks} tracks) deleted (not on prod)`);
+      } catch (err) {
+        console.error(`  ❌ failed to delete ghost show ${ghost.slug}:`, err);
+        stats.errors++;
+      }
+    }
+
+    // Step 8c: orphan-song detection. Local songs whose slug prod doesn't
+    // return on get_songs are renames / merges / deletes upstream. Delete the
+    // zero-track orphans (safe — nothing references them) and log the rest
+    // with their track count so the user can do the manual re-point. Runs
+    // after ghost-show deletion so songs that became zero-track via that
+    // cleanup get auto-deleted here.
+    const localSongCountRows = await db.song.findMany({
+      select: { id: true, slug: true, title: true, _count: { select: { tracks: true } } },
+    });
+    if (localSongCountRows.length > 0) {
+      const { errors: orphanErrors } = await mcpCall<{
+        songs: McpSong[];
+        errors?: Array<{ slug: string; error: string }>;
+      }>("get_songs", { slugs: localSongCountRows.map((s) => s.slug) });
+      const orphanSlugs = new Set((orphanErrors ?? []).map((e) => e.slug));
+      const localSongBySlugMap = new Map(localSongCountRows.map((s) => [s.slug, s]));
+      for (const orphanSlug of orphanSlugs) {
+        const local = localSongBySlugMap.get(orphanSlug);
+        if (!local) continue;
+        if (local._count.tracks === 0) {
+          if (isDryRun) {
+            console.log(`  🗑️  song ${orphanSlug} (0 tracks) would be deleted (not on prod) (dry run)`);
+          } else {
+            try {
+              await db.song.delete({ where: { id: local.id } });
+              songsChanged = true;
+              console.log(`  🗑️  song ${orphanSlug} (0 tracks) deleted (not on prod)`);
+            } catch (err) {
+              console.error(`  ❌ failed to delete orphan song ${orphanSlug}:`, err);
+              stats.errors++;
+              continue;
             }
           }
+          stats.songsOrphanedDeleted++;
+        } else {
+          stats.songsOrphanedWithTracks++;
+          console.warn(
+            `  ⚠️  song ${orphanSlug} ("${local.title}") has ${local._count.tracks} local track(s) but isn't on prod — likely a rename or merge upstream; manual cleanup needed`,
+          );
         }
       }
     }
@@ -1249,10 +1634,17 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Shows created: ${stats.showsCreated}`);
   console.log(`Songs fetched: ${stats.songsFetched}`);
   console.log(`Songs created: ${stats.songsCreated}`);
+  console.log(`Songs orphaned (deleted / with tracks): ${stats.songsOrphanedDeleted} / ${stats.songsOrphanedWithTracks}`);
+  console.log(`Shows orphaned (deleted / with user data): ${stats.showsOrphanedDeleted} / ${stats.showsOrphanedWithUserData}`);
   console.log(`Venues created: ${stats.venuesCreated}`);
   console.log(`Venues linked on shows: ${stats.venuesLinked}`);
   console.log(`Venues unmatched (left NULL): ${stats.venuesUnmatched}`);
-  console.log(`Tracks created: ${stats.tracksCreated}`);
+  console.log(`Setlists reconciled: ${stats.setlistsReconciled}`);
+  console.log(`Setlists structurally changed: ${stats.setlistsStructurallyChanged}`);
+  console.log(`Tracks created / updated / deleted: ${stats.tracksCreated} / ${stats.tracksUpdated} / ${stats.tracksDeleted}`);
+  console.log(`Annotations created / deleted: ${stats.annotationsCreated} / ${stats.annotationsDeleted}`);
+  console.log(`SegueRuns regenerated: ${stats.segueRunsRegenerated}`);
+  console.log(`Unresolved song slugs: ${stats.unresolvedSongSlugs}`);
   console.log(`Errors: ${stats.errors}`);
 }
 

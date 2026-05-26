@@ -143,6 +143,12 @@ export class RatingService {
 
     if (data.rateableType === "Show" && data.showSlug) {
       await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug);
+    } else if (data.rateableType === "Track" && data.showSlug) {
+      // The show's cached setlist payload at CacheKeys.show.data(slug)
+      // embeds Track.averageRating/ratingsCount on each track, so a rating
+      // mutation has to bust that cache for subsequent reads to surface the
+      // new denormalized values.
+      await this.cacheInvalidation.invalidateShow(data.showSlug);
     }
 
     // Update the related show/track average rating and count
@@ -355,6 +361,11 @@ export class RatingService {
 
     if (data.rateableType === "Show" && data.showSlug) {
       await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug);
+    } else if (data.rateableType === "Track" && data.showSlug) {
+      // Same reason as the upsert path: Track.averageRating/ratingsCount
+      // live inside the cached setlist payload, so a recompute has to bust
+      // the show cache.
+      await this.cacheInvalidation.invalidateShow(data.showSlug);
     }
 
     return stats;

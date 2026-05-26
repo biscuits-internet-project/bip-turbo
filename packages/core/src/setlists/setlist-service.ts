@@ -11,7 +11,13 @@ import {
 } from "@bip/domain";
 import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
-import { resolveShowOrderBy, SHOW_ORDER_ASC, SHOW_ORDER_DESC, STATS_SHOWS_WHERE } from "../_shared/show-ordering";
+import {
+  NON_STUB_SHOWS_WHERE,
+  resolveShowOrderBy,
+  SHOW_ORDER_ASC,
+  SHOW_ORDER_DESC,
+  STATS_SHOWS_WHERE,
+} from "../_shared/show-ordering";
 
 /**
  * Filter options for setlist queries. The `hasPhotos` / `hasYoutube` flags
@@ -523,7 +529,10 @@ export class SetlistService {
 
     const results = await this.db.show.findMany({
       where: {
-        venueId,
+        // venueId: explicit caller value when given (the venue-detail page
+        // looks shows up by venueId), otherwise apply the stub filter to drop
+        // orphan placeholder shows that have no venue assigned.
+        venueId: venueId !== undefined ? venueId : NON_STUB_SHOWS_WHERE.venueId,
         date: monthDay
           ? { endsWith: `-${monthDay}` }
           : year

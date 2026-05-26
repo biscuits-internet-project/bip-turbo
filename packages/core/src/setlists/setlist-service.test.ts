@@ -124,6 +124,21 @@ describe("SetlistService.findManyLight", () => {
     expect(call.where.showPhotosCount).toEqual({ gt: 0 });
     expect(call.where.showYoutubesCount).toEqual({ equals: 0 });
   });
+
+  // Year listings on prod include orphan placeholder shows (bare YYYY-MM-DD
+  // slug, no venue) which double-count alongside the real show on the same
+  // date. They render as a blank row in the list with no setlist data, so the
+  // query must drop them at the SQL boundary. Keyed on the missing venue —
+  // see NON_STUB_SHOWS_WHERE.
+  test("excludes orphan stub shows (no venue) from year listings", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never);
+
+    await service.findManyLight({ filters: { year: 2024 } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.venueId).toEqual({ not: null });
+  });
 });
 
 describe("eligibleGapsForAggregation", () => {

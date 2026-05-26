@@ -1,21 +1,20 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildSetlistReconciliation,
   buildShowCreateInput,
   buildSongCreateInput,
-  buildTrackCreateInputs,
-  buildTrackDriftUpdates,
-  diffTrackAnnotations,
   buildSongDriftUpdate,
-  buildVenueDriftUpdate,
   buildShowDriftUpdate,
   buildVenueCreateInput,
+  buildVenueDriftUpdate,
   collectSongSlugs,
   collectVenueKeys,
+  diffTrackAnnotations,
   isStubSlug,
   matchVenue,
   parseYearsArg,
   showNeedsUpdate,
-  type LocalTrackForDrift,
+  type LocalTrackForReconcile,
   type McpSearchVenueResult,
   type McpSetlist,
   type McpShow,
@@ -52,6 +51,32 @@ describe("parseYearsArg", () => {
   // which would hide user intent (e.g. --years=abc shouldn't sync the current year).
   test("throws on non-numeric year values", () => {
     expect(() => parseYearsArg(["--years=abc"], new Date())).toThrow();
+  });
+
+  // Range syntax: backfilling a decade is a common request, and listing each
+  // year manually is tedious. Bounds are inclusive on both ends.
+  test("expands a YYYY-YYYY range to every year in the range", () => {
+    expect(parseYearsArg(["--years=2010-2015"], new Date())).toEqual([2010, 2011, 2012, 2013, 2014, 2015]);
+  });
+
+  // Ranges and single years mix in one --years value. Output is deduplicated
+  // and sorted so callers don't need to defend against either.
+  test("mixes ranges and single years, deduplicating overlaps", () => {
+    expect(parseYearsArg(["--years=2010-2012,2015,2011-2013"], new Date())).toEqual([2010, 2011, 2012, 2013, 2015]);
+  });
+
+  // A reversed range is almost always a typo (--years=2026-2010); throwing
+  // tells the user instead of silently returning an empty list and syncing nothing.
+  test("throws when range end is before start", () => {
+    expect(() => parseYearsArg(["--years=2026-2010"], new Date())).toThrow();
+  });
+
+  // Three-part or empty-part ranges (2010-2015-2020, 2010-, -2026) are
+  // malformed — fail loudly rather than guess what the user meant.
+  test("throws on malformed ranges", () => {
+    expect(() => parseYearsArg(["--years=2010-2015-2020"], new Date())).toThrow();
+    expect(() => parseYearsArg(["--years=2010-"], new Date())).toThrow();
+    expect(() => parseYearsArg(["--years=-2026"], new Date())).toThrow();
   });
 });
 
@@ -292,7 +317,7 @@ describe("showNeedsUpdate", () => {
   test("returns false when every aggregate matches", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
         remote,
       ),
     ).toBe(false);
@@ -304,7 +329,7 @@ describe("showNeedsUpdate", () => {
   test("returns true when ratingsCount drifts", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 18, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 18, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
         remote,
       ),
     ).toBe(true);
@@ -315,7 +340,7 @@ describe("showNeedsUpdate", () => {
   test("returns false for averageRating differences within float tolerance", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.1999999, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        { date: "2025-07-04", averageRating: 4.1999999, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
         remote,
       ),
     ).toBe(false);
@@ -325,7 +350,7 @@ describe("showNeedsUpdate", () => {
   test("returns true for averageRating differences beyond float tolerance", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.1, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        { date: "2025-07-04", averageRating: 4.1, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
         remote,
       ),
     ).toBe(true);
@@ -335,7 +360,7 @@ describe("showNeedsUpdate", () => {
   test("returns true when notes drifts", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: "old note", relistenUrl: "https://relisten.example/rr" },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "old note", relistenUrl: "https://relisten.example/rr" },
         remote,
       ),
     ).toBe(true);
@@ -345,7 +370,7 @@ describe("showNeedsUpdate", () => {
   test("returns true when relistenUrl drifts from null to a value", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: null },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: null },
         remote,
       ),
     ).toBe(true);
@@ -357,7 +382,7 @@ describe("showNeedsUpdate", () => {
     const remoteWithNulls: McpShow = { ...remote, notes: null, relistenUrl: null };
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: null, relistenUrl: null },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: null, relistenUrl: null },
         remoteWithNulls,
       ),
     ).toBe(false);
@@ -370,7 +395,7 @@ describe("showNeedsUpdate", () => {
     const remoteWithFlag: McpShow = { ...remote, countForStats: false };
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: null },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: null },
         remoteWithFlag,
       ),
     ).toBe(true);
@@ -382,7 +407,7 @@ describe("showNeedsUpdate", () => {
     const remoteWithOrder: McpShow = { ...remote, dayOrder: 2 };
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: 1 },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: 1 },
         remoteWithOrder,
       ),
     ).toBe(true);
@@ -394,10 +419,22 @@ describe("showNeedsUpdate", () => {
   test("ignores countForStats/dayOrder when remote omits them", () => {
     expect(
       showNeedsUpdate(
-        { averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: false, dayOrder: 3 },
+        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: false, dayOrder: 3 },
         remote,
       ),
     ).toBe(false);
+  });
+
+  // Date drift: the dev DB carries a few shows with a slug whose date prefix
+  // doesn't match the date column (legacy data + slug-collision suffixes).
+  // showNeedsUpdate must catch these so the orchestrator can rewrite the row.
+  test("returns true when date drifts", () => {
+    expect(
+      showNeedsUpdate(
+        { date: "2025-07-03", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        remote,
+      ),
+    ).toBe(true);
   });
 });
 
@@ -530,6 +567,7 @@ describe("buildShowDriftUpdate", () => {
     relistenUrl: null,
   };
   const localInSync = {
+    date: "2025-11-15",
     averageRating: 3.7,
     ratingsCount: 12,
     notes: null,
@@ -638,6 +676,30 @@ describe("buildShowDriftUpdate", () => {
       relistenUrl: null,
       countForStats: false,
       dayOrder: 2,
+    });
+  });
+
+  // Date drift in isolation: the row got dump-frozen with a date column that
+  // doesn't match the slug (or doesn't match prod after a prod-side correction).
+  // Patch contains only the date — caller does one UPDATE and the orchestrator
+  // expands the gap rebuild window to the earlier of (old, new) date.
+  test("emits the date field when it drifts", () => {
+    const localWrongDate = { ...localInSync, date: "2025-11-14" };
+    const patch = buildShowDriftUpdate(localWrongDate, remote, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({ date: "2025-11-15" });
+  });
+
+  // Date drift combined with aggregate drift: same UPDATE call carries both.
+  test("combines date drift with aggregate drift in one patch", () => {
+    const remoteWith: McpShow = { ...remote, ratingsCount: 13 };
+    const localWrongBoth = { ...localInSync, date: "2025-11-14", ratingsCount: 12 };
+    const patch = buildShowDriftUpdate(localWrongBoth, remoteWith, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({
+      date: "2025-11-15",
+      averageRating: 3.7,
+      ratingsCount: 13,
+      notes: null,
+      relistenUrl: null,
     });
   });
 });
@@ -883,206 +945,445 @@ describe("buildSongCreateInput", () => {
   });
 });
 
-// buildTrackCreateInputs is where the slug→id resolution happens for Song FKs.
-// A missing mapping must skip the track, not insert a NULL songId (the column
-// is non-nullable — Prisma would reject it anyway, but a pre-filter surfaces
-// the problem earlier and keeps the insert-many call atomic.
-describe("buildTrackCreateInputs", () => {
-  // Canonical multi-set insertion: set label + position + segue pass through;
-  // songId gets resolved via the slug→id map keyed off the upserted songs.
-  test("resolves songId via slug map and preserves set/position/segue", () => {
-    const setlist: McpSetlist = {
-      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+// buildSetlistReconciliation is the heart of the setlist sync: per-show
+// insert / update / delete decisions, matched on (set, position). The key
+// must be the composite tuple because position is unique only within a set —
+// a three-set show reuses position 1 three times, so a position-only key
+// collapses across sets. The structurallyChanged flag drives downstream
+// effects (SegueRun regen, stats rebuild window), so the helper has to be
+// precise about which diffs count as structural (insert / delete / songId
+// change) vs cosmetic (segue / note / allTimer / annotation drift).
+describe("buildSetlistReconciliation", () => {
+  const songMap = new Map([
+    ["basis-for-a-day", "song-basis-uuid"],
+    ["aceetobee", "song-aceetobee-uuid"],
+    ["crystal-ball", "song-crystal-uuid"],
+    ["helicopters", "song-helicopters-uuid"],
+    ["munchkin-invasion", "song-munchkin-uuid"],
+    ["spacebirdmatingcall", "song-spacebird-uuid"],
+    ["reactor", "song-reactor-uuid"],
+  ]);
+
+  // Canonical idempotent re-run: local already matches prod on every field.
+  // No ops, neither structurally nor cosmetically changed.
+  test("returns an empty reconciliation when local matches remote", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-basis-uuid",
+        segue: ">",
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show-x",
       showDate: "2026-02-06",
-      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      venue: { name: "v", city: "c", state: "s" },
       sets: [
         {
           label: "S1",
           tracks: [
-            { position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: ">" },
-            { position: 2, songTitle: "Aceetobee", songSlug: "aceetobee", segue: null },
+            { position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: ">", allTimer: false, note: null, annotations: [] },
           ],
         },
       ],
     };
-    const songSlugToId = new Map([
-      ["basis-for-a-day", "song-basis-uuid"],
-      ["aceetobee", "song-aceetobee-uuid"],
-    ]);
-    const tracks = buildTrackCreateInputs(setlist, "show-miami-uuid", songSlugToId);
-    expect(tracks).toEqual([
-      { showId: "show-miami-uuid", songId: "song-basis-uuid", set: "S1", position: 1, segue: ">", note: null, allTimer: false },
-      { showId: "show-miami-uuid", songId: "song-aceetobee-uuid", set: "S1", position: 2, segue: null, note: null, allTimer: false },
-    ]);
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon).toEqual({
+      toInsert: [],
+      toUpdate: [],
+      toDelete: [],
+      structurallyChanged: false,
+      cosmeticallyChanged: false,
+      unresolvedSongSlugs: [],
+    });
   });
 
-  // allTimer and note are admin-curated on prod (admins toggle the all-timer
-  // flag from track pages, and inline track annotations carry the `note`
-  // string). New MCP payloads include both per track; the builder must
-  // mirror them into the insert. Defaults: allTimer=false, note=null when MCP
-  // omits — keeps pre-deploy MCP responses parsing.
-  test("mirrors allTimer and note from MCP tracks into the insert", () => {
-    const setlist: McpSetlist = {
-      showSlug: "2025-07-04-red-rocks-morrison-co",
-      showDate: "2025-07-04",
-      venue: { name: "Red Rocks", city: "Morrison", state: "CO" },
-      sets: [
-        {
-          label: "S2",
-          tracks: [
-            // Curated all-timer with an inline note — a typical Red Rocks moment.
-            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: ">", allTimer: true, note: "Glow-stick war peak" },
-            // Vanilla track, defaults apply.
-            { position: 2, songTitle: "Helicopters", songSlug: "helicopters", segue: null },
-          ],
-        },
-      ],
-    };
-    const songSlugToId = new Map([
-      ["crystal-ball", "song-crystal-uuid"],
-      ["helicopters", "song-helicopters-uuid"],
-    ]);
-    const tracks = buildTrackCreateInputs(setlist, "show-rr-uuid", songSlugToId);
-    expect(tracks[0]).toMatchObject({ allTimer: true, note: "Glow-stick war peak" });
-    expect(tracks[1]).toMatchObject({ allTimer: false, note: null });
-  });
-
-  // If a song slug is missing from the map (upstream skipped or errored), we
-  // skip the track rather than fail the whole show. The show will still land;
-  // missing tracks are logged elsewhere.
-  test("skips tracks whose song slug is not in the resolution map", () => {
-    const setlist: McpSetlist = {
-      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
-      showDate: "2026-02-06",
-      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+  // The Pine Creek failure mode: local has one track, prod has 15 across S1
+  // / S2 / E1. Every (set, position) the local doesn't have becomes an insert,
+  // every local key absent from remote becomes a delete. structurallyChanged
+  // must flip on so SegueRun regen + stats rebuild fire.
+  test("handles a near-empty local against a full prod setlist", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "lone-local-track",
+        set: "S1",
+        position: 1,
+        songId: "song-spacebird-uuid", // local has the wrong song at S1/1
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "pine-creek",
+      showDate: "2025-08-30",
+      venue: { name: "Pine Creek Lodge", city: "Livingston", state: "MT" },
       sets: [
         {
           label: "S1",
           tracks: [
-            { position: 1, songTitle: "Shem-Rah-Boo", songSlug: "shem-rah-boo", segue: null },
-            { position: 2, songTitle: "Munchkin Invasion", songSlug: "munchkin-invasion", segue: null },
+            // S1/1 exists in both but the songId differs → update + structural.
+            { position: 1, songTitle: "Spectacle", songSlug: "basis-for-a-day", segue: ">" },
+            { position: 2, songTitle: "Spacebird", songSlug: "spacebirdmatingcall", segue: ">" },
           ],
         },
-      ],
-    };
-    const songSlugToId = new Map([["shem-rah-boo", "song-shem-uuid"]]);
-    const tracks = buildTrackCreateInputs(setlist, "show-uuid", songSlugToId);
-    expect(tracks).toHaveLength(1);
-    expect(tracks[0]?.songId).toBe("song-shem-uuid");
-  });
-});
-
-// buildTrackDriftUpdates computes per-track patches for existing local tracks
-// in a single show. The key is (showId, position) — within one show, position
-// is unique. Drift fields: segue, note, allTimer. Returns a list of {trackId,
-// patch} so the caller can issue scoped UPDATE statements without re-fetching.
-// Empty array means "nothing changed".
-describe("buildTrackDriftUpdates", () => {
-  // Canonical drift: prod marked track 3 (Crystal Ball) as an all-timer and
-  // added a note. Local row catches up on next sync. Other tracks unchanged
-  // → not in the result.
-  test("emits a patch only for the track whose fields drifted", () => {
-    const local: LocalTrackForDrift[] = [
-      { id: "track-1-uuid", position: 1, segue: ">", note: null, allTimer: false },
-      { id: "track-2-uuid", position: 2, segue: null, note: null, allTimer: false },
-      { id: "track-3-uuid", position: 3, segue: ">", note: null, allTimer: false },
-    ];
-    const remote: McpSetlist = {
-      showSlug: "2025-07-04-red-rocks-morrison-co",
-      showDate: "2025-07-04",
-      venue: { name: "Red Rocks", city: "Morrison", state: "CO" },
-      sets: [
         {
           label: "S2",
           tracks: [
-            { position: 1, songTitle: "Helicopters", songSlug: "helicopters", segue: ">" },
-            { position: 2, songTitle: "Munchkin Invasion", songSlug: "munchkin-invasion", segue: null },
-            { position: 3, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: ">", allTimer: true, note: "Glow-stick war peak" },
+            // S2/1 — note that a position-only key would collide with S1/1.
+            { position: 1, songTitle: "Reactor", songSlug: "reactor", segue: ">" },
           ],
         },
       ],
     };
-    const patches = buildTrackDriftUpdates(local, remote);
-    expect(patches).toEqual([
-      { trackId: "track-3-uuid", patch: { allTimer: true, note: "Glow-stick war peak" } },
-    ]);
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toInsert).toHaveLength(2);
+    expect(recon.toInsert.map((i) => `${i.set}/${i.position}`).sort()).toEqual(["S1/2", "S2/1"]);
+    expect(recon.toUpdate).toHaveLength(1);
+    expect(recon.toUpdate[0]?.patch.songId).toBe("song-basis-uuid");
+    expect(recon.toDelete).toHaveLength(0);
+    expect(recon.structurallyChanged).toBe(true);
   });
 
-  // Idempotency: when local already matches remote on every field, no patches.
-  // This is the no-op re-run path — the orchestrator must skip the UPDATE
-  // entirely so updatedAt doesn't churn.
-  test("returns an empty list when nothing drifted", () => {
-    const local: LocalTrackForDrift[] = [
-      { id: "track-1-uuid", position: 1, segue: ">", note: null, allTimer: false },
+  // Regression: a position-only key would collapse S1/1 and S2/1 into one
+  // bucket. The composite key keeps them distinct so both ends of a track
+  // that repeats across sets (e.g. set-ender → set-opener) sync correctly.
+  test("treats the same position in different sets as distinct slots", () => {
+    const local: LocalTrackForReconcile[] = [
+      // Local has Reactor at S1/6 only — S2/1 is missing.
+      {
+        id: "track-s1-6",
+        set: "S1",
+        position: 6,
+        songId: "song-reactor-uuid",
+        segue: ">",
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
     ];
     const remote: McpSetlist = {
-      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
-      showDate: "2026-02-06",
-      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      showSlug: "pine-creek",
+      showDate: "2025-08-30",
+      venue: { name: "Pine Creek Lodge", city: "Livingston", state: "MT" },
       sets: [
-        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: ">", allTimer: false, note: null }] },
+        {
+          label: "S1",
+          tracks: [{ position: 6, songTitle: "Reactor", songSlug: "reactor", segue: ">" }],
+        },
+        {
+          label: "S2",
+          tracks: [{ position: 1, songTitle: "Reactor", songSlug: "reactor", segue: ">" }],
+        },
       ],
     };
-    expect(buildTrackDriftUpdates(local, remote)).toEqual([]);
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    // S1/6 matches, S2/1 is inserted, nothing deleted.
+    expect(recon.toUpdate).toHaveLength(0);
+    expect(recon.toDelete).toHaveLength(0);
+    expect(recon.toInsert).toHaveLength(1);
+    expect(recon.toInsert[0]?.set).toBe("S2");
+    expect(recon.toInsert[0]?.position).toBe(1);
+    expect(recon.structurallyChanged).toBe(true);
   });
 
-  // Segue edits land too — sometimes prod fixes a `>` to `,` after the fact.
-  // (Tracks can drift segue independently of admin flags.)
-  test("emits a patch when segue drifts", () => {
-    const local: LocalTrackForDrift[] = [
-      { id: "track-1-uuid", position: 1, segue: ">", note: null, allTimer: false },
+  // Local has a track at S1/3 that prod removed (setlist correction). The
+  // delete op carries the annotation ids so the caller can wipe them in the
+  // same transaction.
+  test("emits delete ops for local tracks absent from remote, including their annotation ids", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-basis-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+      {
+        id: "track-3-uuid",
+        set: "S1",
+        position: 3,
+        songId: "song-aceetobee-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [
+          { id: "ann-a-uuid", desc: "stray" },
+          { id: "ann-b-uuid", desc: "still stray" },
+        ],
+      },
     ];
     const remote: McpSetlist = {
-      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
-      showDate: "2026-02-06",
-      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
       sets: [
-        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: "," }] },
+        {
+          label: "S1",
+          tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: null }],
+        },
       ],
     };
-    expect(buildTrackDriftUpdates(local, remote)).toEqual([
-      { trackId: "track-1-uuid", patch: { segue: "," } },
-    ]);
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toDelete).toHaveLength(1);
+    expect(recon.toDelete[0]?.trackId).toBe("track-3-uuid");
+    expect(recon.toDelete[0]?.annotationIds).toEqual(["ann-a-uuid", "ann-b-uuid"]);
+    expect(recon.structurallyChanged).toBe(true);
   });
 
-  // Pre-deploy MCP responses omit allTimer / note. Treat omission as "no
-  // opinion" — don't claim drift just because the remote payload is sparse,
-  // or every existing track would get its admin fields clobbered to defaults
+  // Same (set, position), different songId on prod — a setlist correction.
+  // Patch songId, flag as structural so the gap rebuild window expands.
+  test("treats a same-slot songId change as a structural update", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-helicopters-uuid", // local had Helicopters here
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [{ position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: null }],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toUpdate).toHaveLength(1);
+    expect(recon.toUpdate[0]?.patch).toEqual({ songId: "song-crystal-uuid" });
+    expect(recon.structurallyChanged).toBe(true);
+    expect(recon.cosmeticallyChanged).toBe(false);
+  });
+
+  // Cosmetic-only drift: segue / note / allTimer changed, songId is unchanged.
+  // Must NOT flip structurallyChanged (no SegueRun regen needed for a segue
+  // marker change — the trackIds array is still valid).
+  test("flags cosmetic-only drift without setting structurallyChanged", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-crystal-uuid",
+        segue: ">",
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [
+            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: ",", allTimer: true, note: "Glow-stick war peak" },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toUpdate[0]?.patch).toEqual({ segue: ",", allTimer: true, note: "Glow-stick war peak" });
+    expect(recon.structurallyChanged).toBe(false);
+    expect(recon.cosmeticallyChanged).toBe(true);
+  });
+
+  // Pre-deploy MCP shape: no allTimer / note / annotations keys. Don't claim
+  // drift just because the payload is sparse, or admin-set values get wiped
   // on the next sync.
-  test("ignores allTimer / note when remote omits them", () => {
-    const local: LocalTrackForDrift[] = [
-      { id: "track-1-uuid", position: 1, segue: null, note: "kept locally", allTimer: true },
+  test("ignores allTimer / note / annotations when remote omits them", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-crystal-uuid",
+        segue: null,
+        note: "kept locally",
+        allTimer: true,
+        annotations: [{ id: "ann-a-uuid", desc: "still here" }],
+      },
     ];
     const remote: McpSetlist = {
-      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
-      showDate: "2026-02-06",
-      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
       sets: [
-        // No allTimer / note keys at all — pre-deploy MCP shape.
-        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: null }] },
+        {
+          label: "S1",
+          tracks: [{ position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: null }],
+        },
       ],
     };
-    expect(buildTrackDriftUpdates(local, remote)).toEqual([]);
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toUpdate).toEqual([]);
+    expect(recon.structurallyChanged).toBe(false);
+    expect(recon.cosmeticallyChanged).toBe(false);
   });
 
-  // Position is the only stable key within a show — a track that appears in
-  // local but not in the remote setlist (e.g. removed upstream) gets skipped,
-  // not patched. Deletion is intentionally not handled by drift; it's a
-  // separate cleanup concern.
-  test("skips local tracks whose position is absent from the remote setlist", () => {
-    const local: LocalTrackForDrift[] = [
-      { id: "track-1-uuid", position: 1, segue: null, note: null, allTimer: false },
-      { id: "track-99-uuid", position: 99, segue: null, note: null, allTimer: true },
+  // Annotation drift in isolation: track itself matches but the desc list
+  // changed. Lands as a toUpdate op with the annotation delta — caller still
+  // patches via track id, not a separate path.
+  test("emits annotation delta on an otherwise-matching track", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-crystal-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [{ id: "ann-keep-uuid", desc: "first time played" }, { id: "ann-drop-uuid", desc: "to remove" }],
+      },
     ];
     const remote: McpSetlist = {
-      showSlug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
-      showDate: "2026-02-06",
-      venue: { name: "Miami Beach Bandshell", city: "Miami Beach", state: "FL" },
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
       sets: [
-        { label: "S1", tracks: [{ position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: null }] },
+        {
+          label: "S1",
+          tracks: [
+            {
+              position: 1,
+              songTitle: "Crystal Ball",
+              songSlug: "crystal-ball",
+              segue: null,
+              annotations: ["first time played", "with horns"],
+            },
+          ],
+        },
       ],
     };
-    expect(buildTrackDriftUpdates(local, remote)).toEqual([]);
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toUpdate).toHaveLength(1);
+    expect(recon.toUpdate[0]?.patch).toEqual({});
+    expect(recon.toUpdate[0]?.annotationDiff.toCreateDescs).toEqual(["with horns"]);
+    expect(recon.toUpdate[0]?.annotationDiff.toDeleteIds).toEqual(["ann-drop-uuid"]);
+    expect(recon.cosmeticallyChanged).toBe(true);
+    expect(recon.structurallyChanged).toBe(false);
+  });
+
+  // Inserts carry their annotation strings inline (no track id exists yet)
+  // so the caller can use a nested Prisma create. Defaults: allTimer=false,
+  // note=null when the remote payload omits them.
+  test("inserts carry inline annotation descs and default allTimer/note", () => {
+    const recon = buildSetlistReconciliation(
+      [],
+      {
+        showSlug: "show",
+        showDate: "2025-08-30",
+        venue: { name: "v", city: "c", state: "s" },
+        sets: [
+          {
+            label: "S1",
+            tracks: [
+              {
+                position: 1,
+                songTitle: "Crystal Ball",
+                songSlug: "crystal-ball",
+                segue: ">",
+                annotations: ["with horns"],
+              },
+              { position: 2, songTitle: "Helicopters", songSlug: "helicopters", segue: null, allTimer: true },
+            ],
+          },
+        ],
+      },
+      songMap,
+    );
+    expect(recon.toInsert).toHaveLength(2);
+    expect(recon.toInsert[0]).toMatchObject({
+      set: "S1",
+      position: 1,
+      songId: "song-crystal-uuid",
+      segue: ">",
+      note: null,
+      allTimer: false,
+      annotationDescs: ["with horns"],
+    });
+    expect(recon.toInsert[1]).toMatchObject({ allTimer: true, annotationDescs: [] });
+    expect(recon.structurallyChanged).toBe(true);
+  });
+
+  // Unresolved song slug on a remote-only slot: report it, don't insert. The
+  // local row is untouched — better to skip than to insert with a wrong songId.
+  test("reports unresolved song slugs on inserts without inserting them", () => {
+    const recon = buildSetlistReconciliation(
+      [],
+      {
+        showSlug: "show",
+        showDate: "2025-08-30",
+        venue: { name: "v", city: "c", state: "s" },
+        sets: [
+          {
+            label: "S1",
+            tracks: [{ position: 1, songTitle: "Mystery Song", songSlug: "mystery-song", segue: null }],
+          },
+        ],
+      },
+      songMap,
+    );
+    expect(recon.toInsert).toEqual([]);
+    expect(recon.unresolvedSongSlugs).toEqual(["mystery-song"]);
+    expect(recon.structurallyChanged).toBe(false);
+  });
+
+  // Unresolved song slug on an existing slot: don't drop the local track,
+  // don't try to patch songId, but still process other drift on the row.
+  test("reports unresolved song slugs on updates without clobbering songId", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-crystal-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+    ];
+    const recon = buildSetlistReconciliation(
+      local,
+      {
+        showSlug: "show",
+        showDate: "2025-08-30",
+        venue: { name: "v", city: "c", state: "s" },
+        sets: [
+          {
+            label: "S1",
+            tracks: [{ position: 1, songTitle: "Mystery", songSlug: "mystery-song", segue: ">" }],
+          },
+        ],
+      },
+      songMap,
+    );
+    expect(recon.unresolvedSongSlugs).toEqual(["mystery-song"]);
+    expect(recon.toUpdate).toHaveLength(1);
+    expect(recon.toUpdate[0]?.patch).toEqual({ segue: ">" });
+    expect(recon.toDelete).toEqual([]);
   });
 });
 

@@ -127,10 +127,17 @@ export const CacheKeys = {
    * and songs and back rarity/normalization features).
    */
   stats: {
-    /** Map of `{year: showCount}` for the entire show catalog. */
-    showsByYear: () => "stats:shows-by-year",
-    /** Sorted ISO date strings (YYYY-MM-DD) for every count_for_stats=true show. */
-    showDates: () => "stats:show-dates",
+    /**
+     * Map of `{year: showCount}` for the entire show catalog. `:v2` bump:
+     * now excludes orphan stub shows (venue_id IS NULL); semantics changed,
+     * pre-bump cached values would over-count by the number of stubs.
+     */
+    showsByYear: () => "stats:shows-by-year:v2",
+    /**
+     * Sorted ISO date strings (YYYY-MM-DD) for every count_for_stats=true
+     * show. `:v2` bump: now excludes orphan stub shows (venue_id IS NULL).
+     */
+    showDates: () => "stats:show-dates:v2",
   },
 } as const;
 
