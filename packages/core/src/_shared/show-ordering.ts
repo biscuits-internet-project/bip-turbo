@@ -93,6 +93,32 @@ export const STATS_SHOWS_WHERE = {
 } satisfies Prisma.ShowWhereInput;
 
 /**
+ * Filter that excludes orphan placeholder shows — bare YYYY-MM-DD slug, no
+ * venue, no setlist. These exist on prod alongside the real show on the same
+ * date (e.g. `2025-10-31` next to `2025-10-31-suwannee-music-park-live-oak-fl`)
+ * and double-count in user-facing listings. The signal we key on is the
+ * missing venue: every real show has one resolved at sync time, and a user
+ * can't act on a venueless row anyway.
+ *
+ * Apply to display-facing queries that count or enumerate shows. Admin
+ * tooling that needs to surface these placeholders for cleanup should
+ * intentionally NOT use this.
+ */
+export const NON_STUB_SHOWS_WHERE = {
+  venueId: { not: null },
+} satisfies Prisma.ShowWhereInput;
+
+/**
+ * Raw-SQL fragment matching NON_STUB_SHOWS_WHERE — splice into `WHERE` /
+ * `AND` chains in `$queryRaw` calls. Pass the alias used for the shows
+ * table in your query.
+ */
+export function nonStubShowsSql(alias: ShowAlias = "shows"): Prisma.Sql {
+  const a = Prisma.raw(alias);
+  return Prisma.sql`${a}.venue_id IS NOT NULL`;
+}
+
+/**
  * Raw-SQL fragment matching STATS_SHOWS_WHERE — splice into `WHERE` /
  * `AND` chains in `$queryRaw` calls. Pass the alias used for the shows
  * table in your query.

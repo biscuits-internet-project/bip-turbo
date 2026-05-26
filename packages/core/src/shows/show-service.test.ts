@@ -106,6 +106,22 @@ describe("ShowService.getShowDatesWithFlags", () => {
       showYoutubesCount: true,
     });
   });
+
+  // Prod has orphan placeholder shows (bare YYYY-MM-DD slug, no venue) that
+  // coexist with the real show on the same date — e.g. `2025-10-31` sitting
+  // beside `2025-10-31-suwannee-music-park-live-oak-fl`. Including them in the
+  // per-year count over-reports by one for each date that has a stub. Filter
+  // them at the SQL boundary so every caller of getShowDatesWithFlags inherits
+  // the fix (the year page is the only one today; others may join later).
+  test("excludes orphan stub shows that have no venue assigned", async () => {
+    const db = makeMockDb();
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.getShowDatesWithFlags();
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where).toEqual({ venueId: { not: null } });
+  });
 });
 
 describe("ShowService.reorderByDate", () => {

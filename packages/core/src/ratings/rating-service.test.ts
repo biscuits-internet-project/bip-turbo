@@ -5,6 +5,7 @@ import { RatingService } from "./rating-service";
 // methods under test don't touch it.
 const cacheInvalidation = {
   invalidateAttendanceCaches: vi.fn(),
+  invalidateShow: vi.fn(),
   invalidateShowComprehensive: vi.fn(),
 } as never;
 
@@ -403,6 +404,7 @@ describe("RatingService.clearForUser", () => {
 
     const service = new RatingService(db, {
       invalidateAttendanceCaches: vi.fn(),
+      invalidateShow: vi.fn(),
       invalidateShowComprehensive: invalidate,
     } as never);
     await service.clearForUser({
@@ -413,5 +415,76 @@ describe("RatingService.clearForUser", () => {
     });
 
     expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre");
+  });
+
+  // Track-type clears must invalidate the show's setlist cache. The cached
+  // setlist payload at CacheKeys.show.data(slug) embeds each track's
+  // averageRating/ratingsCount, so the recompute on Track.update would be
+  // shadowed by the stale Redis payload on the next read.
+  test("invalidates the show cache when clearing a Track rating with a showSlug", async () => {
+    const invalidateShow = vi.fn();
+    const db = {
+      rating: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 3.5 }, _count: { id: 2 } }),
+      },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, {
+      invalidateAttendanceCaches: vi.fn(),
+      invalidateShow,
+      invalidateShowComprehensive: vi.fn(),
+    } as never);
+    await service.clearForUser({
+      rateableId: "track-1",
+      rateableType: "Track",
+      userId: "u1",
+      showSlug: "2024-08-12-cap-theatre",
+    });
+
+    expect(invalidateShow).toHaveBeenCalledWith("2024-08-12-cap-theatre");
+  });
+});
+
+describe("RatingService.upsert", () => {
+  // Same motivation as the Track-clear case in clearForUser: the show's
+  // cached setlist embeds Track.averageRating/ratingsCount, so the upsert
+  // path has to bust the show cache for the rating mutation to surface.
+  test("invalidates the show cache when upserting a Track rating with a showSlug", async () => {
+    const invalidateShow = vi.fn();
+    const now = new Date("2024-08-12T00:00:00Z");
+    const db = {
+      rating: {
+        upsert: vi.fn().mockResolvedValue({
+          id: "r1",
+          userId: "u1",
+          rateableId: "track-1",
+          rateableType: "Track",
+          value: 4,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 4.0 }, _count: { id: 1 } }),
+      },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, {
+      invalidateAttendanceCaches: vi.fn(),
+      invalidateShow,
+      invalidateShowComprehensive: vi.fn(),
+    } as never);
+    await service.upsert({
+      rateableId: "track-1",
+      rateableType: "Track",
+      userId: "u1",
+      value: 4,
+      showSlug: "2024-08-12-cap-theatre",
+    });
+
+    expect(invalidateShow).toHaveBeenCalledWith("2024-08-12-cap-theatre");
   });
 });

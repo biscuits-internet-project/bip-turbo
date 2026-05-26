@@ -6,6 +6,7 @@ import { buildIncludeClause, buildWhereClause } from "../_shared/database/query-
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import {
   DAY_ORDER_NULL_SENTINEL,
+  NON_STUB_SHOWS_WHERE,
   resolveShowOrderBy,
   SHOW_ORDER_ASC,
   SHOW_ORDER_DESC,
@@ -105,6 +106,7 @@ export class ShowService {
    */
   async getShowDatesWithFlags(): Promise<Array<{ date: string; hasPhotos: boolean; hasYoutube: boolean }>> {
     const results = await this.db.show.findMany({
+      where: NON_STUB_SHOWS_WHERE,
       select: {
         date: true,
         showPhotosCount: true,

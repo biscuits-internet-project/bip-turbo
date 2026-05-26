@@ -1,5 +1,12 @@
-import { describe, expect, test } from "vitest";
-import { countShowsAfter, countShowsBetween, countShowsOnOrAfter, songStatsChanged } from "./stats-service";
+import { describe, expect, test, vi } from "vitest";
+import type { CacheService } from "../_shared/cache";
+import {
+  countShowsAfter,
+  countShowsBetween,
+  countShowsOnOrAfter,
+  StatsService,
+  songStatsChanged,
+} from "./stats-service";
 
 const baseFresh = {
   timesPlayed: 3,
@@ -146,9 +153,9 @@ describe("countShowsAfter", () => {
     expect(countShowsAfter(["2010-01-01", "2015-06-15", "2020-12-31", "2024-07-04"], "2018-01-01")).toBe(2);
   });
 
-  // Large array sanity — binary search handles 2k entries without churn,
-  // and the result still matches the linear answer.
-  test("matches a linear scan on a 2000-element array", () => {
+  // Large array sanity — binary search handles 480 entries (40 years × 12
+  // months) without churn, and the result still matches the linear answer.
+  test("matches a linear scan on a 480-element array", () => {
     const dates: string[] = [];
     for (let year = 1990; year < 2030; year++) {
       for (let month = 1; month <= 12; month++) {
@@ -222,5 +229,50 @@ describe("countShowsBetween", () => {
   test("returns 0 when no dates fall in range", () => {
     const dates = ["2024-01-01", "2024-02-01"];
     expect(countShowsBetween(dates, "2025-01-01", "2025-12-31")).toBe(0);
+  });
+});
+
+// Both getShowsByYear and getStatsShowDates feed denominators for rarity
+// stats — % since debut, shows since last played. Prod's per-date "stub"
+// rows (bare YYYY-MM-DD slug, no venue, no tracks) sit alongside the real
+// shows and inflate those denominators by one for each stub. The fix is in
+// the SQL: every show-counting predicate must add `venue_id IS NOT NULL`
+// so the rarity math only counts real shows.
+describe("StatsService stub filtering in raw SQL", () => {
+  function makeStubbedService() {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as unknown as ConstructorParameters<typeof StatsService>[0];
+    // Cache: pass through to the producer so we can intercept the SQL it issues.
+    const cache = {
+      getOrSet: async <T>(_key: unknown, producer: () => Promise<T>) => producer(),
+    } as unknown as CacheService;
+    return { service: new StatsService(db, cache), queryRaw };
+  }
+
+  // `$queryRaw` is called as a tag template. Prisma passes the cooked
+  // template-string chunks as the first arg and every interpolated
+  // `Prisma.Sql` fragment as the rest. Concatenate both so the assertion
+  // can `.toContain()` the stub predicate from `nonStubShowsSql`.
+  function joinSqlFromCall(call: unknown[]): string {
+    const chunks = (call[0] as readonly string[]).join("?");
+    const fragments = call
+      .slice(1)
+      .map((arg) => (arg as { sql: string }).sql)
+      .join(" ");
+    return `${chunks} ${fragments}`;
+  }
+
+  test("getShowsByYear's SQL excludes orphan stub shows (venue_id IS NOT NULL)", async () => {
+    const { service, queryRaw } = makeStubbedService();
+    await service.getShowsByYear();
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(joinSqlFromCall(queryRaw.mock.calls[0])).toContain("venue_id IS NOT NULL");
+  });
+
+  test("getStatsShowDates's SQL excludes orphan stub shows (venue_id IS NOT NULL)", async () => {
+    const { service, queryRaw } = makeStubbedService();
+    await service.getStatsShowDates();
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(joinSqlFromCall(queryRaw.mock.calls[0])).toContain("venue_id IS NOT NULL");
   });
 });
