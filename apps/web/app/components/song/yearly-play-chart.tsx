@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CHART_COLORS } from "~/lib/chart-colors";
 import { START_YEAR } from "~/lib/song-filters";
 import { cn } from "~/lib/utils";
 import {
@@ -61,10 +62,10 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-            <XAxis dataKey="year" stroke="#9CA3AF" fontSize={12} />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} opacity={0.3} />
+            <XAxis dataKey="year" stroke={CHART_COLORS.axis} fontSize={12} />
             <YAxis
-              stroke="#9CA3AF"
+              stroke={CHART_COLORS.axis}
               fontSize={12}
               tickFormatter={isPercent ? (v: number) => `${Math.round(v * 100)}%` : undefined}
             />
@@ -72,10 +73,10 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#8B5CF6"
+              stroke={CHART_COLORS.accent}
               strokeWidth={2}
-              dot={{ fill: "#8B5CF6", strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6, stroke: "#8B5CF6", strokeWidth: 2 }}
+              dot={{ fill: CHART_COLORS.accent, strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6, stroke: CHART_COLORS.accent, strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -108,7 +109,11 @@ export function YearlyChartTooltip({ active, payload }: YearlyChartTooltipProps)
   return (
     <div
       className="rounded-md border px-3 py-2 text-sm"
-      style={{ backgroundColor: "#1F2937", borderColor: "#374151", color: "#F3F4F6" }}
+      style={{
+        backgroundColor: CHART_COLORS.tooltipBg,
+        borderColor: CHART_COLORS.tooltipBorder,
+        color: CHART_COLORS.tooltipText,
+      }}
     >
       <div className="font-medium">{year}</div>
       <div>

@@ -342,7 +342,7 @@ describe("SetlistCard", () => {
     await user.click(screen.getByRole("button", { name: /gap chart/i }));
     // Average gap formats to one decimal place — terse, matches the rest
     // of the rarity stat presentation on the song-detail page.
-    expect(screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/average \/ median song gap:\s*7\.5\s*\/\s*6\.0/)).toBeInTheDocument();
     // Label is split into stacked <span>Last</span><span>Played</span>
     // so the accessible name concatenates without whitespace.
     expect(screen.getByRole("columnheader", { name: /LastPlayed/i })).toBeInTheDocument();
@@ -360,7 +360,7 @@ describe("SetlistCard", () => {
         showRating={null}
       />,
     );
-    const summary = screen.getByText(/Average \/ median song gap:\s*7\.5\s*\/\s*6\.0/);
+    const summary = screen.getByText(/average \/ median song gap:\s*7\.5\s*\/\s*6\.0/);
     const trackText = screen.getByText("Basis for a Day");
     // DOM order: track text comes before the summary line. compareDocumentPosition
     // returns DOCUMENT_POSITION_FOLLOWING (4) when `summary` follows `trackText`.

@@ -70,13 +70,13 @@ function SetlistCardComponent({
   // stay one-liners. The catalog summary is server-computed; the personal
   // summary is hoisted from SetlistTablePersonal via onSummaryChange.
   const catalogSummary: SetlistViewSummary = {
-    label: "Average / median song gap",
+    label: "average / median song gap",
     average: setlist.averageSongGap,
     median: setlist.medianSongGap,
     debutCount: setlist.debutCount,
   };
   const personalSummaryView: SetlistViewSummary = {
-    label: "Your average / median song gap",
+    label: "your average / median song gap",
     average: personalSummary.average,
     median: personalSummary.median,
     debutCount: personalSummary.debutCount,
