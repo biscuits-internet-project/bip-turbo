@@ -5,7 +5,7 @@ import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-cont
 
 /** Compact summary builder for tests — sane defaults, override what matters. */
 function summary(overrides: Partial<SetlistViewSummary> = {}): SetlistViewSummary {
-  return { label: "Average / median song gap", average: null, median: null, debutCount: 0, ...overrides };
+  return { label: "average / median song gap", average: null, median: null, debutCount: 0, ...overrides };
 }
 
 describe("SetlistViewControl", () => {
@@ -35,7 +35,7 @@ describe("SetlistViewControl", () => {
         summary={summary({ average: 4.2, median: 3.0, debutCount: 2 })}
       />,
     );
-    expect(screen.getByText(/Average \/ median song gap: 4\.2 \/ 3\.0 · 2 debuts/)).toBeInTheDocument();
+    expect(screen.getByText(/average \/ median song gap: 4\.2 \/ 3\.0 · 2 debuts/)).toBeInTheDocument();
   });
 
   // Singular grammar — `· 1 debut`, not `· 1 debuts`.
@@ -77,10 +77,10 @@ describe("SetlistViewControl", () => {
         view="personal"
         onChange={vi.fn()}
         showPersonal
-        summary={{ label: "Your average / median song gap", average: 6.59, median: 5, debutCount: 2 }}
+        summary={{ label: "your average / median song gap", average: 6.59, median: 5, debutCount: 2 }}
       />,
     );
-    expect(screen.getByText(/Your average \/ median song gap: 6\.6 \/ 5\.0 · 2 debuts/)).toBeInTheDocument();
-    expect(screen.queryByText(/^Average \/ median song gap:/)).not.toBeInTheDocument();
+    expect(screen.getByText(/your average \/ median song gap: 6\.6 \/ 5\.0 · 2 debuts/)).toBeInTheDocument();
+    expect(screen.queryByText(/^average \/ median song gap:/)).not.toBeInTheDocument();
   });
 });

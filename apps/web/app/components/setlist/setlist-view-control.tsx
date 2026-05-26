@@ -1,4 +1,4 @@
-import { cn } from "~/lib/utils";
+import { SegmentButton } from "~/components/ui/segment-button";
 import type { SetlistView } from "./setlist-card";
 
 /**
@@ -8,7 +8,7 @@ import type { SetlistView } from "./setlist-card";
  * renderer without view-specific branching.
  */
 export interface SetlistViewSummary {
-  /** Prefix text. `"Average / median song gap"` or `"Your average / median song gap"`. */
+  /** Prefix text. `"average / median song gap"` or `"your average / median song gap"`. */
   label: string;
   /** Average gap value. Null when no rows qualify; the line is hidden. */
   average: number | null;
@@ -47,9 +47,17 @@ export function SetlistViewControl({ view, onChange, showPersonal, summary }: Se
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <div className="inline-flex items-center">
-        <SegmentButton view={view} target="setlist" label="setlist" onChange={onChange} />
-        <SegmentButton view={view} target="gap-chart" label="gap chart" onChange={onChange} />
-        {showPersonal && <SegmentButton view={view} target="personal" label="personal gap chart" onChange={onChange} />}
+        <SegmentButton active={view === "setlist"} onClick={() => onChange("setlist")}>
+          setlist
+        </SegmentButton>
+        <SegmentButton active={view === "gap-chart"} onClick={() => onChange("gap-chart")}>
+          gap chart
+        </SegmentButton>
+        {showPersonal && (
+          <SegmentButton active={view === "personal"} onClick={() => onChange("personal")}>
+            personal gap chart
+          </SegmentButton>
+        )}
       </div>
       {summary && <SummaryLine summary={summary} />}
     </div>
@@ -76,33 +84,4 @@ function SummaryLine({ summary }: { summary: SetlistViewSummary }) {
     return <span className="text-content-text-secondary text-right">{debutSuffix}</span>;
   }
   return null;
-}
-
-function SegmentButton({
-  view,
-  target,
-  label,
-  onChange,
-}: {
-  view: SetlistView;
-  target: SetlistView;
-  label: string;
-  onChange: (next: SetlistView) => void;
-}) {
-  const active = view === target;
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={() => onChange(target)}
-      className={cn(
-        "px-2 py-1 border-b-2 transition-colors cursor-pointer",
-        active
-          ? "border-brand-primary text-content-text-primary"
-          : "border-transparent text-content-text-tertiary hover:text-content-text-secondary",
-      )}
-    >
-      {label}
-    </button>
-  );
 }

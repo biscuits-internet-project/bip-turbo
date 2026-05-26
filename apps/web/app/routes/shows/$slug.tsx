@@ -11,6 +11,7 @@ import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ArchiveRecordingsCard } from "~/components/show/archive-recordings-card";
+import { DebutYearChart } from "~/components/show/debut-year-chart";
 import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-link-card";
 import { ShowPhotos } from "~/components/show/show-photos";
 import { ShowDate } from "~/components/show-date";
@@ -322,6 +323,8 @@ export default function Show() {
 
             {/* Highlights panel */}
             <SetlistHighlights setlist={setlist} />
+
+            <DebutYearChart setlist={setlist} />
           </div>
         </div>
 
