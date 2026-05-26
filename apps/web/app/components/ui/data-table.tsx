@@ -56,6 +56,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Input } from "~/components/ui/input";
 import { PaginationControls } from "~/components/ui/pagination-controls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { useShowAll } from "~/hooks/use-show-all";
 import { cn } from "~/lib/utils";
 
 /**
@@ -162,6 +163,11 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  // `?all=1` opts the user into a single-page render of every row. `hidePagination`
+  // is the caller-side equivalent (the table conceptually has no pages) — when
+  // it's set, we don't surface the toggle at all.
+  const [showAll, setShowAll] = useShowAll();
+  const paginationDisabled = hidePagination || showAll;
 
   // Measure the table wrapper so col widths can be computed in pixels.
   // Chrome's `table-layout: fixed` algorithm distributes leftover space
@@ -208,7 +214,7 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    ...(hidePagination ? {} : { getPaginationRowModel: getPaginationRowModel() }),
+    ...(paginationDisabled ? {} : { getPaginationRowModel: getPaginationRowModel() }),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
@@ -219,23 +225,38 @@ export function DataTable<TData, TValue>({
     },
     initialState: {
       pagination: {
-        pageSize: hidePagination ? data.length : pageSize,
+        pageSize: paginationDisabled ? Math.max(1, data.length) : pageSize,
       },
     },
   });
 
+  // `initialState.pagination.pageSize` is read once at mount, so flipping
+  // `?all=1` mid-session needs an explicit `setPageSize` for the visible row
+  // count to change. Also re-applies when `data` grows (e.g. a filter clears).
+  useEffect(() => {
+    table.setPageSize(paginationDisabled ? Math.max(1, data.length) : pageSize);
+  }, [paginationDisabled, pageSize, data.length, table]);
+
   const hasResults = table.getFilteredRowModel().rows.length > 0;
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalPages = table.getPageCount();
+  const filteredRowCount = table.getFilteredRowModel().rows.length;
+  // Only offer the toggle when there's actually more than one page worth of
+  // data (otherwise there's nothing to "show all" of). Once the user has
+  // toggled on, keep it visible so they have a way back to paginated mode.
+  const canShowAll = !hidePagination && (showAll || filteredRowCount > pageSize);
 
   const paginationBlock = !hasResults ? null : (
     <PaginationControls
       page={currentPage}
       totalPages={totalPages}
       pageSize={table.getState().pagination.pageSize}
-      total={table.getFilteredRowModel().rows.length}
+      total={filteredRowCount}
       onPageChange={(nextPage) => table.setPageIndex(nextPage - 1)}
       hidePaginationText={hidePaginationText}
+      showAll={showAll}
+      onToggleShowAll={hidePagination ? undefined : setShowAll}
+      canShowAll={canShowAll}
     />
   );
 

@@ -38,6 +38,28 @@ export const gapSortingFn = makeGapSortingFn("gap");
 export const filteredGapSortingFn = makeGapSortingFn("filteredGap");
 
 /**
+ * Sort comparator for the Rating column. Tracks with the same community
+ * average resolve by vote count first (more votes = more confidence in the
+ * average), then by show date, then by position so within-show repeats with
+ * matching rating + vote count stay in setlist order relative to each other.
+ *
+ * Missing ratings collapse to -Infinity so unrated rows cluster at the
+ * bottom on desc and the top on asc, matching the Gap column's treatment
+ * of debuts/repeats.
+ */
+export function ratingSortingFn(a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number {
+  const aRating = a.original.rating ?? Number.NEGATIVE_INFINITY;
+  const bRating = b.original.rating ?? Number.NEGATIVE_INFINITY;
+  if (aRating !== bRating) return aRating - bRating;
+  const aVotes = a.original.ratingsCount ?? 0;
+  const bVotes = b.original.ratingsCount ?? 0;
+  if (aVotes !== bVotes) return aVotes - bVotes;
+  const dateCmp = compareByShowDate(a.original, b.original);
+  if (dateCmp !== 0) return dateCmp;
+  return (a.original.position ?? 0) - (b.original.position ?? 0);
+}
+
+/**
  * Adapt a SongPagePerformance row to the minimal Track-like shape the
  * shared AllTimerCell + TrackRatingOverlay expect. The performance DTO
  * uses `notes` (plural) for the note field and exposes the song title
@@ -433,13 +455,21 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       id: "rating",
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       enableSorting: true,
-      sortingFn: "basic",
-      // Desktop 7.25rem (~116px) = badge width (~91px) + cell padding
-      // (24px), no extra. Mobile fits the compact badge at 6rem. The
-      // 5-star editor is no longer inline — it pops in a popover that
-      // overlays the badge — so the column doesn't need to hold the
-      // wider expanded state.
-      meta: { fixedWidth: "7.25rem", mobileFixedWidth: "6rem" },
+      // Rating ties resolve to vote count (more votes = more confidence),
+      // then show date, then track position — same chain as gapSortingFn so
+      // identical-rating runs across multiple shows still read in a stable
+      // order. Sort defaults to descending ("best first") via sortDescFirst.
+      sortingFn: ratingSortingFn,
+      sortDescFirst: true,
+      // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
+      // average + 3-digit vote count + the viewer's own half-step rating
+      // (4½ is the widest valid user value; ratings cap at 5). Measured at
+      // ~120px on desktop / ~103px on mobile. Desktop 8.25rem (132px)
+      // leaves ~12px slack; mobile 6.75rem (108px) leaves ~5px so typical
+      // rows (no user rating, 1-2 digit count) don't carry obvious empty
+      // space. The 5-star editor pops in a popover that overlays the
+      // badge, so the column doesn't need a wider expanded state.
+      meta: { fixedWidth: "8.25rem", mobileFixedWidth: "6.75rem" },
       cell: (info) => {
         const rating = info.getValue();
         const ratingsCount = info.row.original.ratingsCount;

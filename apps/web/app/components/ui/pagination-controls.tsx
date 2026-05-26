@@ -11,6 +11,15 @@ interface PaginationControlsProps {
   onPageChange: (nextPage: number) => void;
   /** Hides the "Showing N to M of T" copy on the left while keeping the controls. */
   hidePaginationText?: boolean;
+  /**
+   * Optional opt-in "Show all / Paginate" toggle. Rendered next to the
+   * results count when both `onToggleShowAll` and `canShowAll` are provided.
+   * DataTable wires this up via the `useShowAll` hook; standalone callers
+   * (server-side paginators) omit these props and the toggle stays hidden.
+   */
+  showAll?: boolean;
+  onToggleShowAll?: (next: boolean) => void;
+  canShowAll?: boolean;
 }
 
 /**
@@ -26,6 +35,9 @@ export function PaginationControls({
   total,
   onPageChange,
   hidePaginationText = false,
+  showAll = false,
+  onToggleShowAll,
+  canShowAll = false,
 }: PaginationControlsProps) {
   function handlePageInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
@@ -38,20 +50,32 @@ export function PaginationControls({
 
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
+  const showAllToggle = canShowAll && onToggleShowAll && (
+    <button
+      type="button"
+      onClick={() => onToggleShowAll(!showAll)}
+      className="text-sm text-content-text-secondary underline decoration-dotted underline-offset-4 hover:text-brand-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 rounded-sm"
+    >
+      {showAll ? "Paginate" : "Show all"}
+    </button>
+  );
 
   return (
-    <div className="flex items-center justify-between px-2">
+    <div className="flex items-center justify-between px-2 gap-3">
       {!hidePaginationText ? (
-        total === 0 ? (
-          <div className="text-sm text-content-text-secondary font-medium">0 results</div>
-        ) : (
-          <div className="text-sm text-content-text-secondary font-medium">
-            <span className="hidden sm:inline">{`Showing ${from} to ${to} of ${total} results`}</span>
-            <span className="sm:hidden">{`${from}–${to} of ${total}`}</span>
-          </div>
-        )
+        <div className="flex items-center gap-3 min-w-0">
+          {total === 0 ? (
+            <span className="text-sm text-content-text-secondary font-medium">0 results</span>
+          ) : (
+            <span className="text-sm text-content-text-secondary font-medium">
+              <span className="hidden sm:inline">{`Showing ${from} to ${to} of ${total} results`}</span>
+              <span className="sm:hidden">{`${from}–${to} of ${total}`}</span>
+            </span>
+          )}
+          {showAllToggle}
+        </div>
       ) : (
-        <div />
+        <div className="flex items-center">{showAllToggle ?? null}</div>
       )}
       {totalPages > 1 && (
         <div className="flex items-center space-x-2">
