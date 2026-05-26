@@ -217,6 +217,96 @@ describe("createSetlistColumns", () => {
     ]);
   });
 
+  // Sort by Rating (desc, the default click order) puts the highest community
+  // average first. When two tracks share the same rating, the one with more
+  // votes wins the tiebreak — more votes = more confidence the average is
+  // real. Final fall-through is set+position so unrated rows still read in
+  // canonical setlist order.
+  test("sorting by Rating tiebreaks on vote count when averages match", async () => {
+    const user = userEvent.setup();
+    await renderTable([
+      // Two tracks tied at 4.5; "Confrontation" has more votes so it should
+      // sort ahead of "Crickets" when the table sorts rating descending.
+      makeTrack({
+        songId: "a",
+        position: 1,
+        set: "S1",
+        averageRating: 4.5,
+        ratingsCount: 3,
+        song: { id: "a", title: "Crickets", slug: "c" },
+      }),
+      makeTrack({
+        songId: "b",
+        position: 2,
+        set: "S1",
+        averageRating: 4.5,
+        ratingsCount: 50,
+        song: { id: "b", title: "Confrontation", slug: "co" },
+      }),
+      makeTrack({
+        songId: "c",
+        position: 3,
+        set: "S1",
+        averageRating: 3.0,
+        ratingsCount: 100,
+        song: { id: "c", title: "Above the Waves", slug: "a" },
+      }),
+    ]);
+    // First click on Rating sorts descending ("best first" via sortDescFirst).
+    await user.click(screen.getByRole("button", { name: /Rating/i }));
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
+    // 4.5/50 (Confrontation) > 4.5/3 (Crickets) > 3.0 (Above the Waves).
+    expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
+      "Confrontation",
+      "Crickets",
+      "Above the Waves",
+    ]);
+  });
+
+  // Rating + vote count both equal → fall through to set+position. The
+  // Rating column's first click sorts descending (sortDescFirst), and
+  // TanStack inverts the whole comparator on desc — including the
+  // set+position fallback — so the rows read in reverse setlist order when
+  // every primary axis is tied. Same behavior as the Last Played and Song
+  // columns: tiebreak direction follows primary direction.
+  test("sorting by Rating with identical rating+votes falls back to set+position", async () => {
+    const user = userEvent.setup();
+    await renderTable([
+      makeTrack({
+        songId: "a",
+        position: 3,
+        set: "S1",
+        averageRating: null,
+        ratingsCount: 0,
+        song: { id: "a", title: "Crickets", slug: "c" },
+      }),
+      makeTrack({
+        songId: "b",
+        position: 1,
+        set: "S1",
+        averageRating: null,
+        ratingsCount: 0,
+        song: { id: "b", title: "Above the Waves", slug: "a" },
+      }),
+      makeTrack({
+        songId: "c",
+        position: 2,
+        set: "S1",
+        averageRating: null,
+        ratingsCount: 0,
+        song: { id: "c", title: "Basis for a Day", slug: "b" },
+      }),
+    ]);
+    await user.click(screen.getByRole("button", { name: /Rating/i }));
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
+    // All three tied → set+position takes over, inverted by desc → 3, 2, 1.
+    expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
+      "Crickets",
+      "Basis for a Day",
+      "Above the Waves",
+    ]);
+  });
+
   // Track number resets per set so each set/encore reads "1, 2, 3, …"
   // independent of the cumulative position in the show.
   test("renders Track # 1-indexed within each set/encore", async () => {

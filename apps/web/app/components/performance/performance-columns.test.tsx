@@ -660,6 +660,80 @@ describe("gapSortingFn", () => {
   });
 });
 
+// Rating column sort comparator: tracks with the same community average
+// resolve by vote count (more votes = more confidence), then by show date,
+// then by track position. Verified via the exported comparator directly so
+// edge cases stay focused on the comparator math rather than the full table.
+describe("ratingSortingFn", () => {
+  // Primary axis: higher rating > lower rating. Comparator returns a positive
+  // number when `a > b` so TanStack treats `b` as smaller in ascending order
+  // and surfaces `a` first when sorted descending (the column's default).
+  test("ascending: lower rating < higher rating", async () => {
+    const { ratingSortingFn } = await import("./performance-columns");
+    const fakeRow = (rating: number | null, ratingsCount: number, date: string, position: number) =>
+      ({ original: { rating, ratingsCount, position, show: { date } } }) as unknown as Parameters<
+        typeof ratingSortingFn
+      >[0];
+
+    expect(ratingSortingFn(fakeRow(3.5, 5, "2024-01-01", 1), fakeRow(4.5, 5, "2024-01-01", 1))).toBeLessThan(0);
+    expect(ratingSortingFn(fakeRow(4.5, 5, "2024-01-01", 1), fakeRow(3.5, 5, "2024-01-01", 1))).toBeGreaterThan(0);
+  });
+
+  // Missing ratings (null) collapse to -Infinity so unrated tracks cluster at
+  // the bottom on desc (best-first) and the top on asc — matching the gap
+  // column's treatment of debuts/repeats.
+  test("null ratings sort below all rated rows", async () => {
+    const { ratingSortingFn } = await import("./performance-columns");
+    const fakeRow = (rating: number | null, ratingsCount: number, date: string, position: number) =>
+      ({ original: { rating, ratingsCount, position, show: { date } } }) as unknown as Parameters<
+        typeof ratingSortingFn
+      >[0];
+
+    expect(ratingSortingFn(fakeRow(null, 0, "2024-01-01", 1), fakeRow(1.0, 1, "2024-01-01", 1))).toBeLessThan(0);
+  });
+
+  // First tiebreak: when two rows share a rating, the one with more votes
+  // sorts higher. More votes = higher confidence the average is real, so
+  // when scanning "best rated", a 4.8/100-votes version should beat a
+  // 4.8/3-votes version.
+  test("tied rating: more votes wins the tiebreak", async () => {
+    const { ratingSortingFn } = await import("./performance-columns");
+    const fakeRow = (rating: number | null, ratingsCount: number, date: string, position: number) =>
+      ({ original: { rating, ratingsCount, position, show: { date } } }) as unknown as Parameters<
+        typeof ratingSortingFn
+      >[0];
+
+    // 4.8/3-votes < 4.8/100-votes (less votes sorts first in asc).
+    expect(ratingSortingFn(fakeRow(4.8, 3, "2024-01-01", 1), fakeRow(4.8, 100, "2024-01-01", 1))).toBeLessThan(0);
+    expect(ratingSortingFn(fakeRow(4.8, 100, "2024-01-01", 1), fakeRow(4.8, 3, "2024-01-01", 1))).toBeGreaterThan(0);
+  });
+
+  // Second tiebreak: rating + votes both equal → fall through to show date so
+  // identical-quality performances across shows still cluster by show.
+  test("tied rating and votes: earlier date wins the tiebreak", async () => {
+    const { ratingSortingFn } = await import("./performance-columns");
+    const fakeRow = (rating: number | null, ratingsCount: number, date: string, position: number) =>
+      ({ original: { rating, ratingsCount, position, show: { date } } }) as unknown as Parameters<
+        typeof ratingSortingFn
+      >[0];
+
+    expect(ratingSortingFn(fakeRow(4.5, 10, "2018-06-01", 1), fakeRow(4.5, 10, "2024-08-15", 1))).toBeLessThan(0);
+    expect(ratingSortingFn(fakeRow(4.5, 10, "2024-08-15", 1), fakeRow(4.5, 10, "2018-06-01", 1))).toBeGreaterThan(0);
+  });
+
+  // Final tiebreak: rating + votes + date all equal (within-show repeat) →
+  // position breaks so repeats stay in setlist order relative to each other.
+  test("tied rating, votes, and date: position breaks the tie", async () => {
+    const { ratingSortingFn } = await import("./performance-columns");
+    const fakeRow = (rating: number | null, ratingsCount: number, date: string, position: number) =>
+      ({ original: { rating, ratingsCount, position, show: { date } } }) as unknown as Parameters<
+        typeof ratingSortingFn
+      >[0];
+
+    expect(ratingSortingFn(fakeRow(5.0, 12, "2012-08-15", 3), fakeRow(5.0, 12, "2012-08-15", 8))).toBeLessThan(0);
+  });
+});
+
 describe("createPerformanceColumns extras", () => {
   // Icon-only / ultra-narrow columns declare `fixedWidth` so they never
   // grow or shrink with the table — they hold a single glyph or 1-2

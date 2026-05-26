@@ -49,19 +49,26 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
   return columnHelper.accessor((row) => row.averageRating ?? Number.NEGATIVE_INFINITY, {
     id: "rating",
     header: ({ column }) => <SortableHeader column={column} label="Rating" />,
-    // Bounded content (star + "X.XX" + dot + count). The 5-star picker
-    // now floats in a popover instead of expanding the badge inline, so
-    // the column only needs to fit the compact badge. Desktop 7rem (~112px)
-    // gives ~96px content area (after 1rem horizontal padding) so the
-    // widest "★ 5.00 · 99" badge (~91px) sits with a few pixels of
-    // breathing room. Mobile 6rem fits the same compact rendering.
-    meta: { fixedWidth: "7rem", mobileFixedWidth: "6rem" },
+    // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
+    // average + 3-digit vote count + the viewer's own half-step rating
+    // (4½ is the widest valid user value; ratings cap at 5). Matches the
+    // performance table's rating column width so the column reads
+    // consistently across setlist and song-detail tables. The 5-star
+    // picker pops in a popover overlay, so the column doesn't need a
+    // wider expanded state.
+    meta: { fixedWidth: "8.25rem", mobileFixedWidth: "6.75rem" },
     enableSorting: true,
-    // Ties resolve to canonical set+position so "all unrated tracks" still
-    // read top-to-bottom in the order they were played.
-    sortingFn: withSetPositionTiebreak<T>(
-      (a, b) => (a.averageRating ?? Number.NEGATIVE_INFINITY) - (b.averageRating ?? Number.NEGATIVE_INFINITY),
-    ),
+    // Ties resolve first to vote count (more votes = more confidence in the
+    // average), then to canonical set+position so "all unrated tracks" still
+    // read top-to-bottom in the order they were played. Every row in a
+    // setlist shares the same show date, so date can't disambiguate here —
+    // set+position is the canonical narrative tiebreak instead.
+    sortingFn: withSetPositionTiebreak<T>((a, b) => {
+      const aRating = a.averageRating ?? Number.NEGATIVE_INFINITY;
+      const bRating = b.averageRating ?? Number.NEGATIVE_INFINITY;
+      if (aRating !== bRating) return aRating - bRating;
+      return (a.ratingsCount ?? 0) - (b.ratingsCount ?? 0);
+    }),
     sortDescFirst: true,
     cell: (info) => {
       const row = info.row.original;
