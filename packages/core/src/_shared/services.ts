@@ -18,6 +18,7 @@ import { YoutubeService } from "../shows/youtube-service";
 import { SongService } from "../songs/song-service";
 import { StatsService } from "../stats/stats-service";
 import { TrackService } from "../tracks/track-service";
+import { PersonalSongHistoryService } from "../users/personal-song-history-service";
 import { UserService } from "../users/user-service";
 import { VenueService } from "../venues/venue-service";
 import type { CacheService, CloudflareCacheService } from "./cache";
@@ -36,6 +37,7 @@ export interface Services {
   setlists: SetlistService;
   venues: VenueService;
   users: UserService;
+  personalSongHistory: PersonalSongHistoryService;
   reviews: ReviewService;
   ratings: RatingService;
   attendances: AttendanceService;
@@ -76,6 +78,7 @@ export function createServices(container: ServiceContainer): Services {
     setlists: new SetlistService(container.db),
     venues: new VenueService(container.db, container.logger),
     users: new UserService(container.db, container.logger),
+    personalSongHistory: new PersonalSongHistoryService(container.db, container.cache),
     reviews: new ReviewService(container.db, container.logger),
     ratings: new RatingService(container.db, container.cacheInvalidation),
     attendances: new AttendanceService(container.db, container.logger),
@@ -83,7 +86,7 @@ export function createServices(container: ServiceContainer): Services {
     tourDatesService: new TourDatesService(container.redis),
     nugs: new NugsService(container.redis, container.logger),
     archiveDotOrg: new ArchiveDotOrgService(container.redis, container.logger),
-    youtube: new YoutubeService(container.db),
+    youtube: new YoutubeService(container.db, container.cacheInvalidation),
     files: new FileService(container.db, container.logger, {
       accountId: container.env.CLOUDFLARE_ACCOUNT_ID,
       apiToken: container.env.CLOUDFLARE_IMAGES_API_TOKEN,

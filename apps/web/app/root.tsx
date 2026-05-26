@@ -1,4 +1,6 @@
 import type { Route } from ".react-router/types/app/+types/root";
+import { type DehydratedState, HydrationBoundary } from "@tanstack/react-query";
+import { useMemo } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -7,6 +9,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useMatches,
   useRouteError,
 } from "react-router-dom";
 import { Toaster } from "sonner";
@@ -16,12 +19,17 @@ import { HeaderLayout } from "~/components/layout/header-layout";
 import { SearchProvider } from "~/components/search/search-provider";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
+import { mergeDehydratedStates } from "~/lib/query-prefetch";
+import type { SessionUser } from "~/lib/session-user";
+import { toSessionUser } from "~/lib/session-user";
 import { QueryProvider } from "~/providers/query-provider";
 import { env } from "~/server/env";
+import { getRequestUser } from "~/server/request-user";
 import stylesheet from "./styles.css?url";
 
 export type RootData = {
   env: ClientSideEnv;
+  sessionUser: SessionUser | null;
 };
 
 export type ClientSideEnv = {
@@ -33,7 +41,7 @@ export type ClientSideEnv = {
 
 export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
-export async function loader(): Promise<RootData> {
+export async function loader({ request }: Route.LoaderArgs): Promise<RootData> {
   const clientEnv = {
     SUPABASE_URL: env.SUPABASE_URL,
     SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY,
@@ -41,14 +49,28 @@ export async function loader(): Promise<RootData> {
     BASE_URL: env.BASE_URL,
   };
 
+  // Seed useSession's initial state so user-specific UI paints on the
+  // first frame instead of after supabase.auth.getSession() resolves.
+  const user = await getRequestUser(request);
+
   return {
     env: clientEnv,
+    sessionUser: user ? toSessionUser(user) : null,
   };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const data = useLoaderData() as RootData | undefined;
   const env = data?.env;
+
+  const matches = useMatches();
+  const dehydratedState = useMemo(
+    () =>
+      mergeDehydratedStates(
+        matches.map((m) => (m.data as { dehydratedState?: DehydratedState } | undefined)?.dehydratedState),
+      ),
+    [matches],
+  );
 
   return (
     <html lang="en" className="font-quicksand dark overflow-x-hidden">
@@ -62,11 +84,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <ConcertLights />
         <SupabaseProvider env={env}>
           <QueryProvider>
-            <GlobalSearchProvider>
-              <SearchProvider>
-                <HeaderLayout>{children}</HeaderLayout>
-              </SearchProvider>
-            </GlobalSearchProvider>
+            <HydrationBoundary state={dehydratedState}>
+              <GlobalSearchProvider>
+                <SearchProvider>
+                  <HeaderLayout>{children}</HeaderLayout>
+                </SearchProvider>
+              </GlobalSearchProvider>
+            </HydrationBoundary>
           </QueryProvider>
         </SupabaseProvider>
         <Toaster position="top-right" theme="dark" />

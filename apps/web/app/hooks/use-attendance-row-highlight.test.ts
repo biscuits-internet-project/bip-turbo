@@ -2,7 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("~/hooks/use-session", () => ({
-  useSession: vi.fn(() => ({ user: { id: "user-1" }, supabase: null, loading: false })),
+  useSession: vi.fn(() => ({ user: { id: "user-1" }, supabase: null })),
 }));
 
 vi.mock("~/hooks/use-show-user-data", () => ({
@@ -29,7 +29,6 @@ describe("useAttendanceRowHighlight", () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "user-1" } as never,
       supabase: null,
-      loading: false,
     });
     vi.mocked(useShowUserData).mockReturnValue({
       attendanceMap: new Map(),
@@ -70,7 +69,6 @@ describe("useAttendanceRowHighlight", () => {
     vi.mocked(useSession).mockReturnValue({
       user: null,
       supabase: null,
-      loading: false,
     });
 
     const items: TestItem[] = [{ id: "1", showId: "show-1" }];

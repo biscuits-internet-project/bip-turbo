@@ -74,5 +74,40 @@ export const action = protectedAction(async ({ request, context }) => {
     }
   }
 
+  if (request.method === "DELETE") {
+    try {
+      const body = await request.json();
+      const { rateableId, rateableType, showSlug } = body;
+
+      if (!rateableId || !rateableType) {
+        return badRequest();
+      }
+
+      const user = await services.users.findByEmail(currentUser.email);
+      if (!user) {
+        return new Response(JSON.stringify({ error: "User not found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const stats = await services.ratings.clearForUser({
+        rateableId,
+        rateableType,
+        userId: user.id,
+        showSlug,
+      });
+
+      return {
+        userRating: null,
+        averageRating: stats.averageRating,
+        ratingsCount: stats.ratingsCount,
+      };
+    } catch (error) {
+      logger.error("Error clearing rating", { error });
+      throw new Error(error instanceof Error ? error.message : "Failed to clear rating");
+    }
+  }
+
   return methodNotAllowed();
 });

@@ -1,9 +1,11 @@
 import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, Flame, RotateCcw, Star } from "lucide-react";
+import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, RotateCcw, Star } from "lucide-react";
 import { GapIcon } from "~/components/gap-icon";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
+import { ShowDateLink } from "~/components/show-date-link";
+import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -36,6 +38,88 @@ export const gapSortingFn = makeGapSortingFn("gap");
 export const filteredGapSortingFn = makeGapSortingFn("filteredGap");
 
 /**
+ * Sort comparator for the Rating column. Tracks with the same community
+ * average resolve by vote count first (more votes = more confidence in the
+ * average), then by show date, then by position so within-show repeats with
+ * matching rating + vote count stay in setlist order relative to each other.
+ *
+ * Missing ratings collapse to -Infinity so unrated rows cluster at the
+ * bottom on desc and the top on asc, matching the Gap column's treatment
+ * of debuts/repeats.
+ */
+export function ratingSortingFn(a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number {
+  const aRating = a.original.rating ?? Number.NEGATIVE_INFINITY;
+  const bRating = b.original.rating ?? Number.NEGATIVE_INFINITY;
+  if (aRating !== bRating) return aRating - bRating;
+  const aVotes = a.original.ratingsCount ?? 0;
+  const bVotes = b.original.ratingsCount ?? 0;
+  if (aVotes !== bVotes) return aVotes - bVotes;
+  const dateCmp = compareByShowDate(a.original, b.original);
+  if (dateCmp !== 0) return dateCmp;
+  return (a.original.position ?? 0) - (b.original.position ?? 0);
+}
+
+/**
+ * Adapt a SongPagePerformance row to the minimal Track-like shape the
+ * shared AllTimerCell + TrackRatingOverlay expect. The performance DTO
+ * uses `notes` (plural) for the note field and exposes the song title
+ * at the top level rather than under `song.title`; this normalizes both.
+ * Returns a structural subset of TrackLight — only the fields the
+ * overlay actually reads — since fabricating a full TrackLight with
+ * never-read defaults would be misleading.
+ */
+function trackFromPerformance(row: SongPagePerformance) {
+  return {
+    id: row.trackId,
+    allTimer: row.allTimer ?? null,
+    note: row.notes ?? null,
+    song: { title: row.songTitle ?? "", slug: row.songSlug ?? "" },
+    averageRating: row.rating ?? null,
+    ratingsCount: row.ratingsCount ?? null,
+    likesCount: 0,
+  };
+}
+
+/**
+ * Sort comparator factory for the Song Before / Song After columns. The
+ * primary axis is the adjacent song's title (case-insensitive). The
+ * tiebreaker reads the relevant segue field — segue rows sort ahead of
+ * non-segue rows when titles tie so identical-title groups cluster
+ * segue-first. Rows missing the adjacent song (set openers / closers)
+ * sort last in ascending order.
+ */
+function makeAdjacentSongSortingFn(
+  pickAdjacent: (row: SongPagePerformance) => { songTitle?: string | null } | undefined,
+  pickSegue: (row: SongPagePerformance) => string | null | undefined,
+) {
+  return (a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number => {
+    const aTitle = pickAdjacent(a.original)?.songTitle ?? null;
+    const bTitle = pickAdjacent(b.original)?.songTitle ?? null;
+    if (aTitle === null && bTitle === null) return 0;
+    if (aTitle === null) return 1;
+    if (bTitle === null) return -1;
+    const titleCmp = aTitle.localeCompare(bTitle, undefined, { sensitivity: "base" });
+    if (titleCmp !== 0) return titleCmp;
+    const aSegue = !!pickSegue(a.original);
+    const bSegue = !!pickSegue(b.original);
+    if (aSegue === bSegue) return 0;
+    return aSegue ? -1 : 1;
+  };
+}
+
+export const songBeforeSortingFn = makeAdjacentSongSortingFn(
+  (row) => row.songBefore,
+  // The incoming segue lives on the prior track, surfaced via songBefore.segue.
+  (row) => row.songBefore?.segue,
+);
+export const songAfterSortingFn = makeAdjacentSongSortingFn(
+  (row) => row.songAfter,
+  // The outgoing segue lives on the CURRENT row — it describes whether
+  // the current track segued into the next one.
+  (row) => row.segue,
+);
+
+/**
  * Shared cell renderer for Gap and Filtered Gap. Same icon semantics: ★
  * for a debut (null), ↺ for the second occurrence within the same show,
  * tabular number otherwise.
@@ -66,6 +150,13 @@ interface PerformanceColumnOptions {
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
   /**
+   * When true (and `showAllTimerColumn` is on), keep the flame column
+   * visible on mobile and instead hide the Set column there — the
+   * noteworthy marker is the critical signal on jam-charts surfaces,
+   * while the set number is secondary in that context.
+   */
+  mobileFlamePriority?: boolean;
+  /**
    * Gap + Last Played are per-song signals. On surfaces that mix songs
    * (all-timers, on-this-day), pass `false` to hide both. Defaults true.
    */
@@ -76,7 +167,6 @@ interface PerformanceColumnOptions {
    * appears when the filtered set differs from all-time.
    */
   hasNarrowingFilter?: boolean;
-  songTitle?: string;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
 }
@@ -93,7 +183,7 @@ function SortableHeader({
   return (
     <button
       type="button"
-      className="cursor-pointer select-none hover:text-content-text-primary w-full text-left flex items-start gap-1"
+      className="cursor-pointer select-none hover:text-content-text-primary w-full text-left flex flex-wrap items-start gap-x-1"
       onClick={() => column.toggleSorting()}
     >
       <span className={column.getIsSorted() ? "text-content-text-primary font-semibold" : ""}>{label}</span>
@@ -114,9 +204,9 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
   const {
     showSongColumn,
     showAllTimerColumn,
+    mobileFlamePriority,
     showGapColumns,
     hasNarrowingFilter,
-    songTitle,
     userRatingMap,
     isAuthenticated,
   } = options;
@@ -124,44 +214,49 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
   const columnHelper = createColumnHelper<SongPagePerformance>();
   const columns: ColumnDef<SongPagePerformance, unknown>[] = [];
 
+  // AllTimer column comes first so the flame anchors the leftmost slot
+  // on the surfaces that show it (jam-charts, song-detail jam-charts +
+  // all-performances tabs) — the visual hierarchy reads "noteworthy
+  // marker → song/date → context columns" left to right.
+  if (showAllTimerColumn) {
+    columns.push(
+      columnHelper.accessor((row) => row.allTimer ?? false, {
+        id: "allTimer",
+        header: "",
+        // Hidden on mobile by default — the Set cell renders the flame
+        // inline on phones to recover the 16px this column would
+        // otherwise consume. `mobileFlamePriority` flips that on
+        // jam-charts surfaces where the marker is the critical signal
+        // and the Set column hides on mobile instead.
+        meta: { ...allTimerColumnMeta, hideOnMobile: !mobileFlamePriority },
+        enableSorting: false,
+        cell: (info) => <AllTimerCell track={trackFromPerformance(info.row.original)} />,
+      }) as ColumnDef<SongPagePerformance, unknown>,
+    );
+  }
+
   if (showSongColumn) {
     columns.push(
       columnHelper.accessor((row) => row.songTitle || "", {
         id: "song",
         header: ({ column }) => <SortableHeader column={column} label="Song" />,
+        // Cross-song surfaces (this column only renders there): the song
+        // title is the primary signal, so it claims a large share of the
+        // leftover space against the secondary date / context columns.
+        meta: { weight: 3 },
         enableSorting: true,
         sortingFn: "alphanumeric",
         cell: (info) => {
           const title = info.getValue() as string;
           const slug = info.row.original.songSlug;
           return slug ? (
-            <a
-              href={`/songs/${slug}`}
-              className="inline-block min-w-[10ch] text-base text-brand-primary hover:text-brand-secondary font-medium [overflow-wrap:anywhere]"
-            >
+            <a href={`/songs/${slug}`} className="text-base text-brand-primary hover:text-brand-secondary font-medium">
               {title}
             </a>
           ) : (
-            <span className="inline-block min-w-[10ch] text-content-text-secondary [overflow-wrap:anywhere]">
-              {title}
-            </span>
+            <span className="text-content-text-secondary">{title}</span>
           );
         },
-      }) as ColumnDef<SongPagePerformance, unknown>,
-    );
-  }
-
-  if (showAllTimerColumn) {
-    columns.push(
-      columnHelper.accessor((row) => row.allTimer ?? false, {
-        id: "allTimer",
-        header: "",
-        // Flame icon sits flush against the row edge at every viewport —
-        // the default cell padding (`px-1.5` on mobile, `sm:p-3` on
-        // desktop) doubles the visual width of the column for no benefit.
-        meta: { width: "24px", cellClassName: "px-0 sm:px-0" },
-        enableSorting: false,
-        cell: (info) => (info.getValue() ? <Flame className="h-3.5 w-3.5 text-orange-500" /> : null),
       }) as ColumnDef<SongPagePerformance, unknown>,
     );
   }
@@ -169,7 +264,12 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
   columns.push(
     columnHelper.accessor("show.date", {
       id: "date",
-      meta: { width: "180px" },
+      // Desktop: weight 3 gives room for "MMM D, YYYY" + a venue line
+      // (DateVenueCell's @container/datecell drops the venue when the
+      // column gets squeezed). Mobile: fixed 5rem fits "M/D/YYYY" on one
+      // line and locks the column so the song-before / song-after flex
+      // columns can claim the rest.
+      meta: { weight: 3, mobileFixedWidth: "5rem" },
       header: ({ column }) => <SortableHeader column={column} label="Date" />,
       enableSorting: true,
       sortingFn: (a, b) => compareByShowDate(a.original, b.original),
@@ -177,13 +277,21 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         const date = info.getValue();
         const showSlug = info.row.original.show.slug;
         const venue = info.row.original.venue;
+        const track = trackFromPerformance(info.row.original);
         return (
-          <a href={`/shows/${showSlug}`} className="text-base text-brand-primary hover:text-brand-secondary block">
-            <DateVenueCell
-              date={<ShowDate date={date} />}
-              venue={{ name: venue?.name, city: venue?.city, state: venue?.state }}
-            />
-          </a>
+          <div className="flex flex-col gap-0.5">
+            <a href={`/shows/${showSlug}`} className="text-base text-brand-primary hover:text-brand-secondary block">
+              <DateVenueCell
+                date={<ShowDate date={date} />}
+                venue={{ name: venue?.name, city: venue?.city, state: venue?.state }}
+              />
+            </a>
+            {!showSongColumn && (
+              <span className="sm:hidden">
+                <AllTimerCell track={track} align="start" />
+              </span>
+            )}
+          </div>
         );
       },
     }) as ColumnDef<SongPagePerformance, unknown>,
@@ -193,7 +301,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
     columns.push(
       columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
         id: "gap",
-        meta: { width: "64px" },
+        meta: { fixedWidth: "3.5rem", mobileFixedWidth: "2rem" },
         header: ({ column }) => <SortableHeader column={column} label="Gap" />,
         enableSorting: true,
         sortingFn: gapSortingFn,
@@ -210,15 +318,15 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       columns.push(
         columnHelper.accessor((row) => row.filteredGap ?? Number.NEGATIVE_INFINITY, {
           id: "filteredGap",
-          meta: { width: "72px" },
+          meta: { fixedWidth: "3.5rem", mobileFixedWidth: "2rem" },
           header: ({ column }) => (
             <SortableHeader
               column={column}
               label={
-                <span className="inline-flex items-center gap-1">
+                <span className="flex flex-col items-start leading-tight">
                   <Filter className="h-3 w-3" aria-hidden="true" />
                   <span className="sr-only">Filtered</span>
-                  Gap
+                  <span>Gap</span>
                 </span>
               }
             />
@@ -238,120 +346,79 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
     columns.push(
       columnHelper.accessor((row) => row.previousShow?.date ?? "", {
         id: "lastPlayed",
-        meta: { width: "110px", hideOnMobile: true },
+        meta: { fixedWidth: "5rem", hideOnMobile: true },
         header: ({ column }) => <SortableHeader column={column} label="Last Played" />,
         enableSorting: true,
         sortingFn: "alphanumeric",
+        cell: (info) => <ShowDateLink show={info.row.original.previousShow} />,
+      }) as ColumnDef<SongPagePerformance, unknown>,
+    );
+  }
+
+  if (showSongColumn) {
+    // Cross-song surfaces (e.g. /songs/all-timers, /on-this-day) bring
+    // Set back as a column — when rows span many shows, the set label
+    // ("1", "E1") is the only on-row hint of where in the show this
+    // happened. On the single-song surfaces (/songs/:slug) Set was
+    // removed because every row's set is in the surrounding context.
+    columns.push(
+      columnHelper.accessor("set", {
+        id: "set",
+        header: "Set",
+        meta: { fixedWidth: "2.5rem", hideOnMobile: mobileFlamePriority },
+        enableSorting: false,
         cell: (info) => {
-          const previousShow = info.row.original.previousShow;
-          if (!previousShow) {
-            return <span className="text-content-text-tertiary">—</span>;
-          }
-          return (
-            <a href={`/shows/${previousShow.slug}`} className="text-base text-brand-primary hover:text-brand-secondary">
-              <ShowDate date={previousShow.date} />
-            </a>
-          );
+          const set = info.getValue();
+          if (!set) return <span className="text-content-text-tertiary">—</span>;
+          return <span className="text-content-text-secondary">{formatSetLabel(set)}</span>;
         },
       }) as ColumnDef<SongPagePerformance, unknown>,
     );
   }
 
   columns.push(
-    columnHelper.accessor("set", {
-      header: "Set",
-      meta: { width: "48px" },
-      enableSorting: false,
+    columnHelper.accessor((row) => row.songBefore, {
+      id: "songBefore",
+      header: ({ column }) => <SortableHeader column={column} label="Song Before" />,
+      enableSorting: true,
+      sortingFn: songBeforeSortingFn,
+      // Cross-song surfaces hide adjacency on mobile — too many columns
+      // to fit. Per-song surfaces keep them visible (user-requested).
+      meta: { weight: 1.6, hideOnMobile: showSongColumn },
       cell: (info) => {
-        const set = info.getValue();
-        if (!set) return <span className="text-content-text-tertiary">—</span>;
-        // Cross-show table — we don't know the encore count of any one
-        // show, so single-encore collapse (E1 → E) is left off here.
-        return <span className="text-content-text-secondary">{formatSetLabel(set)}</span>;
+        const before = info.getValue();
+        if (!before?.songTitle) return null;
+        // Arrow renders only on segues; its absence implicitly signals a non-segue.
+        return (
+          <span>
+            <a href={`/songs/${before.songSlug}`} className="text-content-text-secondary hover:text-brand-primary">
+              {before.songTitle}
+            </a>
+            {before.segue && <span className="text-content-text-tertiary"> &gt;</span>}
+          </span>
+        );
       },
     }) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor(
-      (row) => ({
-        before: row.songBefore,
-        after: row.songAfter,
-        currentSong: songTitle || row.songTitle || "",
-      }),
-      {
-        id: "sequence",
-        header: "Sequence",
-        enableSorting: false,
-        // Hidden on mobile only when there's a Song column already
-        // competing for room — the song-detail page (no Song column)
-        // has the slack to keep Sequence visible at narrow widths.
-        meta: { hideOnMobile: Boolean(showSongColumn) },
-        cell: (info) => {
-          const { before, after, currentSong } = info.getValue();
-          const parts = [];
-
-          if (before?.songTitle) {
-            parts.push(
-              <a
-                key="before"
-                href={`/songs/${before.songSlug}`}
-                className="text-content-text-secondary hover:text-brand-primary"
-              >
-                {before.songTitle}
-              </a>,
-            );
-            if (before.segue) {
-              parts.push(
-                <span key="segue1" className="text-content-text-tertiary mx-1">
-                  {" "}
-                  &gt;{" "}
-                </span>,
-              );
-            } else {
-              parts.push(
-                <span key="sep1" className="text-content-text-tertiary">
-                  ,&nbsp;
-                </span>,
-              );
-            }
-          }
-
-          parts.push(
-            <span key="current" className="font-bold" style={{ color: "#DDD6FE" }}>
-              {currentSong}
-            </span>,
-          );
-
-          if (after?.songTitle) {
-            if (info.row.original.segue) {
-              parts.push(
-                <span key="segue2" className="text-content-text-tertiary mx-1">
-                  {" "}
-                  &gt;{" "}
-                </span>,
-              );
-            } else {
-              parts.push(
-                <span key="sep2" className="text-content-text-tertiary">
-                  ,&nbsp;
-                </span>,
-              );
-            }
-            parts.push(
-              <a
-                key="after"
-                href={`/songs/${after.songSlug}`}
-                className="text-content-text-secondary hover:text-brand-primary"
-              >
-                {after.songTitle}
-              </a>,
-            );
-          }
-
-          return parts.length > 0 ? (
-            <div className="flex items-center flex-wrap [overflow-wrap:anywhere]">{parts}</div>
-          ) : null;
-        },
+    columnHelper.accessor((row) => row.songAfter, {
+      id: "songAfter",
+      header: ({ column }) => <SortableHeader column={column} label="Song After" />,
+      enableSorting: true,
+      sortingFn: songAfterSortingFn,
+      meta: { weight: 1.6, hideOnMobile: showSongColumn },
+      cell: (info) => {
+        const after = info.getValue();
+        if (!after?.songTitle) return null;
+        const outgoingSegue = info.row.original.segue;
+        return (
+          <span>
+            {outgoingSegue && <span className="text-content-text-tertiary">&gt; </span>}
+            <a href={`/songs/${after.songSlug}`} className="text-content-text-secondary hover:text-brand-primary">
+              {after.songTitle}
+            </a>
+          </span>
+        );
       },
-    ) as ColumnDef<SongPagePerformance, unknown>,
+    }) as ColumnDef<SongPagePerformance, unknown>,
     columnHelper.accessor(
       (row) => ({
         annotations: row.annotations,
@@ -361,7 +428,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         id: "notes",
         header: "Notes",
         enableSorting: false,
-        meta: { hideOnMobile: true },
+        meta: { weight: 2.8, hideOnMobile: true },
         cell: (info) => {
           const { annotations, notes } = info.getValue();
           const items = [];
@@ -388,7 +455,21 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       id: "rating",
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       enableSorting: true,
-      sortingFn: "basic",
+      // Rating ties resolve to vote count (more votes = more confidence),
+      // then show date, then track position — same chain as gapSortingFn so
+      // identical-rating runs across multiple shows still read in a stable
+      // order. Sort defaults to descending ("best first") via sortDescFirst.
+      sortingFn: ratingSortingFn,
+      sortDescFirst: true,
+      // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
+      // average + 3-digit vote count + the viewer's own half-step rating
+      // (4½ is the widest valid user value; ratings cap at 5). Measured at
+      // ~120px on desktop / ~103px on mobile. Desktop 8.25rem (132px)
+      // leaves ~12px slack; mobile 6.75rem (108px) leaves ~5px so typical
+      // rows (no user rating, 1-2 digit count) don't carry obvious empty
+      // space. The 5-star editor pops in a popover that overlays the
+      // badge, so the column doesn't need a wider expanded state.
+      meta: { fixedWidth: "8.25rem", mobileFixedWidth: "6.75rem" },
       cell: (info) => {
         const rating = info.getValue();
         const ratingsCount = info.row.original.ratingsCount;

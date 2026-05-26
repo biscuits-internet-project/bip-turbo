@@ -112,10 +112,10 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
 
 /**
  * Fills the rarity fields the canonical SongService leaves as null:
- * `showsSinceLastPlayed`, `percentSinceDebut`, `averageShowsPerPlay`.
- * Drives the Current Gap / % Since Debut / Avg Gap columns on /songs.
- * Runs inside the cached `fetchFilteredSongs` path so the bulk gap query
- * fires at most once per cache window.
+ * `showsSinceLastPlayed`, `percentSinceDebut`, `averageGapShows`. The Avg
+ * Gap column reads `averageGapShows` (mean of closed gaps from
+ * `tracks.gap`); `medianGapShows` is only computed on the song detail
+ * page, not surfaced in the table, so it stays null here.
  */
 async function populateRarityFields<T extends Song>(
   songs: T[],
@@ -123,9 +123,10 @@ async function populateRarityFields<T extends Song>(
 ): Promise<T[]> {
   if (songs.length === 0) return songs;
   const songIds = songs.map((s) => s.id);
-  const [showsByYear, gaps, filteredRarity] = await Promise.all([
+  const [showsByYear, gaps, avgGaps, filteredRarity] = await Promise.all([
     services.stats.getShowsByYear(),
     services.stats.getShowsSinceLastPlayedBySongIds(songIds),
+    services.stats.getAverageGapShowsBySongIds(songIds),
     filterOptions ? services.songPageComposer.buildFilteredSongRarity(songIds, filterOptions) : Promise.resolve(null),
   ]);
   return songs.map((song) => {
@@ -138,12 +139,12 @@ async function populateRarityFields<T extends Song>(
       ...song,
       showsSinceLastPlayed: gaps.get(song.id) ?? null,
       percentSinceDebut: rarity.percentSinceDebut,
-      averageShowsPerPlay: rarity.averageShowsPerPlay,
+      averageGapShows: avgGaps.get(song.id) ?? null,
       ...(filtered
         ? {
             filteredShowsSinceLastPlayed: filtered.filteredShowsSinceLastPlayed,
             filteredPercentSinceDebut: filtered.filteredPercentSinceDebut,
-            filteredAverageShowsPerPlay: filtered.filteredAverageShowsPerPlay,
+            filteredAverageGapShows: filtered.filteredAverageGapShows,
             dateFirstFilteredPlayed: filtered.dateFirstFilteredPlayed,
             dateLastFilteredPlayed: filtered.dateLastFilteredPlayed,
           }

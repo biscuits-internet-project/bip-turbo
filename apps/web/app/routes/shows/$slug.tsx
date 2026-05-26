@@ -1,12 +1,6 @@
 import type { ShowNavItem } from "@bip/core";
-import {
-  type ArchiveDotOrgRecording,
-  type Attendance,
-  CacheKeys,
-  type ReviewMinimal,
-  type Setlist,
-  type ShowFile,
-} from "@bip/domain";
+import { type ArchiveDotOrgRecording, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowLeft, ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
@@ -17,6 +11,7 @@ import { SetlistCard } from "~/components/setlist/setlist-card";
 import { SetlistHighlights } from "~/components/setlist/setlist-highlights";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ArchiveRecordingsCard } from "~/components/show/archive-recordings-card";
+import { DebutYearChart } from "~/components/show/debut-year-chart";
 import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-link-card";
 import { ShowPhotos } from "~/components/show/show-photos";
 import { ShowDate } from "~/components/show-date";
@@ -25,14 +20,17 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
 import { useSetlistView } from "~/hooks/use-setlist-view";
 import { useShowUserData } from "~/hooks/use-show-user-data";
-import { type Context, publicLoader } from "~/lib/base-loaders";
+import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { logger } from "~/lib/logger";
+import { showUserDataQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
 import { formatDateLong, formatMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
+import { computeShowUserData } from "~/server/show-user-data";
 
 interface ShowLoaderData {
   setlist: Setlist;
@@ -41,30 +39,9 @@ interface ShowLoaderData {
   nugsLinks: ExternalLink[];
   youtubeLinks: ExternalLink[];
   externalSources: ShowExternalSources;
-  userAttendance: Attendance | null;
   photos: ShowFile[];
   adjacentShows: { previous: ShowNavItem | null; next: ShowNavItem | null };
-}
-
-async function fetchUserAttendance(context: Context, showId: string): Promise<Attendance | null> {
-  if (!context.currentUser) {
-    return null;
-  }
-
-  try {
-    const user = await services.users.findByEmail(context.currentUser.email);
-    if (!user) {
-      logger.warn(`User not found with email ${context.currentUser.email}`);
-      return null;
-    }
-
-    const userAttendance = await services.attendances.findByUserIdAndShowId(user.id, showId);
-    logger.info(`Fetch user attendance for show ${showId}: attended? ${!!userAttendance}`);
-    return userAttendance;
-  } catch (error) {
-    logger.warn("Failed to load user attendance", { error });
-    return null;
-  }
+  dehydratedState: DehydratedState;
 }
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -101,9 +78,6 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     services.shows.findAdjacentShows(setlist.show.date, setlist.show.slug),
   ]);
 
-  // If user is authenticated, fetch their attendance data for search results
-  const userAttendance = await fetchUserAttendance(context, setlist.show.id);
-
   logger.info(`Show data loaded for ${slug} - setlist cached, reviews fresh`);
 
   const [archiveRecordings, nugsReleases, youtubeVideoUrls, externalSourcesMap] = await Promise.all([
@@ -112,6 +86,16 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     services.youtube.getVideoUrlsForShow(setlist.show.id),
     computeShowExternalSources([setlist.show]),
   ]);
+
+  // Prefetch attendance + user rating + community average for this show
+  // so the SetlistCard's badges and the StarRating editor paint on the
+  // first server response with no flicker and no client-side POST.
+  const showIds = [setlist.show.id];
+  const queryClient = createPrefetchClient();
+  await queryClient.prefetchQuery({
+    queryKey: showUserDataQueryKey(showIds),
+    queryFn: () => computeShowUserData(context, showIds),
+  });
 
   const nugsLinks: ExternalLink[] = nugsReleases.map((release) => ({
     url: release.url,
@@ -129,9 +113,9 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     nugsLinks,
     youtubeLinks,
     externalSources: externalSourcesMap[setlist.show.id] ?? {},
-    userAttendance,
     photos,
     adjacentShows,
+    dehydratedState: dehydrate(queryClient),
   };
 });
 
@@ -140,25 +124,16 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const {
-    setlist,
-    reviews,
-    archiveRecordings,
-    nugsLinks,
-    youtubeLinks,
-    externalSources,
-    userAttendance,
-    photos,
-    adjacentShows,
-  } = useSerializedLoaderData<ShowLoaderData>();
+  const { setlist, reviews, archiveRecordings, nugsLinks, youtubeLinks, externalSources, photos, adjacentShows } =
+    useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
   const [setlistView, setSetlistView] = useSetlistView();
-  const { userRatingMap } = useShowUserData([setlist.show.id]);
+  const { userRatingMap, attendanceMap } = useShowUserData([setlist.show.id]);
   const userRating = userRatingMap.get(setlist.show.id) ?? null;
+  const userAttendance = attendanceMap.get(setlist.show.id) ?? null;
 
-  // Get the internal user ID from Supabase metadata
-  const internalUserId = user?.user_metadata?.internal_user_id;
+  const internalUserId = user?.internalUserId ?? undefined;
 
   const handleReviewSubmit = async (data: { content: string }) => {
     try {
@@ -266,7 +241,7 @@ export default function Show() {
         <div className="flex justify-between items-center gap-2">
           {adjacentShows.previous ? (
             <Link
-              to={`/shows/${adjacentShows.previous.slug}${setlistView === "gap-chart" ? "?view=gap-chart" : ""}`}
+              to={`/shows/${adjacentShows.previous.slug}${setlistView === "setlist" ? "" : `?view=${setlistView}`}`}
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0"
             >
               <ChevronLeft className="h-3 w-3 shrink-0" />
@@ -292,7 +267,7 @@ export default function Show() {
           </Link>
           {adjacentShows.next ? (
             <Link
-              to={`/shows/${adjacentShows.next.slug}${setlistView === "gap-chart" ? "?view=gap-chart" : ""}`}
+              to={`/shows/${adjacentShows.next.slug}${setlistView === "setlist" ? "" : `?view=${setlistView}`}`}
               className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors min-w-0 justify-end"
             >
               <span className="truncate">
@@ -348,6 +323,8 @@ export default function Show() {
 
             {/* Highlights panel */}
             <SetlistHighlights setlist={setlist} />
+
+            <DebutYearChart setlist={setlist} />
           </div>
         </div>
 

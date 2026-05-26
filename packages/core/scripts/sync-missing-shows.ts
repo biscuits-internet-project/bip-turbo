@@ -40,7 +40,10 @@ export interface McpShowSummary {
 
 // Richer shape returned by the `get_shows` tool (vs the summary from
 // `get_shows_by_year`). Carries the aggregate fields we mirror: ratingsCount,
-// notes, relistenUrl.
+// notes, relistenUrl, and the admin-controlled stat flags countForStats /
+// dayOrder. The flags are optional so older MCP deploys (pre-this-change)
+// keep parsing cleanly — see showNeedsUpdate for the "omit means no opinion"
+// drift semantics.
 export interface McpShow {
   slug: string;
   date: string;
@@ -50,6 +53,8 @@ export interface McpShow {
   ratingsCount: number;
   notes: string | null;
   relistenUrl: string | null;
+  countForStats?: boolean;
+  dayOrder?: number | null;
 }
 
 export interface McpSetlistTrack {
@@ -57,6 +62,13 @@ export interface McpSetlistTrack {
   songTitle: string;
   songSlug: string;
   segue: string | null;
+  // Admin-curated; optional on the wire so older MCP responses parse cleanly.
+  allTimer?: boolean | null;
+  note?: string | null;
+  // Per-track annotations from the Annotation table. `undefined` means
+  // "no opinion" (pre-deploy MCP); an explicit empty array means "prod has
+  // zero". Replace-not-merge semantics on sync — see diffTrackAnnotations.
+  annotations?: string[];
 }
 
 export interface McpSetlistSet {
@@ -80,6 +92,17 @@ export interface McpSong {
   // MCP serializes these as ISO strings (JSON.stringify of Date); tolerate both.
   dateFirstPlayed: string | Date | null;
   dateLastPlayed: string | Date | null;
+  // Curated admin fields. Optional on the wire so pre-deploy MCP responses
+  // parse, and treated as "no opinion" in drift detection — see
+  // buildSongDriftUpdate. `null` is distinct from `undefined` here: explicit
+  // null means "prod has cleared the value" and DOES drift.
+  cover?: boolean | null;
+  legacyAuthor?: string | null;
+  featuredLyric?: string | null;
+  tabs?: string | null;
+  notes?: string | null;
+  history?: string | null;
+  guitarTabsUrl?: string | null;
 }
 
 export interface McpVenue {
@@ -89,6 +112,14 @@ export interface McpVenue {
   state: string | null;
   country: string | null;
   timesPlayed: number;
+  // Contact + geocode columns. Optional on the wire so pre-deploy MCP parses;
+  // `undefined` = "no opinion" in drift detection.
+  street?: string | null;
+  postalCode?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface McpSearchVenueResult {
@@ -190,6 +221,13 @@ export function buildShowCreateInput(
     ratingsCount: show.ratingsCount,
     notes: show.notes,
     relistenUrl: show.relistenUrl,
+    // Fall back to schema defaults when MCP omits the flags. `??` is critical:
+    // a pre-deploy MCP returns `undefined`, which Prisma would otherwise pass
+    // through as "no opinion" (fine on insert) but the explicit default makes
+    // the contract obvious in tests and avoids surprises if Prisma's behavior
+    // ever shifts.
+    countForStats: show.countForStats ?? true,
+    dayOrder: show.dayOrder ?? null,
     venueId: opts.venueId ?? null,
     bandId: opts.bandId ?? null,
     createdAt: now,
@@ -204,6 +242,8 @@ export interface LocalShowAggregates {
   ratingsCount: number;
   notes: string | null;
   relistenUrl: string | null;
+  countForStats?: boolean;
+  dayOrder?: number | null;
 }
 
 const AVERAGE_RATING_TOLERANCE = 1e-6;
@@ -212,6 +252,12 @@ export function showNeedsUpdate(local: LocalShowAggregates, remote: McpShow): bo
   if (local.ratingsCount !== remote.ratingsCount) return true;
   if (local.notes !== remote.notes) return true;
   if (local.relistenUrl !== remote.relistenUrl) return true;
+  // countForStats / dayOrder: only compare when remote actually reports them.
+  // A pre-deploy MCP omits these, and treating `undefined` as a drift would
+  // claim every show needs an update — flapping `countForStats` to its default
+  // and clobbering admin-set values.
+  if (remote.countForStats !== undefined && (local.countForStats ?? true) !== remote.countForStats) return true;
+  if (remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder) return true;
   const la = local.averageRating;
   const ra = remote.averageRating;
   if (la === null || ra === null) return la !== ra;
@@ -235,23 +281,37 @@ export interface ShowDriftUpdate {
   notes?: string | null;
   relistenUrl?: string | null;
   venueId?: string | null;
+  countForStats?: boolean;
+  dayOrder?: number | null;
 }
 
 /**
- * Compute the patch to apply to an already-local show row. Two independent
- * triggers: aggregate drift (rating/notes/relistenUrl/ratingsCount) and venue
- * back-fill (local venueId is null but the venue is now resolvable). Returns
- * null when nothing changed so callers can skip the UPDATE entirely and keep
- * re-runs idempotent.
+ * Compute the patch to apply to an already-local show row. Independent
+ * triggers: aggregate drift (rating/notes/relistenUrl/ratingsCount), the
+ * admin-controlled flags (countForStats, dayOrder), and venue back-fill (local
+ * venueId is null but the venue is now resolvable). Returns null when nothing
+ * changed so callers can skip the UPDATE entirely and keep re-runs idempotent.
+ *
+ * countForStats and dayOrder are emitted independently from the aggregate
+ * block — flipping the flag shouldn't churn updatedAt with an identical
+ * rating payload, and vice versa.
  */
 export function buildShowDriftUpdate(
   local: LocalShowForDrift,
   remote: McpShow,
   resolvedVenueId: string | null,
 ): ShowDriftUpdate | null {
-  const aggregatesDrift = showNeedsUpdate(local, remote);
+  const aggregatesDrift =
+    local.ratingsCount !== remote.ratingsCount ||
+    local.notes !== remote.notes ||
+    local.relistenUrl !== remote.relistenUrl ||
+    averageRatingDrift(local.averageRating, remote.averageRating);
+  const countForStatsDrift =
+    remote.countForStats !== undefined && (local.countForStats ?? true) !== remote.countForStats;
+  const dayOrderDrift =
+    remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder;
   const venueDrift = local.venueId === null && resolvedVenueId !== null;
-  if (!aggregatesDrift && !venueDrift) return null;
+  if (!aggregatesDrift && !countForStatsDrift && !dayOrderDrift && !venueDrift) return null;
   const update: ShowDriftUpdate = {};
   if (aggregatesDrift) {
     update.averageRating = remote.averageRating;
@@ -259,8 +319,15 @@ export function buildShowDriftUpdate(
     update.notes = remote.notes;
     update.relistenUrl = remote.relistenUrl;
   }
+  if (countForStatsDrift) update.countForStats = remote.countForStats;
+  if (dayOrderDrift) update.dayOrder = remote.dayOrder ?? null;
   if (venueDrift) update.venueId = resolvedVenueId;
   return update;
+}
+
+function averageRatingDrift(local: number | null, remote: number | null): boolean {
+  if (local === null || remote === null) return local !== remote;
+  return Math.abs(local - remote) > AVERAGE_RATING_TOLERANCE;
 }
 
 export function buildSongCreateInput(song: McpSong, now: Date): Prisma.SongUncheckedCreateInput {
@@ -271,9 +338,76 @@ export function buildSongCreateInput(song: McpSong, now: Date): Prisma.SongUnche
     timesPlayed: song.timesPlayed,
     dateFirstPlayed: song.dateFirstPlayed ? new Date(song.dateFirstPlayed) : null,
     dateLastPlayed: song.dateLastPlayed ? new Date(song.dateLastPlayed) : null,
+    // Optional curated fields — `?? null` collapses `undefined` (older MCP)
+    // to a stable explicit value, matching the existing buildShowCreateInput
+    // pattern.
+    cover: song.cover ?? null,
+    legacyAuthor: song.legacyAuthor ?? null,
+    featuredLyric: song.featuredLyric ?? null,
+    tabs: song.tabs ?? null,
+    notes: song.notes ?? null,
+    history: song.history ?? null,
+    guitarTabsUrl: song.guitarTabsUrl ?? null,
     createdAt: now,
     updatedAt: now,
   };
+}
+
+// Shape-minimal view of a local Song row for drift detection. Mirrors the
+// curated fields buildSongDriftUpdate compares; derived stats columns are
+// intentionally omitted (the post-sync rebuild owns them).
+export interface LocalSongCurated {
+  title: string;
+  lyrics: string | null;
+  cover: boolean | null;
+  legacyAuthor: string | null;
+  featuredLyric: string | null;
+  tabs: string | null;
+  notes: string | null;
+  history: string | null;
+  guitarTabsUrl: string | null;
+}
+
+export interface SongDriftUpdate {
+  title?: string;
+  lyrics?: string | null;
+  cover?: boolean | null;
+  legacyAuthor?: string | null;
+  featuredLyric?: string | null;
+  tabs?: string | null;
+  notes?: string | null;
+  history?: string | null;
+  guitarTabsUrl?: string | null;
+}
+
+/**
+ * Compute the patch to mirror prod's curated Song fields onto an existing
+ * local row. Returns null when nothing changed. Derived stats columns
+ * (timesPlayed, dateFirstPlayed/LastPlayed, yearlyPlayData) are owned by
+ * `rebuildGapsAndSongStatsSince` and intentionally never appear in the patch.
+ *
+ * Fields whose remote value is `undefined` are treated as "no opinion" — a
+ * pre-deploy MCP that doesn't return `cover` shouldn't clobber a locally set
+ * value. Explicit `null` from MCP IS drift (prod cleared the field).
+ */
+export function buildSongDriftUpdate(local: LocalSongCurated, remote: McpSong): SongDriftUpdate | null {
+  const patch: SongDriftUpdate = {};
+  if (local.title !== remote.title) patch.title = remote.title;
+  if (local.lyrics !== remote.lyrics) patch.lyrics = remote.lyrics;
+  if (remote.cover !== undefined && local.cover !== remote.cover) patch.cover = remote.cover;
+  if (remote.legacyAuthor !== undefined && local.legacyAuthor !== remote.legacyAuthor) {
+    patch.legacyAuthor = remote.legacyAuthor;
+  }
+  if (remote.featuredLyric !== undefined && local.featuredLyric !== remote.featuredLyric) {
+    patch.featuredLyric = remote.featuredLyric;
+  }
+  if (remote.tabs !== undefined && local.tabs !== remote.tabs) patch.tabs = remote.tabs;
+  if (remote.notes !== undefined && local.notes !== remote.notes) patch.notes = remote.notes;
+  if (remote.history !== undefined && local.history !== remote.history) patch.history = remote.history;
+  if (remote.guitarTabsUrl !== undefined && local.guitarTabsUrl !== remote.guitarTabsUrl) {
+    patch.guitarTabsUrl = remote.guitarTabsUrl;
+  }
+  return Object.keys(patch).length === 0 ? null : patch;
 }
 
 export function buildVenueCreateInput(venue: McpVenue, now: Date): Prisma.VenueUncheckedCreateInput {
@@ -284,9 +418,70 @@ export function buildVenueCreateInput(venue: McpVenue, now: Date): Prisma.VenueU
     state: venue.state,
     country: venue.country,
     timesPlayed: venue.timesPlayed,
+    street: venue.street ?? null,
+    postalCode: venue.postalCode ?? null,
+    phone: venue.phone ?? null,
+    website: venue.website ?? null,
+    latitude: venue.latitude ?? null,
+    longitude: venue.longitude ?? null,
     createdAt: now,
     updatedAt: now,
   };
+}
+
+// Shape-minimal local Venue row used by buildVenueDriftUpdate. Excludes
+// timesPlayed (derived, not curated) and the search/legacy columns.
+export interface LocalVenueCurated {
+  name: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  street: string | null;
+  postalCode: string | null;
+  phone: string | null;
+  website: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface VenueDriftUpdate {
+  name?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  street?: string | null;
+  postalCode?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/**
+ * Diff a local Venue row against the latest MCP venue payload and return a
+ * patch of the drifted curated fields, or null when nothing changed.
+ *
+ * timesPlayed is intentionally excluded — it's a derived count of shows at
+ * the venue, not a curated value, and the search/legacy columns are likewise
+ * out of scope. Fields whose remote value is `undefined` (older MCP that
+ * doesn't return contact/geocode columns) are treated as "no opinion" so a
+ * sparse upstream can't clobber locally populated columns.
+ */
+export function buildVenueDriftUpdate(local: LocalVenueCurated, remote: McpVenue): VenueDriftUpdate | null {
+  const patch: VenueDriftUpdate = {};
+  // name / city / state / country come from the base MCP shape and are
+  // compared unconditionally (they were always synced on insert).
+  if (local.name !== remote.name) patch.name = remote.name;
+  if (local.city !== remote.city) patch.city = remote.city;
+  if (local.state !== remote.state) patch.state = remote.state;
+  if (local.country !== remote.country) patch.country = remote.country;
+  if (remote.street !== undefined && local.street !== remote.street) patch.street = remote.street;
+  if (remote.postalCode !== undefined && local.postalCode !== remote.postalCode) patch.postalCode = remote.postalCode;
+  if (remote.phone !== undefined && local.phone !== remote.phone) patch.phone = remote.phone;
+  if (remote.website !== undefined && local.website !== remote.website) patch.website = remote.website;
+  if (remote.latitude !== undefined && local.latitude !== remote.latitude) patch.latitude = remote.latitude;
+  if (remote.longitude !== undefined && local.longitude !== remote.longitude) patch.longitude = remote.longitude;
+  return Object.keys(patch).length === 0 ? null : patch;
 }
 
 export function buildTrackCreateInputs(
@@ -305,10 +500,85 @@ export function buildTrackCreateInputs(
         set: set.label,
         position: track.position,
         segue: track.segue,
+        // Defaults mirror the Prisma schema so a pre-deploy MCP (no allTimer
+        // / note in payload) still produces explicit, predictable inserts.
+        note: track.note ?? null,
+        allTimer: track.allTimer ?? false,
       });
     }
   }
   return tracks;
+}
+
+// Shape-minimal local Track row used by the drift-update path. Keyed by
+// (showId, position) at the call site — `id` is the primary key we patch.
+export interface LocalTrackForDrift {
+  id: string;
+  position: number;
+  segue: string | null;
+  note: string | null;
+  allTimer: boolean | null;
+}
+
+export interface TrackDriftPatch {
+  segue?: string | null;
+  note?: string | null;
+  allTimer?: boolean;
+}
+
+/**
+ * Diff the local tracks of a single show against the remote setlist payload
+ * and return one {trackId, patch} per drifted track. Drift fields: segue,
+ * note, allTimer. Pre-deploy MCP omits allTimer/note entirely — those keys
+ * are treated as "no opinion" and never produce a patch, so an older upstream
+ * can't clobber admin-set values.
+ */
+export function buildTrackDriftUpdates(
+  local: LocalTrackForDrift[],
+  remote: McpSetlist,
+): Array<{ trackId: string; patch: TrackDriftPatch }> {
+  const remoteByPosition = new Map<number, McpSetlistTrack>();
+  for (const set of remote.sets) {
+    for (const track of set.tracks) {
+      remoteByPosition.set(track.position, track);
+    }
+  }
+  const out: Array<{ trackId: string; patch: TrackDriftPatch }> = [];
+  for (const localTrack of local) {
+    const remoteTrack = remoteByPosition.get(localTrack.position);
+    if (!remoteTrack) continue;
+    const patch: TrackDriftPatch = {};
+    if (localTrack.segue !== remoteTrack.segue) patch.segue = remoteTrack.segue;
+    if (remoteTrack.note !== undefined && localTrack.note !== remoteTrack.note) {
+      patch.note = remoteTrack.note;
+    }
+    if (remoteTrack.allTimer !== undefined) {
+      const localFlag = localTrack.allTimer ?? false;
+      const remoteFlag = remoteTrack.allTimer ?? false;
+      if (localFlag !== remoteFlag) patch.allTimer = remoteFlag;
+    }
+    if (Object.keys(patch).length > 0) out.push({ trackId: localTrack.id, patch });
+  }
+  return out;
+}
+
+/**
+ * Compute the minimum create/delete operations needed to replace one track's
+ * local annotation set with whatever prod returned. Identity is by `desc`
+ * text — Annotation has no other mutable content, so an edited description
+ * surfaces as one delete + one create. `undefined` remote = "no opinion"
+ * (older MCP) and produces empty deltas; an explicit empty array wipes local.
+ */
+export function diffTrackAnnotations(
+  local: Array<{ id: string; desc: string | null }>,
+  remote: string[] | undefined,
+): { toCreateDescs: string[]; toDeleteIds: string[] } {
+  if (remote === undefined) return { toCreateDescs: [], toDeleteIds: [] };
+  const remoteSet = new Set(remote);
+  const localSet = new Set(local.map((a) => a.desc ?? ""));
+  const toDeleteIds = local.filter((a) => !remoteSet.has(a.desc ?? "")).map((a) => a.id);
+  const toCreateDescs = remote.filter((d) => !localSet.has(d));
+  return { toCreateDescs, toDeleteIds };
 }
 
 // --- JSON-RPC transport ---
@@ -362,6 +632,11 @@ interface SyncStats {
 
 async function syncMissingShows(): Promise<void> {
   const isDryRun = process.argv.includes("--dry-run");
+  // --full-track-sync: fetch setlists for every existing local show in scope,
+  // not just missing-or-needs-venue. Catches Track.allTimer / Track.note /
+  // Track.segue / annotation edits on shows that haven't otherwise changed.
+  // Default run stays fast; opt in for periodic catch-up.
+  const isFullTrackSync = process.argv.includes("--full-track-sync");
   const years = parseYearsArg(process.argv.slice(2), new Date());
   const now = new Date();
   const db = prisma;
@@ -458,11 +733,14 @@ async function syncMissingShows(): Promise<void> {
       select: {
         id: true,
         slug: true,
+        date: true,
         averageRating: true,
         ratingsCount: true,
         notes: true,
         relistenUrl: true,
         venueId: true,
+        countForStats: true,
+        dayOrder: true,
       },
     });
     const existingBySlug = new Map(existingLocal.map((s) => [s.slug, s]));
@@ -475,8 +753,10 @@ async function syncMissingShows(): Promise<void> {
     const needsVenueSlugs = existingLocal.filter((s) => s.venueId === null).map((s) => s.slug);
     console.log(`📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`);
 
-    if (missingShows.length === 0 && needsVenueSlugs.length === 0) {
+    if (missingShows.length === 0 && needsVenueSlugs.length === 0 && !isFullTrackSync) {
       // Pure aggregate-drift run: do the simple update loop and bail out.
+      // (When --full-track-sync is set we fall through to the full pipeline so
+      // every existing show's setlist gets diffed for Track / Annotation drift.)
       for (const remote of existingRemoteShows) {
         const local = existingBySlug.get(remote.slug);
         if (!local) continue;
@@ -493,6 +773,16 @@ async function syncMissingShows(): Promise<void> {
         try {
           await db.show.update({ where: { slug: remote.slug }, data: { ...patch, updatedAt: now } });
           changedSlugs.add(remote.slug);
+          // countForStats flip on an existing show invalidates the gap chain
+          // from that show's date forward — feed the date into the rebuild
+          // trigger so the post-batch stats sweep picks it up. (Aggregate
+          // drift alone doesn't shift gap math.)
+          if (patch.countForStats !== undefined) {
+            const showDate = String(local.date);
+            if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+              earliestInsertedDate = showDate;
+            }
+          }
           stats.showsUpdated++;
           console.log(`  🔄 ${remote.slug} ${JSON.stringify(patch)}`);
         } catch (err) {
@@ -501,13 +791,33 @@ async function syncMissingShows(): Promise<void> {
         }
       }
       console.log(`📊 Existing shows: ${stats.showsUpdated} updated, ${stats.showsUnchanged} unchanged`);
+      // Even a pure aggregate-drift run can trip the rebuild trigger if a
+      // countForStats flip was observed above.
+      if (!isDryRun && earliestInsertedDate !== null) {
+        console.log(`📐 Rebuilding gaps + song stats since ${earliestInsertedDate} (countForStats flip)`);
+        try {
+          await statsService.rebuildGapsAndSongStatsSince(earliestInsertedDate);
+        } catch (err) {
+          console.error("  ❌ stats rebuild failed:", err);
+          stats.errors++;
+        }
+      }
       printSummary(stats, isDryRun);
       return;
     }
 
     // Step 3: fetch setlists for missing shows AND existing shows that need
-    // venue back-fill, in one batched call.
-    const setlistFetchSlugs = [...missingShows.map((s) => s.slug), ...needsVenueSlugs];
+    // venue back-fill, in one batched call. --full-track-sync adds every
+    // remaining existing-local slug so Track / Annotation drift can be diffed
+    // against the latest prod state, not just the inserts + venue back-fills.
+    const fullTrackSyncSlugs = isFullTrackSync
+      ? existingLocal.filter((s) => s.venueId !== null).map((s) => s.slug)
+      : [];
+    const setlistFetchSlugs = [
+      ...missingShows.map((s) => s.slug),
+      ...needsVenueSlugs,
+      ...fullTrackSyncSlugs,
+    ];
     const { setlists, errors: setlistErrors } = await mcpCall<{
       setlists: McpSetlist[];
       errors?: Array<{ slug: string; error: string }>;
@@ -548,32 +858,68 @@ async function syncMissingShows(): Promise<void> {
       }
     }
 
-    // Any resolved venue slugs missing locally get pulled from get_venues and inserted.
+    // Pull the full curated shape locally for every resolved venue slug so the
+    // same data drives both the "missing → create" branch and the
+    // "already-local → diff" branch below. No second DB round-trip needed.
     const neededVenueSlugs = Array.from(new Set(venueKeyToSlug.values()));
-    const localVenues = await db.venue.findMany({
+    const localVenueRows = await db.venue.findMany({
       where: { slug: { in: neededVenueSlugs } },
-      select: { slug: true, id: true },
+      select: {
+        slug: true,
+        id: true,
+        name: true,
+        city: true,
+        state: true,
+        country: true,
+        street: true,
+        postalCode: true,
+        phone: true,
+        website: true,
+        latitude: true,
+        longitude: true,
+      },
     });
-    const venueSlugToId = new Map<string, string>(localVenues.map((v) => [v.slug, v.id]));
-    const missingVenueSlugs = neededVenueSlugs.filter((slug) => !venueSlugToId.has(slug));
-    if (missingVenueSlugs.length > 0) {
+    const venueSlugToId = new Map<string, string>(localVenueRows.map((v) => [v.slug, v.id]));
+    const localVenueBySlug = new Map(localVenueRows.map((v) => [v.slug, v]));
+    // Fetch the full MCP venue shape for every in-scope slug — missing ones
+    // get created, already-local ones get diffed against buildVenueDriftUpdate.
+    if (neededVenueSlugs.length > 0) {
       const { venues: remoteVenues, errors: venueErrors } = await mcpCall<{
         venues: McpVenue[];
         errors?: Array<{ slug: string; error: string }>;
-      }>("get_venues", { slugs: missingVenueSlugs });
+      }>("get_venues", { slugs: neededVenueSlugs });
       if (venueErrors?.length) stats.errors += venueErrors.length;
       for (const venue of remoteVenues) {
+        const localId = venueSlugToId.get(venue.slug);
+        if (localId === undefined) {
+          if (isDryRun) {
+            venueSlugToId.set(venue.slug, `dry-run-venue-${venue.slug}`);
+            stats.venuesCreated++;
+            continue;
+          }
+          try {
+            const created = await db.venue.create({ data: buildVenueCreateInput(venue, now) });
+            venueSlugToId.set(created.slug, created.id);
+            stats.venuesCreated++;
+          } catch (err) {
+            console.error(`  ❌ failed to create venue ${venue.slug}:`, err);
+            stats.errors++;
+          }
+          continue;
+        }
+        const localVenue = localVenueBySlug.get(venue.slug);
+        if (!localVenue) continue;
+        const patch = buildVenueDriftUpdate(localVenue, venue);
+        if (patch === null) continue;
         if (isDryRun) {
-          venueSlugToId.set(venue.slug, `dry-run-venue-${venue.slug}`);
-          stats.venuesCreated++;
+          console.log(`  🔄 venue ${venue.slug} would update ${JSON.stringify(patch)} (dry run)`);
           continue;
         }
         try {
-          const created = await db.venue.create({ data: buildVenueCreateInput(venue, now) });
-          venueSlugToId.set(created.slug, created.id);
-          stats.venuesCreated++;
+          await db.venue.update({ where: { id: localId }, data: { ...patch, updatedAt: now } });
+          console.log(`  🔄 venue ${venue.slug} ${JSON.stringify(patch)}`);
         } catch (err) {
-          console.error(`  ❌ failed to create venue ${venue.slug}:`, err);
+          console.error(`  ❌ failed to update venue ${venue.slug}:`, err);
           stats.errors++;
         }
       }
@@ -607,6 +953,13 @@ async function syncMissingShows(): Promise<void> {
         await db.show.update({ where: { slug: remote.slug }, data: { ...patch, updatedAt: now } });
         changedSlugs.add(remote.slug);
         if (patch.venueId) stats.venuesLinked++;
+        // countForStats flip → expand the rebuild window to cover this show.
+        if (patch.countForStats !== undefined) {
+          const showDate = String(local.date);
+          if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+            earliestInsertedDate = showDate;
+          }
+        }
         stats.showsUpdated++;
         console.log(`  🔄 ${remote.slug} ${JSON.stringify(patch)}`);
       } catch (err) {
@@ -618,39 +971,77 @@ async function syncMissingShows(): Promise<void> {
 
     // Step 6: resolve songs (local + remote) into an id map the track builder
     // can consume. Songs already in the DB reuse their existing id; new songs
-    // get created via get_songs fetch.
+    // get created via get_songs fetch. We fetch the full MCP shape for EVERY
+    // in-scope song (not just missing ones) so the same call doubles as the
+    // source for buildSongDriftUpdate — admin edits to lyrics / cover /
+    // featuredLyric on prod mirror locally without a second round-trip.
     const allSongSlugs = collectSongSlugs(setlists);
-    const localSongs = await db.song.findMany({
+    const localSongRows = await db.song.findMany({
       where: { slug: { in: allSongSlugs } },
-      select: { slug: true, id: true },
+      select: {
+        slug: true,
+        id: true,
+        title: true,
+        lyrics: true,
+        cover: true,
+        legacyAuthor: true,
+        featuredLyric: true,
+        tabs: true,
+        notes: true,
+        history: true,
+        guitarTabsUrl: true,
+      },
     });
-    const songSlugToId = new Map<string, string>(localSongs.map((s) => [s.slug, s.id]));
+    const songSlugToId = new Map<string, string>(localSongRows.map((s) => [s.slug, s.id]));
+    const localSongBySlug = new Map(localSongRows.map((s) => [s.slug, s]));
     const missingSongSlugs = allSongSlugs.filter((slug) => !songSlugToId.has(slug));
     console.log(`🎵 ${allSongSlugs.length} distinct songs in setlists; ${missingSongSlugs.length} missing locally`);
 
-    if (missingSongSlugs.length > 0) {
+    if (allSongSlugs.length > 0) {
       const { songs: remoteSongs, errors: songErrors } = await mcpCall<{
         songs: McpSong[];
         errors?: Array<{ slug: string; error: string }>;
-      }>("get_songs", { slugs: missingSongSlugs });
+      }>("get_songs", { slugs: allSongSlugs });
       stats.songsFetched = remoteSongs.length;
       if (songErrors?.length) {
         console.warn(`⚠️  ${songErrors.length} song fetch errors:`, songErrors);
         stats.errors += songErrors.length;
       }
       for (const song of remoteSongs) {
+        const localId = songSlugToId.get(song.slug);
+        if (localId === undefined) {
+          // Not local yet → create.
+          if (isDryRun) {
+            songSlugToId.set(song.slug, `dry-run-song-${song.slug}`);
+            stats.songsCreated++;
+            continue;
+          }
+          try {
+            const created = await db.song.create({ data: buildSongCreateInput(song, now) });
+            songSlugToId.set(created.slug, created.id);
+            stats.songsCreated++;
+            songsChanged = true;
+          } catch (err) {
+            console.error(`  ❌ failed to create song ${song.slug}:`, err);
+            stats.errors++;
+          }
+          continue;
+        }
+        // Already local → diff curated admin fields and patch if drifted.
+        const localSong = localSongBySlug.get(song.slug);
+        if (!localSong) continue;
+        const patch = buildSongDriftUpdate(localSong, song);
+        if (patch === null) continue;
         if (isDryRun) {
-          songSlugToId.set(song.slug, `dry-run-song-${song.slug}`);
-          stats.songsCreated++;
+          console.log(`  🔄 song ${song.slug} would update ${JSON.stringify(patch)} (dry run)`);
           continue;
         }
         try {
-          const created = await db.song.create({ data: buildSongCreateInput(song, now) });
-          songSlugToId.set(created.slug, created.id);
-          stats.songsCreated++;
+          await db.song.update({ where: { id: localId }, data: { ...patch, updatedAt: now } });
           songsChanged = true;
+          console.log(`  🔄 song ${song.slug} ${JSON.stringify(patch)}`);
         } catch (err) {
-          console.error(`  ❌ failed to create song ${song.slug}:`, err);
+          console.error(`  ❌ failed to update song ${song.slug}:`, err);
           stats.errors++;
         }
       }
@@ -700,6 +1091,109 @@ async function syncMissingShows(): Promise<void> {
       } catch (err) {
         console.error(`  ❌ failed to insert show ${slug}:`, err);
         stats.errors++;
+      }
+    }
+
+    // Step 8: track + annotation drift for existing shows whose setlists
+    // were fetched (venue back-fill + --full-track-sync). Catches admin edits
+    // to Track.allTimer / Track.note / Track.segue and the per-track
+    // Annotation set without re-doing the show row itself. countForStats is
+    // pulled in so we know whether a flip should expand the rebuild window.
+    const driftShowSlugs = Array.from(new Set([...needsVenueSlugs, ...fullTrackSyncSlugs]));
+    if (driftShowSlugs.length > 0) {
+      const driftShows = await db.show.findMany({
+        where: { slug: { in: driftShowSlugs } },
+        select: {
+          slug: true,
+          date: true,
+          countForStats: true,
+          tracks: {
+            select: {
+              id: true,
+              position: true,
+              segue: true,
+              note: true,
+              allTimer: true,
+              annotations: { select: { id: true, desc: true } },
+            },
+          },
+        },
+      });
+      for (const show of driftShows) {
+        const setlist = setlistBySlug.get(show.slug);
+        if (!setlist) continue;
+        const trackPatches = buildTrackDriftUpdates(show.tracks, setlist);
+        // Map track-id → its remote annotation list for the per-track annotation diff.
+        const remoteAnnotationsByPosition = new Map<number, string[] | undefined>();
+        for (const set of setlist.sets) {
+          for (const track of set.tracks) {
+            remoteAnnotationsByPosition.set(track.position, track.annotations);
+          }
+        }
+        let touchedShow = false;
+        for (const { trackId, patch } of trackPatches) {
+          if (isDryRun) {
+            console.log(`  🔄 track ${trackId} would update ${JSON.stringify(patch)} (dry run)`);
+            touchedShow = true;
+            continue;
+          }
+          try {
+            await db.track.update({ where: { id: trackId }, data: { ...patch, updatedAt: now } });
+            touchedShow = true;
+            console.log(`  🔄 track ${trackId} ${JSON.stringify(patch)}`);
+          } catch (err) {
+            console.error(`  ❌ failed to update track ${trackId}:`, err);
+            stats.errors++;
+          }
+        }
+        // Annotation set replace: for each local track, compare to the remote
+        // annotation strings and apply the minimal create/delete delta.
+        for (const localTrack of show.tracks) {
+          const remoteAnnotations = remoteAnnotationsByPosition.get(localTrack.position);
+          const diff = diffTrackAnnotations(localTrack.annotations, remoteAnnotations);
+          if (diff.toCreateDescs.length === 0 && diff.toDeleteIds.length === 0) continue;
+          if (isDryRun) {
+            console.log(
+              `  🔄 track ${localTrack.id} annotations: +${diff.toCreateDescs.length} -${diff.toDeleteIds.length} (dry run)`,
+            );
+            touchedShow = true;
+            continue;
+          }
+          try {
+            if (diff.toDeleteIds.length > 0) {
+              await db.annotation.deleteMany({ where: { id: { in: diff.toDeleteIds } } });
+            }
+            if (diff.toCreateDescs.length > 0) {
+              await db.annotation.createMany({
+                data: diff.toCreateDescs.map((desc) => ({
+                  trackId: localTrack.id,
+                  desc,
+                  createdAt: now,
+                  updatedAt: now,
+                })),
+              });
+            }
+            touchedShow = true;
+            console.log(
+              `  🔄 track ${localTrack.id} annotations: +${diff.toCreateDescs.length} -${diff.toDeleteIds.length}`,
+            );
+          } catch (err) {
+            console.error(`  ❌ failed to sync annotations for track ${localTrack.id}:`, err);
+            stats.errors++;
+          }
+        }
+        if (touchedShow) {
+          changedSlugs.add(show.slug);
+          // Track / annotation drift on a stats-counting show shifts the gap
+          // chain (e.g. an all-timer flag change is cosmetic, but a segue
+          // change affects ordering; play it safe and expand the window).
+          if (show.countForStats) {
+            const showDate = String(show.date);
+            if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
+              earliestInsertedDate = showDate;
+            }
+          }
+        }
       }
     }
 

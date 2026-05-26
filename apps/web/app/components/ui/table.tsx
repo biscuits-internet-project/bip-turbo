@@ -4,8 +4,12 @@ import { cn } from "~/lib/utils";
 
 function Table({ className, ...props }: ComponentProps<"table">) {
   return (
-    <div data-slot="table-container" className="relative w-full">
-      <table data-slot="table" className={cn("w-full caption-bottom text-sm table-fixed", className)} {...props} />
+    <div data-slot="table-container" className="relative w-full min-w-0">
+      <table
+        data-slot="table"
+        className={cn("w-full max-w-full caption-bottom text-sm table-fixed", className)}
+        {...props}
+      />
     </div>
   );
 }

@@ -486,6 +486,125 @@ describe("buildSongPerformanceCounts", () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildJamCharts — all-timers ∪ tracks-with-notes
+// ---------------------------------------------------------------------------
+
+describe("buildJamCharts", () => {
+  // Flattens a $queryRaw mock call (TemplateStringsArray + Prisma.Sql
+  // interpolations) into a single SQL string so the test can assert the
+  // base WHERE clause is composed of the right two conditions. Prisma.Sql
+  // exposes its raw template parts under `.strings`.
+  function flattenSqlFromMockCall(call: unknown[]): string {
+    const [templateStrings, ...interpolations] = call as [readonly string[], ...unknown[]];
+    const interpolated = interpolations
+      .map((v) => {
+        if (v && typeof v === "object" && Array.isArray((v as { strings?: unknown[] }).strings)) {
+          return (v as { strings: string[] }).strings.join(" ");
+        }
+        return "";
+      })
+      .join(" ");
+    return `${[...templateStrings].join(" ")} ${interpolated}`;
+  }
+
+  function createComposer(rows: Array<Partial<PerformanceDto>>) {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue(rows.map((r) => makeDto(r as Partial<PerformanceDto>))),
+      // enrichPerformances looks up annotations + previous-show data per
+      // returned track. Stub both to empty so the test focuses on the
+      // base WHERE composition and the result shape.
+      annotation: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const mockSongService = {} as never;
+    return { composer: new SongPageComposer(mockDb as never, mockSongService), mockDb };
+  }
+
+  // The whole point of the jam-charts page: include tracks flagged as
+  // all-timers AND tracks that carry a curated note, in a single result.
+  // The WHERE clause must OR the two conditions so neither set is
+  // dropped on the way to the UI.
+  test("base WHERE clause unions all_timer with note IS NOT NULL", async () => {
+    const { composer, mockDb } = createComposer([]);
+    await composer.buildJamCharts();
+    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/tracks\.all_timer\s*=\s*true/);
+    expect(sql).toMatch(/tracks\.note\s+IS\s+NOT\s+NULL/);
+    // Empty-string notes must be filtered out too — the note column
+    // historically allows '' as well as NULL for "no note", and the UI
+    // treats both as absent.
+    expect(sql).toMatch(/tracks\.note\s*<>\s*''/);
+    // Both branches must be ORed together (otherwise note-only tracks
+    // get filtered out when all_timer is false).
+    expect(sql).toMatch(/all_timer.*OR.*note/s);
+  });
+
+  // The method returns the standard AllTimersPageView shape so the route
+  // can drop it straight into PerformanceTable without bespoke wiring.
+  test("returns AllTimersPageView shape (performances array) populated from rows", async () => {
+    const { composer } = createComposer([
+      { track_id: "t-allTimer", all_timer: true, note: null, song_id: "song-1" },
+      { track_id: "t-note", all_timer: false, note: "Big Type II Spaga." },
+    ]);
+    const result = await composer.buildJamCharts();
+    expect(result.performances).toHaveLength(2);
+    const ids = result.performances.map((p) => p.trackId).sort();
+    expect(ids).toEqual(["t-allTimer", "t-note"]);
+  });
+
+  // Filter options compose: jam-charts plus, say, a year range or cover
+  // filter, should AND together. Verifies the call still goes through and
+  // the additional filter shows up in the SQL.
+  test("forwards filter options through buildFilterQuery", async () => {
+    const { composer, mockDb } = createComposer([]);
+    await composer.buildJamCharts({ monthDay: "07-26" });
+    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/shows\.date\s+LIKE/);
+  });
+});
+
+describe("buildSongPerformances populates songTitle/songSlug", () => {
+  // The single-song composer queries without a song join (the song is
+  // already known in context). The cross-song UI components that
+  // consume `SongPagePerformance` (TrackRatingOverlay's popover header,
+  // for instance) read `songTitle` / `songSlug` directly — so the
+  // composer must fill those fields from the page's song context, or
+  // the popover renders with an empty title.
+  test("propagates the page song's title and slug onto every returned performance", async () => {
+    const mockDb = {
+      $queryRaw: vi.fn().mockResolvedValue([makeDto({ track_id: "t-1" }), makeDto({ track_id: "t-2" })]),
+      annotation: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+    const mockSongService = {
+      findBySlug: vi.fn().mockResolvedValue({
+        id: "song-1",
+        title: "King of the World",
+        slug: "king-of-the-world",
+        cover: false,
+        authorId: null,
+      }),
+    };
+    const composer = new SongPageComposer(mockDb as never, mockSongService as never);
+
+    const performances = await composer.buildSongPerformances("king-of-the-world");
+
+    expect(performances).toHaveLength(2);
+    for (const p of performances) {
+      expect(p.songTitle).toBe("King of the World");
+      expect(p.songSlug).toBe("king-of-the-world");
+    }
+  });
+});
+
+describe("CacheKeys.songs.jamCharts", () => {
+  // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
+  // bumped together with the rest of the songs cache family.
+  test("returns a stable, versioned key string", () => {
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v4");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // isNarrowingFilter — gate for filteredGap computation
 // ---------------------------------------------------------------------------
 
@@ -694,7 +813,7 @@ describe("buildFilteredSongRarity", () => {
   //    (the last play IS the latest matching show).
   //  - showsOnOrAfterDebut: 5 (debut at index 0, inclusive).
   //  - filteredPercentSinceDebut: 2 / 5 = 0.4.
-  //  - filteredAverageShowsPerPlay: shows-in-gaps / number-of-gaps =
+  //  - filteredAverageGapShows: shows-in-gaps / number-of-gaps =
   //    (5 - 2) / (2 - 1) = 3.0 (3 matching shows fell between the 2 plays).
   test("computes filteredShowsSinceLastPlayed, percentSinceDebut, averageShowsPerPlay against the matching universe", async () => {
     const composer = createComposer(
@@ -707,13 +826,13 @@ describe("buildFilteredSongRarity", () => {
     const row = result.get("above-the-waves");
     expect(row?.filteredShowsSinceLastPlayed).toBe(0);
     expect(row?.filteredPercentSinceDebut).toBeCloseTo(0.4);
-    expect(row?.filteredAverageShowsPerPlay).toBeCloseTo(3);
+    expect(row?.filteredAverageGapShows).toBeCloseTo(3);
   });
 
   // When the song's last filtered play is the earliest matching show and
   // there are more matching shows after it → the gap is the number of
   // shows after. Sanity check that `countShowsAfter` semantics propagate.
-  // A single play has no gaps to average, so filteredAverageShowsPerPlay
+  // A single play has no gaps to average, so filteredAverageGapShows
   // must be null (em-dash in the UI), not a degenerate 1.0.
   test("filteredShowsSinceLastPlayed counts matching shows strictly after the last filtered play", async () => {
     const composer = createComposer(
@@ -727,7 +846,31 @@ describe("buildFilteredSongRarity", () => {
     // Three matching shows are strictly after the one filtered play.
     expect(row?.filteredShowsSinceLastPlayed).toBe(3);
     // One filtered play → no gaps → null average.
-    expect(row?.filteredAverageShowsPerPlay).toBeNull();
+    expect(row?.filteredAverageGapShows).toBeNull();
+  });
+
+  // Trailing-tail correctness: the song's filtered plays are clustered at
+  // the start of the filter window and many matching shows have happened
+  // since the last play. filteredAverageGapShows must be the mean of the
+  // single closed gap (1 show between the two plays at indexes 0 and 2 of
+  // 5), NOT inflated by the 2 matching shows in the trailing tail. The
+  // earlier formula `(showsOnOrAfterDebut - timesPlayed) / (timesPlayed - 1)`
+  // would have returned 3 — wrong, because it swept the tail into the
+  // numerator. New formula uses `countShowsBetween(first, last)`.
+  test("filteredAverageGapShows excludes the trailing tail after the last filtered play", async () => {
+    const composer = createComposer(
+      [{ d: "2024-01-01" }, { d: "2024-02-01" }, { d: "2024-03-01" }, { d: "2024-04-01" }, { d: "2024-05-01" }],
+      [{ song_id: "electric-slinky", show_count: "2", first_date: "2024-01-01", last_date: "2024-03-01" }],
+    );
+
+    const result = await composer.buildFilteredSongRarity(["electric-slinky"], { encore: true });
+
+    const row = result.get("electric-slinky");
+    // 2 matching shows are strictly after the last filtered play (apr/may).
+    expect(row?.filteredShowsSinceLastPlayed).toBe(2);
+    // 1 matching show strictly between first (Jan) and last (Mar) play; one
+    // closed gap → 1 / 1 = 1.
+    expect(row?.filteredAverageGapShows).toBeCloseTo(1);
   });
 });
 
@@ -824,7 +967,7 @@ describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08");
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v3");
   });
 
   // The on-this-day counts cache key is used by the home page to cache
@@ -855,8 +998,6 @@ describe("computeRarityStats", () => {
     expect(result.showsSinceDebut).toBe(260);
     expect(result.percentOfAllShows).toBeCloseTo(0.5, 5);
     expect(result.percentSinceDebut).toBeCloseTo(0.5, 5);
-    // Mean gap between plays: shows-in-gaps / gaps = (260 - 130) / (130 - 1).
-    expect(result.averageShowsPerPlay).toBeCloseTo(130 / 129, 5);
     expect((result.showsBeforeDebut ?? 0) + (result.showsSinceDebut ?? 0)).toBe(result.totalShows);
   });
 
@@ -876,9 +1017,6 @@ describe("computeRarityStats", () => {
     expect(result.showsSinceDebut).toBe(60);
     expect(result.percentOfAllShows).toBeCloseTo(6 / 320, 5);
     expect(result.percentSinceDebut).toBeCloseTo(6 / 60, 5);
-    // Mean gap between plays: (60 - 6) / (6 - 1) = 54 / 5 = 10.8 — average
-    // 10.8 shows happened between consecutive plays of the song.
-    expect(result.averageShowsPerPlay).toBeCloseTo(54 / 5, 5);
     // Sanity: scarcity reads stronger against the song's own era.
     expect(result.percentSinceDebut).toBeGreaterThan(result.percentOfAllShows ?? 0);
   });
@@ -897,20 +1035,18 @@ describe("computeRarityStats", () => {
     expect(result.showsBeforeDebut).toBeNull();
     expect(result.showsSinceDebut).toBeNull();
     expect(result.percentSinceDebut).toBeNull();
-    expect(result.averageShowsPerPlay).toBeNull();
     expect(result.percentOfAllShows).toBe(0);
   });
 
-  // Single-play song has no gaps between plays to average — averageShowsPerPlay
-  // must be null, not 1.0 or any degenerate value. percentSinceDebut still
-  // computes (1 play out of the 1 show in the song's era = 100%).
-  test("single-play song nulls averageShowsPerPlay (no gaps to average)", () => {
+  // Single-play song still gets percentSinceDebut populated (1 play out of
+  // the 1 show in the song's era = 100%). Avg/median/longest gap stats live
+  // on the page composer, not here, since they require track-level data.
+  test("single-play song still computes percentSinceDebut", () => {
     const showsByYear = { 2024: 50 };
     const dateFirstPlayed = new Date(Date.UTC(2024, 0, 1));
 
     const result = computeRarityStats({ dateFirstPlayed, timesPlayed: 1 }, showsByYear);
 
-    expect(result.averageShowsPerPlay).toBeNull();
     expect(result.percentSinceDebut).toBeCloseTo(1 / 50, 5);
   });
 });

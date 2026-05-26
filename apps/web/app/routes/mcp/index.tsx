@@ -483,6 +483,15 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
         try {
           const setlist = await services.setlists.findByShowSlug(slug);
           if (setlist) {
+            // Annotation rows carry `trackId`; group them so each track in
+            // the response can carry its own annotation strings. Sync's
+            // diffTrackAnnotations replaces local-by-trackId on every run.
+            const annotationsByTrackId = new Map<string, string[]>();
+            for (const ann of setlist.annotations) {
+              const list = annotationsByTrackId.get(ann.trackId) ?? [];
+              list.push(ann.desc ?? "");
+              annotationsByTrackId.set(ann.trackId, list);
+            }
             setlists.push({
               showSlug: setlist.show.slug,
               showDate: setlist.show.date,
@@ -494,6 +503,12 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
                   songTitle: t.song?.title || "",
                   songSlug: t.song?.slug || "",
                   segue: t.segue,
+                  // Admin-curated; sync-missing-shows reads these from the
+                  // payload to populate Track.note / Track.allTimer on insert
+                  // and to drift-update existing rows.
+                  note: t.note,
+                  allTimer: t.allTimer ?? false,
+                  annotations: annotationsByTrackId.get(t.id) ?? [],
                 })),
               })),
             });
@@ -527,6 +542,11 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               ratingsCount: show.ratingsCount,
               notes: show.notes,
               relistenUrl: show.relistenUrl,
+              // Admin-curated stat flags; gate every downstream aggregate
+              // (countForStats → STATS_SHOWS_WHERE) and same-day ordering
+              // (dayOrder). Sync mirrors them on insert + drift-update.
+              countForStats: show.countForStats,
+              dayOrder: show.dayOrder,
             });
           } else {
             errors.push({ slug, error: "Not found" });
@@ -556,6 +576,16 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               timesPlayed: song.timesPlayed,
               dateFirstPlayed: song.dateFirstPlayed,
               dateLastPlayed: song.dateLastPlayed,
+              // Curated admin fields the lyrics/info page surfaces. Sync
+              // mirrors them on insert + drift-update (see
+              // buildSongDriftUpdate).
+              cover: song.cover,
+              legacyAuthor: song.legacyAuthor,
+              featuredLyric: song.featuredLyric,
+              tabs: song.tabs,
+              notes: song.notes,
+              history: song.history,
+              guitarTabsUrl: song.guitarTabsUrl,
             });
           } else {
             errors.push({ slug, error: "Not found" });
@@ -584,6 +614,14 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               state: venue.state,
               country: venue.country,
               timesPlayed: venue.timesPlayed,
+              // Contact + geocode columns. Sync mirrors them on insert +
+              // drift-update (see buildVenueDriftUpdate).
+              street: venue.street,
+              postalCode: venue.postalCode,
+              phone: venue.phone,
+              website: venue.website,
+              latitude: venue.latitude,
+              longitude: venue.longitude,
             });
           } else {
             errors.push({ slug, error: "Not found" });

@@ -87,14 +87,16 @@ export function FilterNav({
 
   // The mobile toggle button is always rendered (`sm:hidden`). On desktop
   // we render either a static h2 (always expanded) or the same toggle
-  // button (collapsible) depending on `defaultExpanded`.
+  // button (collapsible) depending on `defaultExpanded`. On phone-landscape
+  // viewports we re-show the toggle so the filter chrome doesn't eat the
+  // already-shallow row count.
   const ToggleButton = (
     <button
       type="button"
       className={cn(
         "w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none transition-colors",
         expanded ? "mb-3" : "mb-0",
-        !desktopCollapsible && "sm:hidden",
+        !desktopCollapsible && "sm:hidden short:!flex",
         {
           "hover:text-brand-primary": expanded,
           "hover:text-brand-secondary": !expanded,
@@ -121,7 +123,9 @@ export function FilterNav({
       <div className="px-4 py-3">
         {ToggleButton}
         {!desktopCollapsible && (
-          <h2 className="hidden sm:flex text-sm font-semibold text-white mb-3 items-center gap-2">{headingContent}</h2>
+          <h2 className="hidden sm:flex short:hidden text-sm font-semibold text-white mb-3 items-center gap-2">
+            {headingContent}
+          </h2>
         )}
         <div
           className={cn(
@@ -130,6 +134,13 @@ export function FilterNav({
             // Desktop is always visible unless the caller opted into a
             // desktop-collapsible variant via `defaultExpanded={false}`.
             !desktopCollapsible && "sm:!max-h-[1000px] sm:!opacity-100 sm:!pointer-events-auto",
+            // …but on phone-landscape viewports we follow the user's
+            // toggle state instead of force-open: filter chrome eats too
+            // much vertical space on a rotated phone. The user can still
+            // click to expand; this just changes the default.
+            !desktopCollapsible &&
+              !expanded &&
+              "short:!max-h-0 short:!opacity-0 short:!pointer-events-none short:transition-none",
           )}
         >
           <div className={cn("grid gap-1.5", columnCSS)}>

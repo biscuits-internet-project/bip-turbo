@@ -74,7 +74,8 @@ function makeSong(overrides: Partial<SongWithShows> = {}): SongWithShows {
     totalShows: 0,
     percentOfAllShows: null,
     percentSinceDebut: null,
-    averageShowsPerPlay: null,
+    averageGapShows: null,
+    medianGapShows: null,
     longestGapShows: null,
     yearlyPlayData: {},
     longestGapsData: {},
@@ -145,7 +146,7 @@ describe("getSongsColumns", () => {
   });
 
   // The three filtered rarity columns ride on the same `showFilteredPlays`
-  // gate as Filtered Plays. They mirror Current Gap / Since Debut / Avg Gap,
+  // gate as Filtered Plays. They mirror Gap to Now / Since Debut / Avg Gap,
   // computed against the active filter scope. Hidden by default so they
   // don't duplicate the all-time columns when no filter narrows the data.
   test("showFilteredPlays=false: filtered rarity columns are not rendered", async () => {
@@ -157,7 +158,7 @@ describe("getSongsColumns", () => {
             filteredTimesPlayed: 3,
             filteredShowsSinceLastPlayed: 9,
             filteredPercentSinceDebut: 0.42,
-            filteredAverageShowsPerPlay: 2.4,
+            filteredAverageGapShows: 2.4,
           }),
         ]}
         hideSearch
@@ -165,7 +166,7 @@ describe("getSongsColumns", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /Filtered Current Gap/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Filtered Gap to End/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Filtered Since Debut/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Filtered Avg Gap/i })).not.toBeInTheDocument();
   });
@@ -181,7 +182,7 @@ describe("getSongsColumns", () => {
             filteredTimesPlayed: 3,
             filteredShowsSinceLastPlayed: 9,
             filteredPercentSinceDebut: 0.42,
-            filteredAverageShowsPerPlay: 2.4,
+            filteredAverageGapShows: 2.4,
           }),
         ]}
         hideSearch
@@ -189,36 +190,12 @@ describe("getSongsColumns", () => {
       />,
     );
 
-    // Filtered Current Gap renders the raw integer.
+    // Filtered Gap to End renders the raw integer.
     expect(screen.getByText("9")).toBeInTheDocument();
     // Filtered Since Debut renders as a percent (matches existing % formatter).
     expect(screen.getByText("42%")).toBeInTheDocument();
     // Filtered Avg Gap renders with one decimal place.
     expect(screen.getByText("2.4")).toBeInTheDocument();
-  });
-
-  // When showFilteredPlays is true, Last Played and First Played drop the
-  // venue sublabel and shrink — the row is wider with the extra filtered
-  // columns, so we trade venue-on-row for horizontal room.
-  test("showFilteredPlays=true: Last Played and First Played cells omit the venue sublabel", async () => {
-    await setupWithRouter(
-      <DataTable
-        columns={filteredColumns}
-        data={[
-          makeSong({
-            lastPlayedShow: makeShow(),
-            firstPlayedShow: makeShow({ slug: "1995-07-04-some-venue" }),
-          }),
-        ]}
-        hideSearch
-        hidePagination
-      />,
-    );
-
-    // Venue text would appear under the date in the no-filter baseline
-    // (see "Last Played venue" test below). Under filtered columns it
-    // must NOT render — neither for Last Played nor for First Played.
-    expect(screen.queryByText(/The Capitol Theatre/)).not.toBeInTheDocument();
   });
 
   // When showFilteredPlays is true, the factory inserts a "Filtered Plays"
@@ -344,6 +321,9 @@ describe("getSongsColumns", () => {
     ];
     const { user } = await setupWithRouter(<DataTable columns={baseColumns} data={songs} hideSearch hidePagination />);
 
+    // Header label is split into stacked <span>First</span><span>Played</span>
+    // (so it wraps to two lines at narrow widths); accessible name has no
+    // whitespace between the words.
     const sortHeader = screen.getByRole("button", { name: /^First Played/i });
     await user.click(sortHeader);
 
@@ -491,45 +471,46 @@ describe("getSongsColumns", () => {
     expect(titlesDesc.map((el) => el.textContent)).toEqual(["Crickets", "Plan B", "Home Again"]);
   });
 
-  // On mobile, the Last Played and First Played dates render in a compact
-  // M/D/YY format so the column fits without overlap. The long format
-  // ("Jun 15, 2024") is preserved at sm+ so desktop users see the full date.
-  // Both formats are present in the DOM, gated by responsive Tailwind classes.
-  test("Last Played cell renders both compact (mobile) and long (desktop) date formats", async () => {
+  // Both date formats are present in the DOM; the wrapping cell declares
+  // `@container/datecell` and ShowDate's spans use `@max-[6rem]/datecell:`
+  // to swap which one is visible. Wide column → full "Jun 15, 2024";
+  // tight column (many picks or narrow layout) → compact "6/15/24". One
+  // width for dense and sparse column sets, browser does the rest.
+  test("Last Played cell renders both compact and long date formats gated by container width", async () => {
     const song = makeSong({
       dateLastPlayed: new Date("2024-06-15"),
       lastPlayedShow: makeShow({ slug: "2024-06-15-the-cap" }),
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    // Long format visible at sm+ (hidden on mobile)
+    // Long format hidden once the cell tightens below 6rem
     const longFormat = screen.getByText(/6\/15\/2024/);
-    expect(longFormat.className).toContain("hidden");
-    expect(longFormat.className).toContain("sm:inline");
+    expect(longFormat.className).toContain("@max-[6rem]/datecell:hidden");
 
-    // Compact format visible on mobile (hidden at sm+)
+    // Compact format swaps in once the cell tightens below 6rem
     const compactFormat = screen.getByText("6/15/24");
-    expect(compactFormat.className).toContain("sm:hidden");
+    expect(compactFormat.className).toContain("hidden");
+    expect(compactFormat.className).toContain("@max-[6rem]/datecell:inline");
   });
 
   // Same dual-format treatment for First Played, mirroring Last Played so
-  // both date columns line up neatly at the same breakpoint.
-  test("First Played cell renders both compact (mobile) and long (desktop) date formats", async () => {
+  // both date columns collapse at the same threshold.
+  test("First Played cell renders both compact and long date formats gated by container width", async () => {
     const song = makeSong({
       dateFirstPlayed: new Date("1995-07-04"),
       firstPlayedShow: makeShow({ id: "show-first", slug: "1995-07-04-red-rocks" }),
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    expect(screen.getByText(/7\/4\/1995/).className).toContain("hidden");
-    expect(screen.getByText("7/4/95").className).toContain("sm:hidden");
+    expect(screen.getByText(/7\/4\/1995/).className).toContain("@max-[6rem]/datecell:hidden");
+    expect(screen.getByText("7/4/95").className).toContain("@max-[6rem]/datecell:inline");
   });
 
-  // The venue line beneath Last/First Played dates uses `hidden sm:block`
-  // so the cells collapse to date-only on mobile (matching the perf-table
-  // DateVenueCell pattern). Otherwise the wrapped venue text adds two
-  // extra lines per row on phones for marginal value.
-  test("Last Played venue line is hidden on mobile (hidden sm:block)", async () => {
+  // The venue line beneath Last/First Played dates is gated by the cell's
+  // @container/datecell — drops out once the column shrinks below ~10rem
+  // so dense tables collapse to date-only automatically (no viewport or
+  // filter-flag branching required).
+  test("Last Played venue line is gated by datecell container width", async () => {
     const song = makeSong({
       dateLastPlayed: new Date("2024-06-15"),
       lastPlayedShow: makeShow({ slug: "2024-06-15-the-cap" }),
@@ -538,10 +519,10 @@ describe("getSongsColumns", () => {
 
     const venueLine = screen.getByText(/The Capitol Theatre/);
     expect(venueLine.className).toContain("hidden");
-    expect(venueLine.className).toContain("sm:block");
+    expect(venueLine.className).toContain("@[8rem]/datecell:block");
   });
 
-  test("First Played venue line is hidden on mobile (hidden sm:block)", async () => {
+  test("First Played venue line is gated by datecell container width", async () => {
     const song = makeSong({
       dateFirstPlayed: new Date("1995-07-04"),
       firstPlayedShow: makeShow({
@@ -564,7 +545,7 @@ describe("getSongsColumns", () => {
 
     const venueLine = screen.getByText(/Red Rocks Amphitheatre/);
     expect(venueLine.className).toContain("hidden");
-    expect(venueLine.className).toContain("sm:block");
+    expect(venueLine.className).toContain("@[8rem]/datecell:block");
   });
 
   // Plays and Filtered Plays are short-but-prone-to-overlap headers on
@@ -596,10 +577,10 @@ describe("getSongsColumns", () => {
     expect(playsColumn?.meta?.hideOnMobile).toBeFalsy();
   });
 
-  // The Current Gap column shows shows-since-last-played (`showsSinceLastPlayed`)
+  // The Gap to Now column shows shows-since-last-played (`showsSinceLastPlayed`)
   // — same number that drives the "X shows ago" sublabel on the song detail
   // page. It's the most-immediate "is this song missing right now?" signal.
-  test("Current Gap cell renders the integer when showsSinceLastPlayed is set", async () => {
+  test("Gap to Now cell renders the integer when showsSinceLastPlayed is set", async () => {
     await setupWithRouter(
       <DataTable columns={baseColumns} data={[makeSong({ showsSinceLastPlayed: 12 })]} hideSearch hidePagination />,
     );
@@ -610,7 +591,7 @@ describe("getSongsColumns", () => {
   // populated for any other reason) get the em-dash placeholder so the
   // column stays readable instead of showing "0" (which would mean
   // "played at the most recent show").
-  test("Current Gap cell renders em-dash when showsSinceLastPlayed is null", async () => {
+  test("Gap to Now cell renders em-dash when showsSinceLastPlayed is null", async () => {
     await setupWithRouter(
       <DataTable columns={baseColumns} data={[makeSong({ showsSinceLastPlayed: null })]} hideSearch hidePagination />,
     );
@@ -635,20 +616,20 @@ describe("getSongsColumns", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
-  // Avg Gap renders `averageShowsPerPlay` to one decimal — mirrors the
+  // Avg Gap renders `averageGapShows` to one decimal — mirrors the
   // "Average Gap" stat box on the song detail page. The number alone
   // carries the meaning ("played every 5.7 shows since debut") because
   // the column header sets the framing.
-  test("Avg Gap cell renders averageShowsPerPlay to one decimal", async () => {
+  test("Avg Gap cell renders averageGapShows to one decimal", async () => {
     await setupWithRouter(
-      <DataTable columns={baseColumns} data={[makeSong({ averageShowsPerPlay: 5.7 })]} hideSearch hidePagination />,
+      <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: 5.7 })]} hideSearch hidePagination />,
     );
     expect(screen.getByText("5.7")).toBeInTheDocument();
   });
 
-  test("Avg Gap cell renders em-dash when averageShowsPerPlay is null", async () => {
+  test("Avg Gap cell renders em-dash when averageGapShows is null", async () => {
     await setupWithRouter(
-      <DataTable columns={baseColumns} data={[makeSong({ averageShowsPerPlay: null })]} hideSearch hidePagination />,
+      <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: null })]} hideSearch hidePagination />,
     );
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
@@ -656,19 +637,80 @@ describe("getSongsColumns", () => {
   // All three rarity columns are secondary signals — they hide on mobile
   // so Title + Plays + Last Played stay legible at narrow widths, matching
   // the existing Filtered Plays pattern.
-  test("Current Gap, % Since Debut, Avg Gap all carry meta.hideOnMobile", () => {
+  test("Gap to Now, % Since Debut, Avg Gap all carry meta.hideOnMobile", () => {
     const columns = getSongsColumns({ showFilteredPlays: false });
     const gap = columns.find((c) => "accessorKey" in c && c.accessorKey === "showsSinceLastPlayed");
     const pct = columns.find((c) => "accessorKey" in c && c.accessorKey === "percentSinceDebut");
-    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "averageShowsPerPlay");
+    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "averageGapShows");
     expect(gap?.meta?.hideOnMobile).toBe(true);
     expect(pct?.meta?.hideOnMobile).toBe(true);
     expect(avg?.meta?.hideOnMobile).toBe(true);
   });
 
-  // Column ordering: Current Gap sits immediately to the left of Last
+  // Dense filtered view on mobile drops the all-time date pair so the
+  // filtered date pair (which is the user's relevant signal under an
+  // active filter) has room. Desktop continues to show both pairs.
+  test("Last Played + First Played hide on mobile when showFilteredPlays is true", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const last = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateLastPlayed");
+    const first = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateFirstPlayed");
+    expect(last?.meta?.hideOnMobile).toBe(true);
+    expect(first?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // Sparse view (no filter) keeps both date columns on mobile. They're
+  // the primary "when did this song happen?" signal when no filtered pair
+  // exists to take their place.
+  test("Last Played + First Played stay visible on mobile when showFilteredPlays is false", () => {
+    const columns = getSongsColumns({ showFilteredPlays: false });
+    const last = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateLastPlayed");
+    const first = columns.find((c) => "accessorKey" in c && c.accessorKey === "dateFirstPlayed");
+    expect(last?.meta?.hideOnMobile).toBeFalsy();
+    expect(first?.meta?.hideOnMobile).toBeFalsy();
+  });
+
+  // Filtered Since First is the first filter column to drop on mobile
+  // because it's a derivable summary (filtered plays / shows in scope).
+  // The remaining 5 filter cols + Song fit; with Since First the row is
+  // too cramped.
+  test("Filtered Since First carries meta.hideOnMobile", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const col = columns.find((c) => "accessorKey" in c && c.accessorKey === "filteredPercentSinceDebut");
+    expect(col?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // Filtered Avg Gap and Filtered Gap to End must NOT hide on mobile.
+  // They're part of the "Song + filter columns" mobile layout the user
+  // explicitly chose. Pinning so a future cleanup doesn't accidentally
+  // re-hide them along with their unconditionally-hidden all-time
+  // counterparts.
+  test("Filtered Avg Gap + Filtered Gap to End stay visible on mobile", () => {
+    const columns = getSongsColumns({ showFilteredPlays: true });
+    const avg = columns.find((c) => "accessorKey" in c && c.accessorKey === "filteredAverageGapShows");
+    const gap = columns.find((c) => "accessorKey" in c && c.accessorKey === "filteredShowsSinceLastPlayed");
+    expect(avg?.meta?.hideOnMobile).toBeFalsy();
+    expect(gap?.meta?.hideOnMobile).toBeFalsy();
+  });
+
+  // Numeric cells wrap their value in an inline-block sized with `ch`
+  // units, right-aligned, with tabular-nums so digit widths are uniform.
+  // The effect is that 1 / 10 / 100 stack with their ones digit aligned
+  // and larger numbers extend further left, without right-aligning the
+  // whole cell. Locks the alignment technique against silent regressions.
+  test("numeric cells render as right-aligned inline-block slots with tabular-nums", async () => {
+    await setupWithRouter(
+      <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: 5.7 })]} hideSearch hidePagination />,
+    );
+    const slot = screen.getByText("5.7");
+    expect(slot.className).toContain("inline-block");
+    expect(slot.className).toContain("text-right");
+    expect(slot.className).toContain("tabular-nums");
+    expect(slot.style.minWidth).toBe("4ch");
+  });
+
+  // Column ordering: Gap to Now sits immediately to the left of Last
   // Played so the "X shows ago" number reads naturally next to the date
-  // it's measured against. % Since Debut and Avg Gap precede Current Gap
+  // it's measured against. % Since Debut and Avg Gap precede Gap to Now
   // as the broader rarity signals; Last Played + First Played remain
   // rightmost.
   test("rarity columns appear between Plays and Last Played in the expected order", () => {
@@ -679,7 +721,7 @@ describe("getSongsColumns", () => {
     const playsIdx = keys.indexOf("timesPlayed");
     const gapIdx = keys.indexOf("showsSinceLastPlayed");
     const pctIdx = keys.indexOf("percentSinceDebut");
-    const avgIdx = keys.indexOf("averageShowsPerPlay");
+    const avgIdx = keys.indexOf("averageGapShows");
     const lastIdx = keys.indexOf("dateLastPlayed");
     expect(playsIdx).toBeLessThan(pctIdx);
     expect(pctIdx).toBeLessThan(avgIdx);
@@ -687,10 +729,10 @@ describe("getSongsColumns", () => {
     expect(gapIdx).toBeLessThan(lastIdx);
   });
 
-  // Sorting Current Gap asc must put nulls (never-played / unpopulated
+  // Sorting Gap to Now asc must put nulls (never-played / unpopulated
   // songs) at the bottom — otherwise null-coercion-to-0 would surface
   // them at the top, masking the smallest real gaps.
-  test("Current Gap sort puts nulls last on asc and first on desc", async () => {
+  test("Gap to Now sort puts nulls last on asc and first on desc", async () => {
     const songs = [
       makeSong({ id: "a", title: "Basis for a Day", slug: "basis-for-a-day", showsSinceLastPlayed: 5 }),
       makeSong({ id: "b", title: "Above The Waves", slug: "above-the-waves", showsSinceLastPlayed: null }),
@@ -698,11 +740,11 @@ describe("getSongsColumns", () => {
     ];
     const { user } = await setupWithRouter(<DataTable columns={baseColumns} data={songs} hideSearch hidePagination />);
 
-    // Header text is the short "Gap"; the full "Current Gap" lives in the
+    // Header text is the short "Gap"; the full "Gap to Now" lives in the
     // title attribute as hover tooltip. Find the button via title to fail
     // loudly if the tooltip is ever dropped.
-    const sortHeader = screen.getAllByRole("button").find((b) => b.getAttribute("title") === "Current Gap");
-    if (!sortHeader) throw new Error("Current Gap header not found");
+    const sortHeader = screen.getAllByRole("button").find((b) => b.getAttribute("title") === "Gap to Now");
+    if (!sortHeader) throw new Error("Gap to Now header not found");
     await user.click(sortHeader); // asc
 
     const titlesAsc = screen

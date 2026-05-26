@@ -1,3 +1,4 @@
+import { glassSelectContentClass, glassSelectItemClass, glassSelectTriggerClass } from "~/components/ui/glass-select";
 import {
   Select,
   SelectContent,
@@ -8,10 +9,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-const selectTriggerClass =
-  "h-[34px] text-sm bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20";
-const selectContentClass = "bg-glass-bg border-glass-border backdrop-blur-md";
-const selectItemClass = "text-content-text-primary hover:bg-hover-glass";
 const labelClass =
   "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 const groupLabelClass = "text-xs uppercase text-content-text-tertiary tracking-wide py-1";
@@ -48,12 +45,12 @@ export function SelectFilter({
         {label}
       </label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger id={id} className={`${width ?? ""} ${selectTriggerClass}`}>
+        <SelectTrigger id={id} className={`${width ?? ""} ${glassSelectTriggerClass}`}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent className={selectContentClass}>
+        <SelectContent className={glassSelectContentClass}>
           {options?.map((option) => (
-            <SelectItem key={option.value} value={option.value} className={selectItemClass}>
+            <SelectItem key={option.value} value={option.value} className={glassSelectItemClass}>
               {option.label}
             </SelectItem>
           ))}
@@ -61,7 +58,7 @@ export function SelectFilter({
             <SelectGroup key={group.label}>
               <SelectLabel className={groupLabelClass}>{group.label}</SelectLabel>
               {group.options.map((option) => (
-                <SelectItem key={option.value} value={option.value} className={selectItemClass}>
+                <SelectItem key={option.value} value={option.value} className={glassSelectItemClass}>
                   {option.label}
                 </SelectItem>
               ))}

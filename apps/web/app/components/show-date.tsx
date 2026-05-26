@@ -1,28 +1,25 @@
 import { formatDateShort, formatDateShortMobile } from "~/lib/utils";
 
-interface ShowDateProps {
-  date: string | Date;
-  /**
-   * Render the compact `M/D/YY` form at all viewport sizes instead of
-   * only on mobile. For dense surfaces where the four-digit year would
-   * wrap the cell.
-   */
-  compact?: boolean;
-}
-
 /**
- * Single rendering point for show dates across the app. Outputs `M/D/YYYY`
- * at sm+ and the compact `M/D/YY` on mobile so narrow tables (songs list,
- * performance tables) stay readable without overlap. Centralizing here keeps
- * date formatting consistent everywhere a show date is displayed — change
- * the format once and every callsite follows.
+ * Single rendering point for show dates across the app. Outputs both the
+ * full `M/D/YYYY` and compact `M/D/YY` forms; CSS picks which one to display
+ * based on the nearest ancestor labeled `@container/datecell`. When no such
+ * container exists (e.g. the SetlistCard header), the default — full form —
+ * shows and the compact span stays hidden. Cells that DO declare a
+ * `@container/datecell` (DateVenueCell variants, ShowDateLink) swap to the
+ * compact form once the cell tightens below ~6rem, so dense tables and
+ * narrow layouts collapse dates automatically.
+ *
+ * Implementation note: ShowDate must not establish the container itself —
+ * `container-type: inline-size` zeroes the element's intrinsic inline
+ * size, which collapses an inline-block to 0 width and breaks the date
+ * character-by-character. The container lives on a sized parent.
  */
-export function ShowDate({ date, compact }: ShowDateProps) {
-  if (compact) return <span>{formatDateShortMobile(date)}</span>;
+export function ShowDate({ date }: { date: string | Date }) {
   return (
     <>
-      <span className="hidden sm:inline">{formatDateShort(date)}</span>
-      <span className="sm:hidden">{formatDateShortMobile(date)}</span>
+      <span className="inline whitespace-nowrap @max-[6rem]/datecell:hidden">{formatDateShort(date)}</span>
+      <span className="hidden whitespace-nowrap @max-[6rem]/datecell:inline">{formatDateShortMobile(date)}</span>
     </>
   );
 }

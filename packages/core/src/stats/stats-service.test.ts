@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { countShowsAfter, countShowsOnOrAfter, songStatsChanged } from "./stats-service";
+import { countShowsAfter, countShowsBetween, countShowsOnOrAfter, songStatsChanged } from "./stats-service";
 
 const baseFresh = {
   timesPlayed: 3,
@@ -108,7 +108,7 @@ describe("songStatsChanged", () => {
 // ---------------------------------------------------------------------------
 
 describe("countShowsAfter", () => {
-  // Drives the songs-list Current Gap column (number of stats-eligible shows
+  // Drives the songs-list Gap to Now column (number of stats-eligible shows
   // since a song's dateLastPlayed) and the song-detail page's "X shows ago"
   // sublabel. Backed by a single cached date array so the binary search
   // runs in O(log n) per song.
@@ -191,5 +191,36 @@ describe("countShowsOnOrAfter", () => {
   // Target later than the latest date → nothing remains.
   test("returns 0 when target follows every date", () => {
     expect(countShowsOnOrAfter(["2010-01-01", "2015-06-15"], "2030-01-01")).toBe(0);
+  });
+});
+
+describe("countShowsBetween", () => {
+  // Drives the mean-closed-gap numerator for filteredAverageGapShows:
+  // matching-universe shows strictly between the first and last filtered
+  // plays. Both endpoints are exclusive — the play dates themselves are
+  // performances, not gaps.
+
+  // Empty array short-circuits regardless of bounds.
+  test("returns 0 for empty input", () => {
+    expect(countShowsBetween([], "2024-01-01", "2024-12-31")).toBe(0);
+  });
+
+  // Strict between: dates equal to either endpoint are excluded.
+  test("excludes both endpoints", () => {
+    const dates = ["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01", "2024-05-01"];
+    expect(countShowsBetween(dates, "2024-01-01", "2024-05-01")).toBe(3);
+  });
+
+  // No shows fall in a degenerate or inverted interval — never negative.
+  test("returns 0 when low >= high", () => {
+    const dates = ["2024-01-01", "2024-02-01", "2024-03-01"];
+    expect(countShowsBetween(dates, "2024-03-01", "2024-01-01")).toBe(0);
+    expect(countShowsBetween(dates, "2024-02-01", "2024-02-01")).toBe(0);
+  });
+
+  // Bounds outside the array range count nothing past the endpoints.
+  test("returns 0 when no dates fall in range", () => {
+    const dates = ["2024-01-01", "2024-02-01"];
+    expect(countShowsBetween(dates, "2025-01-01", "2025-12-31")).toBe(0);
   });
 });

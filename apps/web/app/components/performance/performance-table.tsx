@@ -11,9 +11,15 @@ const getShowId = (performance: SongPagePerformance) => performance.show.id;
 
 interface PerformanceTableProps {
   performances: SongPagePerformance[];
-  songTitle?: string;
   showSongColumn?: boolean;
   showAllTimerColumn?: boolean;
+  /**
+   * When true (and `showAllTimerColumn` is on), keep the flame column
+   * visible on mobile and hide the Set column there instead. Used on
+   * jam-charts surfaces where the noteworthy marker is the critical
+   * signal at narrow viewports.
+   */
+  mobileFlamePriority?: boolean;
   showGapColumns?: boolean;
   /**
    * When true, render the Filtered Gap column. Route is responsible for
@@ -33,9 +39,9 @@ interface PerformanceTableProps {
  */
 export function PerformanceTable({
   performances,
-  songTitle,
   showSongColumn,
   showAllTimerColumn,
+  mobileFlamePriority,
   showGapColumns,
   hasNarrowingFilter,
   headerContent,
@@ -69,13 +75,21 @@ export function PerformanceTable({
       createPerformanceColumns({
         showSongColumn,
         showAllTimerColumn,
+        mobileFlamePriority,
         showGapColumns,
         hasNarrowingFilter,
-        songTitle,
         userRatingMap,
         isAuthenticated,
       }),
-    [showSongColumn, showAllTimerColumn, showGapColumns, hasNarrowingFilter, songTitle, userRatingMap, isAuthenticated],
+    [
+      showSongColumn,
+      showAllTimerColumn,
+      mobileFlamePriority,
+      showGapColumns,
+      hasNarrowingFilter,
+      userRatingMap,
+      isAuthenticated,
+    ],
   );
 
   return (

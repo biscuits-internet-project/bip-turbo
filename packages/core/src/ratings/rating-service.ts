@@ -67,7 +67,10 @@ export class RatingService {
     protected readonly cacheInvalidation: CacheInvalidationService,
   ) {}
 
-  private async updateRateableAverageRating(rateableId: string, rateableType: string): Promise<void> {
+  private async updateRateableAverageRating(
+    rateableId: string,
+    rateableType: string,
+  ): Promise<{ averageRating: number; ratingsCount: number }> {
     // Calculate the new average rating and count
     const stats = await this.db.rating.aggregate({
       where: { rateableId, rateableType },
@@ -75,7 +78,7 @@ export class RatingService {
       _count: { id: true },
     });
 
-    const averageRating = stats._avg.value || 0;
+    const averageRating = stats._avg.value ?? 0;
     const ratingsCount = stats._count.id;
 
     // Update the appropriate table based on rateable type
@@ -98,6 +101,8 @@ export class RatingService {
         },
       });
     }
+
+    return { averageRating, ratingsCount };
   }
 
   async findManyByUserIdAndRateableIds(userId: string, rateableIds: string[], rateableType: string): Promise<Rating[]> {
@@ -324,5 +329,34 @@ export class RatingService {
         rateableType,
       },
     });
+  }
+
+  /**
+   * Removes a single user's rating for a rateable and recomputes the
+   * denormalized averageRating/ratingsCount on the corresponding Show or
+   * Track row. Returns the recomputed values so callers can update their
+   * caches in one round-trip.
+   */
+  async clearForUser(data: {
+    rateableId: string;
+    rateableType: string;
+    userId: string;
+    showSlug?: string;
+  }): Promise<{ averageRating: number; ratingsCount: number }> {
+    await this.db.rating.deleteMany({
+      where: {
+        userId: data.userId,
+        rateableId: data.rateableId,
+        rateableType: data.rateableType,
+      },
+    });
+
+    const stats = await this.updateRateableAverageRating(data.rateableId, data.rateableType);
+
+    if (data.rateableType === "Show" && data.showSlug) {
+      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug);
+    }
+
+    return stats;
   }
 }

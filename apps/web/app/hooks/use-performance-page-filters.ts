@@ -8,6 +8,8 @@ export const searchPerformance = (performance: SongPagePerformance, query: strin
   performance.venue?.name?.toLowerCase().includes(query) ||
   performance.venue?.city?.toLowerCase().includes(query) ||
   performance.venue?.state?.toLowerCase().includes(query) ||
+  performance.songBefore?.songTitle?.toLowerCase().includes(query) ||
+  performance.songAfter?.songTitle?.toLowerCase().includes(query) ||
   false;
 
 interface PageFiltersOptions<T> {

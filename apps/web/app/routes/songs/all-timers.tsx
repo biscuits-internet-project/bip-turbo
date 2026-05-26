@@ -1,16 +1,11 @@
-import { type AllTimersPageView, CacheKeys } from "@bip/domain";
-import { PerformanceTable } from "~/components/performance";
-import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
-import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
-import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import { publicLoader } from "~/lib/base-loaders";
+import { CacheKeys } from "@bip/domain";
+import { createNoteworthyLoader } from "~/lib/noteworthy-performance-loader";
+import { NoteworthyPerformancePage } from "~/lib/noteworthy-performance-page";
 import { services } from "~/server/services";
 
-export const loader = publicLoader(async (): Promise<AllTimersPageView> => {
-  const cacheKey = CacheKeys.songs.allTimers();
-  const cacheOptions = { ttl: 3600 };
-
-  return await services.cache.getOrSet(cacheKey, async () => services.songPageComposer.buildAllTimers(), cacheOptions);
+export const loader = createNoteworthyLoader({
+  cacheKey: CacheKeys.songs.allTimers(),
+  build: () => services.songPageComposer.buildAllTimers(),
 });
 
 export function meta() {
@@ -18,49 +13,5 @@ export function meta() {
 }
 
 export default function AllTimersPage() {
-  const { performances: allPerformances } = useSerializedLoaderData<AllTimersPageView>();
-  const {
-    filteredData: filteredPerformances,
-    isLoading,
-    selectedTimeRange,
-    coverFilter,
-    selectedAuthor,
-    activeToggleSet,
-    hasActiveFilters,
-    searchText,
-    setSearchText,
-    updateFilter,
-    toggleFilter,
-    clearFilters,
-  } = usePerformancePageFilters({
-    initialData: allPerformances,
-    apiUrl: "/api/all-timers",
-    searchFilter: searchPerformance,
-  });
-
-  return (
-    <div>
-      <PerformanceTable
-        performances={filteredPerformances}
-        isLoading={isLoading}
-        showSongColumn
-        showGapColumns={false}
-        headerContent={
-          <PerformanceFilterControls
-            selectedTimeRange={selectedTimeRange}
-            activeToggleSet={activeToggleSet}
-            updateFilter={updateFilter}
-            toggleFilter={toggleFilter}
-            clearFilters={clearFilters}
-            coverFilter={coverFilter}
-            selectedAuthor={selectedAuthor}
-            showAllTimerToggle={false}
-            searchValue={searchText}
-            onSearchChange={setSearchText}
-            hasActiveFilters={hasActiveFilters}
-          />
-        }
-      />
-    </div>
-  );
+  return <NoteworthyPerformancePage apiUrl="/api/all-timers" hideAllTimerToggle hideJamChartToggle />;
 }

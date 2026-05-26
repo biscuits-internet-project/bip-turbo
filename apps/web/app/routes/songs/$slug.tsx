@@ -1,29 +1,54 @@
 import { compareByShowDate, type SongPageView } from "@bip/domain";
+import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
 import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
+import { isNoteworthy } from "~/components/track/noteworthy-marker";
 import { Button } from "~/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { pickGapTier } from "~/lib/gap-tier";
+import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
+import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
+import { computeShowUserData } from "~/server/show-user-data";
+import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
-export const loader = publicLoader(async ({ params }: LoaderFunctionArgs): Promise<SongPageView> => {
+type LoaderData = SongPageView & { dehydratedState: DehydratedState };
+
+export const loader = publicLoader(async ({ params, context }: LoaderFunctionArgs): Promise<LoaderData> => {
   const slug = params.slug;
   if (!slug) throw new Response("Not Found", { status: 404 });
 
-  return services.songPageComposer.build(slug);
+  const view = await services.songPageComposer.build(slug);
+
+  const trackIds = view.performances.map((p) => p.trackId);
+  const showIds = [...new Set(view.performances.map((p) => p.show.id))];
+  const queryClient = createPrefetchClient();
+  await Promise.all([
+    queryClient.prefetchQuery({
+      queryKey: trackUserRatingsQueryKey(trackIds),
+      queryFn: () => computeTrackUserRatings(context, trackIds),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: showUserDataQueryKey(showIds),
+      queryFn: () => computeShowUserData(context, showIds),
+    }),
+  ]);
+
+  return { ...view, dehydratedState: dehydrate(queryClient) };
 });
 
 interface StatBoxProps {
@@ -34,13 +59,27 @@ interface StatBoxProps {
 }
 
 function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
+  // On phone-landscape viewports the stat cards eat too much vertical
+  // space: 8 cards in a 4x2 grid push the rest of the page below the
+  // fold. Shrink padding, value font, and inter-element spacing so the
+  // grid stays legible at half its usual height.
   return (
-    <div className="glass-content p-2 sm:p-3 rounded-lg h-full">
-      <dt className="text-sm font-medium text-content-text-secondary">{label}</dt>
-      <dd className="mt-2">
-        <span className="text-xl sm:text-3xl font-bold text-content-text-primary">{value}</span>
-        {sublabel && <div className="mt-1 text-sm text-content-text-tertiary">{sublabel}</div>}
-        {sublabel2 && <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block">{sublabel2}</div>}
+    <div className="glass-content p-2 sm:p-3 short:!py-1 short:!px-2.5 rounded-lg h-full">
+      <dt className="text-sm short:!text-[11px] short:!leading-tight font-medium text-content-text-secondary">
+        {label}
+      </dt>
+      <dd className="mt-2 short:!mt-0.5">
+        <span className="text-xl sm:text-3xl short:!text-base short:!leading-tight font-bold text-content-text-primary">
+          {value}
+        </span>
+        {sublabel && (
+          <div className="mt-1 text-sm short:!text-[11px] short:!leading-tight short:!mt-0.5 text-content-text-tertiary">
+            {sublabel}
+          </div>
+        )}
+        {sublabel2 && (
+          <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block short:hidden">{sublabel2}</div>
+        )}
       </dd>
     </div>
   );
@@ -94,7 +133,7 @@ function ReviewNote({ notes }: { notes: string }) {
   );
 }
 
-export function meta({ data }: { data: SongPageView }) {
+export function meta({ data }: { data: LoaderData }) {
   return getSongMeta({
     ...data.song,
     timesPlayed: data.song.timesPlayed,
@@ -141,18 +180,27 @@ function formatCount(value: number | null | undefined): string {
   return value.toLocaleString();
 }
 
-function formatDecimal(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  return value.toFixed(1);
+function formatAvgMedianGap(avg: number | null | undefined, median: number | null | undefined): string {
+  const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "—" : v.toFixed(1));
+  if ((avg === null || avg === undefined) && (median === null || median === undefined)) return "—";
+  return `${fmt(avg)} / ${fmt(median)}`;
 }
 
+// Allowlist used to validate the `:tab` URL segment so a typo'd path
+// like /songs/triumph/foo falls back to the default tab instead of
+// rendering nothing. Order is informational only.
+const VALID_TABS = ["performances", "jam-charts", "all-timers", "stats", "history", "lyrics", "guitar-tabs"] as const;
+type TabValue = (typeof VALID_TABS)[number];
+
 export default function SongPage() {
-  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<SongPageView>();
-  const [searchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const validTabs = ["performances", "all-timers", "stats", "history", "lyrics", "guitar-tabs"];
-  const defaultTab = tabParam && validTabs.includes(tabParam) ? tabParam : "performances";
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const { song, performances: allPerformances, showsByYear } = useSerializedLoaderData<LoaderData>();
+  const params = useParams<{ tab?: string }>();
+  const navigate = useNavigate();
+  // The :tab segment is the source of truth — Tabs renders whatever
+  // the URL says, and clicking a tab navigates so back/forward and
+  // shareable links work.
+  const activeTab: TabValue =
+    params.tab && (VALID_TABS as readonly string[]).includes(params.tab) ? (params.tab as TabValue) : "performances";
   const {
     filteredData: filteredPerformances,
     isLoading,
@@ -170,14 +218,31 @@ export default function SongPage() {
     extraParams: useMemo(() => ({ slug: song.slug }), [song.slug]),
     searchFilter: searchPerformance,
   });
+  const handleTabChange = (value: string) => {
+    clearFilters();
+    // "performances" is the default; navigate to bare /songs/:slug so
+    // the URL doesn't carry a redundant /performances suffix.
+    navigate(value === "performances" ? `/songs/${song.slug}` : `/songs/${song.slug}/${value}`);
+  };
 
   const hasAllTimers = useMemo(() => allPerformances.some((p) => p.allTimer), [allPerformances]);
   const filteredAllTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
+  // Jam Charts: all-timer OR any track with a curated note (non-empty).
+  // Superset of all-timers; the tab only appears when the song has at
+  // least one such performance.
+  const hasJamCharts = useMemo(() => allPerformances.some(isNoteworthy), [allPerformances]);
+  const filteredJamCharts = useMemo(() => filteredPerformances.filter(isNoteworthy), [filteredPerformances]);
   // Server-narrowing filter active = any UI filter that affects the
   // performance set the server returned. Excludes `searchText` (client-only).
   // Used to render the Filtered Gap column in the performances table.
   const hasServerNarrowingFilter = selectedTimeRange !== "all" || activeToggleSet.size > 0;
-  const filterContent = (
+  // Tab-specific noteworthy-toggle suppression: when the active tab is
+  // already scoped to "all-timers" or "jam-charts", the matching chip
+  // (and the chip that strictly subsets it) shouldn't reappear in the
+  // filter row because toggling it would either be a no-op or
+  // contradict the tab's scope. Mirrors how the global pages hide
+  // those chips on their own routes.
+  const renderFilterContent = (overrides?: { hideAllTimerToggle?: boolean; hideJamChartToggle?: boolean }) => (
     <PerformanceFilterControls
       selectedTimeRange={selectedTimeRange}
       activeToggleSet={activeToggleSet}
@@ -187,6 +252,8 @@ export default function SongPage() {
       searchValue={searchText}
       onSearchChange={setSearchText}
       hasActiveFilters={hasActiveFilters}
+      showAllTimerToggle={!overrides?.hideAllTimerToggle}
+      showJamChartToggle={!overrides?.hideJamChartToggle}
     />
   );
 
@@ -232,9 +299,9 @@ export default function SongPage() {
       </div>
 
       {/* Stats Grid */}
-      <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <dl className="grid grid-cols-2 lg:grid-cols-4 short:!grid-cols-4 gap-4 short:!gap-2">
         <StatBox label="Times Played" value={song.timesPlayed} />
-        <StatBox label="Average Gap" value={formatDecimal(song.averageShowsPerPlay)} />
+        <StatBox label="Avg / Median Gap" value={formatAvgMedianGap(song.averageGapShows, song.medianGapShows)} />
         {song.lastShowSlug ? (
           <Link to={`/shows/${song.lastShowSlug}`} className="block">
             <StatBox
@@ -242,7 +309,7 @@ export default function SongPage() {
               value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
               sublabel={
                 song.actualLastPlayedDate
-                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                  ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                   : undefined
               }
               sublabel2={
@@ -260,7 +327,7 @@ export default function SongPage() {
             value={song.actualLastPlayedDate ? <ShowDate date={song.actualLastPlayedDate} /> : "Never"}
             sublabel={
               song.actualLastPlayedDate
-                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageShowsPerPlay, song.longestGapShows)
+                ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                 : undefined
             }
             sublabel2={
@@ -317,34 +384,25 @@ export default function SongPage() {
         </div>
       )}
 
-      <Tabs
-        value={activeTab}
-        className="w-full"
-        onValueChange={(value) => {
-          setActiveTab(value);
-          clearFilters();
-        }}
-      >
-        <div className="sm:hidden mb-4">
-          <label htmlFor="song-view-select" className="sr-only">
-            Song view
-          </label>
-          <select
-            id="song-view-select"
-            value={activeTab}
-            onChange={(event) => {
-              setActiveTab(event.target.value);
-              clearFilters();
-            }}
-            className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
-          >
-            <option value="performances">All Performances</option>
-            {hasAllTimers && <option value="all-timers">All-Timers</option>}
-            <option value="stats">Stats</option>
-            {song.history && <option value="history">History</option>}
-            {song.lyrics && <option value="lyrics">Lyrics</option>}
-            {(song.tabs || song.guitarTabsUrl) && <option value="guitar-tabs">Guitar Tabs</option>}
-          </select>
+      <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
+        <div className="sm:hidden mb-4" data-testid="mobile-song-view">
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger
+              aria-label="Song view"
+              className="w-full h-11 bg-glass-bg border border-glass-border text-content-text-primary hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
+              <SelectItem value="performances">All Performances</SelectItem>
+              {hasJamCharts && <SelectItem value="jam-charts">Jam Charts</SelectItem>}
+              {hasAllTimers && <SelectItem value="all-timers">All-Timers</SelectItem>}
+              <SelectItem value="stats">Stats</SelectItem>
+              {song.history && <SelectItem value="history">History</SelectItem>}
+              {song.lyrics && <SelectItem value="lyrics">Lyrics</SelectItem>}
+              {(song.tabs || song.guitarTabsUrl) && <SelectItem value="guitar-tabs">Guitar Tabs</SelectItem>}
+            </SelectContent>
+          </Select>
         </div>
         <TabsList className="w-full hidden sm:flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
           <TabsTrigger
@@ -358,6 +416,19 @@ export default function SongPage() {
             <ListMusic className="h-4 w-4" />
             All Performances
           </TabsTrigger>
+          {hasJamCharts && (
+            <TabsTrigger
+              value="jam-charts"
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
+                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
+                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
+              )}
+            >
+              <Flame className="h-4 w-4" />
+              Jam Charts
+            </TabsTrigger>
+          )}
           {hasAllTimers && (
             <TabsTrigger
               value="all-timers"
@@ -423,6 +494,18 @@ export default function SongPage() {
           )}
         </TabsList>
 
+        {hasJamCharts && (
+          <TabsContent value="jam-charts" className="mt-6">
+            <PerformanceTable
+              performances={filteredJamCharts}
+              isLoading={isLoading}
+              showAllTimerColumn
+              hasNarrowingFilter={hasServerNarrowingFilter}
+              headerContent={renderFilterContent({ hideJamChartToggle: true })}
+            />
+          </TabsContent>
+        )}
+
         {hasAllTimers && (
           <TabsContent value="all-timers" className="mt-6 space-y-8">
             {/* Featured cards for performances with notes */}
@@ -460,10 +543,9 @@ export default function SongPage() {
 
             <PerformanceTable
               performances={filteredAllTimers}
-              songTitle={song.title}
               isLoading={isLoading}
               hasNarrowingFilter={hasServerNarrowingFilter}
-              headerContent={filterContent}
+              headerContent={renderFilterContent({ hideAllTimerToggle: true, hideJamChartToggle: true })}
             />
           </TabsContent>
         )}
@@ -471,11 +553,10 @@ export default function SongPage() {
         <TabsContent value="performances" className="mt-6">
           <PerformanceTable
             performances={filteredPerformances}
-            songTitle={song.title}
             showAllTimerColumn
             isLoading={isLoading}
             hasNarrowingFilter={hasServerNarrowingFilter}
-            headerContent={filterContent}
+            headerContent={renderFilterContent()}
           />
         </TabsContent>
 

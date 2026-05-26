@@ -9,8 +9,6 @@ import { cn } from "~/lib/utils";
 
 const ALL_TOGGLE_FILTERS = TOGGLE_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
 
-const TOGGLE_FILTERS_WITHOUT_ALL_TIMER = ALL_TOGGLE_FILTERS.filter((filter) => filter.key !== "allTimer");
-
 const labelClass =
   "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 
@@ -22,6 +20,14 @@ interface PerformanceFilterControlsProps {
   clearFilters: () => void;
   extraSelectFilters?: ReactNode;
   showAllTimerToggle?: boolean;
+  /**
+   * When false, hide the "Jam Chart" toggle chip. Set on the dedicated
+   * Jam Charts page (the whole result set is already jam-charts there)
+   * and on the All-Timers page (same reasoning as why "All-Timer" is
+   * hidden there) so toggle filters within those views express
+   * additional narrowing rather than redundant scope.
+   */
+  showJamChartToggle?: boolean;
   hideTimeRange?: boolean;
   coverFilter?: string;
   selectedAuthor?: string | null;
@@ -39,6 +45,7 @@ export function PerformanceFilterControls({
   clearFilters,
   extraSelectFilters,
   showAllTimerToggle = true,
+  showJamChartToggle = true,
   hideTimeRange = false,
   coverFilter,
   selectedAuthor,
@@ -47,7 +54,11 @@ export function PerformanceFilterControls({
   onSearchChange,
   hasActiveFilters = false,
 }: PerformanceFilterControlsProps) {
-  const toggleFilters = showAllTimerToggle ? ALL_TOGGLE_FILTERS : TOGGLE_FILTERS_WITHOUT_ALL_TIMER;
+  const toggleFilters = ALL_TOGGLE_FILTERS.filter((filter) => {
+    if (!showAllTimerToggle && filter.key === "allTimer") return false;
+    if (!showJamChartToggle && filter.key === "jamChart") return false;
+    return true;
+  });
   const showPlayedFilter =
     playedFilter !== undefined &&
     (hideTimeRange ||
@@ -76,12 +87,15 @@ export function PerformanceFilterControls({
       <button
         type="button"
         onClick={() => setMobileOpen((open) => !open)}
-        className="sm:hidden w-full flex items-center justify-between px-3 py-2 rounded-md bg-glass-bg border border-glass-border text-sm font-medium text-content-text-primary"
+        // Mobile toggle re-shows on phone-landscape viewports — a
+        // rotated phone has the same vertical-space crunch as portrait,
+        // so the filter chrome collapses there too.
+        className="sm:hidden short:!flex w-full flex items-center justify-between px-3 py-2 rounded-md bg-glass-bg border border-glass-border text-sm font-medium text-content-text-primary"
         aria-expanded={mobileOpen}
       >
         <span className="flex items-center gap-2">
           <Filter className="h-4 w-4" aria-hidden="true" />
-          Filters
+          Search &amp; Filters
           {activeFilterCount > 0 && (
             <span className="px-2 py-0.5 rounded-full bg-brand-primary/20 text-brand-primary text-xs">
               {activeFilterCount}
@@ -90,7 +104,17 @@ export function PerformanceFilterControls({
         </span>
         <ChevronDown className={cn("h-4 w-4 transition-transform", mobileOpen && "rotate-180")} />
       </button>
-      <div data-testid="filter-content-wrapper" className={cn("space-y-3 sm:block", mobileOpen ? "block" : "hidden")}>
+      <div
+        data-testid="filter-content-wrapper"
+        className={cn(
+          "space-y-3 sm:block",
+          mobileOpen ? "block" : "hidden",
+          // …but on phone-landscape viewports follow the toggle state
+          // instead of the sm: force-open. User can still expand by
+          // clicking the toggle button.
+          !mobileOpen && "short:!hidden",
+        )}
+      >
         <div className="flex items-end flex-wrap gap-x-3 gap-y-2">
           {searchValue !== undefined && onSearchChange && (
             <Input

@@ -4,7 +4,7 @@ import type { DbClient } from "../_shared/database/models";
 import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import { computeTrackGaps, sortTracksForGapWalk, type TrackForGapWalk } from "../_shared/track-gap";
 import type { SongService } from "../songs/song-service";
-import { countShowsAfter, countShowsOnOrAfter, type StatsService } from "../stats/stats-service";
+import { countShowsAfter, countShowsBetween, countShowsOnOrAfter, type StatsService } from "../stats/stats-service";
 
 /**
  * Filters for querying performances. All fields are optional — only
@@ -15,7 +15,7 @@ import { countShowsAfter, countShowsOnOrAfter, type StatsService } from "../stat
 export interface FilteredSongRarity {
   filteredShowsSinceLastPlayed: number | null;
   filteredPercentSinceDebut: number | null;
-  filteredAverageShowsPerPlay: number | null;
+  filteredAverageGapShows: number | null;
   dateFirstFilteredPlayed: Date;
   dateLastFilteredPlayed: Date;
 }
@@ -34,6 +34,8 @@ export interface PerformanceFilterOptions {
   standalone?: boolean;
   inverted?: boolean;
   dyslexic?: boolean;
+  /** Narrow to tracks carrying a curated jam-chart note (non-empty). */
+  jamChart?: boolean;
   allTimer?: boolean;
   monthDay?: string;
 }
@@ -142,6 +144,11 @@ export class SongPageComposer {
       ...this.transformToSongPagePerformanceView(row),
       cover: song.cover ?? undefined,
       authorId: song.authorId ?? null,
+      // Single-song rows skip the song join; fill in title/slug from the
+      // page's song context so cross-song renderers (e.g. the
+      // noteworthy-track popover header) see a populated title.
+      songTitle: song.title,
+      songSlug: song.slug,
     }));
     await this.enrichPerformances(performances);
 
@@ -151,18 +158,28 @@ export class SongPageComposer {
       showsByYear,
     );
 
-    // Longest historical gap (in shows) for this song, restricted to
-    // stats-eligible shows so non-stats sets (e.g., late-night side
-    // projects) don't pollute the maximum. Null when the song has only
-    // ever been played once — debuts have no gap recorded.
-    const longestGapResult = await this.db.$queryRaw<[{ longest: number | null }]>`
-      SELECT MAX(tracks.gap)::int as longest
+    // Aggregate the closed gaps between consecutive stats-eligible plays
+    // of this song. `tracks.gap` is NULL on debuts and populated for
+    // every later performance, so MAX/AVG/percentile cover only real
+    // closed intervals. Non-stats shows are excluded so late-night side
+    // projects don't pollute the numbers. All three are null when the
+    // song has been played at most once (no closed gap exists).
+    const gapAggregateResult = await this.db.$queryRaw<
+      [{ longest: number | null; average: number | null; median: number | null }]
+    >`
+      SELECT
+        MAX(tracks.gap)::int AS longest,
+        AVG(tracks.gap)::float AS average,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY tracks.gap)::float AS median
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
       WHERE tracks.song_id = ${song.id}::uuid
+        AND tracks.gap IS NOT NULL
         AND ${statsShowsSql("shows")}
     `;
-    const longestGapShows = longestGapResult[0]?.longest ?? null;
+    const longestGapShows = gapAggregateResult[0]?.longest ?? null;
+    const averageGapShows = gapAggregateResult[0]?.average ?? null;
+    const medianGapShows = gapAggregateResult[0]?.median ?? null;
 
     return {
       song: {
@@ -174,6 +191,8 @@ export class SongPageComposer {
         firstVenue,
         firstShowSlug,
         ...rarity,
+        averageGapShows,
+        medianGapShows,
         longestGapShows,
       },
       performances,
@@ -195,11 +214,34 @@ export class SongPageComposer {
 
   /** Build the all-timers page view, optionally filtered by date range, cover, author, attendance, and performance tags. */
   async buildAllTimers(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
-    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(
-      [Prisma.sql`tracks.all_timer = true`],
+    return this.buildCrossSongPerformanceView(Prisma.sql`tracks.all_timer = true`, options);
+  }
+
+  /**
+   * Build the Jam Charts page view. Includes any track that is either an
+   * all-timer OR carries a curated note — the union of the two
+   * noteworthy categories surfaced throughout the app. The note column
+   * historically allows empty strings as well as NULL for "no note", so
+   * both are filtered out to match what the UI treats as a real note.
+   */
+  async buildJamCharts(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
+    return this.buildCrossSongPerformanceView(
+      Prisma.sql`(tracks.all_timer = true OR (tracks.note IS NOT NULL AND tracks.note <> ''))`,
       options,
     );
+  }
 
+  /**
+   * Shared body of the cross-song page views (all-timers, jam-charts).
+   * The two endpoints differ only in their base WHERE condition; this
+   * helper composes the rest of the pipeline — filter merging, the
+   * cross-song SELECT with song title/slug, and per-track enrichment.
+   */
+  private async buildCrossSongPerformanceView(
+    baseCondition: Prisma.Sql,
+    options?: PerformanceFilterOptions,
+  ): Promise<AllTimersPageView> {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([baseCondition], options);
     const whereClause = Prisma.join(conditions, " AND ");
     const result = await this.queryPerformances({
       whereClause,
@@ -234,6 +276,13 @@ export class SongPageComposer {
       ...this.transformToSongPagePerformanceView(row),
       cover: song.cover ?? undefined,
       authorId: song.authorId ?? null,
+      // The per-song composer queries without a song join (the song is
+      // already known), so the raw rows don't carry song_title/song_slug.
+      // Fill them in from the page's song context so downstream renderers
+      // (e.g. the noteworthy-track popover header) don't see an empty
+      // title when this projection lands in a cross-song UI component.
+      songTitle: song.title,
+      songSlug: song.slug,
     }));
     await this.enrichPerformances(performances);
 
@@ -286,8 +335,9 @@ export class SongPageComposer {
    *   - filteredPercentSinceDebut: filteredTimesPlayed divided by the
    *     count of matching-universe shows on or after this song's first
    *     filtered play
-   *   - filteredAverageShowsPerPlay: same denominator over the numerator,
-   *     inverted — "matching-universe shows per filtered play"
+   *   - filteredAverageGapShows: mean closed gap within the filter scope —
+   *     matching shows strictly between first and last filtered plays
+   *     divided by (filteredTimesPlayed - 1)
    *
    * Only computed for the survivor set the loader already produced. Songs
    * absent from the result map are left untouched by the caller; the UI
@@ -333,15 +383,20 @@ export class SongPageComposer {
       const filteredShowsSinceLastPlayed = countShowsAfter(matchingShowDates, row.last_date);
       const showsOnOrAfterDebut = countShowsOnOrAfter(matchingShowDates, row.first_date);
       const filteredPercentSinceDebut = showsOnOrAfterDebut === 0 ? null : filteredTimesPlayed / showsOnOrAfterDebut;
-      // Same mean-gap semantic as computeRarityStats.averageShowsPerPlay:
-      // shows that fell in gaps divided by the number of gaps. Requires
-      // at least 2 plays — a single play has no gaps to average.
-      const filteredAverageShowsPerPlay =
-        filteredTimesPlayed < 2 ? null : (showsOnOrAfterDebut - filteredTimesPlayed) / (filteredTimesPlayed - 1);
+      // Mean closed gap within the filter scope. Numerator counts only
+      // matching shows strictly BETWEEN the first and last filtered plays,
+      // excluding the trailing dry spell after the last play and the
+      // pre-first-play stretch. Without that bracketing, an early-clustered
+      // song with a long quiet tail inside the filter would have its avg
+      // inflated by the tail. Requires ≥ 2 plays for a closed gap to exist.
+      const filteredAverageGapShows =
+        filteredTimesPlayed < 2
+          ? null
+          : countShowsBetween(matchingShowDates, row.first_date, row.last_date) / (filteredTimesPlayed - 1);
       out.set(row.song_id, {
         filteredShowsSinceLastPlayed,
         filteredPercentSinceDebut,
-        filteredAverageShowsPerPlay,
+        filteredAverageGapShows,
         dateFirstFilteredPlayed: new Date(row.first_date),
         dateLastFilteredPlayed: new Date(row.last_date),
       });
@@ -425,6 +480,7 @@ export class SongPageComposer {
           }
         : null,
     allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
+    jamChart: (o) => (o.jamChart ? { condition: Prisma.sql`tracks.note IS NOT NULL AND tracks.note <> ''` } : null),
     monthDay: (o) => (o.monthDay ? { condition: Prisma.sql`shows.date LIKE ${`%-${o.monthDay}`}` } : null),
     inverted: (o) =>
       o.inverted
@@ -627,6 +683,7 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.standalone ||
       options.inverted ||
       options.dyslexic ||
+      options.jamChart ||
       options.allTimer ||
       options.monthDay,
   );
@@ -794,7 +851,6 @@ export function computeRarityStats(
   showsSinceDebut: number | null;
   percentOfAllShows: number | null;
   percentSinceDebut: number | null;
-  averageShowsPerPlay: number | null;
 } {
   const totalShows = Object.values(showsByYear).reduce((sum, count) => sum + count, 0);
   const percentOfAllShows = totalShows === 0 ? null : song.timesPlayed / totalShows;
@@ -806,7 +862,6 @@ export function computeRarityStats(
       showsSinceDebut: null,
       percentOfAllShows,
       percentSinceDebut: null,
-      averageShowsPerPlay: null,
     };
   }
 
@@ -816,12 +871,6 @@ export function computeRarityStats(
     .reduce((sum, [, count]) => sum + count, 0);
   const showsBeforeDebut = totalShows - showsSinceDebut;
   const percentSinceDebut = showsSinceDebut === 0 ? null : song.timesPlayed / showsSinceDebut;
-  // Mean gap between consecutive plays of this song since its debut.
-  // (showsSinceDebut - timesPlayed) is the number of shows that fell in
-  // gaps between plays; dividing by (timesPlayed - 1) gives the mean per
-  // gap. Requires at least 2 plays — a single-play song has no gaps to
-  // average. Null also when the song has never been played.
-  const averageShowsPerPlay = song.timesPlayed < 2 ? null : (showsSinceDebut - song.timesPlayed) / (song.timesPlayed - 1);
 
   return {
     totalShows,
@@ -829,7 +878,6 @@ export function computeRarityStats(
     showsSinceDebut,
     percentOfAllShows,
     percentSinceDebut,
-    averageShowsPerPlay,
   };
 }
 

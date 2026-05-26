@@ -11,6 +11,8 @@ export const songSchema = z.object({
   notes: z.string().nullable(),
   cover: z.boolean().nullable().default(false),
   authorId: z.string().uuid().nullable(),
+  // Optional — mirrors prod's legacy_author column, surfaced via sync.
+  legacyAuthor: z.string().nullable().optional(),
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   timesPlayed: z.number().default(0),
@@ -19,11 +21,11 @@ export const songSchema = z.object({
   // the "Filtered Plays" column alongside the all-time Plays column.
   filteredTimesPlayed: z.number().optional(),
   // Filtered analogs of the rarity fields below — populated only when a narrowing
-  // filter is active. Drive the Filtered Current Gap / Filtered Since Debut /
+  // filter is active. Drive the Filtered Gap to End / Filtered Since Debut /
   // Filtered Avg Gap columns on /songs.
   filteredShowsSinceLastPlayed: z.number().nullable().optional(),
   filteredPercentSinceDebut: z.number().nullable().optional(),
-  filteredAverageShowsPerPlay: z.number().nullable().optional(),
+  filteredAverageGapShows: z.number().nullable().optional(),
   dateFirstFilteredPlayed: z.date().nullable().optional(),
   dateLastFilteredPlayed: z.date().nullable().optional(),
   dateLastPlayed: z.date().nullable(),
@@ -51,7 +53,8 @@ export const songSchema = z.object({
   totalShows: z.number(),
   percentOfAllShows: z.number().nullable(),
   percentSinceDebut: z.number().nullable(),
-  averageShowsPerPlay: z.number().nullable(),
+  averageGapShows: z.number().nullable(),
+  medianGapShows: z.number().nullable(),
   longestGapShows: z.number().nullable(),
   yearlyPlayData: z.record(z.string(), z.unknown()).default({}),
   longestGapsData: z.record(z.string(), z.unknown()).default({}),

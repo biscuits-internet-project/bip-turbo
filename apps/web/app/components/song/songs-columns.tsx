@@ -85,11 +85,7 @@ function HeaderLabel({
   reserveIconRow: boolean;
   children: ReactNode;
 }) {
-  const iconRow = filtered ? (
-    <FilterMark />
-  ) : reserveIconRow ? (
-    <span className="block h-3" aria-hidden="true" />
-  ) : null;
+  const iconRow = filtered ? <FilterMark /> : reserveIconRow ? <span className="block h-3" aria-hidden="true" /> : null;
   return (
     <span className="flex flex-col leading-tight items-start">
       {iconRow}
@@ -101,9 +97,22 @@ function HeaderLabel({
 interface SortableColumnOptions {
   accessorKey: keyof SongWithShows;
   label: ReactNode;
-  /** Hover tooltip; used when `label` is a shorthand (e.g. "Gap" → "Current Gap"). */
+  /** Hover tooltip; used when the visible label needs disambiguation in prose. */
   title?: string;
-  width?: string;
+  /**
+   * Relative width share of *leftover* space under `table-layout: fixed`.
+   * Defaults to 1. Use > 1 for text columns; ignored when `fixedWidth` is
+   * set.
+   */
+  weight?: number;
+  /** Fixed column width (e.g. `"3rem"`) for short-content columns that
+   * shouldn't grow when the table widens. Wins over `weight`. */
+  fixedWidth?: string;
+  /** Mobile-specific fixed width — applied below the `sm` breakpoint.
+   * Use when a column's mobile rendering has a knowable max (e.g. dates
+   * without venue) and shouldn't gobble the leftover flex space that
+   * primary columns need. */
+  mobileFixedWidth?: string;
   hideOnMobile?: boolean;
   cell: (row: SongWithShows) => ReactNode;
   sortingFn?: SortingFn<SongWithShows>;
@@ -127,7 +136,12 @@ function makeSortableColumn(opts: SortableColumnOptions): ColumnDef<SongWithShow
   const sortIconWrapperClass = opts.reservesIconRow ? "sm:mt-3" : "";
   const def: ColumnDef<SongWithShows> = {
     accessorKey: opts.accessorKey,
-    meta: { width: opts.width, hideOnMobile: opts.hideOnMobile },
+    meta: {
+      weight: opts.weight,
+      fixedWidth: opts.fixedWidth,
+      mobileFixedWidth: opts.mobileFixedWidth,
+      hideOnMobile: opts.hideOnMobile,
+    },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -147,38 +161,35 @@ function makeSortableColumn(opts: SortableColumnOptions): ColumnDef<SongWithShow
 
 /**
  * Renders a date with optional link to the show and a venue sublabel under
- * the date. Used by both Last Played and First Played columns — the only
- * difference between them is which date/show pair feeds in.
+ * the date. The cell is its own inline-size container, so the venue line
+ * drops out automatically when the column gets squeezed (many columns picked
+ * or a narrow layout) without callers passing a `hideVenue` flag. The date
+ * format collapses to compact via ShowDate's own container query.
  */
-function DateVenueCell({
-  date,
-  show,
-  hideVenue,
-  compact,
-}: {
-  date: Date | null;
-  show?: Show | null;
-  hideVenue?: boolean;
-  compact?: boolean;
-}): ReactNode {
+function DateVenueCell({ date, show }: { date: Date | null; show?: Show | null }): ReactNode {
   if (!date) return <span className="text-content-text-tertiary text-sm">—</span>;
-  const dateBlock = <ShowDate date={date} compact={compact} />;
-  const venueLine =
-    show?.venue && !hideVenue ? (
-      <div className="text-content-text-tertiary text-sm hidden sm:block">
-        {show.venue.name}, {show.venue.city} {show.venue.state}
-      </div>
-    ) : null;
+  const dateBlock = <ShowDate date={date} />;
+  // Venue only shows at `sm` and above (mobile keeps each row tight to
+  // a single date line), AND when the column is genuinely wide enough
+  // to hold it on desktop.
+  const venueLine = show?.venue ? (
+    <div className="text-content-text-tertiary text-sm hidden sm:@[8rem]/datecell:block">
+      {show.venue.name}, {show.venue.city} {show.venue.state}
+    </div>
+  ) : null;
   if (show?.slug) {
     return (
-      <Link to={`/shows/${show.slug}`} className="text-brand-primary hover:text-brand-secondary transition-colors">
+      <Link
+        to={`/shows/${show.slug}`}
+        className="@container/datecell block text-brand-primary hover:text-brand-secondary transition-colors"
+      >
         <div>{dateBlock}</div>
         {venueLine}
       </Link>
     );
   }
   return (
-    <div>
+    <div className="@container/datecell">
       <div className="text-content-text-secondary">{dateBlock}</div>
       {venueLine}
     </div>
@@ -188,6 +199,24 @@ function DateVenueCell({
 function dashOrSpan(content: ReactNode | null | undefined, className = "text-content-text-primary"): ReactNode {
   if (content === null || content === undefined) return <span className="text-content-text-tertiary text-sm">—</span>;
   return <span className={className}>{content}</span>;
+}
+
+/**
+ * Right-aligns digits inside an inline-block sized to the column's widest
+ * realistic value, so 1 / 10 / 100 stack with their ones digit aligned and
+ * larger numbers extend further left. The block itself sits flush-left in
+ * the cell (cells are left-aligned), so the whole column reads as
+ * "left-anchored numbers with right-aligned digits" rather than as a
+ * right-aligned column. `width` is the min-width of the slot in `ch`
+ * units; tabular-nums makes every digit the same `0`-glyph width so the
+ * digit columns actually align.
+ */
+function NumberCell({ width, className, children }: { width: string; className?: string; children: ReactNode }) {
+  return (
+    <span className={`inline-block text-right tabular-nums ${className ?? ""}`} style={{ minWidth: width }}>
+      {children}
+    </span>
+  );
 }
 
 interface GetSongsColumnsOptions {
@@ -201,48 +230,63 @@ interface GetSongsColumnsOptions {
  * counts.
  */
 export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): ColumnDef<SongWithShows>[] {
-  const titleColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const titleColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "title",
+    // Dense view (filtered cols competing): Song needs a healthy share so
+    // single-word titles like "Shem-Rah Boo" fit on one line. Sparse view
+    // (2 date cols): Song should yield space to the date columns so their
+    // venue sublabels read on 1-2 lines instead of being squeezed to 3+.
+    weight: showFilteredPlays ? 3 : 1.5,
+    // No mobileFixedWidth: on dense mobile the all-time pair columns are
+    // hidden, so Song claims whatever leftover the 4 numeric + 2 date
+    // filter cols leave. Single-word titles fit one line; multi-word wrap.
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Song</HeaderLabel>,
-    width: showFilteredPlays ? "14%" : "26%",
     cell: (song) => (
-      <Link
-        to={`/songs/${song.slug}`}
-        className="inline-block min-w-[10ch] text-base text-brand-primary hover:text-brand-secondary font-medium [overflow-wrap:anywhere]"
-      >
+      <Link to={`/songs/${song.slug}`} className="text-base text-brand-primary hover:text-brand-secondary font-medium">
         {song.title}
       </Link>
     ),
   });
 
-  const playsColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const playsColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "timesPlayed",
+    fixedWidth: "4rem",
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Plays</HeaderLabel>,
-    width: showFilteredPlays ? "5%" : "8%",
-    // When Filtered Plays is also visible there isn't room for both count
-    // columns on mobile; the all-time count drops out at narrow widths.
+    // When Filtered Plays is also visible the all-time count is paired
+    // beside it; mobile-hide on the dense layout keeps both legible.
     hideOnMobile: showFilteredPlays,
     cell: (song) =>
       song.timesPlayed > 0 ? (
-        <span className="text-content-text-primary font-semibold">{song.timesPlayed}</span>
+        <NumberCell width="3ch" className="text-content-text-primary font-semibold">
+          {song.timesPlayed}
+        </NumberCell>
       ) : (
         <span className="text-content-text-tertiary text-sm italic">Never performed</span>
       ),
   });
 
-  const filteredPlaysColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredPlaysColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "filteredTimesPlayed",
+    fixedWidth: "4rem",
+    // Mobile dense view fits 4 numeric filter cols + 2 date filter cols
+    // alongside Song. 2.5rem matches the other numeric filter cols so the
+    // row reads as a consistent block, and filtered counts top out at ~36.
+    mobileFixedWidth: "2.5rem",
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Plays</span>
       </HeaderLabel>
     ),
     title: "Filtered Plays",
-    width: "5%",
     cell: (song) => {
       const plays = song.filteredTimesPlayed ?? 0;
       return plays > 0 ? (
-        <span className="text-content-text-primary font-medium">{plays}</span>
+        <NumberCell width="3ch" className="text-content-text-primary font-medium">
+          {plays}
+        </NumberCell>
       ) : (
         <span className="text-content-text-tertiary text-sm">—</span>
       );
@@ -263,8 +307,10 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
   // at the same precision.
   const sinceDebutFormatter = showFilteredPlays ? wholePercentFormatter : percentFormatter;
 
-  const percentSinceDebutColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const percentSinceDebutColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "percentSinceDebut",
+    fixedWidth: "4rem",
     label: (
       <HeaderLabel reserveIconRow={showFilteredPlays}>
         <span>Since</span>
@@ -272,19 +318,24 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       </HeaderLabel>
     ),
     title: "% Since Debut",
-    width: showFilteredPlays ? "7%" : "6%",
     hideOnMobile: true,
     cell: (song) =>
       dashOrSpan(
         song.percentSinceDebut !== null ? (
-          <span className="whitespace-nowrap">{sinceDebutFormatter.format(song.percentSinceDebut)}</span>
+          <NumberCell width="6ch">{sinceDebutFormatter.format(song.percentSinceDebut)}</NumberCell>
         ) : null,
       ),
     sortingFn: nullsLastNumericSort("percentSinceDebut"),
   });
 
-  const filteredPercentSinceDebutColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredPercentSinceDebutColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "filteredPercentSinceDebut",
+    fixedWidth: "4rem",
+    // Hidden on mobile: the dense layout already crams Plays + Avg Gap
+    // + Gap to End + 2 date cols next to Song; this is the first filter
+    // col to drop because it's a derivable summary (plays / total shows).
+    hideOnMobile: true,
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Since</span>
@@ -292,33 +343,38 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       </HeaderLabel>
     ),
     title: "Filtered Since First",
-    width: "7%",
-    hideOnMobile: true,
     cell: (song) =>
       dashOrSpan(
         song.filteredPercentSinceDebut != null ? (
-          <span className="whitespace-nowrap">{sinceDebutFormatter.format(song.filteredPercentSinceDebut)}</span>
+          <NumberCell width="5ch">{sinceDebutFormatter.format(song.filteredPercentSinceDebut)}</NumberCell>
         ) : null,
       ),
     sortingFn: nullsLastNumericSort("filteredPercentSinceDebut"),
   });
 
-  const avgGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
-    accessorKey: "averageShowsPerPlay",
+  const avgGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
+    accessorKey: "averageGapShows",
+    fixedWidth: "4rem",
     label: (
       <HeaderLabel reserveIconRow={showFilteredPlays}>
         <span>Avg</span>
         <span>Gap</span>
       </HeaderLabel>
     ),
-    width: "7%",
     hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.averageShowsPerPlay !== null ? song.averageShowsPerPlay.toFixed(1) : null),
-    sortingFn: nullsLastNumericSort("averageShowsPerPlay"),
+    cell: (song) =>
+      dashOrSpan(
+        song.averageGapShows !== null ? <NumberCell width="4ch">{song.averageGapShows.toFixed(1)}</NumberCell> : null,
+      ),
+    sortingFn: nullsLastNumericSort("averageGapShows"),
   });
 
-  const filteredAvgGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
-    accessorKey: "filteredAverageShowsPerPlay",
+  const filteredAvgGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
+    accessorKey: "filteredAverageGapShows",
+    fixedWidth: "4rem",
+    mobileFixedWidth: "2.5rem",
     label: (
       <HeaderLabel filtered reserveIconRow>
         <span>Avg</span>
@@ -326,105 +382,117 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
       </HeaderLabel>
     ),
     title: "Filtered Avg Gap",
-    width: "7%",
-    hideOnMobile: true,
     cell: (song) =>
-      dashOrSpan(song.filteredAverageShowsPerPlay != null ? song.filteredAverageShowsPerPlay.toFixed(1) : null),
-    sortingFn: nullsLastNumericSort("filteredAverageShowsPerPlay"),
+      dashOrSpan(
+        song.filteredAverageGapShows != null ? (
+          <NumberCell width="4ch">{song.filteredAverageGapShows.toFixed(1)}</NumberCell>
+        ) : null,
+      ),
+    sortingFn: nullsLastNumericSort("filteredAverageGapShows"),
   });
 
-  const currentGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const currentGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "showsSinceLastPlayed",
-    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap</HeaderLabel>,
-    title: "Current Gap",
-    width: "7%",
+    fixedWidth: "4rem",
+    // Spelled out vs. plain "Gap" so users can't confuse it with "Avg Gap"
+    // on a quick scan. "to Now" anchors that this is the count up to today
+    // (the filtered variant uses "to End" because its denominator stops
+    // at the filter boundary).
+    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap to Now</HeaderLabel>,
+    title: "Gap to Now",
     hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.showsSinceLastPlayed),
+    cell: (song) =>
+      dashOrSpan(
+        song.showsSinceLastPlayed != null ? <NumberCell width="4ch">{song.showsSinceLastPlayed}</NumberCell> : null,
+      ),
     sortingFn: nullsLastNumericSort("showsSinceLastPlayed"),
   });
 
-  const filteredCurrentGapColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredCurrentGapColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "filteredShowsSinceLastPlayed",
+    fixedWidth: "4rem",
+    mobileFixedWidth: "2.5rem",
     label: (
       <HeaderLabel filtered reserveIconRow>
-        <span>Gap</span>
+        <span>Gap to End</span>
       </HeaderLabel>
     ),
-    title: "Filtered Current Gap",
-    width: "7%",
-    hideOnMobile: true,
-    cell: (song) => dashOrSpan(song.filteredShowsSinceLastPlayed ?? null),
+    title: "Filtered Gap to End",
+    cell: (song) =>
+      dashOrSpan(
+        song.filteredShowsSinceLastPlayed != null ? (
+          <NumberCell width="3ch">{song.filteredShowsSinceLastPlayed}</NumberCell>
+        ) : null,
+      ),
     sortingFn: nullsLastNumericSort("filteredShowsSinceLastPlayed"),
   });
 
-  // When filtered columns are active the row is wider; drop the venue
-  // sublabel and shrink the date columns to make room.
-  const dateColumnWidth = showFilteredPlays ? "8%" : "22%";
+  // Date columns flex — they share leftover space with the Song column.
+  // On the sparse view (2 date cols, no filtered siblings) the dates
+  // yield extra width to Song so the title column reads cleanly; on the
+  // dense filtered view they're already squeezed by their 4-up layout
+  // so the weight stays higher to keep each date legible.
+  const dateColumnWeight = showFilteredPlays ? 1.4 : 1.0;
 
-  const lastPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  // All-time date columns only render on mobile in the sparse view (no
+  // filters). 4.5rem comfortably fits the compact "M/D/YY" form ShowDate
+  // produces below its 6rem container-query threshold.
+  const allTimeDateMobileWidth = "4.5rem";
+
+  // Filtered date columns share mobile space with Song + 4 numeric filter
+  // cols, so they tighten to 4rem. Still above the compact-form CQ
+  // threshold; M/D/YY (max 8 chars) fits with text-xs and cell padding.
+  const filteredDateMobileWidth = "4rem";
+
+  const lastPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateLastPlayed",
+    weight: dateColumnWeight,
+    mobileFixedWidth: allTimeDateMobileWidth,
+    // Hidden on mobile in dense view so the filtered date pair has room.
+    hideOnMobile: showFilteredPlays,
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Last Played</HeaderLabel>,
-    width: dateColumnWidth,
-    cell: (song) => (
-      <DateVenueCell
-        date={song.dateLastPlayed}
-        show={song.lastPlayedShow}
-        hideVenue={showFilteredPlays}
-        compact={showFilteredPlays}
-      />
-    ),
+    cell: (song) => <DateVenueCell date={song.dateLastPlayed} show={song.lastPlayedShow} />,
   });
 
-  const filteredLastPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredLastPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateLastFilteredPlayed",
+    weight: dateColumnWeight,
+    mobileFixedWidth: filteredDateMobileWidth,
     label: (
       <HeaderLabel filtered reserveIconRow>
         Last
       </HeaderLabel>
     ),
     title: "Filtered Last Played",
-    width: dateColumnWidth,
-    cell: (song) => (
-      <DateVenueCell
-        date={song.dateLastFilteredPlayed ?? null}
-        show={song.lastFilteredPlayedShow}
-        hideVenue
-        compact
-      />
-    ),
+    cell: (song) => <DateVenueCell date={song.dateLastFilteredPlayed ?? null} show={song.lastFilteredPlayedShow} />,
   });
 
-  const firstPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const firstPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateFirstPlayed",
+    weight: dateColumnWeight,
+    mobileFixedWidth: allTimeDateMobileWidth,
+    hideOnMobile: showFilteredPlays,
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>First Played</HeaderLabel>,
-    width: dateColumnWidth,
-    cell: (song) => (
-      <DateVenueCell
-        date={song.dateFirstPlayed}
-        show={song.firstPlayedShow}
-        hideVenue={showFilteredPlays}
-        compact={showFilteredPlays}
-      />
-    ),
+    cell: (song) => <DateVenueCell date={song.dateFirstPlayed} show={song.firstPlayedShow} />,
   });
 
-  const filteredFirstPlayedColumn = makeSortableColumn({ reservesIconRow: showFilteredPlays,
+  const filteredFirstPlayedColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
     accessorKey: "dateFirstFilteredPlayed",
+    weight: dateColumnWeight,
+    mobileFixedWidth: filteredDateMobileWidth,
     label: (
       <HeaderLabel filtered reserveIconRow>
         First
       </HeaderLabel>
     ),
     title: "Filtered First Played",
-    width: dateColumnWidth,
-    cell: (song) => (
-      <DateVenueCell
-        date={song.dateFirstFilteredPlayed ?? null}
-        show={song.firstFilteredPlayedShow}
-        hideVenue
-        compact
-      />
-    ),
+    cell: (song) => <DateVenueCell date={song.dateFirstFilteredPlayed ?? null} show={song.firstFilteredPlayedShow} />,
   });
 
   const columns: ColumnDef<SongWithShows>[] = [titleColumn, playsColumn];

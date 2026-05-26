@@ -16,11 +16,12 @@ vi.mock("./setlist-card", () => ({
 }));
 
 // Mock useShowUserData — SetlistList owns this call. Tests drive the return
-// value to simulate the batched API response and assert on the options the
-// wrapper passes through (notably initialData for SSR cache seeding).
+// value to simulate the batched API response and assert on the arguments the
+// wrapper passes through (just the show id list now; SSR seeding is handled
+// by the root HydrationBoundary, not a per-call initialData option).
 const useShowUserDataMock = vi.fn();
 vi.mock("~/hooks/use-show-user-data", () => ({
-  useShowUserData: (showIds: string[], options?: object) => useShowUserDataMock(showIds, options),
+  useShowUserData: (showIds: string[]) => useShowUserDataMock(showIds),
 }));
 
 import { SetlistList } from "./setlist-list";
@@ -84,6 +85,7 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
     annotations: [],
     averageSongGap: null,
     medianSongGap: null,
+    debutCount: 0,
   };
 }
 
@@ -203,27 +205,6 @@ describe("SetlistList", () => {
     expect(useShowUserDataMock).toHaveBeenCalled();
     const passed = useShowUserDataMock.mock.calls[0][0] as string[];
     expect(passed).toEqual(["show-a", "show-b", "show-c"]);
-  });
-
-  // When a loader pre-fetched show user data, SetlistList forwards it to the
-  // hook as initialData so React Query seeds the cache and cards render
-  // attendance / rating badges on first paint (no hydration flicker).
-  test("forwards initialUserData to the hook as initialData", async () => {
-    setMockReturn();
-    const initialUserData = {
-      attendances: { "show-1": null },
-      userRatings: { "show-1": null },
-      averageRatings: { "show-1": { average: 4.2, count: 3 } },
-    };
-    await setupWithRouter(
-      <SetlistList
-        setlists={[makeSetlist("show-1", "Basis for a Day")]}
-        externalSources={{}}
-        initialUserData={initialUserData}
-      />,
-    );
-
-    expect(useShowUserDataMock).toHaveBeenCalledWith(["show-1"], { initialData: initialUserData });
   });
 
   // Empty list with no `empty` prop: render nothing, no cards, no stray DOM.

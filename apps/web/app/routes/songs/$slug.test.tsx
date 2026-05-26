@@ -4,6 +4,20 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+// Mock `useNavigate` + `useParams` to drive the URL-syncing tab logic
+// without needing a Routes definition. Other react-router exports
+// (MemoryRouter, Link, etc.) keep their real implementations.
+const mockNavigate = vi.fn();
+const mockParams: { slug?: string; tab?: string } = { slug: "basis-for-a-day" };
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+    useParams: () => mockParams,
+  };
+});
+
 // Mock server-side modules
 vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
@@ -91,6 +105,51 @@ function renderSongPage() {
 describe("SongPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset URL params to the default (no :tab) between tests so each
+    // test starts on the "All Performances" tab.
+    mockParams.slug = "basis-for-a-day";
+    mockParams.tab = undefined;
+  });
+
+  // The :tab URL segment is the source of truth for the active tab —
+  // back/forward and shareable links should land on the right pane.
+  test("activates the tab specified by the URL :tab segment", () => {
+    mockParams.tab = "stats";
+    renderSongPage();
+
+    const statsTab = screen.getByRole("tab", { name: /graphs/i });
+    expect(statsTab).toHaveAttribute("data-state", "active");
+  });
+
+  // A typo'd or unknown :tab segment falls back to "All Performances"
+  // instead of rendering nothing — guards against broken inbound links.
+  test("falls back to the All Performances tab when :tab is unknown", () => {
+    mockParams.tab = "definitely-not-a-tab";
+    renderSongPage();
+
+    const performancesTab = screen.getByRole("tab", { name: /all performances/i });
+    expect(performancesTab).toHaveAttribute("data-state", "active");
+  });
+
+  // Clicking a non-default tab navigates to the nested URL so the new
+  // URL can be bookmarked / shared / used by the back button.
+  test("clicking a tab navigates to /songs/:slug/:tab", async () => {
+    const user = userEvent.setup();
+    renderSongPage();
+
+    await user.click(screen.getByRole("tab", { name: /graphs/i }));
+    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day/stats");
+  });
+
+  // The default ("performances") tab navigates back to the bare song
+  // URL so there's no redundant `/performances` suffix in the URL.
+  test("clicking the All Performances tab navigates to bare /songs/:slug", async () => {
+    mockParams.tab = "stats";
+    const user = userEvent.setup();
+    renderSongPage();
+
+    await user.click(screen.getByRole("tab", { name: /all performances/i }));
+    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day");
   });
 
   // The All-Timers tab visibility should be based on the unfiltered data,
@@ -164,18 +223,21 @@ describe("SongPage", () => {
 
   // The TabsList on song-detail clips at narrow widths because there can be
   // up to 6 tabs (All Performances, All-Timers, Stats, History, Lyrics,
-  // Guitar Tabs). Mobile gets a single <select> dropdown instead while sm+
-  // continues to use the horizontal tab strip.
-  test("song tabs render as a select on mobile (sm:hidden) and tab strip on sm+", () => {
+  // Guitar Tabs). Mobile gets a Radix Select instead — a native <select> was
+  // used before, but its OS-styling didn't look like a dropdown to users, so
+  // they didn't realize it was tappable. The Radix trigger renders as a
+  // styled button (role="combobox") with a visible chevron.
+  test("song tabs render as a Radix Select on mobile (sm:hidden) and tab strip on sm+", () => {
     renderSongPage();
 
     const tabList = screen.getByRole("tablist");
     expect(tabList.className).toContain("hidden");
     expect(tabList.className).toContain("sm:flex");
 
-    const select = screen.getByLabelText(/song view/i);
-    const wrapper = select.closest("div");
-    expect(wrapper?.className).toContain("sm:hidden");
+    const trigger = screen.getByRole("combobox", { name: /song view/i });
+    expect(trigger.textContent).toMatch(/All Performances/);
+    const wrapper = screen.getByTestId("mobile-song-view");
+    expect(wrapper.className).toContain("sm:hidden");
   });
 
   // The "last show" sublabel marks the song as having been played at the
@@ -275,11 +337,10 @@ describe("SongPage", () => {
     expect(screen.queryByText(/last show/i)).not.toBeInTheDocument();
   });
 
-  // The play-frequency stat card surfaces `averageShowsPerPlay` (shows
-  // since debut / timesPlayed). Labeled "Average Gap" to share terminology
-  // with the same-named column on /songs. Value is the bare number —
-  // the surrounding label carries the unit.
-  test("Average Gap StatBox renders label 'Average Gap' and the bare numeric value", () => {
+  // The gap stat card surfaces both `averageGapShows` and `medianGapShows`
+  // (mean and median of closed gaps from `tracks.gap`). One combined box
+  // labeled "Avg / Median Gap" with the value rendered as "AVG / MEDIAN".
+  test("Avg / Median Gap StatBox renders both values to one decimal", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
       song: {
         title: "Basis for a Day",
@@ -287,7 +348,8 @@ describe("SongPage", () => {
         timesPlayed: 200,
         dateFirstPlayed: "1995-06-01",
         dateLastPlayed: "2024-01-01",
-        averageShowsPerPlay: 5.7,
+        averageGapShows: 5.7,
+        medianGapShows: 4,
         showsSinceLastPlayed: 12,
         history: null,
         lyrics: null,
@@ -301,16 +363,15 @@ describe("SongPage", () => {
     });
     renderSongPage();
 
-    expect(screen.getByText("Average Gap")).toBeInTheDocument();
-    expect(screen.getByText("5.7")).toBeInTheDocument();
-    // The previous label and the trailing "shows" suffix are gone.
-    expect(screen.queryByText(/Song Performed Every/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^shows$/)).not.toBeInTheDocument();
+    expect(screen.getByText("Avg / Median Gap")).toBeInTheDocument();
+    expect(screen.getByText("5.7 / 4.0")).toBeInTheDocument();
   });
 
-  // Null `averageShowsPerPlay` (never-played or no-debut songs) renders
-  // the standard em-dash placeholder, mirroring the other stat cards.
-  test("Average Gap StatBox renders em-dash when averageShowsPerPlay is null", () => {
+  // Songs with no closed gaps (never played, or played only once — debuts
+  // have no `tracks.gap`) get null for both avg and median. The box still
+  // renders, with a single em-dash for the whole value rather than a
+  // confusing "— / —" pair.
+  test("Avg / Median Gap StatBox renders em-dash when both are null", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
       song: {
         title: "Munchkin Invasion",
@@ -318,7 +379,8 @@ describe("SongPage", () => {
         timesPlayed: 0,
         dateFirstPlayed: null,
         dateLastPlayed: null,
-        averageShowsPerPlay: null,
+        averageGapShows: null,
+        medianGapShows: null,
         showsSinceLastPlayed: null,
         history: null,
         lyrics: null,
@@ -332,8 +394,7 @@ describe("SongPage", () => {
     });
     renderSongPage();
 
-    expect(screen.getByText("Average Gap")).toBeInTheDocument();
-    // The Average Gap card should have an em-dash; other null cards may too.
+    expect(screen.getByText("Avg / Median Gap")).toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
