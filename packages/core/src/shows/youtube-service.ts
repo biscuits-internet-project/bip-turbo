@@ -1,4 +1,4 @@
-import type { CacheInvalidationService } from "../_shared/cache";
+import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cache";
 import type { DbClient } from "../_shared/database/models";
 
 function videoUrl(videoId: string): string {
@@ -114,10 +114,11 @@ export class YoutubeService {
     if (!this.cacheInvalidation) return;
     const show = await this.db.show.findUnique({
       where: { id: showId },
-      select: { slug: true },
+      select: { slug: true, date: true },
     });
     if (show?.slug) {
-      await this.cacheInvalidation.invalidateShowComprehensive(showId, show.slug);
+      const year = yearFromShowDate(show.date);
+      await this.cacheInvalidation.invalidateShowComprehensive(showId, show.slug, [year]);
     }
   }
 }

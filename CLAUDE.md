@@ -47,6 +47,8 @@ cd apps/web && bun run test:watch    # Watch mode
 
 Test files are colocated with source: `*.test.{ts,tsx}`. Shared test helpers live in `apps/web/test/test-utils.tsx` (import via `@test/*` alias, e.g. `import { setup } from "@test/test-utils"`).
 
+**Skip tests the typechecker covers.** Don't test helper signatures, argument counts, or type-enforced shapes. Add only wiring assertions where the typechecker can't verify a value gets pulled from the right source (e.g. the right field threads through a call chain).
+
 **Git Hooks:**
 Custom hooks live in `.githooks/`. Enable them once per clone:
 ```bash

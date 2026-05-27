@@ -1,5 +1,5 @@
 import type { Annotation, Logger, Track } from "@bip/domain";
-import type { CacheInvalidationService } from "../_shared/cache";
+import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cache";
 import type { DbAnnotation, DbClient, DbSong, DbTrack } from "../_shared/database/models";
 import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
@@ -52,14 +52,16 @@ export class TrackService {
   private async invalidateShowCaches(showId: string): Promise<void> {
     if (!this.cacheInvalidation) return;
 
-    // Get show slug for invalidation
+    // slug keys the per-show Redis entries; date keys the Cloudflare
+    // `year-YYYY` listing tag.
     const show = await this.db.show.findUnique({
       where: { id: showId },
-      select: { slug: true },
+      select: { slug: true, date: true },
     });
 
     if (show?.slug) {
-      await this.cacheInvalidation.invalidateShowComprehensive(showId, show.slug);
+      const year = yearFromShowDate(show.date);
+      await this.cacheInvalidation.invalidateShowComprehensive(showId, show.slug, [year]);
     }
   }
 

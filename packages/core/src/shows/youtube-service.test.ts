@@ -126,7 +126,7 @@ describe("YoutubeService.createForShow", () => {
   test("persists the row, increments showYoutubesCount, and invalidates show caches", async () => {
     const db = makeMockDb();
     db.showYoutube.create.mockResolvedValue({ id: "row-new", videoId: "dQw4w9WgXcQ" });
-    db.show.findUnique.mockResolvedValue({ slug: "2001-09-01-wetlands" });
+    db.show.findUnique.mockResolvedValue({ slug: "2001-09-01-wetlands", date: "2001-09-01" });
     const cache = makeMockCacheInvalidation();
     const service = new YoutubeService(db as never, cache as never);
 
@@ -140,7 +140,7 @@ describe("YoutubeService.createForShow", () => {
       where: { id: "show-1" },
       data: { showYoutubesCount: { increment: 1 } },
     });
-    expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-1", "2001-09-01-wetlands");
+    expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-1", "2001-09-01-wetlands", [2001]);
     expect(result).toEqual({
       id: "row-new",
       videoId: "dQw4w9WgXcQ",
@@ -186,7 +186,7 @@ describe("YoutubeService.deleteEntry", () => {
   test("looks up the show, deletes the row, decrements count, invalidates caches", async () => {
     const db = makeMockDb();
     db.showYoutube.findUnique.mockResolvedValue({ showId: "show-1" });
-    db.show.findUnique.mockResolvedValue({ slug: "2001-09-01-wetlands" });
+    db.show.findUnique.mockResolvedValue({ slug: "2001-09-01-wetlands", date: "2001-09-01" });
     const cache = makeMockCacheInvalidation();
     const service = new YoutubeService(db as never, cache as never);
 
@@ -201,7 +201,7 @@ describe("YoutubeService.deleteEntry", () => {
       where: { id: "show-1" },
       data: { showYoutubesCount: { decrement: 1 } },
     });
-    expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-1", "2001-09-01-wetlands");
+    expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-1", "2001-09-01-wetlands", [2001]);
   });
 
   // Deleting a row that no longer exists is a no-op — no delete, no count

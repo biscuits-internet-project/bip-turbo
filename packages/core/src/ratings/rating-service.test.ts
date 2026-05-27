@@ -414,7 +414,7 @@ describe("RatingService.clearForUser", () => {
       showSlug: "2024-08-12-cap-theatre",
     });
 
-    expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre");
+    expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
   });
 
   // Track-type clears must invalidate the show's setlist cache. The cached
@@ -486,5 +486,45 @@ describe("RatingService.upsert", () => {
     });
 
     expect(invalidateShow).toHaveBeenCalledWith("2024-08-12-cap-theatre");
+  });
+
+  // Show ratings go through invalidateShowComprehensive — the year is parsed
+  // from the slug's leading `YYYY-MM-DD-` so the past-year edge entry on
+  // `/shows/year/YYYY` gets purged. Without the right year, a 2018 rating
+  // would clear Redis but leave the 24h-cached year listing stale.
+  test("passes the slug's year to invalidateShowComprehensive on a Show rating", async () => {
+    const invalidateShowComprehensive = vi.fn();
+    const now = new Date("2018-07-12T00:00:00Z");
+    const db = {
+      rating: {
+        upsert: vi.fn().mockResolvedValue({
+          id: "r1",
+          userId: "u1",
+          rateableId: "show-1",
+          rateableType: "Show",
+          value: 5,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 5.0 }, _count: { id: 1 } }),
+      },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, {
+      invalidateAttendanceCaches: vi.fn(),
+      invalidateShow: vi.fn(),
+      invalidateShowComprehensive,
+    } as never);
+    await service.upsert({
+      rateableId: "show-1",
+      rateableType: "Show",
+      userId: "u1",
+      value: 5,
+      showSlug: "2018-07-12-red-rocks",
+    });
+
+    expect(invalidateShowComprehensive).toHaveBeenCalledWith(undefined, "2018-07-12-red-rocks", [2018]);
   });
 });

@@ -391,6 +391,113 @@ describe("ShowService.update — rock opera assignments", () => {
   });
 });
 
+describe("ShowService — Cloudflare year-tag wiring", () => {
+  // create() lacks a "current year" to fall back on, so the new show's date
+  // is the only source of the year tag. Admin-creating a past-year show
+  // (e.g. a missing late-90s show) must purge that year's listing tag, not
+  // the current calendar year.
+  test("create() passes the new show's year to invalidateShowListings", async () => {
+    const db = makeMockDb();
+    const cacheStub = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cacheStub, makeStatsStub());
+
+    await service.create({ date: "1999-12-31" });
+
+    expect(cacheStub.invalidateShowListings).toHaveBeenCalledWith([1999]);
+  });
+
+  // delete() reads the show's date before removing the row (also used by
+  // the stats rebuild). The Cloudflare purge for the deleted show's year
+  // must use that captured date, not the current year — otherwise
+  // /shows/year/2018 keeps showing the deleted row at the edge.
+  test("delete() passes the deleted show's year to invalidateShowComprehensive", async () => {
+    const db = makeMockDb();
+    db.show.findUnique.mockResolvedValueOnce({ slug: "2018-07-12-red-rocks", date: "2018-07-12" });
+    const cacheStub = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cacheStub, makeStatsStub());
+
+    await service.delete("show-id");
+
+    expect(cacheStub.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "2018-07-12-red-rocks", [2018]);
+  });
+
+  // The show's actual year (not the current calendar year) must reach
+  // invalidateShowComprehensive so the `year-YYYY` Cloudflare tag for
+  // `/shows/year/YYYY` gets purged. Without this wiring, a past-year edit
+  // would clear Redis but leave the edge entry stale until s-maxage
+  // (24h for past years).
+  test("update() without a date change passes the show's year to invalidateShowComprehensive", async () => {
+    const db = makeMockDb();
+    db.show.findUnique.mockResolvedValueOnce({ id: "show-id", date: "2018-07-12", venueId: "venue-1" });
+    db.show.update.mockResolvedValue({
+      id: "show-id",
+      slug: "2018-07-12-red-rocks",
+      date: "2018-07-12",
+      venueId: "venue-1",
+      bandId: null,
+      notes: "edited",
+      relistenUrl: null,
+      countForStats: true,
+      dayOrder: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      likesCount: 0,
+      averageRating: 0,
+      ratingsCount: 0,
+      showPhotosCount: 0,
+      showYoutubesCount: 0,
+      reviewsCount: 0,
+    });
+    const cacheStub = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cacheStub, makeStatsStub());
+
+    await service.update("2018-07-12-red-rocks", { date: "", notes: "edited" });
+
+    expect(cacheStub.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "2018-07-12-red-rocks", [2018]);
+  });
+
+  // A date-move across calendar years (2018 -> 2019) has to purge BOTH year
+  // tags: the old year so its listing evicts the now-misplaced row, the new
+  // year so its listing picks up the row. The slug also changes in this
+  // case so the call path goes through invalidateShowListings, not
+  // invalidateShowComprehensive.
+  test("update() with cross-year date move passes both old and new years", async () => {
+    const db = makeMockDb();
+    db.show.findUnique
+      .mockResolvedValueOnce({ id: "show-id", date: "2018-07-12", venueId: "venue-1" })
+      // generateShowSlug looks for slug collisions
+      .mockResolvedValueOnce(null);
+    db.show.update.mockResolvedValue({
+      id: "show-id",
+      slug: "2019-07-12-red-rocks",
+      date: "2019-07-12",
+      venueId: "venue-1",
+      bandId: null,
+      notes: null,
+      relistenUrl: null,
+      countForStats: true,
+      dayOrder: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      likesCount: 0,
+      averageRating: 0,
+      ratingsCount: 0,
+      showPhotosCount: 0,
+      showYoutubesCount: 0,
+      reviewsCount: 0,
+    });
+    db.venue.findUnique.mockResolvedValue({ name: "Red Rocks", city: "Morrison", state: "CO" });
+    const cacheStub = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cacheStub, makeStatsStub());
+
+    await service.update("2018-07-12-red-rocks", { date: "2019-07-12" });
+
+    const listingsCall = (cacheStub.invalidateShowListings as Mock).mock.calls[0][0] as number[];
+    expect(listingsCall).toEqual(expect.arrayContaining([2018, 2019]));
+    expect(listingsCall).toHaveLength(2);
+  });
+});
+
 describe("ShowService — gap rebuild on mutation", () => {
   // Adding a new show changes the universe of count_for_stats=true shows,
   // which ripples to gap chains for songs whose performances span the new

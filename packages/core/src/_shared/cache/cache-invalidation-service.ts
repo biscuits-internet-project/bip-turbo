@@ -2,6 +2,24 @@ import { CacheKeys, type Logger } from "@bip/domain";
 import type { CacheService } from "./cache-service";
 import type { CloudflareCacheService } from "./cloudflare-cache-service";
 
+/**
+ * Extract the year from a show slug. Show slugs start with `YYYY-MM-DD-`.
+ * Returns null when the leading four characters don't parse as a year.
+ */
+export function yearFromShowSlug(slug: string): number | null {
+  const year = Number.parseInt(slug.slice(0, 4), 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+/**
+ * Extract the year from a Show.date. The Prisma column is `String` in the
+ * `YYYY-MM-DD` format, but accept Date for callers that hold one in memory.
+ */
+export function yearFromShowDate(date: string | Date): number {
+  if (typeof date === "string") return Number.parseInt(date.slice(0, 4), 10);
+  return date.getUTCFullYear();
+}
+
 export class CacheInvalidationService {
   constructor(
     private readonly cache: CacheService,
@@ -43,10 +61,16 @@ export class CacheInvalidationService {
   }
 
   /**
-   * Invalidate all show listing caches (for when show metadata changes)
+   * Invalidate all show listing caches (for when show metadata changes).
+   *
+   * `years` lists the calendar years whose `/shows/year/:year` Cloudflare
+   * edge entries need purging — typically the year(s) of the mutated show.
+   * Pass an empty array when no year tag is affected; the Redis layer is
+   * purged unconditionally.
    */
-  async invalidateShowListings(): Promise<void> {
-    this.logger.info("Invalidating all show listing caches and home page");
+  async invalidateShowListings(years: number[]): Promise<void> {
+    this.logger.info("Invalidating all show listing caches and home page", { years });
+    const dedupedYears = Array.from(new Set(years.filter(Number.isFinite)));
     await Promise.all([
       this.cache.delPattern(CacheKeys.shows.allLists()),
       this.cache.delPattern("home:*"), // Invalidate all home page caches
@@ -68,7 +92,7 @@ export class CacheInvalidationService {
       // changes, neighbors' annotations (rank/prev/next) shift — wipe
       // every show.data so the next request rebuilds with fresh data.
       this.cache.delPattern(CacheKeys.show.allData()),
-      this.cloudflareCache?.purgeYearListings(),
+      dedupedYears.length > 0 ? this.cloudflareCache?.purgeYearListings(dedupedYears) : Promise.resolve(),
     ]);
   }
 
@@ -90,15 +114,23 @@ export class CacheInvalidationService {
   }
 
   /**
-   * Comprehensive show invalidation - clears all caches related to a show
+   * Comprehensive show invalidation - clears all caches related to a show.
+   *
+   * `years` lists the calendar year(s) whose listing edge entries must be
+   * purged — both old and new on a date move so each year's edge entry
+   * gets evicted.
    */
-  async invalidateShowComprehensive(showId?: string, slug?: string): Promise<void> {
-    this.logger.info(`Comprehensive invalidation for show: ${showId}, slug: ${slug}`);
+  async invalidateShowComprehensive(
+    showId: string | undefined,
+    slug: string | undefined,
+    years: number[],
+  ): Promise<void> {
+    this.logger.info(`Comprehensive invalidation for show: ${showId}, slug: ${slug}`, { years });
 
     await Promise.all([
       slug ? this.invalidateShow(slug) : Promise.resolve(),
       showId ? this.invalidateShowReviews(showId) : Promise.resolve(),
-      this.invalidateShowListings(),
+      this.invalidateShowListings(years),
       this.invalidateSongCaches(),
     ]);
   }
@@ -139,13 +171,27 @@ export class CacheInvalidationService {
   }
 
   /**
-   * Bulk invalidation for multiple shows (useful for admin operations)
+   * Bulk invalidation for multiple shows (useful for admin operations).
+   *
+   * Each show carries a `date` (preferred — Show.date is `YYYY-MM-DD`) or
+   * a `slug` that starts with the date; both feed the Cloudflare year-tag
+   * purge so every affected year's listing is evicted.
    */
-  async invalidateShows(shows: Array<{ id: string; slug?: string }>): Promise<void> {
+  async invalidateShows(shows: Array<{ id: string; slug?: string; date?: string | Date }>): Promise<void> {
     this.logger.info(`Bulk invalidating ${shows.length} shows`);
+
+    const years: number[] = [];
+    for (const show of shows) {
+      if (show.date !== undefined) {
+        years.push(yearFromShowDate(show.date));
+      } else if (show.slug) {
+        const year = yearFromShowSlug(show.slug);
+        if (year !== null) years.push(year);
+      }
+    }
 
     const invalidations = shows.map((show) => this.invalidateShowByShowId(show.id, show.slug));
 
-    await Promise.all([...invalidations, this.invalidateShowListings()]);
+    await Promise.all([...invalidations, this.invalidateShowListings(years)]);
   }
 }

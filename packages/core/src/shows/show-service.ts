@@ -1,6 +1,6 @@
 import type { Logger, Show, Venue } from "@bip/domain";
 import { Prisma } from "@prisma/client";
-import type { CacheInvalidationService } from "../_shared/cache";
+import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cache";
 import type { DbClient, DbShow, DbVenue } from "../_shared/database/models";
 import { buildIncludeClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -359,7 +359,7 @@ export class ShowService {
     const show = mapShowToDomainEntity(result);
 
     // Invalidate show listing caches (new show affects listings)
-    await this.cacheInvalidation.invalidateShowListings();
+    await this.cacheInvalidation.invalidateShowListings([yearFromShowDate(createInput.date)]);
 
     // Adding a count_for_stats=true show changes the "shows between"
     // denominator for songs whose chains span this date — rebuild gaps
@@ -412,15 +412,23 @@ export class ShowService {
 
     const show = mapShowToDomainEntity(result);
 
+    // Year-tag purges cover both the old date (so its listing evicts) and
+    // the new date (so its listing picks the row up). `||` not `??` so an
+    // empty-string date falls through to currentShow.date, matching the
+    // slug-regen guard above.
+    const affectedYears = Array.from(
+      new Set([yearFromShowDate(currentShow.date), yearFromShowDate(data.date || currentShow.date)]),
+    );
+
     if (newSlug && newSlug !== slug) {
       // Slug changed - invalidate both old and new
       await Promise.all([
         this.cacheInvalidation.invalidateShow(slug), // old slug
         this.cacheInvalidation.invalidateShow(newSlug), // new slug
-        this.cacheInvalidation.invalidateShowListings(),
+        this.cacheInvalidation.invalidateShowListings(affectedYears),
       ]);
     } else {
-      await this.cacheInvalidation.invalidateShowComprehensive(currentShow.id, slug);
+      await this.cacheInvalidation.invalidateShowComprehensive(currentShow.id, slug, affectedYears);
     }
 
     if (data.rockOperaIds !== undefined) {
@@ -525,7 +533,7 @@ export class ShowService {
       ),
     );
 
-    await this.cacheInvalidation.invalidateShowListings();
+    await this.cacheInvalidation.invalidateShowListings([yearFromShowDate(date)]);
   }
 
   async delete(id: string): Promise<boolean> {
@@ -542,7 +550,8 @@ export class ShowService {
       });
 
       if (show?.slug) {
-        await this.cacheInvalidation.invalidateShowComprehensive(id, show.slug);
+        const years = show.date ? [yearFromShowDate(show.date)] : [];
+        await this.cacheInvalidation.invalidateShowComprehensive(id, show.slug, years);
       }
 
       // Removing a stats-show shrinks the "shows between" denominator for
