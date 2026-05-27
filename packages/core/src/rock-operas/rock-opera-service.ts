@@ -1,7 +1,13 @@
-import type { AdjacentRockOperaPerformance, Logger, RockOpera, RockOperaPerformanceAnnotation } from "@bip/domain";
+import {
+  type AdjacentRockOperaPerformance,
+  countSortedBetween,
+  type Logger,
+  type RockOpera,
+  type RockOperaPerformanceAnnotation,
+} from "@bip/domain";
 import type { DbClient } from "../_shared/database/models";
 import { SHOW_ORDER_ASC } from "../_shared/show-ordering";
-import { countShowsBetween, type StatsService } from "../stats/stats-service";
+import type { StatsService } from "../stats/stats-service";
 
 type DbRockOpera = {
   id: string;
@@ -101,10 +107,10 @@ export class RockOperaService {
       const next = index < operaShows.length - 1 ? operaShows[index + 1] : null;
 
       const previousPerformance: AdjacentRockOperaPerformance | null = prev
-        ? { date: prev.date, slug: prev.slug, gap: countShowsBetween(statsShowDates, prev.date, current.date) }
+        ? { date: prev.date, slug: prev.slug, gap: countSortedBetween(statsShowDates, prev.date, current.date) }
         : null;
       const nextPerformance: AdjacentRockOperaPerformance | null = next
-        ? { date: next.date, slug: next.slug, gap: countShowsBetween(statsShowDates, current.date, next.date) }
+        ? { date: next.date, slug: next.slug, gap: countSortedBetween(statsShowDates, current.date, next.date) }
         : null;
 
       const annotation: RockOperaPerformanceAnnotation = {

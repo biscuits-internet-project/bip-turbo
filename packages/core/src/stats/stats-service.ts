@@ -1,4 +1,4 @@
-import { CacheKeys } from "@bip/domain";
+import { CacheKeys, countSortedAfter } from "@bip/domain";
 import type { CacheService } from "../_shared/cache/cache-service";
 import type { DbClient } from "../_shared/database/models";
 import { nonStubShowsSql, STATS_SHOWS_WHERE, statsShowsSql, TRACK_BY_SHOW_ORDER_ASC } from "../_shared/show-ordering";
@@ -98,13 +98,50 @@ export class StatsService {
   }
 
   /**
+   * Returns `{songId: [date, ...]}` covering every stats-eligible
+   * performance of every song, each per-song array sorted ascending.
+   * Backs the gap-chart "Played Before" column: clients fetch this
+   * once per session and binary-search prior counts client-side, so
+   * year/top-rated pages don't pay a per-show query when users open
+   * the gap-chart view. Sort happens in SQL so the JS group step is
+   * O(n) — preserving insertion order is enough to keep arrays sorted.
+   */
+  async getSongPlayDates(): Promise<Record<string, string[]>> {
+    if (!this.cache) {
+      throw new Error("StatsService.getSongPlayDates() requires a cache; constructed without one");
+    }
+    return this.cache.getOrSet(
+      CacheKeys.stats.songPlayDates(),
+      async () => {
+        const rows = await this.db.$queryRaw<Array<{ song_id: string; d: string }>>`
+          SELECT tracks.song_id, to_char(shows.date::date, 'YYYY-MM-DD') AS d
+          FROM tracks
+          JOIN shows ON tracks.show_id = shows.id
+          WHERE shows.date IS NOT NULL
+            AND ${statsShowsSql("shows")}
+            AND ${nonStubShowsSql("shows")}
+          ORDER BY shows.date ASC
+        `;
+        const out: Record<string, string[]> = {};
+        for (const row of rows) {
+          const arr = out[row.song_id];
+          if (arr) arr.push(row.d);
+          else out[row.song_id] = [row.d];
+        }
+        return out;
+      },
+      { ttl: ONE_DAY_SECONDS },
+    );
+  }
+
+  /**
    * Number of stats-eligible shows strictly after a song's `dateLastPlayed`
    * — drives the "X shows ago" reading on the song detail page and the
    * Gap to Now column on /songs.
    */
   async getShowsSinceLastPlayed(dateLastPlayed: Date | string): Promise<number> {
     const dates = await this.getStatsShowDates();
-    return countShowsAfter(dates, toIsoDate(dateLastPlayed));
+    return countSortedAfter(dates, toIsoDate(dateLastPlayed));
   }
 
   /**
@@ -129,7 +166,7 @@ export class StatsService {
     const out = new Map<string, number>();
     for (const song of songs) {
       if (!song.dateLastPlayed) continue;
-      out.set(song.id, countShowsAfter(dates, toIsoDate(song.dateLastPlayed)));
+      out.set(song.id, countSortedAfter(dates, toIsoDate(song.dateLastPlayed)));
     }
     return out;
   }
@@ -358,70 +395,6 @@ function dateMs(d: Date | null): number | null {
 function toIsoDate(d: Date | string): string {
   if (typeof d === "string") return d.length > 10 ? d.slice(0, 10) : d;
   return d.toISOString().slice(0, 10);
-}
-
-/**
- * Counts entries strictly greater than `target` in a sorted-ascending
- * string array via binary search. Strictly-greater (not `>=`) so a song
- * played at the most recent stats-eligible show reads "0 shows ago",
- * not "1 show ago".
- */
-export function countShowsAfter(sortedDates: string[], target: string): number {
-  if (sortedDates.length === 0) return 0;
-  // Find the index of the first element strictly greater than target.
-  let lo = 0;
-  let hi = sortedDates.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (sortedDates[mid] <= target) lo = mid + 1;
-    else hi = mid;
-  }
-  return sortedDates.length - lo;
-}
-
-/**
- * Counts entries on or after `target` in a sorted-ascending string array.
- * Used as the denominator for Filtered Since Debut / Filtered Avg Gap on
- * /songs — "matching-universe shows from this song's first filtered play
- * onward", which includes the debut show itself.
- */
-export function countShowsOnOrAfter(sortedDates: string[], target: string): number {
-  if (sortedDates.length === 0) return 0;
-  let lo = 0;
-  let hi = sortedDates.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (sortedDates[mid] < target) lo = mid + 1;
-    else hi = mid;
-  }
-  return sortedDates.length - lo;
-}
-
-/**
- * Counts entries strictly between `low` and `high` (both exclusive) in a
- * sorted-ascending string array. Drives the "shows that fell in gaps
- * between plays" denominator for filtered Avg Gap on /songs: we want the
- * mean closed gap, so the trailing dry spell after the last filtered play
- * and the period before the first filtered play must both be excluded.
- */
-export function countShowsBetween(sortedDates: string[], low: string, high: string): number {
-  if (sortedDates.length === 0 || low >= high) return 0;
-  let lo = 0;
-  let hi = sortedDates.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (sortedDates[mid] <= low) lo = mid + 1;
-    else hi = mid;
-  }
-  const startIdx = lo;
-  lo = startIdx;
-  hi = sortedDates.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (sortedDates[mid] < high) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo - startIdx;
 }
 
 function stableYearlyJson(value: unknown): string {

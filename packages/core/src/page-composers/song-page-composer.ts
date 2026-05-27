@@ -1,10 +1,18 @@
-import type { AllTimersPageView, Annotation, SongPagePerformance, SongPageView } from "@bip/domain";
+import {
+  type AllTimersPageView,
+  type Annotation,
+  countSortedAfter,
+  countSortedBetween,
+  countSortedOnOrAfter,
+  type SongPagePerformance,
+  type SongPageView,
+} from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
 import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import { computeTrackGaps, sortTracksForGapWalk, type TrackForGapWalk } from "../_shared/track-gap";
 import type { SongService } from "../songs/song-service";
-import { countShowsAfter, countShowsBetween, countShowsOnOrAfter, type StatsService } from "../stats/stats-service";
+import type { StatsService } from "../stats/stats-service";
 
 /**
  * Filters for querying performances. All fields are optional — only
@@ -380,8 +388,8 @@ export class SongPageComposer {
     const out = new Map<string, FilteredSongRarity>();
     for (const row of rows) {
       const filteredTimesPlayed = Number.parseInt(row.show_count, 10);
-      const filteredShowsSinceLastPlayed = countShowsAfter(matchingShowDates, row.last_date);
-      const showsOnOrAfterDebut = countShowsOnOrAfter(matchingShowDates, row.first_date);
+      const filteredShowsSinceLastPlayed = countSortedAfter(matchingShowDates, row.last_date);
+      const showsOnOrAfterDebut = countSortedOnOrAfter(matchingShowDates, row.first_date);
       const filteredPercentSinceDebut = showsOnOrAfterDebut === 0 ? null : filteredTimesPlayed / showsOnOrAfterDebut;
       // Mean closed gap within the filter scope. Numerator counts only
       // matching shows strictly BETWEEN the first and last filtered plays,
@@ -392,7 +400,7 @@ export class SongPageComposer {
       const filteredAverageGapShows =
         filteredTimesPlayed < 2
           ? null
-          : countShowsBetween(matchingShowDates, row.first_date, row.last_date) / (filteredTimesPlayed - 1);
+          : countSortedBetween(matchingShowDates, row.first_date, row.last_date) / (filteredTimesPlayed - 1);
       out.set(row.song_id, {
         filteredShowsSinceLastPlayed,
         filteredPercentSinceDebut,

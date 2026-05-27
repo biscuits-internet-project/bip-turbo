@@ -87,6 +87,62 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
 }
 
 /**
+ * Stacked-label count column used by both gap-chart views: catalog "Played
+ * Before" and personal "Seen Before". The two columns share header shape,
+ * sort config, and cell rendering — only the accessor, label words, and
+ * mobile presentation differ. Centralizing here avoids drift between the
+ * two factories.
+ *
+ * The accessor returns `null` to indicate "not loaded yet" (the catalog
+ * variant fetches its data asynchronously); rendered as an em-dash so the
+ * column doesn't flash a misleading "0" before settling on the real count.
+ * Synchronous callers (personal view) can return `0` directly and never
+ * see the placeholder.
+ */
+export function createCountColumn<T extends TrackLight>(opts: {
+  id: string;
+  accessor: (row: T) => number | null;
+  /**
+   * Two-word header rendered as stacked spans so the column can stay
+   * narrow on phones (e.g., `["Played", "Before"]`, `["Seen", "Before"]`).
+   */
+  label: [string, string];
+  hideOnMobile?: boolean;
+  mobileFixedWidth?: string;
+}): ColumnDef<T, unknown> {
+  const columnHelper = createColumnHelper<T>();
+  return columnHelper.accessor((row) => opts.accessor(row) ?? Number.NEGATIVE_INFINITY, {
+    id: opts.id,
+    header: ({ column }) => (
+      <SortableHeader
+        column={column}
+        label={
+          <span className="flex flex-col items-start leading-tight">
+            <span>{opts.label[0]}</span>
+            <span>{opts.label[1]}</span>
+          </span>
+        }
+      />
+    ),
+    // 4-digit max content (catalog's most-played songs land in the high
+    // hundreds), so 4.5rem fits the stacked header + sort arrow on its
+    // own row below without slack.
+    meta: {
+      fixedWidth: "4.5rem",
+      ...(opts.hideOnMobile ? { hideOnMobile: true } : {}),
+      ...(opts.mobileFixedWidth ? { mobileFixedWidth: opts.mobileFixedWidth } : {}),
+    },
+    enableSorting: true,
+    sortingFn: "basic",
+    sortDescFirst: false,
+    cell: (info) => {
+      const value = opts.accessor(info.row.original);
+      return <span className="text-content-text-secondary tabular-nums">{value === null ? "—" : value}</span>;
+    },
+  }) as ColumnDef<T, unknown>;
+}
+
+/**
  * Set, Track, and Song columns are identical across every SetlistCard
  * table view (gap chart, personal gap chart, and anything we add later).
  * Centralize them here so the per-view column factories can focus on

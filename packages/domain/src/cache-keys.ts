@@ -156,6 +156,14 @@ export const CacheKeys = {
      * show. `:v2` bump: now excludes orphan stub shows (venue_id IS NULL).
      */
     showDates: () => "stats:show-dates:v2",
+    /**
+     * Catalog play-history blob: `{songId: [date, date, ...]}` with every
+     * stats-track performance per song, dates sorted ascending. Backs the
+     * gap-chart "Played Before" column — clients fetch this once per
+     * session (lazy on first gap-chart open), then binary-search prior
+     * counts client-side instead of paying a per-show server query.
+     */
+    songPlayDates: () => "stats:song-play-dates:v1",
   },
 } as const;
 

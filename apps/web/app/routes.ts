@@ -133,6 +133,7 @@ export default [
     route("users", "routes/api/users.tsx"),
     route("users/avatar", "routes/api/users/avatar.tsx"),
     route("users/song-history", "routes/api/users/song-history.tsx"),
+    route("stats/song-play-dates", "routes/api/stats/song-play-dates.tsx"),
     route("contact", "routes/api/contact.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
     route("images/upload", "routes/api/images/upload.tsx"),
