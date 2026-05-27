@@ -1,5 +1,5 @@
 import type { Rating } from "@bip/domain";
-import type { CacheInvalidationService } from "../_shared/cache";
+import { type CacheInvalidationService, yearFromShowSlug } from "../_shared/cache";
 import type { DbClient, DbRating } from "../_shared/database/models";
 
 /**
@@ -142,7 +142,8 @@ export class RatingService {
     });
 
     if (data.rateableType === "Show" && data.showSlug) {
-      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug);
+      const year = yearFromShowSlug(data.showSlug);
+      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug, year !== null ? [year] : []);
     } else if (data.rateableType === "Track" && data.showSlug) {
       // The show's cached setlist payload at CacheKeys.show.data(slug)
       // embeds Track.averageRating/ratingsCount on each track, so a rating
@@ -360,7 +361,8 @@ export class RatingService {
     const stats = await this.updateRateableAverageRating(data.rateableId, data.rateableType);
 
     if (data.rateableType === "Show" && data.showSlug) {
-      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug);
+      const year = yearFromShowSlug(data.showSlug);
+      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug, year !== null ? [year] : []);
     } else if (data.rateableType === "Track" && data.showSlug) {
       // Same reason as the upsert path: Track.averageRating/ratingsCount
       // live inside the cached setlist payload, so a recompute has to bust

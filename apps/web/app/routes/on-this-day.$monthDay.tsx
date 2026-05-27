@@ -32,7 +32,10 @@ interface LoaderData {
 
 export function headers(): Headers {
   const headers = new Headers();
-  headers.set("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600");
+  // max-age only, no `s-maxage`. This route has no Cache-Tag mapping any
+  // subset of shows, so the edge has no purge path for show mutations.
+  // Origin work is covered by Redis (setlists + all-timers caches).
+  headers.set("Cache-Control", "public, max-age=300");
   return headers;
 }
 
