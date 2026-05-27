@@ -323,7 +323,11 @@ function SetlistCardComponent({
                   summary={catalogSummary}
                   showPersonal={Boolean(user)}
                 />
-                <SetlistTable showSlug={setlist.show.slug ?? ""} tracks={setlist.sets.flatMap((s) => s.tracks)} />
+                <SetlistTable
+                  showSlug={setlist.show.slug ?? ""}
+                  showDate={setlist.show.date}
+                  tracks={setlist.sets.flatMap((s) => s.tracks)}
+                />
               </div>
             ) : view === "personal" && user ? (
               <div className="space-y-2">

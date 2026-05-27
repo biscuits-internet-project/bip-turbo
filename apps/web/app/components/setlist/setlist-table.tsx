@@ -1,9 +1,10 @@
-import type { TrackLight } from "@bip/domain";
+import { countSortedBefore, type TrackLight } from "@bip/domain";
 import { useMemo } from "react";
 import { DataTable } from "~/components/ui/data-table";
 import { useSession } from "~/hooks/use-session";
+import { useSongPlayDates } from "~/hooks/use-song-play-dates";
 import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
-import { createSetlistColumns } from "./setlist-columns";
+import { createSetlistColumns, type SetlistTableRow } from "./setlist-columns";
 
 interface SetlistTableProps {
   tracks: TrackLight[];
@@ -12,6 +13,11 @@ interface SetlistTableProps {
    * cells. Threaded down to RatingBadgeButton.
    */
   showSlug: string;
+  /**
+   * Show date in `YYYY-MM-DD`. Drives the Played Before column — for each
+   * row we count stats performances of the song strictly before this date.
+   */
+  showDate: string;
 }
 
 /**
@@ -20,15 +26,25 @@ interface SetlistTableProps {
  * SetlistViewControl (rendered by SetlistCard above and below the table)
  * so it can sit on the same row as the setlist/gap-chart toggle.
  *
- * Calls `useTrackUserRatings` lazily — this component only mounts when the
- * card is in `view="gap-chart"`, so list pages don't fetch viewer ratings
- * until a user actually opens the chart view.
+ * Calls `useTrackUserRatings` and `useSongPlayDates` lazily — this component
+ * only mounts when the card is in `view="gap-chart"`, so list pages don't
+ * fetch either dataset until a user actually opens the chart view. The
+ * catalog play-dates blob is one fetch per session that powers Played
+ * Before for every gap-chart toggle thereafter.
  */
-export function SetlistTable({ tracks, showSlug }: SetlistTableProps) {
+export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) {
   const { user } = useSession();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
   const { userRatingMap } = useTrackUserRatings(trackIds);
+  const { data: songPlayDates, isLoading: isPlayDatesLoading } = useSongPlayDates();
+
+  const rows: SetlistTableRow[] = useMemo(() => {
+    return tracks.map((track) => ({
+      ...track,
+      priorPerformanceCount: isPlayDatesLoading ? null : countSortedBefore(songPlayDates[track.songId] ?? [], showDate),
+    }));
+  }, [tracks, songPlayDates, isPlayDatesLoading, showDate]);
 
   const columns = useMemo(
     () => createSetlistColumns({ showSlug, userRatingMap, isAuthenticated }),
@@ -37,7 +53,7 @@ export function SetlistTable({ tracks, showSlug }: SetlistTableProps) {
   return (
     <DataTable
       columns={columns}
-      data={tracks}
+      data={rows}
       hideSearch
       hidePagination
       hidePaginationText

@@ -22,5 +22,6 @@ export * from "./models/venue";
 export * from "./search";
 export * from "./segue-run";
 export * from "./show-ordering";
+export * from "./sorted-dates";
 export * from "./views/blog-post";
 export * from "./views/song-page";

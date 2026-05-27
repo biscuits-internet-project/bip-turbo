@@ -19,6 +19,11 @@ vi.mock("~/hooks/use-show-user-data", () => ({
 vi.mock("~/hooks/use-track-user-ratings", () => ({
   useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
 }));
+// SetlistTable also fetches the catalog play-dates blob for the Played
+// Before column; stub it so the gap-chart view renders without React Query.
+vi.mock("~/hooks/use-song-play-dates", () => ({
+  useSongPlayDates: vi.fn(() => ({ data: {} as Record<string, string[]>, isLoading: false })),
+}));
 
 // Stub heavy child components
 vi.mock("./track-rating-overlay", () => ({

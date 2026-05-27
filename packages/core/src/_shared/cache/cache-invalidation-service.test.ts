@@ -68,6 +68,7 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
     expect(cache.delPattern).toHaveBeenCalledWith("home:*");
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.stats.showsByYear());
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.stats.showDates());
+    expect(cache.del).toHaveBeenCalledWith(CacheKeys.stats.songPlayDates());
   });
 
   // Per-user song-history embeds track-level data from every attended show,

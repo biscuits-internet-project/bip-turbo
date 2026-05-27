@@ -12,6 +12,9 @@ vi.mock("~/hooks/use-session", () => ({
 vi.mock("~/hooks/use-track-user-ratings", () => ({
   useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
 }));
+vi.mock("~/hooks/use-song-play-dates", () => ({
+  useSongPlayDates: vi.fn(() => ({ data: {} as Record<string, string[]>, isLoading: false })),
+}));
 // Stub TrackRatingCell so the rating column emits a deterministic, prop-
 // dumping node — the rating cell internals are covered elsewhere.
 vi.mock("~/components/performance/track-rating-cell", () => ({
@@ -20,6 +23,7 @@ vi.mock("~/components/performance/track-rating-cell", () => ({
 
 const { useSession } = await import("~/hooks/use-session");
 const { useTrackUserRatings } = await import("~/hooks/use-track-user-ratings");
+const { useSongPlayDates } = await import("~/hooks/use-song-play-dates");
 const { SetlistTable } = await import("./setlist-table");
 
 function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: number }): TrackLight {
@@ -52,6 +56,7 @@ describe("SetlistTable", () => {
     await setupWithRouter(
       <SetlistTable
         showSlug="2024-07-19-camden"
+        showDate="2024-07-19"
         tracks={[
           makeTrack({
             songId: "c",
@@ -80,7 +85,7 @@ describe("SetlistTable", () => {
         ]}
       />,
     );
-    const cells = screen.getAllByRole("cell").filter((_, i) => i % 7 === 3);
+    const cells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 3);
     expect(cells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -95,6 +100,7 @@ describe("SetlistTable", () => {
     await setupWithRouter(
       <SetlistTable
         showSlug="2024-07-19-camden"
+        showDate="2024-07-19"
         tracks={[
           makeTrack({
             songId: "a",
@@ -134,6 +140,7 @@ describe("SetlistTable", () => {
     await setupWithRouter(
       <SetlistTable
         showSlug="2024-07-19-camden"
+        showDate="2024-07-19"
         tracks={[
           makeTrack({
             songId: "song-basis",
@@ -151,5 +158,47 @@ describe("SetlistTable", () => {
     expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"showSlug":"2024-07-19-camden"');
     expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"userRating":5');
     expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"isAuthenticated":true');
+  });
+
+  // Wiring: SetlistTable threads each row's songId into the catalog blob,
+  // counts dates strictly before `showDate`, and surfaces that count in the
+  // Played Before cell. Stubs return a non-empty blob so the augmentation
+  // path actually runs (loading state already covered in setlist-columns
+  // tests via the em-dash rendering).
+  test("renders the prior-performance count derived from the catalog blob", async () => {
+    vi.mocked(useSongPlayDates).mockReturnValue({
+      data: {
+        // Three plays strictly before 2024-07-19 → cell renders "3".
+        "song-tractorbeam": ["2018-12-31", "2020-06-10", "2022-04-14", "2024-07-19", "2025-01-01"],
+        // No prior plays → "0" (a personal debut from the catalog's view).
+        "song-debut": ["2024-07-19"],
+      },
+      isLoading: false,
+    });
+
+    await setupWithRouter(
+      <SetlistTable
+        showSlug="2024-07-19-camden"
+        showDate="2024-07-19"
+        tracks={[
+          makeTrack({
+            songId: "song-tractorbeam",
+            position: 1,
+            song: { id: "song-tractorbeam", title: "Tractorbeam", slug: "tractorbeam" },
+          }),
+          makeTrack({
+            songId: "song-debut",
+            position: 2,
+            song: { id: "song-debut", title: "Munchkin Invasion", slug: "munchkin-invasion" },
+          }),
+        ]}
+      />,
+    );
+
+    // Each row has 8 cells; Played Before is index 6. Cells 6 + 14 are the
+    // Played Before cells for the two rows respectively.
+    const cells = screen.getAllByRole("cell");
+    expect(cells[6].textContent).toBe("3");
+    expect(cells[14].textContent).toBe("0");
   });
 });
