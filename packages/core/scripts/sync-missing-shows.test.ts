@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import type { RatingService } from "../src/ratings/rating-service";
 import {
   buildRockOperaAssignmentDiff,
   buildSetlistReconciliation,
@@ -1389,6 +1390,116 @@ describe("buildSetlistReconciliation", () => {
     expect(recon.toUpdate[0]?.patch).toEqual({ segue: ">" });
     expect(recon.toDelete).toEqual([]);
   });
+
+  // Track-id mismatch: a previous sync inserted the local track with a
+  // fresh Prisma-generated UUID (the buggy default before id preservation
+  // landed). Same (set, position) but different id from prod's. The
+  // reconciler must treat this as structural — emit a delete + reinsert
+  // with prod's id so cross-environment ratings FK-resolve on the next
+  // rating sync.
+  test("treats same-(set,position)-but-different-id as a structural delete+reinsert", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "local-only-uuid-from-buggy-sync",
+        set: "S1",
+        position: 1,
+        songId: "song-basis-uuid",
+        segue: ">",
+        note: null,
+        allTimer: false,
+        annotations: [{ id: "ann-local", desc: "explosive intro" }],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show-x",
+      showDate: "2026-02-06",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [
+            {
+              id: "prod-track-uuid",
+              position: 1,
+              songTitle: "Basis for a Day",
+              songSlug: "basis-for-a-day",
+              segue: ">",
+              allTimer: false,
+              note: null,
+              annotations: ["explosive intro"],
+            },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.structurallyChanged).toBe(true);
+    expect(recon.toDelete).toEqual([
+      { trackId: "local-only-uuid-from-buggy-sync", annotationIds: ["ann-local"] },
+    ]);
+    expect(recon.toInsert).toHaveLength(1);
+    expect(recon.toInsert[0]).toMatchObject({
+      id: "prod-track-uuid",
+      set: "S1",
+      position: 1,
+      songId: "song-basis-uuid",
+      annotationDescs: ["explosive intro"],
+    });
+    // toUpdate is empty for this slot — the row is being rebuilt, not patched.
+    expect(recon.toUpdate).toEqual([]);
+  });
+
+  // Same key, same id → normal patch path. Adding this case so the new
+  // id-mismatch branch above doesn't silently swallow drift updates when
+  // ids agree.
+  test("ignores the id-mismatch branch when ids match (falls through to patch logic)", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "shared-id",
+        set: "S1",
+        position: 1,
+        songId: "song-basis-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show-x",
+      showDate: "2026-02-06",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [
+            {
+              id: "shared-id",
+              position: 1,
+              songTitle: "Basis for a Day",
+              songSlug: "basis-for-a-day",
+              segue: ">", // segue drifts
+              allTimer: false,
+              note: null,
+              annotations: [],
+            },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toDelete).toEqual([]);
+    expect(recon.toInsert).toEqual([]);
+    expect(recon.toUpdate).toEqual([
+      {
+        trackId: "shared-id",
+        patch: { segue: ">" },
+        annotationDiff: { toCreateDescs: [], toDeleteIds: [] },
+      },
+    ]);
+    expect(recon.structurallyChanged).toBe(false);
+    expect(recon.cosmeticallyChanged).toBe(true);
+  });
 });
 
 // diffTrackAnnotations replaces the local Annotation set for one track with
@@ -1667,18 +1778,32 @@ function makeStubDb(seed: {
   const db = {
     user: {
       findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(users)),
-      findMany: vi.fn(async (args?: { where?: { id?: { in?: string[] } }; select?: Record<string, unknown> }) => {
-        const matching = args?.where?.id?.in
-          ? users.filter((u) => args.where?.id?.in?.includes(u.id))
-          : users;
-        if (args?.select && (args.select as Record<string, unknown>)._count) {
-          return matching.map((u) => ({
-            id: u.id,
-            _count: u._refs ?? { ratings: 0, attendances: 0, reviews: 0, blogPosts: 0 },
-          }));
-        }
-        return matching.map((u) => ({ id: u.id }));
-      }),
+      findMany: vi.fn(
+        async (args?: {
+          where?: { id?: { in?: string[] }; username?: { in?: string[] } };
+          select?: Record<string, unknown>;
+        }) => {
+          let matching = users;
+          if (args?.where?.id?.in) {
+            const idSet = new Set(args.where.id.in);
+            matching = matching.filter((u) => idSet.has(u.id));
+          }
+          if (args?.where?.username?.in) {
+            const unameSet = new Set(args.where.username.in);
+            matching = matching.filter((u) => u.username !== null && unameSet.has(u.username));
+          }
+          if (args?.select && (args.select as Record<string, unknown>)._count) {
+            return matching.map((u) => ({
+              id: u.id,
+              _count: u._refs ?? { ratings: 0, attendances: 0, reviews: 0, blogPosts: 0 },
+            }));
+          }
+          if (args?.select && (args.select as Record<string, unknown>).username) {
+            return matching.map((u) => ({ id: u.id, username: u.username }));
+          }
+          return matching.map((u) => ({ id: u.id }));
+        },
+      ),
       upsert: vi.fn(
         async (args: {
           where: { id: string };
@@ -1694,6 +1819,16 @@ function makeStubDb(seed: {
           return args.create;
         },
       ),
+      create: vi.fn(async (args: { data: StubUserRow }) => {
+        users.push(args.data);
+        return args.data;
+      }),
+      update: vi.fn(async (args: { where: { id: string }; data: Partial<StubUserRow> }) => {
+        const u = users.find((row) => row.id === args.where.id);
+        if (!u) throw new Error("user not found");
+        Object.assign(u, args.data);
+        return u;
+      }),
       deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
         const ids = new Set(args.where.id.in);
         for (let i = users.length - 1; i >= 0; i--) {
@@ -1705,15 +1840,37 @@ function makeStubDb(seed: {
     rating: {
       findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(ratings)),
       findMany: vi.fn(async () => ratings.map((r) => ({ id: r.id, rateableId: r.rateableId, rateableType: r.rateableType }))),
-      upsert: vi.fn(async (args: { where: { id: string }; create: StubRatingRow; update: Partial<StubRatingRow> }) => {
-        const existing = ratings.find((r) => r.id === args.where.id);
-        if (existing) {
-          Object.assign(existing, args.update);
-          return existing;
-        }
-        ratings.push(args.create);
-        return args.create;
-      }),
+      upsert: vi.fn(
+        async (args: {
+          where: {
+            id?: string;
+            userId_rateableId_rateableType?: { userId: string; rateableId: string; rateableType: string };
+          };
+          create: StubRatingRow;
+          update: Partial<StubRatingRow>;
+        }) => {
+          // Mirror Prisma: look up by whichever unique key the caller passed.
+          // The script uses the compound key to absorb stale-id rows; tests
+          // that pre-seed a row with the same compound key should see it
+          // matched, not a duplicate insert.
+          const existing = args.where.id
+            ? ratings.find((r) => r.id === args.where.id)
+            : args.where.userId_rateableId_rateableType
+              ? ratings.find(
+                  (r) =>
+                    r.userId === args.where.userId_rateableId_rateableType?.userId &&
+                    r.rateableId === args.where.userId_rateableId_rateableType.rateableId &&
+                    r.rateableType === args.where.userId_rateableId_rateableType.rateableType,
+                )
+              : undefined;
+          if (existing) {
+            Object.assign(existing, args.update);
+            return existing;
+          }
+          ratings.push(args.create);
+          return args.create;
+        },
+      ),
       deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
         const ids = new Set(args.where.id.in);
         for (let i = ratings.length - 1; i >= 0; i--) {
@@ -1725,15 +1882,28 @@ function makeStubDb(seed: {
     attendance: {
       findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(attendances)),
       findMany: vi.fn(async () => attendances.map((a) => ({ id: a.id, showId: a.showId }))),
-      upsert: vi.fn(async (args: { where: { id: string }; create: StubAttendanceRow; update: Partial<StubAttendanceRow> }) => {
-        const existing = attendances.find((a) => a.id === args.where.id);
-        if (existing) {
-          Object.assign(existing, args.update);
-          return existing;
-        }
-        attendances.push(args.create);
-        return args.create;
-      }),
+      upsert: vi.fn(
+        async (args: {
+          where: { id?: string; userId_showId?: { userId: string; showId: string } };
+          create: StubAttendanceRow;
+          update: Partial<StubAttendanceRow>;
+        }) => {
+          const existing = args.where.id
+            ? attendances.find((a) => a.id === args.where.id)
+            : args.where.userId_showId
+              ? attendances.find(
+                  (a) =>
+                    a.userId === args.where.userId_showId?.userId && a.showId === args.where.userId_showId.showId,
+                )
+              : undefined;
+          if (existing) {
+            Object.assign(existing, args.update);
+            return existing;
+          }
+          attendances.push(args.create);
+          return args.create;
+        },
+      ),
       deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
         const ids = new Set(args.where.id.in);
         for (let i = attendances.length - 1; i >= 0; i--) {
@@ -1787,9 +1957,15 @@ function makeStubMcp(responses: Record<string, unknown[]>) {
   };
 }
 
-const stubRatingService = () => ({
-  rebuildAggregatesFor: vi.fn(async () => {}),
-}) as never;
+// Minimal RatingService stub for syncUserActivity tests. Only
+// rebuildAggregatesFor is invoked — every other RatingService method is out
+// of scope here. We cast through `unknown` to RatingService so call sites
+// can pass this in where the real class is expected, and we expose the
+// inner mock as `.rebuildAggregatesFor` directly so assertions stay terse.
+const stubRatingService = (): RatingService & { rebuildAggregatesFor: ReturnType<typeof vi.fn> } =>
+  ({
+    rebuildAggregatesFor: vi.fn(async () => {}),
+  }) as unknown as RatingService & { rebuildAggregatesFor: ReturnType<typeof vi.fn> };
 
 describe("syncUserActivity — incremental mode", () => {
   // Stub user insert path: synthetic email + STUB digest, real id +
@@ -1819,7 +1995,8 @@ describe("syncUserActivity — incremental mode", () => {
 
     await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
       ratingService: stubRatingService(),
       cacheInvalidation: null,
       changedSlugs: new Set(),
@@ -1883,7 +2060,8 @@ describe("syncUserActivity — incremental mode", () => {
 
     await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
       ratingService,
       cacheInvalidation: null,
       changedSlugs,
@@ -1944,7 +2122,8 @@ describe("syncUserActivity — incremental mode", () => {
 
     const result = await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
       ratingService,
       cacheInvalidation: null,
       changedSlugs: new Set(),
@@ -1998,7 +2177,8 @@ describe("syncUserActivity — incremental mode", () => {
 
     await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
       ratingService: stubRatingService(),
       cacheInvalidation: null,
       changedSlugs,
@@ -2040,7 +2220,8 @@ describe("syncUserActivity — incremental mode", () => {
 
     await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
       ratingService: stubRatingService(),
       cacheInvalidation: null,
       changedSlugs: new Set(),
@@ -2085,7 +2266,8 @@ describe("syncUserActivity — full-users mode", () => {
 
     const result = await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: true,
+      pullFromEpoch: true,
+      pruneOrphans: true,
       ratingService,
       cacheInvalidation: null,
       changedSlugs: new Set(),
@@ -2124,7 +2306,8 @@ describe("syncUserActivity — full-users mode", () => {
 
     const result = await syncUserActivity(db as never, {
       isDryRun: false,
-      fullMode: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
       ratingService: stubRatingService(),
       cacheInvalidation: null,
       changedSlugs: new Set(),
@@ -2134,5 +2317,312 @@ describe("syncUserActivity — full-users mode", () => {
 
     expect(state.ratings).toHaveLength(1);
     expect(result.ratingsDeleted).toBe(0);
+  });
+});
+
+describe("syncUserActivity — compound-key upserts", () => {
+  // Regression for the live-run failure: local DBs seeded from older prod
+  // dumps can hold an attendance with the same (userId, showId) as prod but
+  // a different id. Upserting by id would hit
+  // attendances_user_id_show_id_unique on insert; upserting by the compound
+  // key absorbs the existing row cleanly.
+  test("attendance with same (userId, showId) but different id updates in place", async () => {
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+      attendances: [
+        {
+          id: "att-local-stale-id",
+          userId: "u-marc",
+          showId: "show-1",
+          createdAt: new Date("2023-01-01T00:00:00Z"),
+          updatedAt: new Date("2023-01-01T00:00:00Z"),
+        },
+      ],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [
+        {
+          attendances: [
+            {
+              id: "att-prod-new-id",
+              userId: "u-marc",
+              showId: "show-1",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    // Only one local row — the stale-id local row absorbed the update via
+    // the compound key. Its id stays local for now; --full-users converges
+    // it back to prod on a later run.
+    expect(state.attendances).toHaveLength(1);
+    expect(state.attendances[0].id).toBe("att-local-stale-id");
+    expect(state.attendances[0].updatedAt.toISOString()).toBe("2024-08-12T00:00:00.000Z");
+  });
+
+  // Same regression as above, for ratings. Local row with same
+  // (userId, rateableId, rateableType) but different id absorbs the update
+  // via ratings_user_id_rateable_id_rateable_type_unique.
+  test("rating with same (userId, rateableId, rateableType) but different id updates in place", async () => {
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+      ratings: [
+        {
+          id: "r-local-stale-id",
+          userId: "u-marc",
+          value: 3,
+          rateableType: "Show",
+          rateableId: "show-1",
+          createdAt: new Date("2023-01-01T00:00:00Z"),
+          updatedAt: new Date("2023-01-01T00:00:00Z"),
+        },
+      ],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-prod-new-id",
+              userId: "u-marc",
+              value: 5,
+              rateableType: "Show",
+              rateableId: "show-1",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.ratings).toHaveLength(1);
+    expect(state.ratings[0].id).toBe("r-local-stale-id");
+    expect(state.ratings[0].value).toBe(5);
+  });
+});
+
+describe("syncUserActivity — avatarFileId FK safety", () => {
+  // Stub users never write avatarFileId because the File table isn't synced.
+  // Without this guard, prod users referencing a File row added after the
+  // last db-restore dump would violate users_avatar_file_id_fkey on insert.
+  // avatarFileUrl is a plain VarChar with no FK, so it still gets the
+  // remote URL.
+  test("inserts stub users with avatarFileId=null even when prod sends one", async () => {
+    const { db, state } = makeStubDb({});
+    const mcp = makeStubMcp({
+      list_users_since: [
+        {
+          users: [
+            {
+              id: "u-marc",
+              username: "trance-marc",
+              avatarFileId: "file-not-in-local-db",
+              avatarFileUrl: "https://cdn.example/marc.jpg",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.users[0].avatarFileId).toBeNull();
+    expect(state.users[0].avatarFileUrl).toBe("https://cdn.example/marc.jpg");
+  });
+});
+
+describe("syncUserActivity — username-keyed user upsert", () => {
+  // When a prod user's id doesn't match locally but their username does
+  // (e.g. local was seeded from a dump that gave evan a different id), the
+  // sync must update the local row in place — NOT create a second row that
+  // would hit users_username_unique — and must remap ratings/attendances
+  // owned by the prod id onto the local id so they attach to the right
+  // account.
+  test("matches a local user by username when ids differ and remaps the rating's userId", async () => {
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          // Local id, kept stable across the sync (PKs aren't rewritten).
+          id: "local-evan-id",
+          email: "stub-local-evan-id@local.invalid",
+          passwordDigest: "STUB",
+          username: "evan",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2020-01-01T00:00:00Z"),
+          updatedAt: new Date("2020-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [
+        {
+          users: [
+            {
+              // Prod's id for "evan" differs from local.
+              id: "prod-evan-id",
+              username: "evan",
+              avatarFileId: null,
+              avatarFileUrl: "https://cdn.example/evan.jpg",
+              createdAt: "2020-01-01T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-1",
+              userId: "prod-evan-id",
+              value: 5,
+              rateableType: "Show",
+              rateableId: "show-1",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    // Only one user row — no users_username_unique violation; local id
+    // stays stable; the prod-side update (new avatar URL) lands.
+    expect(state.users).toHaveLength(1);
+    expect(state.users[0].id).toBe("local-evan-id");
+    expect(state.users[0].avatarFileUrl).toBe("https://cdn.example/evan.jpg");
+    // Rating's userId was remapped from prod-evan-id to local-evan-id.
+    expect(state.ratings).toHaveLength(1);
+    expect(state.ratings[0].userId).toBe("local-evan-id");
+  });
+});
+
+describe("syncUserActivity — pull-from-epoch (full reconcile)", () => {
+  // When pullFromEpoch is set, the cursor is forced to 1970-01-01 instead of
+  // local MAX(updatedAt). This is what unblocks the "missing-older rows"
+  // case: a local DB seeded from a dump that's missing months of activity
+  // can't backfill via the cursor approach (its MAX is too new).
+  test("pulls ratings since epoch regardless of local MAX(updatedAt)", async () => {
+    const { db } = makeStubDb({
+      ratings: [
+        {
+          id: "r-recent",
+          userId: "u-marc",
+          value: 5,
+          rateableType: "Show",
+          rateableId: "show-1",
+          createdAt: new Date("2026-05-01T00:00:00Z"),
+          updatedAt: new Date("2026-05-01T00:00:00Z"),
+        },
+      ],
+    });
+    const calls: Array<{ tool: string; args: Record<string, unknown> }> = [];
+    const mcp = async <T>(toolName: string, args: Record<string, unknown>): Promise<T> => {
+      calls.push({ tool: toolName, args });
+      if (toolName === "list_users_since") return { users: [], nextCursor: null } as T;
+      if (toolName === "list_ratings_since") return { ratings: [], nextCursor: null } as T;
+      if (toolName === "list_attendances_since") return { attendances: [], nextCursor: null } as T;
+      throw new Error(`unexpected tool ${toolName}`);
+    };
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: true,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    const ratingsCall = calls.find((c) => c.tool === "list_ratings_since");
+    expect(ratingsCall?.args.since).toBe("1970-01-01T00:00:00.000Z");
   });
 });

@@ -596,6 +596,12 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               sets: setlist.sets.map((set) => ({
                 label: set.label,
                 tracks: set.tracks.map((t) => ({
+                  // Preserved so sync-missing-shows can insert local rows
+                  // with prod's id. Rating/attendance rows from prod
+                  // reference these ids cross-environment; mismatching
+                  // local-generated UUIDs would FK-skip every related
+                  // user-activity row.
+                  id: t.id,
                   position: t.position,
                   songTitle: t.song?.title || "",
                   songSlug: t.song?.slug || "",
@@ -634,6 +640,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               services.rockOperas.findPerformancesForShow(show.id),
             ]);
             shows.push({
+              // Preserved so sync-missing-shows can insert local rows with
+              // prod's id. Same reasoning as the track id in get_setlists —
+              // rating/attendance rows from prod reference show.id.
+              id: show.id,
               slug: show.slug,
               date: show.date,
               venueName: venue?.name,
