@@ -1,4 +1,5 @@
 import type { Annotation } from "./annotation";
+import type { RockOperaPerformanceAnnotation } from "./rock-opera";
 import type { Show } from "./show";
 import type { Track, TrackLight } from "./track";
 import type { Venue } from "./venue";
@@ -22,6 +23,12 @@ export type Setlist = {
    * because debuts are excluded from those numbers but still signal rarity.
    */
   debutCount: number;
+  /**
+   * Rock opera annotations for this show. Populated only by single-show
+   * fetches (services.setlists.findByShowSlug); list-page composers leave
+   * this empty so list pages pay no lookup cost.
+   */
+  rockOperaPerformances: RockOperaPerformanceAnnotation[];
 };
 
 export type SetLight = {
@@ -43,4 +50,10 @@ export type SetlistLight = {
    * because debuts are excluded from those numbers but still signal rarity.
    */
   debutCount: number;
+  /**
+   * Rock opera annotations for this show. Populated only by single-show
+   * fetches (services.setlists.findByShowSlug); list-page composers leave
+   * this empty so list pages pay no lookup cost.
+   */
+  rockOperaPerformances: RockOperaPerformanceAnnotation[];
 };

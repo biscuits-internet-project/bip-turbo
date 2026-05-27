@@ -1,5 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import { addDaysYearAgnostic, formatMonthDay, getAnniversaryYears, getOrdinalSuffix, isValidMonthDay } from "./utils";
+import {
+  addDaysYearAgnostic,
+  formatMonthDay,
+  getAnniversaryYears,
+  getOrdinalSuffix,
+  isValidMonthDay,
+  slugifyAnchor,
+} from "./utils";
 
 describe("formatMonthDay", () => {
   // Converts zero-padded MM-DD to human-readable "Month Day" format
@@ -296,5 +303,46 @@ describe("getAnniversaryYears", () => {
     vi.setSystemTime(new Date("2026-04-14"));
     expect(getAnniversaryYears("2027-01-01")).toBeNull();
     vi.useRealTimers();
+  });
+});
+
+describe("slugifyAnchor", () => {
+  // Canonical case: a song / act / section title becomes a kebab-case
+  // anchor fragment that pairs with `<element id="...">` on the same page.
+  test("lowercases and joins words with single hyphens", () => {
+    expect(slugifyAnchor("Hot Air Balloon")).toBe("hot-air-balloon");
+  });
+
+  // Punctuation in titles (apostrophes, periods, slashes, parens) collapses
+  // to hyphens. Rock opera titles include "Spaga's Last Stand",
+  // "To Be Continued...", "Tourists (Rocket Ship)" — keep them anchor-safe.
+  test("collapses punctuation runs into single hyphens", () => {
+    expect(slugifyAnchor("Spaga's Last Stand")).toBe("spaga-s-last-stand");
+    expect(slugifyAnchor("To Be Continued...")).toBe("to-be-continued");
+    expect(slugifyAnchor("Tourists (Rocket Ship)")).toBe("tourists-rocket-ship");
+  });
+
+  // Leading and trailing hyphens get trimmed so the anchor doesn't have
+  // dead "-" characters (which break some smooth-scroll polyfills and look
+  // ugly in URL fragments).
+  test("trims leading and trailing hyphens", () => {
+    expect(slugifyAnchor("!Shocked!")).toBe("shocked");
+    expect(slugifyAnchor("...Quiet Storm...")).toBe("quiet-storm");
+  });
+
+  // Numbers are preserved — "Act 1", "Plan B", "JP8000" should all yield
+  // anchors that read like their source titles.
+  test("preserves digits", () => {
+    expect(slugifyAnchor("Act 1")).toBe("act-1");
+    expect(slugifyAnchor("Plan B")).toBe("plan-b");
+    expect(slugifyAnchor("JP8000")).toBe("jp8000");
+  });
+
+  // All-non-alphanumeric input would collapse to a single hyphen, then
+  // get trimmed to empty. Documented behavior so callers can decide
+  // whether to fall back; today nothing in the codebase relies on this.
+  test("returns empty string when input has no alphanumeric characters", () => {
+    expect(slugifyAnchor("!!!")).toBe("");
+    expect(slugifyAnchor("   ")).toBe("");
   });
 });

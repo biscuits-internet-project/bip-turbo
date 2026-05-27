@@ -18,6 +18,7 @@ import {
   SHOW_ORDER_DESC,
   STATS_SHOWS_WHERE,
 } from "../_shared/show-ordering";
+import type { RockOperaService } from "../rock-operas/rock-opera-service";
 
 /**
  * Filter options for setlist queries. The `hasPhotos` / `hasYoutube` flags
@@ -265,6 +266,7 @@ function mapSetlistToDomainEntity(
     averageSongGap: average(eligible),
     medianSongGap: median(eligible),
     debutCount: computeDebutCount(tracks),
+    rockOperaPerformances: [],
   };
 }
 
@@ -328,11 +330,33 @@ function mapSetlistLightToDomainEntity(
     averageSongGap: average(eligible),
     medianSongGap: median(eligible),
     debutCount: computeDebutCount(tracks),
+    rockOperaPerformances: [],
   };
 }
 
 export class SetlistService {
-  constructor(private readonly db: DbClient) {}
+  constructor(
+    private readonly db: DbClient,
+    /**
+     * Used by `overlayRockOperaAnnotations` so every Setlist this
+     * service returns carries its rock opera annotations. Centralizing
+     * the lookup here means SetlistCard renders the
+     * "Nth full performance of <name>" line wherever a Setlist is read,
+     * without each caller having to know to ask for annotations.
+     */
+    private readonly rockOperas: RockOperaService,
+  ) {}
+
+  private async overlayRockOperaAnnotations<T extends Setlist | SetlistLight>(setlists: T[]): Promise<T[]> {
+    if (setlists.length === 0) return setlists;
+    const annotations = await this.rockOperas.findPerformancesForShows(setlists.map((s) => s.show.id));
+    if (annotations.size === 0) return setlists;
+    for (const setlist of setlists) {
+      const forShow = annotations.get(setlist.show.id);
+      if (forShow) setlist.rockOperaPerformances = forShow;
+    }
+    return setlists;
+  }
 
   async findByShowId(id: string): Promise<Setlist | null> {
     const show = await this.db.show.findUnique({
@@ -352,10 +376,12 @@ export class SetlistService {
 
     if (!show || !show.venue) return null;
 
-    return mapSetlistToDomainEntity({
+    const setlist = mapSetlistToDomainEntity({
       ...show,
       venue: show.venue,
     });
+    await this.overlayRockOperaAnnotations([setlist]);
+    return setlist;
   }
 
   async findByShowSlug(slug: string): Promise<Setlist | null> {
@@ -376,10 +402,12 @@ export class SetlistService {
 
     if (!result || !result.venue) return null;
 
-    return mapSetlistToDomainEntity({
+    const setlist = mapSetlistToDomainEntity({
       ...result,
       venue: result.venue,
     });
+    await this.overlayRockOperaAnnotations([setlist]);
+    return setlist;
   }
 
   /**
@@ -429,7 +457,7 @@ export class SetlistService {
       },
     });
 
-    return results
+    const setlists = results
       .filter((show) => show.venue !== null)
       .map((show) =>
         mapSetlistToDomainEntity({
@@ -441,6 +469,7 @@ export class SetlistService {
           })),
         }),
       );
+    return this.overlayRockOperaAnnotations(setlists);
   }
 
   async findMany(options?: {
@@ -491,7 +520,7 @@ export class SetlistService {
       },
     });
 
-    return results
+    const setlists = results
       .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
       .map((show) =>
         mapSetlistToDomainEntity({
@@ -503,6 +532,7 @@ export class SetlistService {
           })),
         }),
       );
+    return this.overlayRockOperaAnnotations(setlists);
   }
 
   /**
@@ -579,7 +609,7 @@ export class SetlistService {
       },
     });
 
-    return results
+    const setlists = results
       .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
       .map((show) =>
         mapSetlistLightToDomainEntity({
@@ -591,6 +621,7 @@ export class SetlistService {
           })),
         }),
       );
+    return this.overlayRockOperaAnnotations(setlists);
   }
 
   async countByMonthDay(monthDay: string): Promise<number> {

@@ -81,4 +81,33 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
 
     expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.users.allSongHistory());
   });
+
+  // Rock opera resource pages cache full Setlists (with tracks, annotations,
+  // ratings, notes, date) for every tagged show. Any non-rock-opera mutation
+  // on a tagged show — notes, a track edit, a rating, even a date shift —
+  // makes that fat payload stale. Wildcard wipe so the cache rebuilds on the
+  // next visit; cost is trivial (~3 keys for 3 rock operas).
+  test("wipes the rock opera resource-page cache on show-listing changes", async () => {
+    const cache = makeCache();
+    const service = new CacheInvalidationService(cache as never, logger);
+
+    await service.invalidateShowListings();
+
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.rockOperas.allPerformances());
+  });
+
+  // show.data caches per-slug Setlists with rockOperaPerformances baked
+  // in by the SetlistService overlay. A date change on one tagged show
+  // — or any rock opera assignment — shifts every neighbor's rank /
+  // prev / next, so neighbor show.data entries are stale even though
+  // their own row didn't move. Wipe the whole per-slug pattern so the
+  // next request rebuilds with fresh annotations.
+  test("wipes per-slug show.data on show-listing changes", async () => {
+    const cache = makeCache();
+    const service = new CacheInvalidationService(cache as never, logger);
+
+    await service.invalidateShowListings();
+
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.show.allData());
+  });
 });

@@ -9,14 +9,17 @@ const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } 
 // Cache invalidation stub — write-path tests don't reach into it but the
 // constructor requires a real-shaped service. Cast at the boundary so we
 // don't have to enumerate every method.
-function makeCacheInvalidationStub(): CacheInvalidationService {
+function makeCacheInvalidationStub(): CacheInvalidationService & {
+  invalidateRockOperaAssignment: Mock;
+} {
   return {
     invalidateShow: vi.fn(),
     invalidateShowListings: vi.fn(),
     invalidateShowComprehensive: vi.fn(),
     invalidateSongCaches: vi.fn(),
     invalidateAllTimers: vi.fn(),
-  } as unknown as CacheInvalidationService;
+    invalidateRockOperaAssignment: vi.fn(),
+  } as unknown as CacheInvalidationService & { invalidateRockOperaAssignment: Mock };
 }
 
 // Stats stub — preserves the Mock type on `rebuildGapsAndSongStatsSince`
@@ -29,7 +32,11 @@ function makeStatsStub(): StatsService & { rebuildGapsAndSongStatsSince: Mock } 
 }
 
 function makeMockDb() {
-  return {
+  // Bound to a single object so $transaction(callback) passes the same
+  // mock through, letting tests assert on `db.rockOperaPerformance.*.mock.calls`
+  // for calls made inside the transaction.
+  // biome-ignore lint/suspicious/noExplicitAny: test mock
+  const db: any = {
     show: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn(),
@@ -61,11 +68,26 @@ function makeMockDb() {
     venue: {
       findUnique: vi.fn().mockResolvedValue(null),
     },
-    $transaction: vi.fn(async (ops: unknown[]) => {
-      // Mirror Prisma's array-form $transaction: resolve each pre-built call.
-      return Promise.all(ops as Array<Promise<unknown>>);
-    }),
+    rockOpera: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    rockOperaPerformance: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   };
+  db.$transaction = vi.fn(async (input: unknown) => {
+    // Two forms: an array of pre-built calls, or a callback that receives
+    // the tx client. Mirror both — the rock-opera diff uses the callback
+    // form so it can sequence findMany → deleteMany → createMany against
+    // the same tx handle.
+    if (typeof input === "function") {
+      return (input as (tx: unknown) => Promise<unknown>)(db);
+    }
+    return Promise.all(input as Array<Promise<unknown>>);
+  });
+  return db;
 }
 
 describe("ShowService.getShowDatesWithFlags", () => {
@@ -230,6 +252,142 @@ describe("ShowService.update countForStats", () => {
 
     const updateArgs = db.show.update.mock.calls[0][0];
     expect(updateArgs.data.countForStats).toBe(false);
+  });
+});
+
+describe("ShowService.update — rock opera assignments", () => {
+  // Helper: stock a show.update mock that returns a valid show row so the
+  // outer update flow completes. The rock opera diff runs after this.
+  function setupShowUpdate(db: ReturnType<typeof makeMockDb>) {
+    db.show.findUnique.mockResolvedValueOnce({ id: "show-id", date: "2024-03-29", venueId: "venue-1" });
+    db.show.update.mockResolvedValue({
+      id: "show-id",
+      slug: "2024-03-29-test",
+      date: "2024-03-29",
+      venueId: "venue-1",
+      bandId: "band-1",
+      notes: null,
+      relistenUrl: null,
+      legacyId: null,
+      likesCount: 0,
+      averageRating: 0,
+      ratingsCount: 0,
+      showPhotosCount: 0,
+      showYoutubesCount: 0,
+      reviewsCount: 0,
+      countForStats: true,
+      dayOrder: null,
+      searchText: null,
+      searchVector: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  // Admin toggles rock opera tags from {A, B} to {B, C}. Expect a transactional
+  // diff: A is deleted, C is inserted, B is untouched. Drives the admin form
+  // "set me to exactly this list" semantics.
+  test("diffs {A,B} -> {B,C} as delete A + insert C, leaves B untouched", async () => {
+    const db = makeMockDb();
+    setupShowUpdate(db);
+    // Current rock opera tags for the show
+    db.rockOperaPerformance.findMany.mockResolvedValueOnce([
+      { rockOperaId: "ro-A", rockOpera: { slug: "opera-A" } },
+      { rockOperaId: "ro-B", rockOpera: { slug: "opera-B" } },
+    ]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.update("2024-03-29-test", {
+      date: "2024-03-29",
+      rockOperaIds: ["ro-B", "ro-C"],
+    });
+
+    expect(db.rockOperaPerformance.deleteMany).toHaveBeenCalledWith({
+      where: { showId: "show-id", rockOperaId: { in: ["ro-A"] } },
+    });
+    expect(db.rockOperaPerformance.createMany).toHaveBeenCalledWith({
+      data: [{ showId: "show-id", rockOperaId: "ro-C" }],
+    });
+  });
+
+  // No rock opera change → no diff queries fired. Untouched edits (notes
+  // only, etc.) shouldn't read or write the join table.
+  test("does not touch rock opera tables when rockOperaIds is omitted", async () => {
+    const db = makeMockDb();
+    setupShowUpdate(db);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.update("2024-03-29-test", { date: "2024-03-29", notes: "edited" });
+
+    expect(db.rockOperaPerformance.findMany).not.toHaveBeenCalled();
+    expect(db.rockOperaPerformance.deleteMany).not.toHaveBeenCalled();
+    expect(db.rockOperaPerformance.createMany).not.toHaveBeenCalled();
+  });
+
+  // Empty array semantics: caller is saying "this show has no rock opera
+  // tags". Delete every existing row for the show, insert nothing.
+  test("clears all tags when rockOperaIds is an empty array", async () => {
+    const db = makeMockDb();
+    setupShowUpdate(db);
+    db.rockOperaPerformance.findMany.mockResolvedValueOnce([
+      { rockOperaId: "ro-A", rockOpera: { slug: "opera-A" } },
+      { rockOperaId: "ro-B", rockOpera: { slug: "opera-B" } },
+    ]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.update("2024-03-29-test", { date: "2024-03-29", rockOperaIds: [] });
+
+    expect(db.rockOperaPerformance.deleteMany).toHaveBeenCalledWith({
+      where: { showId: "show-id", rockOperaId: { in: ["ro-A", "ro-B"] } },
+    });
+    expect(db.rockOperaPerformance.createMany).not.toHaveBeenCalled();
+  });
+
+  // No-op diff (current set === new set): no writes, no cache invalidation
+  // for rock operas. The outer show comprehensive invalidation still fires.
+  test("no DB writes or rock opera cache invalidation when tags are unchanged", async () => {
+    const db = makeMockDb();
+    setupShowUpdate(db);
+    db.rockOperaPerformance.findMany.mockResolvedValueOnce([
+      { rockOperaId: "ro-A", rockOpera: { slug: "opera-A" } },
+      { rockOperaId: "ro-B", rockOpera: { slug: "opera-B" } },
+    ]);
+    const cacheStub = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cacheStub, makeStatsStub());
+
+    await service.update("2024-03-29-test", { date: "2024-03-29", rockOperaIds: ["ro-A", "ro-B"] });
+
+    expect(db.rockOperaPerformance.deleteMany).not.toHaveBeenCalled();
+    expect(db.rockOperaPerformance.createMany).not.toHaveBeenCalled();
+    expect(cacheStub.invalidateRockOperaAssignment).not.toHaveBeenCalled();
+  });
+
+  // Cache invalidation fires for the union of removed + added slugs (so
+  // both opera-A's resource page list and opera-C's are refreshed).
+  // Neighbor-show invalidation (every other tagged show's annotation
+  // rank shifting) is handled at the broader invalidateShowListings
+  // layer via the show.data:* pattern delete — see
+  // cache-invalidation-service.test.ts.
+  test("invalidates rock opera caches for the union of removed + added slugs", async () => {
+    const db = makeMockDb();
+    setupShowUpdate(db);
+    db.rockOperaPerformance.findMany.mockResolvedValueOnce([
+      { rockOperaId: "ro-A", rockOpera: { slug: "opera-A" } },
+      { rockOperaId: "ro-B", rockOpera: { slug: "opera-B" } },
+    ]);
+    // Resolve newly-added opera-C's slug for cache invalidation
+    db.rockOpera.findMany.mockResolvedValueOnce([{ id: "ro-C", slug: "opera-C" }]);
+    const cacheStub = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cacheStub, makeStatsStub());
+
+    await service.update("2024-03-29-test", { date: "2024-03-29", rockOperaIds: ["ro-B", "ro-C"] });
+
+    expect(cacheStub.invalidateRockOperaAssignment).toHaveBeenCalledWith(
+      expect.arrayContaining(["opera-A", "opera-C"]),
+    );
+    // opera-B is untouched (in both sets) — should not appear in invalidation list.
+    const invalidatedSlugs = (cacheStub.invalidateRockOperaAssignment as Mock).mock.calls[0][0] as string[];
+    expect(invalidatedSlugs).not.toContain("opera-B");
   });
 });
 

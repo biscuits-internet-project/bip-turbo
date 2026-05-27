@@ -22,4 +22,9 @@ export const EXTERNAL_SOURCE_DOMAINS = {
   nugs: "nugs.net",
   youtube: "youtube.com",
   archive: "archive.org",
+  spotify: "spotify.com",
+  appleMusic: "music.apple.com",
+  // Odesli (song.link / album.link) — the "any other service" chooser
+  // we link to when we want listeners on Tidal / Deezer / Amazon / etc.
+  songLink: "song.link",
 } as const;

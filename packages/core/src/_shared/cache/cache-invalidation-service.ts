@@ -58,6 +58,16 @@ export class CacheInvalidationService {
       // Per-user song-history embeds the catalog of tracks at each attended
       // show; a show metadata or tracks change can shift values.
       this.cache.delPattern(CacheKeys.users.allSongHistory()),
+      // Rock opera resource pages embed full Setlists (with tracks,
+      // annotations, ratings, notes, date) for every tagged show. Any
+      // show-affecting mutation can stale them.
+      this.cache.delPattern(CacheKeys.rockOperas.allPerformances()),
+      // show.data caches per-slug Setlists with rockOperaPerformances
+      // baked in (SetlistService overlays them in findByShowSlug etc.).
+      // When a tagged show's date moves or any rock opera assignment
+      // changes, neighbors' annotations (rank/prev/next) shift — wipe
+      // every show.data so the next request rebuilds with fresh data.
+      this.cache.delPattern(CacheKeys.show.allData()),
       this.cloudflareCache?.purgeYearListings(),
     ]);
   }
@@ -113,6 +123,19 @@ export class CacheInvalidationService {
       // SetlistCard "personal" view reads this user's song-history blob.
       this.cache.del(CacheKeys.users.songHistory(userId)),
     ]);
+  }
+
+  /**
+   * Invalidate rock opera resource-page caches after an assignment
+   * change. Per-show annotation invalidation is handled at the
+   * listings layer because annotations now ride inside the cached
+   * Setlist payloads (show.data, shows.list, etc.) — see
+   * `invalidateShowListings`.
+   */
+  async invalidateRockOperaAssignment(rockOperaSlugs: string[]): Promise<void> {
+    if (rockOperaSlugs.length === 0) return;
+    this.logger.info(`Invalidating rock opera resource caches: slugs=${rockOperaSlugs.join(",")}`);
+    await Promise.all(rockOperaSlugs.map((slug) => this.cache.del(CacheKeys.rockOperas.performances(slug))));
   }
 
   /**

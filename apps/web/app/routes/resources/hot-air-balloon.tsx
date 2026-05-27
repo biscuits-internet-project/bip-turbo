@@ -1,8 +1,15 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { SetlistList } from "~/components/setlist/setlist-list";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { ROCK_OPERA_SLUG } from "~/lib/rock-operas";
+import { slugifyAnchor } from "~/lib/utils";
+import { getRockOperaPerformances, type RockOperaPerformancesLoaderData } from "./rock-opera-performances";
 
-export const loader = publicLoader<void>(async () => {});
+export const loader = publicLoader<RockOperaPerformancesLoaderData>(({ context }) =>
+  getRockOperaPerformances(ROCK_OPERA_SLUG.HOT_AIR_BALLOON, context),
+);
 
 export function meta() {
   return [
@@ -472,6 +479,7 @@ function StoryCard({ song, index, actLabel }: { song: SongSection; index: number
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 const HotAirBalloon: React.FC = () => {
+  const { performances, externalSources } = useSerializedLoaderData<RockOperaPerformancesLoaderData>();
   return (
     <div className="space-y-10 md:space-y-14">
       {/* ── Hero Banner ── */}
@@ -513,8 +521,52 @@ const HotAirBalloon: React.FC = () => {
         </p>
       </div>
 
+      {/* ── Table of Contents ── */}
+      <nav
+        aria-label="Page contents"
+        className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 to-purple-900/5 p-5 md:p-6"
+      >
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Contents</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-base">
+          <a href="#characters" className="text-brand-primary hover:text-brand-secondary">
+            Characters
+          </a>
+          <a href="#full-performances" className="text-brand-primary hover:text-brand-secondary">
+            Full Performances
+          </a>
+          <div>
+            <a href="#act-1" className="text-brand-primary hover:text-brand-secondary font-medium">
+              Act I
+            </a>
+            <ul className="mt-1.5 ml-3 space-y-1 text-sm text-content-text-secondary">
+              {act1.map((song) => (
+                <li key={song.name}>
+                  <a href={`#hab-${slugifyAnchor(song.name)}`} className="hover:text-brand-secondary">
+                    {song.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <a href="#act-2" className="text-brand-primary hover:text-brand-secondary font-medium">
+              Act II
+            </a>
+            <ul className="mt-1.5 ml-3 space-y-1 text-sm text-content-text-secondary">
+              {act2.map((song) => (
+                <li key={song.name}>
+                  <a href={`#hab-${slugifyAnchor(song.name)}`} className="hover:text-brand-secondary">
+                    {song.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </nav>
+
       {/* ── Characters ── */}
-      <section>
+      <section id="characters" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Characters</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {characters.map((char) => (
@@ -524,22 +576,40 @@ const HotAirBalloon: React.FC = () => {
       </section>
 
       {/* ── Act I ── */}
-      <section>
+      <section id="act-1" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Act I</h2>
         <div className="space-y-4">
           {act1.map((song, i) => (
-            <StoryCard key={song.name} song={song} index={i} actLabel="Act I" />
+            <div key={song.name} id={`hab-${slugifyAnchor(song.name)}`} className="scroll-mt-20">
+              <StoryCard song={song} index={i} actLabel="Act I" />
+            </div>
           ))}
         </div>
       </section>
 
       {/* ── Act II ── */}
-      <section>
+      <section id="act-2" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Act II</h2>
         <div className="space-y-4">
           {act2.map((song, i) => (
-            <StoryCard key={song.name} song={song} index={i} actLabel="Act II" />
+            <div key={song.name} id={`hab-${slugifyAnchor(song.name)}`} className="scroll-mt-20">
+              <StoryCard song={song} index={i} actLabel="Act II" />
+            </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Full Performances ── */}
+      <section id="full-performances" className="scroll-mt-20">
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Full Performances</h2>
+        <div className="space-y-1">
+          <SetlistList
+            setlists={performances}
+            externalSources={externalSources}
+            numbered
+            collapsible
+            empty={<p className="text-sm text-content-text-tertiary">No full performances tagged yet.</p>}
+          />
         </div>
       </section>
     </div>

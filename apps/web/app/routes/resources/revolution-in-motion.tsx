@@ -1,9 +1,18 @@
+import { Podcast } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { SetlistList } from "~/components/setlist/setlist-list";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
+import { ROCK_OPERA_SLUG } from "~/lib/rock-operas";
+import { slugifyAnchor } from "~/lib/utils";
+import { getRockOperaPerformances, type RockOperaPerformancesLoaderData } from "./rock-opera-performances";
 
-export const loader = publicLoader<void>(async () => {});
+export const loader = publicLoader<RockOperaPerformancesLoaderData>(({ context }) =>
+  getRockOperaPerformances(ROCK_OPERA_SLUG.REVOLUTION_IN_MOTION, context),
+);
 
 export function meta() {
   return [
@@ -261,73 +270,71 @@ const places = [
   { name: "The Wormhole", description: "Cosmic anomaly that transports the JP-8000 between Polyfuzia and Earth." },
 ];
 
-const listenLinks = [
-  // Albums
+/**
+ * Service URLs are kept as direct deep-links (no song.link wrapper)
+ * because Odesli's ISRC-fingerprint match can't pair these albums'
+ * Spotify and Apple Music releases — going through the chooser would
+ * silently drop whichever side it can't resolve. Direct links always
+ * land somewhere.
+ */
+const albumLinks: Array<{
+  label: string;
+  spotify?: string;
+  appleMusic?: string;
+  youtube?: string;
+  songLink?: string;
+}> = [
   {
     label: "Studio Album",
-    platform: "Spotify",
-    url: "https://open.spotify.com/album/0uPgoCXqTnQHJG3DZIJsHw?si=tOGABWMRRwWha_b5FXjwgQ",
-  },
-  {
-    label: "Studio Album",
-    platform: "YouTube",
-    url: "https://youtu.be/u7zLw5bxFBo?list=PLGwX3lC4qIF1wHftTP21qVuujFo3gTbJv",
+    spotify: "https://open.spotify.com/album/0uPgoCXqTnQHJG3DZIJsHw?si=tOGABWMRRwWha_b5FXjwgQ",
+    appleMusic: "https://music.apple.com/us/album/revolution-in-motion/1728324671",
+    youtube: "https://youtu.be/u7zLw5bxFBo?list=PLGwX3lC4qIF1wHftTP21qVuujFo3gTbJv",
+    songLink: "https://album.link/i/1728324671",
   },
   {
     label: "Live at Webster Hall",
-    platform: "Spotify",
-    url: "https://open.spotify.com/album/0rGWjTzqLiOrLK4vbeemap?si=S6msCxqXR0auGtY7vHJOkA",
+    spotify: "https://open.spotify.com/album/0rGWjTzqLiOrLK4vbeemap?si=S6msCxqXR0auGtY7vHJOkA",
+    appleMusic:
+      "https://music.apple.com/us/album/revolution-in-motion-live-3-29-2024-webster-hall-new-york-ny/1805195096",
+    songLink: "https://album.link/i/1805195096",
   },
   {
     label: "Instrumental",
-    platform: "Spotify",
-    url: "https://open.spotify.com/album/5BfTU8jKekyoZ9Pzo05TrR?si=54IWEib1Sy-c56TMk1mTcA",
-  },
-  // Video
-  { label: "Comic Film", platform: "YouTube", url: "https://youtu.be/vD-VmObIg5M" },
-  // Podcast
-  {
-    label: "TDAD Ep. 1",
-    platform: "Spotify",
-    url: "https://open.spotify.com/episode/6s4tAeUX33pSaDumUmkOQM?si=db8bdf1c97b7468b",
+    spotify: "https://open.spotify.com/album/5BfTU8jKekyoZ9Pzo05TrR?si=54IWEib1Sy-c56TMk1mTcA",
+    appleMusic: "https://music.apple.com/us/album/revolution-in-motion-the-instrumentals-instrumental/1811777941",
+    songLink: "https://album.link/i/1811777941",
   },
   {
-    label: "TDAD Ep. 2",
-    platform: "Spotify",
-    url: "https://open.spotify.com/episode/54Zjuh6fwPsiO8gTLZsYNC?si=e734ccc483a54f04",
+    label: "Comic Film",
+    youtube: "https://youtu.be/vD-VmObIg5M",
   },
-  {
-    label: "TDAD Ep. 3",
-    platform: "Spotify",
-    url: "https://open.spotify.com/episode/10MMvZkLjms2Neeio5saxk?si=0f83eda6565d4f58",
-  },
-  {
-    label: "TDAD Ep. 4",
-    platform: "Spotify",
-    url: "https://open.spotify.com/episode/40MdETGDzLMX953uretRsT?si=_R8KGhETRjuIfcvmPaS1RA",
-  },
-  {
-    label: "TDAD Ep. 5",
-    platform: "Spotify",
-    url: "https://open.spotify.com/episode/3roMHKm8JXNbxM6QVmsCd5?si=5514142a431743a6",
-  },
+];
+
+// Podcast — pod.link routes the listener to whichever podcast app they
+// prefer (Apple Podcasts, Spotify, Overcast, etc.), so a single icon
+// link per episode is enough.
+const podcastEpisodes: Array<{ label: string; url: string }> = [
+  { label: "TDAD Ep. 1", url: "https://pod.link/1460530534/episode/NjVhZDYwNzQyZTY0MTQwMDE2ZjExYzcy" },
+  { label: "TDAD Ep. 2", url: "https://pod.link/1460530534/episode/NjVkMmJmMDgyMTNjMzAwMDE4NmE0Mzhi" },
+  { label: "TDAD Ep. 3", url: "https://pod.link/1460530534/episode/NjVmNzg0ZWY0N2RhZGYwMDE3ZGQ1ZTFm" },
+  { label: "TDAD Ep. 4", url: "https://pod.link/1460530534/episode/NjYwOWZjZmQ4NGQzOGEwMDE2YWY2NDY5" },
+  { label: "TDAD Ep. 5", url: "https://pod.link/1460530534/episode/NjYxNGMyZmU3MTA1ZWMwMDE2NjQ0MGQx" },
 ];
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
-function SpotifyIcon({ className }: { className?: string }) {
+function ServiceIconLink({ domain, href, label }: { domain: string; href: string; label: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role="img" aria-label="Spotify">
-      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-    </svg>
-  );
-}
-
-function YouTubeIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role="img" aria-label="YouTube">
-      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-    </svg>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      title={label}
+      className="shrink-0 rounded p-1 hover:bg-purple-500/20 transition-colors"
+    >
+      <img src={faviconSrc(domain)} alt="" className="h-4 w-4" />
+    </a>
   );
 }
 
@@ -457,6 +464,7 @@ function GlossaryPill({ item }: { item: (typeof glossary)[number] }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 const RevolutionInMotion: React.FC = () => {
+  const { performances, externalSources } = useSerializedLoaderData<RockOperaPerformancesLoaderData>();
   return (
     <div className="space-y-10 md:space-y-14">
       {/* ── Hero Banner ── */}
@@ -496,50 +504,120 @@ const RevolutionInMotion: React.FC = () => {
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5">
             <h3 className="text-base font-semibold tracking-[3px] text-purple-400/70 uppercase mb-4">Listen & Watch</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-[3fr_2fr] gap-4">
               <div className="space-y-2">
-                {listenLinks
-                  .filter((l) => !l.label.startsWith("TDAD"))
-                  .map((link) => (
-                    <a
-                      key={link.url}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 rounded-lg border border-purple-500/10 bg-purple-950/30 px-3 py-2.5 text-sm text-purple-200 hover:border-purple-500/30 hover:bg-purple-900/20 transition-colors"
-                    >
-                      {link.platform === "YouTube" ? (
-                        <YouTubeIcon className="w-4 h-4 text-red-400 shrink-0" />
-                      ) : (
-                        <SpotifyIcon className="w-4 h-4 text-green-400 shrink-0" />
+                {albumLinks.map((album) => (
+                  <div
+                    key={album.label}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-purple-500/10 bg-purple-950/30 px-3 py-2.5 text-sm text-purple-200"
+                  >
+                    <span className="truncate">{album.label}</span>
+                    {/* ml-auto so the icon group stays right-aligned
+                        whether it sits on the same line as the label
+                        or wraps to its own line. */}
+                    <div className="ml-auto flex items-center gap-0.5 shrink-0">
+                      {album.spotify && (
+                        <ServiceIconLink
+                          domain={EXTERNAL_SOURCE_DOMAINS.spotify}
+                          href={album.spotify}
+                          label={`${album.label} on Spotify`}
+                        />
                       )}
-                      <span className="truncate">{link.label}</span>
-                    </a>
-                  ))}
+                      {album.appleMusic && (
+                        <ServiceIconLink
+                          domain={EXTERNAL_SOURCE_DOMAINS.appleMusic}
+                          href={album.appleMusic}
+                          label={`${album.label} on Apple Music`}
+                        />
+                      )}
+                      {album.youtube && (
+                        <ServiceIconLink
+                          domain={EXTERNAL_SOURCE_DOMAINS.youtube}
+                          href={album.youtube}
+                          label={`${album.label} on YouTube`}
+                        />
+                      )}
+                      {album.songLink && (
+                        <ServiceIconLink
+                          domain={EXTERNAL_SOURCE_DOMAINS.songLink}
+                          href={album.songLink}
+                          label={`${album.label} on other services`}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="space-y-2">
-                {listenLinks
-                  .filter((l) => l.label.startsWith("TDAD"))
-                  .map((link) => (
-                    <a
-                      key={link.url}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 rounded-lg border border-purple-500/10 bg-purple-950/30 px-3 py-2.5 text-sm text-purple-200 hover:border-purple-500/30 hover:bg-purple-900/20 transition-colors"
-                    >
-                      <SpotifyIcon className="w-4 h-4 text-green-400 shrink-0" />
-                      <span className="truncate">{link.label}</span>
-                    </a>
-                  ))}
+              {/* 2 columns on mobile (panel is full-width below the
+                  albums so two short "TDAD Ep. N" labels fit comfortably
+                  per row), single column at sm+ where the panel is the
+                  narrow right side and there's no room to pair them. */}
+              <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
+                {podcastEpisodes.map((episode) => (
+                  <a
+                    key={episode.url}
+                    href={episode.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 rounded-lg border border-purple-500/10 bg-purple-950/30 px-3 py-2.5 text-sm text-purple-200 hover:border-purple-500/30 hover:bg-purple-900/20 transition-colors"
+                  >
+                    <Podcast className="w-4 h-4 text-purple-300 shrink-0" aria-label="Podcast" />
+                    <span className="truncate">{episode.label}</span>
+                  </a>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* ── Table of Contents ── */}
+      <nav
+        aria-label="Page contents"
+        className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 to-purple-900/5 p-5 md:p-6"
+      >
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Contents</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-base">
+          <a href="#characters" className="text-brand-primary hover:text-brand-secondary">
+            Characters
+          </a>
+          <a href="#tracklist" className="text-brand-primary hover:text-brand-secondary">
+            Track Listing
+          </a>
+          <a href="#places" className="text-brand-primary hover:text-brand-secondary">
+            Places
+          </a>
+          <a href="#glossary" className="text-brand-primary hover:text-brand-secondary">
+            Glossary
+          </a>
+          <a href="#background" className="text-brand-primary hover:text-brand-secondary">
+            Background & Development
+          </a>
+          <a href="#releases" className="text-brand-primary hover:text-brand-secondary">
+            Releases
+          </a>
+          <a href="#full-performances" className="text-brand-primary hover:text-brand-secondary">
+            Full Performances
+          </a>
+          <div>
+            <a href="#the-story" className="text-brand-primary hover:text-brand-secondary font-medium">
+              The Story
+            </a>
+            <ul className="mt-1.5 ml-3 space-y-1 text-sm text-content-text-secondary">
+              {storyParts.map((part) => (
+                <li key={part.title}>
+                  <a href={`#rim-${slugifyAnchor(part.title)}`} className="hover:text-brand-secondary">
+                    {part.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </nav>
+
       {/* ── Characters ── */}
-      <section>
+      <section id="characters" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Characters</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {characters.map((char) => (
@@ -549,11 +627,13 @@ const RevolutionInMotion: React.FC = () => {
       </section>
 
       {/* ── The Story ── */}
-      <section>
+      <section id="the-story" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">The Story</h2>
         <div className="space-y-4">
           {storyParts.map((part, i) => (
-            <StoryCard key={part.title} part={part} index={i} />
+            <div key={part.title} id={`rim-${slugifyAnchor(part.title)}`} className="scroll-mt-20">
+              <StoryCard part={part} index={i} />
+            </div>
           ))}
         </div>
       </section>
@@ -561,7 +641,10 @@ const RevolutionInMotion: React.FC = () => {
       {/* ── Reference Grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Tracklist */}
-        <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5">
+        <div
+          id="tracklist"
+          className="scroll-mt-20 rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5"
+        >
           <h3 className="text-base font-semibold tracking-[3px] text-purple-400/70 uppercase mb-4">Track Listing</h3>
           <ol className="space-y-1.5">
             {tracklist.map((track, i) => (
@@ -576,7 +659,10 @@ const RevolutionInMotion: React.FC = () => {
         </div>
 
         {/* Places */}
-        <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5">
+        <div
+          id="places"
+          className="scroll-mt-20 rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5"
+        >
           <h3 className="text-base font-semibold tracking-[3px] text-purple-400/70 uppercase mb-4">Places</h3>
           <div className="space-y-4">
             {places.map((place) => (
@@ -590,7 +676,7 @@ const RevolutionInMotion: React.FC = () => {
       </div>
 
       {/* ── Glossary ── */}
-      <section>
+      <section id="glossary" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Glossary</h2>
         <p className="text-sm text-content-text-tertiary mb-4">Tap a term to see its definition</p>
         <div className="flex flex-wrap gap-2">
@@ -601,7 +687,10 @@ const RevolutionInMotion: React.FC = () => {
       </section>
 
       {/* ── Background & Development ── */}
-      <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5 md:p-8">
+      <section
+        id="background"
+        className="scroll-mt-20 rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5 md:p-8"
+      >
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-6">
           Background & Development
         </h2>
@@ -678,7 +767,7 @@ const RevolutionInMotion: React.FC = () => {
       </section>
 
       {/* ── Releases ── */}
-      <section>
+      <section id="releases" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">
           Releases & Performances
         </h2>
@@ -718,6 +807,20 @@ const RevolutionInMotion: React.FC = () => {
               <p className="text-sm text-content-text-secondary leading-relaxed">{release.detail}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Full Performances ── */}
+      <section id="full-performances" className="scroll-mt-20">
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Full Performances</h2>
+        <div className="space-y-1">
+          <SetlistList
+            setlists={performances}
+            externalSources={externalSources}
+            numbered
+            collapsible
+            empty={<p className="text-sm text-content-text-tertiary">No full performances tagged yet.</p>}
+          />
         </div>
       </section>
     </div>

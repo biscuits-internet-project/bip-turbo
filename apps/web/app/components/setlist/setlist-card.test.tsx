@@ -96,6 +96,7 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
     averageSongGap: null,
     medianSongGap: null,
     debutCount: 0,
+    rockOperaPerformances: [],
   };
 }
 

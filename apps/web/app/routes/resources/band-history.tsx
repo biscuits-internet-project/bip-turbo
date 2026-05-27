@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
+import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 
 const Link = (props: React.ComponentProps<typeof RouterLink>) => (
   <RouterLink {...props} className={`text-brand hover:text-hover-accent ${props.className || ""}`} />
@@ -550,9 +551,9 @@ const BandHistory: React.FC = () => {
               June was a month that found the band reaching for the{" "}
               <span style={{ color: "black", backgroundColor: "hotpink", padding: 4 }}>stars</span> on a nightly basis.
               Starting things off with a full performance of{" "}
-              <Link to="/resources/chemical-warfare-brigade">Chemical Warfare Brigade</Link> in Providence, RI on{" "}
-              <Link to="/shows/2009-06-03-lupo-s-heartbreak-hotel-providence-ri">6/3</Link>, the band then traveled to
-              Buffalo for a free outdoors show in Lafayette Square.{" "}
+              <Link to={rockOperaPath(ROCK_OPERA_SLUG.CHEMICAL_WARFARE_BRIGADE)}>Chemical Warfare Brigade</Link> in
+              Providence, RI on <Link to="/shows/2009-06-03-lupo-s-heartbreak-hotel-providence-ri">6/3</Link>, the band
+              then traveled to Buffalo for a free outdoors show in Lafayette Square.{" "}
               <Link to="/shows/2009-06-05-house-of-blues-cleveland-oh">6/05</Link> in Cleveland, OH might be one of the
               most complete shows of this banner year start to finish, but it would be criminal to not at least mention
               the Vassillios &gt; HAB and the Basis from this storied evening.{" "}

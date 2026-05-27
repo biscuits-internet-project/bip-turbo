@@ -10,6 +10,7 @@ import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
+import { RockOperaAnnotations } from "./rock-opera-annotations";
 import { SetlistTable } from "./setlist-table";
 import { SetlistTablePersonal } from "./setlist-table-personal";
 import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-control";
@@ -306,6 +307,7 @@ function SetlistCardComponent({
       >
         <div className={cn(collapsible && "overflow-hidden")}>
           <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
+            <RockOperaAnnotations performances={setlist.rockOperaPerformances} />
             {setlist.show.notes && (
               <div
                 className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"

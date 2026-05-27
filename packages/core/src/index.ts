@@ -12,6 +12,7 @@ export * from "./blog-posts/blog-post-service";
 export * from "./page-composers/song-page-composer";
 export * from "./ratings/rating-service";
 export * from "./reviews/review-service";
+export * from "./rock-operas/rock-opera-service";
 export * from "./search/postgres-search-service";
 export * from "./setlists/setlist-service";
 export * from "./shows/archive-dot-org-service";

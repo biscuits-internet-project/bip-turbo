@@ -12,6 +12,7 @@ import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
+import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 import { getHomeMeta } from "~/lib/seo";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -356,7 +357,7 @@ export default function Index() {
 
             {/* Revolution in Motion */}
             <div>
-              <Link to="/resources/revolution-in-motion" className="block group">
+              <Link to={rockOperaPath(ROCK_OPERA_SLUG.REVOLUTION_IN_MOTION)} className="block group">
                 <div className="card-premium rounded-lg overflow-hidden">
                   <div className="relative">
                     <img

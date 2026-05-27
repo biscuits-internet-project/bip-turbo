@@ -25,6 +25,20 @@ export function getSafeRedirectUrl(url: string | null): string {
 export const ATTENDED_ROW_CLASS = "!border-l-2 !border-l-green-500 bg-green-500/5";
 
 /**
+ * Slugify a display name into an in-page anchor fragment: lowercase,
+ * non-alphanumeric runs become single hyphens, leading/trailing hyphens
+ * trimmed. Used by static pages (rock opera resources, anywhere we
+ * generate `id="..."` and matching `<a href="#...">` from prose-style
+ * names). Not a URL slug — for that, use core's `slugify`.
+ */
+export function slugifyAnchor(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/**
  * Canonical desktop short date for show-related dates across the app
  * (year listings, top-rated, songs/all-timers performance tables, song-detail
  * stat cards). Output is `M/D/YYYY` with no leading zeros.

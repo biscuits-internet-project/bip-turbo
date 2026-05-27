@@ -344,10 +344,37 @@ model Show {
   previousPerformanceTracks Track[]            @relation("TrackPreviousPerformance")
   segueRuns         SegueRun[]
   files             ShowToFile[]
+  rockOperaPerformances RockOperaPerformance[]
 
   @@index([likesCount])
   @@index([date])
   @@map("shows")
+}
+
+model RockOpera {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug         String                 @unique(map: "rock_operas_slug_unique") @db.VarChar
+  name         String                 @db.VarChar
+  shortName    String                 @map("short_name") @db.VarChar
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime               @updatedAt @map("updated_at") @db.Timestamp(6)
+  performances RockOperaPerformance[]
+
+  @@map("rock_operas")
+}
+
+model RockOperaPerformance {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showId      String   @map("show_id") @db.Uuid
+  rockOperaId String   @map("rock_opera_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  show      Show      @relation(fields: [showId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rock_opera_performances_shows_show_id")
+  rockOpera RockOpera @relation(fields: [rockOperaId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rock_opera_performances_rock_operas_rock_opera_id")
+
+  @@unique([showId, rockOperaId], map: "rock_opera_performances_show_rock_opera_unique")
+  @@index([rockOperaId])
+  @@map("rock_opera_performances")
 }
 
 model SideProject {
