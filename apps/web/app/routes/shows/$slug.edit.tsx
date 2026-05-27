@@ -1,4 +1,4 @@
-import type { Band, Show, Track, Venue } from "@bip/domain";
+import type { Band, RockOpera, Show, Track, Venue } from "@bip/domain";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -19,6 +19,8 @@ interface LoaderData {
   venues: Venue[];
   tracks: Track[];
   sameDateShows: ShowDayOrderRow[];
+  rockOperas: RockOpera[];
+  currentRockOperaIds: string[];
 }
 
 export const loader = adminLoader(async ({ params }) => {
@@ -48,7 +50,19 @@ export const loader = adminLoader(async ({ params }) => {
     venueName: s.venue?.name ?? null,
   }));
 
-  return { show, bands, venues, tracks, sameDateShows };
+  // Rock opera checkbox source + current selection. The annotations call
+  // returns each opera's slug; we map back to id for the form value via
+  // the full list. Tiny lookup tables, both queries are cheap.
+  const [rockOperas, currentRockOperaAnnotations] = await Promise.all([
+    services.rockOperas.findAll(),
+    services.rockOperas.findPerformancesForShow(show.id),
+  ]);
+  const slugToId = new Map(rockOperas.map((o) => [o.slug, o.id]));
+  const currentRockOperaIds = currentRockOperaAnnotations
+    .map((annotation) => slugToId.get(annotation.rockOpera.slug))
+    .filter((id): id is string => id !== undefined);
+
+  return { show, bands, venues, tracks, sameDateShows, rockOperas, currentRockOperaIds };
 });
 
 export const action = adminAction(async ({ request, params }) => {
@@ -65,6 +79,9 @@ export const action = adminAction(async ({ request, params }) => {
     notes: (formData.get("notes") as string) || null,
     relistenUrl: (formData.get("relistenUrl") as string) || null,
     countForStats: formData.get("countForStats") === "true",
+    // Multi-select: every checked id is appended under the same FormData key
+    // so `getAll` returns the full selection (empty array = clear all tags).
+    rockOperaIds: formData.getAll("rockOperaIds").map(String),
   };
 
   // Update the show
@@ -74,7 +91,7 @@ export const action = adminAction(async ({ request, params }) => {
 });
 
 export default function EditShow() {
-  const { show, bands, tracks, sameDateShows } = useSerializedLoaderData<LoaderData>();
+  const { show, bands, tracks, sameDateShows, rockOperas, currentRockOperaIds } = useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<ShowFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,10 +106,11 @@ export default function EditShow() {
         notes: show.notes || "",
         relistenUrl: show.relistenUrl || "",
         countForStats: show.countForStats ?? true,
+        rockOperaIds: currentRockOperaIds,
       });
       setIsLoading(false);
     }
-  }, [show]);
+  }, [show, currentRockOperaIds]);
 
   const handleSubmit = async (data: ShowFormValues) => {
     const loadingToast = toast.loading("Updating show...");
@@ -105,6 +123,9 @@ export default function EditShow() {
       formData.append("notes", data.notes);
       formData.append("relistenUrl", data.relistenUrl);
       formData.append("countForStats", data.countForStats ? "true" : "false");
+      for (const id of data.rockOperaIds) {
+        formData.append("rockOperaIds", id);
+      }
 
       const response = await fetch(`/shows/${show.slug}/edit`, {
         method: "POST",
@@ -148,6 +169,7 @@ export default function EditShow() {
               cancelHref={`/shows/${show.slug}`}
               bands={bands}
               showId={show.id}
+              rockOperas={rockOperas}
             />
           </CardContent>
         </Card>

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildRockOperaAssignmentDiff,
   buildSetlistReconciliation,
   buildShowCreateInput,
   buildSongCreateInput,
@@ -1436,6 +1437,49 @@ describe("diffTrackAnnotations", () => {
     expect(diffTrackAnnotations(local, [])).toEqual({
       toCreateDescs: [],
       toDeleteIds: ["ann-a-uuid", "ann-b-uuid"],
+    });
+  });
+});
+
+// buildRockOperaAssignmentDiff drives the show ↔ rock_operas join sync. Same
+// "undefined means no opinion (pre-deploy MCP), explicit array is authoritative"
+// semantics as diffTrackAnnotations / buildVenueDriftUpdate. Identity is by
+// rock opera slug — slugs are the stable wire identifier (HAB resource page is
+// served at /resources/hot-air-balloon regardless of UUID).
+describe("buildRockOperaAssignmentDiff", () => {
+  // Canonical case: local has the show tagged with CWB, prod has HAB + RIM.
+  // Add HAB + RIM, remove CWB. Drives the sync transactional diff that mirrors
+  // admin-curated rock-opera tagging.
+  test("returns the add/remove delta to reach the remote set", () => {
+    expect(
+      buildRockOperaAssignmentDiff(["chemical-warfare-brigade"], ["hot-air-balloon", "revolution-in-motion"]),
+    ).toEqual({
+      toAdd: ["hot-air-balloon", "revolution-in-motion"],
+      toRemove: ["chemical-warfare-brigade"],
+    });
+  });
+
+  // No drift: same set in any order. No writes — keeps re-runs idempotent and
+  // avoids churning updatedAt on either side.
+  test("returns empty deltas when local and remote match (order-insensitive)", () => {
+    expect(buildRockOperaAssignmentDiff(["hot-air-balloon", "chemical-warfare-brigade"], ["chemical-warfare-brigade", "hot-air-balloon"]))
+      .toEqual({ toAdd: [], toRemove: [] });
+  });
+
+  // Pre-deploy MCP omits rockOperaSlugs entirely. `undefined` means "no
+  // opinion" — never wipe local tags. (Versus explicit empty array which
+  // means "prod has cleared this show's tags; delete local".)
+  test("returns empty deltas when remote is undefined (pre-deploy MCP)", () => {
+    expect(buildRockOperaAssignmentDiff(["hot-air-balloon"], undefined)).toEqual({ toAdd: [], toRemove: [] });
+  });
+
+  // Explicit empty array: prod cleared all tags for this show — local must be
+  // wiped. Distinguishing from `undefined` is the same pattern as
+  // diffTrackAnnotations.
+  test("removes all local tags when remote is explicitly empty", () => {
+    expect(buildRockOperaAssignmentDiff(["hot-air-balloon", "chemical-warfare-brigade"], [])).toEqual({
+      toAdd: [],
+      toRemove: ["hot-air-balloon", "chemical-warfare-brigade"],
     });
   });
 });

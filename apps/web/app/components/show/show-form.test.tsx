@@ -11,6 +11,7 @@ const baseValues: ShowFormValues = {
   notes: "",
   relistenUrl: "",
   countForStats: true,
+  rockOperaIds: [],
 };
 
 describe("ShowForm countForStats", () => {

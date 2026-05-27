@@ -211,6 +211,15 @@ const tools = [
       required: ["slugs"],
     },
   },
+  {
+    name: "get_rock_operas",
+    description: "Get the list of rock operas (Hot Air Balloon, Chemical Warfare Brigade, etc.) and their slugs",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 async function handleToolCall(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -532,7 +541,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
         try {
           const show = await services.shows.findBySlug(slug);
           if (show) {
-            const venue = show.venueId ? await services.venues.findById(show.venueId) : null;
+            const [venue, rockOperaAnnotations] = await Promise.all([
+              show.venueId ? services.venues.findById(show.venueId) : Promise.resolve(null),
+              services.rockOperas.findPerformancesForShow(show.id),
+            ]);
             shows.push({
               slug: show.slug,
               date: show.date,
@@ -547,6 +559,9 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               // (dayOrder). Sync mirrors them on insert + drift-update.
               countForStats: show.countForStats,
               dayOrder: show.dayOrder,
+              // Admin-curated full-rock-opera tagging. Sync mirrors via
+              // findManyRockOperaSlugsForShow in buildShowDriftUpdate.
+              rockOperaSlugs: rockOperaAnnotations.map((annotation) => annotation.rockOpera.slug),
             });
           } else {
             errors.push({ slug, error: "Not found" });
@@ -557,6 +572,17 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       }
 
       return { shows, ...(errors.length > 0 && { errors }) };
+    }
+
+    case "get_rock_operas": {
+      const rockOperas = await services.rockOperas.findAll();
+      return {
+        rockOperas: rockOperas.map((opera) => ({
+          slug: opera.slug,
+          name: opera.name,
+          shortName: opera.shortName,
+        })),
+      };
     }
 
     case "get_songs": {

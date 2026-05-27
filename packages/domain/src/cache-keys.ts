@@ -12,12 +12,16 @@ export const CacheKeys = {
    */
   show: {
     /** Complete show + setlist data for show page */
-    data: (slug: string) => `show:${slug}:data:v3`,
+    data: (slug: string) => `show:${slug}:data:v5`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
     /** All cache keys for a show (for pattern deletion) */
     all: (slug: string) => `show:${slug}:*`,
+    /** Every show.data entry across all slugs (for invalidations on
+     *  mutations that ripple beyond a single show — e.g. a date shift
+     *  on a tagged show changes neighbors' rock opera annotations). */
+    allData: () => "show:*:data:*",
   },
 
   /**
@@ -27,7 +31,7 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      return `shows:list:${filterHash}:v3`;
+      return `shows:list:${filterHash}:v5`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -42,7 +46,7 @@ export const CacheKeys = {
    */
   setlist: {
     /** Complete setlist data with tracks and annotations */
-    data: (slug: string) => `setlist:${slug}:data:v3`,
+    data: (slug: string) => `setlist:${slug}:data:v5`,
   },
 
   /**
@@ -98,7 +102,7 @@ export const CacheKeys = {
      * have 400+ attended shows and the un-paginated payload is large enough
      * to be slow to deserialize/transport even from Redis.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v3`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v5`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -115,11 +119,25 @@ export const CacheKeys = {
   },
 
   /**
+   * Rock opera cache keys. `performances` payloads back the resource-page
+   * lists (Hot Air Balloon / CWB / RIM). Per-show annotation data is no
+   * longer cached separately — SetlistService overlays it onto every
+   * returned setlist, so it rides inside the existing show.data /
+   * shows.list / users.attendedSetlists payloads.
+   */
+  rockOperas: {
+    /** Resource-page list payload: setlists + external sources for one rock opera. */
+    performances: (slug: string) => `rock-operas:performances:${slug}:v3`,
+    /** Pattern for invalidating every performances cache (broad mutations). */
+    allPerformances: () => "rock-operas:performances:*",
+  },
+
+  /**
    * Home page cache keys
    */
   home: {
     /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v3`,
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v5`,
   },
 
   /**

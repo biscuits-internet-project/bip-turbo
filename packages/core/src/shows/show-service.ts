@@ -35,6 +35,13 @@ export interface ShowServiceCreateInput {
   notes?: string | null;
   relistenUrl?: string | null;
   countForStats?: boolean;
+  /**
+   * Full-set semantics: the show ends up tagged with exactly these rock
+   * opera ids. Caller passes the complete list (including unchanged ones);
+   * update() diffs against current rows. Omit to leave tags untouched;
+   * pass `[]` to clear all tags.
+   */
+  rockOperaIds?: string[];
 }
 
 export type ShowCreateInput = Prisma.ShowCreateInput;
@@ -416,6 +423,10 @@ export class ShowService {
       await this.cacheInvalidation.invalidateShowComprehensive(currentShow.id, slug);
     }
 
+    if (data.rockOperaIds !== undefined) {
+      await this.syncRockOperaAssignments(currentShow.id, data.rockOperaIds);
+    }
+
     // Show edits that move the show in time (or later: count_for_stats /
     // day_order toggles) can change the gap denominator. Rebuild from the
     // earlier of the old and new dates so chains spanning either side are
@@ -427,6 +438,54 @@ export class ShowService {
     }
 
     return show;
+  }
+
+  /**
+   * Apply full-set rock opera assignments to a show. Reads current tags,
+   * computes the diff against `nextRockOperaIds`, and runs delete + insert
+   * in one transaction. Targets the resource-page cache for every opera
+   * whose performance list changed; neighbor invalidation (show.data
+   * entries whose annotations shifted) is handled by the broader
+   * invalidateShowListings called from the outer update path.
+   */
+  private async syncRockOperaAssignments(showId: string, nextRockOperaIds: string[]): Promise<void> {
+    const current = await this.db.rockOperaPerformance.findMany({
+      where: { showId },
+      include: { rockOpera: { select: { id: true, slug: true } } },
+    });
+    const currentIds = new Set(current.map((row) => row.rockOperaId));
+    const nextIds = new Set(nextRockOperaIds);
+
+    const toRemove = current.filter((row) => !nextIds.has(row.rockOperaId));
+    const toAdd = nextRockOperaIds.filter((id) => !currentIds.has(id));
+
+    if (toRemove.length === 0 && toAdd.length === 0) return;
+
+    await this.db.$transaction(async (tx) => {
+      if (toRemove.length > 0) {
+        await tx.rockOperaPerformance.deleteMany({
+          where: { showId, rockOperaId: { in: toRemove.map((row) => row.rockOperaId) } },
+        });
+      }
+      if (toAdd.length > 0) {
+        await tx.rockOperaPerformance.createMany({
+          data: toAdd.map((rockOperaId) => ({ showId, rockOperaId })),
+        });
+      }
+    });
+
+    // Resolve added-id slugs (we already have removed-id slugs from `current`)
+    // so cache invalidation can target the affected resource pages.
+    const addedSlugs =
+      toAdd.length === 0
+        ? []
+        : (await this.db.rockOpera.findMany({ where: { id: { in: toAdd } }, select: { slug: true } })).map(
+            (r) => r.slug,
+          );
+    const removedSlugs = toRemove.map((row) => row.rockOpera.slug);
+    const affectedSlugs = Array.from(new Set([...removedSlugs, ...addedSlugs]));
+
+    await this.cacheInvalidation.invalidateRockOperaAssignment(affectedSlugs);
   }
 
   /**

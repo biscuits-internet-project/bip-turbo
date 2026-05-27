@@ -1,8 +1,15 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { SetlistList } from "~/components/setlist/setlist-list";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
+import { slugifyAnchor } from "~/lib/utils";
+import { getRockOperaPerformances, type RockOperaPerformancesLoaderData } from "./rock-opera-performances";
 
-export const loader = publicLoader<void>(async () => {});
+export const loader = publicLoader<RockOperaPerformancesLoaderData>(({ context }) =>
+  getRockOperaPerformances(ROCK_OPERA_SLUG.CHEMICAL_WARFARE_BRIGADE, context),
+);
 
 export function meta() {
   return [
@@ -549,6 +556,7 @@ function SongCard({ song, index }: { song: (typeof songs)[number]; index: number
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 const ChemicalWarfareBrigade: React.FC = () => {
+  const { performances, externalSources } = useSerializedLoaderData<RockOperaPerformancesLoaderData>();
   return (
     <div className="space-y-10 md:space-y-14">
       {/* ── Hero Banner ── */}
@@ -591,8 +599,52 @@ const ChemicalWarfareBrigade: React.FC = () => {
         </p>
       </div>
 
+      {/* ── Table of Contents ── */}
+      <nav
+        aria-label="Page contents"
+        className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/30 to-purple-900/5 p-5 md:p-6"
+      >
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Contents</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-base">
+          <a href="#characters" className="text-brand-primary hover:text-brand-secondary">
+            Characters
+          </a>
+          <a href="#full-performances" className="text-brand-primary hover:text-brand-secondary">
+            Full Performances
+          </a>
+          <div>
+            <a href="#the-story" className="text-brand-primary hover:text-brand-secondary font-medium">
+              The Story
+            </a>
+            <ul className="mt-1.5 ml-3 space-y-1 text-sm text-content-text-secondary">
+              {acts.map((act) => (
+                <li key={act.name}>
+                  <a href={`#cwb-${slugifyAnchor(act.name)}`} className="hover:text-brand-secondary">
+                    {act.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <a href="#songs" className="text-brand-primary hover:text-brand-secondary font-medium">
+              Songs
+            </a>
+            <ul className="mt-1.5 ml-3 space-y-1 text-sm text-content-text-secondary">
+              {songs.map((song) => (
+                <li key={song.name}>
+                  <a href={`#cwb-${slugifyAnchor(song.name)}`} className="hover:text-brand-secondary">
+                    {song.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </nav>
+
       {/* ── Characters ── */}
-      <section>
+      <section id="characters" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Characters</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {characters.map((char) => (
@@ -602,22 +654,40 @@ const ChemicalWarfareBrigade: React.FC = () => {
       </section>
 
       {/* ── The Story ── */}
-      <section>
+      <section id="the-story" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">The Story</h2>
         <div className="space-y-4">
           {acts.map((act, i) => (
-            <ActCard key={act.name} act={act} index={i} />
+            <div key={act.name} id={`cwb-${slugifyAnchor(act.name)}`} className="scroll-mt-20">
+              <ActCard act={act} index={i} />
+            </div>
           ))}
         </div>
       </section>
 
       {/* ── Songs ── */}
-      <section>
+      <section id="songs" className="scroll-mt-20">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Songs</h2>
         <div className="space-y-4">
           {songs.map((song, i) => (
-            <SongCard key={song.name} song={song} index={i} />
+            <div key={song.name} id={`cwb-${slugifyAnchor(song.name)}`} className="scroll-mt-20">
+              <SongCard song={song} index={i} />
+            </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Full Performances ── */}
+      <section id="full-performances" className="scroll-mt-20">
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-5">Full Performances</h2>
+        <div className="space-y-1">
+          <SetlistList
+            setlists={performances}
+            externalSources={externalSources}
+            numbered
+            collapsible
+            empty={<p className="text-sm text-content-text-tertiary">No full performances tagged yet.</p>}
+          />
         </div>
       </section>
 
@@ -625,7 +695,10 @@ const ChemicalWarfareBrigade: React.FC = () => {
       <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5 md:p-8">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Related</h2>
         <div className="space-y-2">
-          <Link to="/resources/hot-air-balloon" className="text-brand-primary hover:text-brand-secondary block">
+          <Link
+            to={rockOperaPath(ROCK_OPERA_SLUG.HOT_AIR_BALLOON)}
+            className="text-brand-primary hover:text-brand-secondary block"
+          >
             The Hot Air Balloon
           </Link>
           <a

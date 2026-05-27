@@ -56,6 +56,16 @@ export interface McpShow {
   relistenUrl: string | null;
   countForStats?: boolean;
   dayOrder?: number | null;
+  // Admin-curated rock opera tagging. Same optional + drift semantics as
+  // `countForStats`: undefined = pre-deploy MCP, explicit array (including
+  // empty) = authoritative. See buildRockOperaAssignmentDiff.
+  rockOperaSlugs?: string[];
+}
+
+export interface McpRockOpera {
+  slug: string;
+  name: string;
+  shortName: string;
 }
 
 export interface McpSetlistTrack {
@@ -691,6 +701,32 @@ export function buildSetlistReconciliation(
  * surfaces as one delete + one create. `undefined` remote = "no opinion"
  * (older MCP) and produces empty deltas; an explicit empty array wipes local.
  */
+/**
+ * Compute the add/remove ops needed to align a show's local rock opera
+ * tagging with prod. Identity is by rock opera slug (the stable wire id;
+ * resource pages are routed by slug). `undefined` remote = "no opinion"
+ * (pre-deploy MCP) and yields empty deltas so admin-set local tags aren't
+ * clobbered; explicit empty array = "prod has cleared this show's tags"
+ * and removes all local rows.
+ */
+export interface RockOperaAssignmentDiff {
+  toAdd: string[];
+  toRemove: string[];
+}
+
+export function buildRockOperaAssignmentDiff(
+  local: string[],
+  remote: string[] | undefined,
+): RockOperaAssignmentDiff {
+  if (remote === undefined) return { toAdd: [], toRemove: [] };
+  const localSet = new Set(local);
+  const remoteSet = new Set(remote);
+  return {
+    toAdd: remote.filter((slug) => !localSet.has(slug)),
+    toRemove: local.filter((slug) => !remoteSet.has(slug)),
+  };
+}
+
 export function diffTrackAnnotations(
   local: Array<{ id: string; desc: string | null }>,
   remote: string[] | undefined,
@@ -761,6 +797,9 @@ interface SyncStats {
   annotationsDeleted: number;
   segueRunsRegenerated: number;
   unresolvedSongSlugs: number;
+  rockOperasUpserted: number;
+  rockOperaAssignmentsAdded: number;
+  rockOperaAssignmentsRemoved: number;
   errors: number;
 }
 
@@ -868,6 +907,9 @@ async function syncMissingShows(): Promise<void> {
     annotationsDeleted: 0,
     segueRunsRegenerated: 0,
     unresolvedSongSlugs: 0,
+    rockOperasUpserted: 0,
+    rockOperaAssignmentsAdded: 0,
+    rockOperaAssignmentsRemoved: 0,
     errors: 0,
   };
 
@@ -961,6 +1003,65 @@ async function syncMissingShows(): Promise<void> {
     // bandId is nullable, so a missing band just means shows land without band FK.
     const band = await db.band.findFirst({ where: { slug: DEFAULT_BAND_SLUG } });
     if (!band) console.warn(`⚠️  No band with slug "${DEFAULT_BAND_SLUG}" in local DB; bandId will be NULL`);
+
+    // Step 4b: rock opera lookup table. Independent of the per-show data —
+    // mirror the small (3-row) lookup so the per-show assignment diff in step
+    // 7b can resolve every slug from the McpShow.rockOperaSlugs payload.
+    // Pre-deploy MCP returns no such tool; tolerate by skipping rock opera
+    // sync entirely for this run.
+    const rockOperaSlugToId = new Map<string, string>();
+    try {
+      const { rockOperas } = await mcpCall<{ rockOperas: McpRockOpera[] }>("get_rock_operas", {});
+      const existingRockOperas = await db.rockOpera.findMany({
+        select: { id: true, slug: true, name: true, shortName: true },
+      });
+      const existingBySlugRO = new Map(existingRockOperas.map((r) => [r.slug, r]));
+      for (const remote of rockOperas) {
+        const local = existingBySlugRO.get(remote.slug);
+        if (local) {
+          rockOperaSlugToId.set(local.slug, local.id);
+          // Cheap name / shortName drift — patch when prod renames an opera.
+          if (local.name !== remote.name || local.shortName !== remote.shortName) {
+            if (isDryRun) {
+              console.log(`  🔄 rock_opera ${remote.slug} would update name/shortName (dry run)`);
+              stats.rockOperasUpserted++;
+              continue;
+            }
+            try {
+              await db.rockOpera.update({
+                where: { id: local.id },
+                data: { name: remote.name, shortName: remote.shortName, updatedAt: now },
+              });
+              stats.rockOperasUpserted++;
+              console.log(`  🔄 rock_opera ${remote.slug} updated`);
+            } catch (err) {
+              console.error(`  ❌ failed to update rock_opera ${remote.slug}:`, err);
+              stats.errors++;
+            }
+          }
+        } else {
+          if (isDryRun) {
+            rockOperaSlugToId.set(remote.slug, `dry-run-rock-opera-${remote.slug}`);
+            stats.rockOperasUpserted++;
+            console.log(`  🆕 rock_opera ${remote.slug} (dry run)`);
+            continue;
+          }
+          try {
+            const created = await db.rockOpera.create({
+              data: { slug: remote.slug, name: remote.name, shortName: remote.shortName, updatedAt: now },
+            });
+            rockOperaSlugToId.set(created.slug, created.id);
+            stats.rockOperasUpserted++;
+            console.log(`  🆕 rock_opera ${remote.slug}`);
+          } catch (err) {
+            console.error(`  ❌ failed to create rock_opera ${remote.slug}:`, err);
+            stats.errors++;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`⚠️  get_rock_operas failed — skipping rock opera assignment sync:`, err);
+    }
 
     // Step 5: resolve venues. For each unique (name, city, state) from the
     // setlists, search_venues by name and disambiguate on city+state. Cache the
@@ -1250,6 +1351,86 @@ async function syncMissingShows(): Promise<void> {
       } catch (err) {
         console.error(`  ❌ failed to insert show ${slug}:`, err);
         stats.errors++;
+      }
+    }
+
+    // Step 7b: mirror rock opera assignments for every in-scope show. Runs
+    // after show inserts (step 7) so every prod slug exists in `existingBySlug`
+    // with a real local id. Skipped silently when rockOperaSlugToId is empty
+    // (pre-deploy MCP couldn't serve get_rock_operas) — the per-show diff
+    // logic still wouldn't have ids to write to.
+    if (rockOperaSlugToId.size > 0) {
+      const reconcileShowIds = Array.from(existingBySlug.values())
+        .filter((s) => !String(s.id).startsWith("dry-run-show-"))
+        .map((s) => s.id);
+      const localTagRows = reconcileShowIds.length === 0
+        ? []
+        : await db.rockOperaPerformance.findMany({
+            where: { showId: { in: reconcileShowIds } },
+            include: { rockOpera: { select: { slug: true } } },
+          });
+      const localTagsByShowId = new Map<string, string[]>();
+      for (const row of localTagRows) {
+        const arr = localTagsByShowId.get(row.showId);
+        if (arr) arr.push(row.rockOpera.slug);
+        else localTagsByShowId.set(row.showId, [row.rockOpera.slug]);
+      }
+
+      // remoteFullShows still has the rockOperaSlugs from get_shows. Loop
+      // those and diff against local for every in-scope show — captures both
+      // newly-inserted shows (which have empty local tags) and existing
+      // shows whose admin-curated tags changed on prod.
+      const remoteShowsBySlug = new Map(remoteFullShows.map((s) => [s.slug, s]));
+      for (const [slug, local] of existingBySlug) {
+        const remote = remoteShowsBySlug.get(slug);
+        if (!remote) continue;
+        const isDryRunShow = String(local.id).startsWith("dry-run-show-");
+        const localSlugs = isDryRunShow ? [] : (localTagsByShowId.get(local.id) ?? []);
+        const diff = buildRockOperaAssignmentDiff(localSlugs, remote.rockOperaSlugs);
+        if (diff.toAdd.length === 0 && diff.toRemove.length === 0) continue;
+
+        if (isDryRun || isDryRunShow) {
+          console.log(`  🎭 ${slug}: +[${diff.toAdd.join(",")}] -[${diff.toRemove.join(",")}] rock opera tag(s) (dry run)`);
+          stats.rockOperaAssignmentsAdded += diff.toAdd.length;
+          stats.rockOperaAssignmentsRemoved += diff.toRemove.length;
+          continue;
+        }
+
+        const addIds = diff.toAdd
+          .map((s) => rockOperaSlugToId.get(s))
+          .filter((id): id is string => id !== undefined);
+        const removeIds = diff.toRemove
+          .map((s) => rockOperaSlugToId.get(s))
+          .filter((id): id is string => id !== undefined);
+        try {
+          await db.$transaction(async (tx) => {
+            if (removeIds.length > 0) {
+              await tx.rockOperaPerformance.deleteMany({
+                where: { showId: local.id, rockOperaId: { in: removeIds } },
+              });
+            }
+            if (addIds.length > 0) {
+              await tx.rockOperaPerformance.createMany({
+                data: addIds.map((rockOperaId) => ({ showId: local.id, rockOperaId })),
+              });
+            }
+          });
+          stats.rockOperaAssignmentsAdded += diff.toAdd.length;
+          stats.rockOperaAssignmentsRemoved += diff.toRemove.length;
+          changedSlugs.add(slug);
+          // Invalidate rock opera resource-page caches for every slug
+          // whose performance list changed. Neighbor invalidation
+          // (other shows' show.data entries whose annotations shifted)
+          // is handled by invalidateShowListings at the end of the run.
+          if (cacheInvalidation) {
+            const affectedSlugs = Array.from(new Set([...diff.toAdd, ...diff.toRemove]));
+            await cacheInvalidation.invalidateRockOperaAssignment(affectedSlugs);
+          }
+          console.log(`  🎭 ${slug}: +${diff.toAdd.length} -${diff.toRemove.length} rock opera tag(s)`);
+        } catch (err) {
+          console.error(`  ❌ failed to sync rock opera tags for ${slug}:`, err);
+          stats.errors++;
+        }
       }
     }
 
@@ -1645,6 +1826,8 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Annotations created / deleted: ${stats.annotationsCreated} / ${stats.annotationsDeleted}`);
   console.log(`SegueRuns regenerated: ${stats.segueRunsRegenerated}`);
   console.log(`Unresolved song slugs: ${stats.unresolvedSongSlugs}`);
+  console.log(`Rock operas upserted: ${stats.rockOperasUpserted}`);
+  console.log(`Rock opera assignments added / removed: ${stats.rockOperaAssignmentsAdded} / ${stats.rockOperaAssignmentsRemoved}`);
   console.log(`Errors: ${stats.errors}`);
 }
 

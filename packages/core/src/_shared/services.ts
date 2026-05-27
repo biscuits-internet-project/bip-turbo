@@ -7,6 +7,7 @@ import { FileService } from "../files/file-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
 import { RatingService } from "../ratings/rating-service";
 import { ReviewService } from "../reviews/review-service";
+import { RockOperaService } from "../rock-operas/rock-opera-service";
 import { PostgresSearchService } from "../search/postgres-search-service";
 import { SearchHistoryService } from "../search/search-history-service";
 import { SetlistService } from "../setlists/setlist-service";
@@ -39,6 +40,7 @@ export interface Services {
   users: UserService;
   personalSongHistory: PersonalSongHistoryService;
   reviews: ReviewService;
+  rockOperas: RockOperaService;
   ratings: RatingService;
   attendances: AttendanceService;
   songPageComposer: SongPageComposer;
@@ -66,6 +68,10 @@ export function createServices(container: ServiceContainer): Services {
   // StatsService is constructed first so ShowService can hand it the
   // post-mutation rebuild dependency.
   const statsService = new StatsService(container.db, container.cache);
+  // RockOperaService is constructed before SetlistService because every
+  // setlist returned overlays rock opera annotations via a batched
+  // lookup — SetlistService takes RockOperaService as a constructor dep.
+  const rockOperaService = new RockOperaService(container.db, container.logger, statsService);
 
   return {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
@@ -75,11 +81,12 @@ export function createServices(container: ServiceContainer): Services {
     songs: songService,
     stats: statsService,
     tracks: new TrackService(container.db, container.logger, container.cacheInvalidation),
-    setlists: new SetlistService(container.db),
+    setlists: new SetlistService(container.db, rockOperaService),
     venues: new VenueService(container.db, container.logger),
     users: new UserService(container.db, container.logger),
     personalSongHistory: new PersonalSongHistoryService(container.db, container.cache),
     reviews: new ReviewService(container.db, container.logger),
+    rockOperas: rockOperaService,
     ratings: new RatingService(container.db, container.cacheInvalidation),
     attendances: new AttendanceService(container.db, container.logger),
     songPageComposer: new SongPageComposer(container.db, songService, statsService),

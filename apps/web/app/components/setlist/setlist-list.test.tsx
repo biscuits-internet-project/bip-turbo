@@ -86,6 +86,7 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
     averageSongGap: null,
     medianSongGap: null,
     debutCount: 0,
+    rockOperaPerformances: [],
   };
 }
 

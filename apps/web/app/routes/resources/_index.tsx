@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import ResourceCard from "~/components/resources/resource-card";
 import { publicLoader } from "~/lib/base-loaders";
+import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 
 export const loader = publicLoader<void>(async () => {});
 
@@ -52,7 +53,7 @@ export default function Resources(): ReactElement {
               title="The Hot Air Balloon"
               content="The band's first full length rock opera, written by Jon Gutwillig and debuted at the band's 1998 New Year's Eve show at Silk City in Philadelphia."
               image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/hot-air-balloon.jpg"
-              url="/resources/hot-air-balloon"
+              url={rockOperaPath(ROCK_OPERA_SLUG.HOT_AIR_BALLOON)}
             />
           </div>
           <div className="h-full">
@@ -60,7 +61,7 @@ export default function Resources(): ReactElement {
               title="The Chemical Warfare Brigade"
               content="The band's second full length rock opera, written by Marc Brownstein, and debuted Dec 30, 2000 at the Vanderbilt on Long Island."
               image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/cwb.jpg"
-              url="/resources/chemical-warfare-brigade"
+              url={rockOperaPath(ROCK_OPERA_SLUG.CHEMICAL_WARFARE_BRIGADE)}
             />
           </div>
           <div className="h-full">
@@ -68,7 +69,7 @@ export default function Resources(): ReactElement {
               title="Revolution in Motion"
               content="The band's third rock opera, a sci-fi concept album created by Jon Gutwillig, Joey Friedman, and Aron Magner. Follow a blacksheep alien prince whose collision with humanity rewrites the fate of two worlds."
               image="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/revolution-in-motion.png"
-              url="/resources/revolution-in-motion"
+              url={rockOperaPath(ROCK_OPERA_SLUG.REVOLUTION_IN_MOTION)}
             />
           </div>
           <div className="h-full">

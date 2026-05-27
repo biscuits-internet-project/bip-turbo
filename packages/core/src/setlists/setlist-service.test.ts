@@ -1,5 +1,6 @@
 import { average, median } from "@bip/domain";
 import { describe, expect, test, vi } from "vitest";
+import type { RockOperaService } from "../rock-operas/rock-opera-service";
 import { computeDebutCount, eligibleGapsForAggregation, SetlistService } from "./setlist-service";
 
 // Minimal mock DbClient — only the paths used by tests
@@ -13,11 +14,25 @@ function makeMockDb() {
   };
 }
 
+// RockOperaService stub — SetlistService overlays annotations onto every
+// returned setlist via `findPerformancesForShows`. Default to an empty
+// map so existing tests don't have to wire annotation data; tests that
+// care can swap in a custom mock.
+function makeRockOperaStub(): RockOperaService {
+  return {
+    findPerformancesForShows: vi.fn().mockResolvedValue(new Map()),
+    findPerformancesForShow: vi.fn().mockResolvedValue([]),
+    findAll: vi.fn().mockResolvedValue([]),
+    findBySlug: vi.fn().mockResolvedValue(null),
+    findPerformanceShowIds: vi.fn().mockResolvedValue([]),
+  } as unknown as RockOperaService;
+}
+
 describe("SetlistService.findManyLight", () => {
   // monthDay filter passes endsWith to Prisma's date where clause
   test("applies endsWith date filter when monthDay is provided", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({
       filters: { monthDay: "04-04" },
@@ -32,7 +47,7 @@ describe("SetlistService.findManyLight", () => {
   // year's first day) so it works with the string-shaped date column.
   test("applies gte/lt date filter when year is provided", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({
       filters: { year: 2024 },
@@ -45,7 +60,7 @@ describe("SetlistService.findManyLight", () => {
   // No date filter when neither year nor monthDay is provided
   test("omits date filter when no year or monthDay provided", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({ filters: {} });
 
@@ -57,7 +72,7 @@ describe("SetlistService.findManyLight", () => {
   // but targets the denormalized YouTube count on the Show model.
   test("applies showYoutubesCount > 0 when hasYoutube is true", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({
       filters: { year: 2024, hasYoutube: true },
@@ -72,7 +87,7 @@ describe("SetlistService.findManyLight", () => {
   // rather than skipping the filter (which is the `undefined` case).
   test("applies showYoutubesCount = 0 when hasYoutube is false", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({
       filters: { year: 2024, hasYoutube: false },
@@ -86,7 +101,7 @@ describe("SetlistService.findManyLight", () => {
   // "shows without photos" filter from the year-page UI.
   test("applies showPhotosCount = 0 when hasPhotos is false", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({
       filters: { year: 2024, hasPhotos: false },
@@ -100,7 +115,7 @@ describe("SetlistService.findManyLight", () => {
   // either count column so all shows remain in the results.
   test("omits photos/youtube filters when hasPhotos and hasYoutube are undefined", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({ filters: { year: 2024 } });
 
@@ -114,7 +129,7 @@ describe("SetlistService.findManyLight", () => {
   // and negative mix to cover the cross-product.
   test("stacks hasPhotos=true with hasYoutube=false", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({
       filters: { year: 2024, hasPhotos: true, hasYoutube: false },
@@ -132,7 +147,7 @@ describe("SetlistService.findManyLight", () => {
   // see NON_STUB_SHOWS_WHERE.
   test("excludes orphan stub shows (no venue) from year listings", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({ filters: { year: 2024 } });
 
@@ -236,7 +251,7 @@ describe("SetlistService.findByShowSlug", () => {
   // payload — keeps the response compact).
   test("includes previousPerformanceShow date+slug on tracks", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findByShowSlug("2024-07-26-red-rocks-amphitheatre-morrison-co");
 
@@ -251,7 +266,7 @@ describe("SetlistService.findByShowSlug", () => {
   // from Prisma with the denormalized `gap` field already populated.
   test("returns averageSongGap derived from tracks", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
     db.show.findUnique.mockResolvedValue({
       id: "show-1",
       slug: "2024-07-26",
@@ -364,7 +379,7 @@ describe("SetlistService.findManyLight", () => {
   // toggle on those pages needs the same prior-show pointer + averageSongGap.
   test("includes previousPerformanceShow date+slug on tracks", async () => {
     const db = makeMockDb();
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     await service.findManyLight({ filters: { year: 2024 } });
 
@@ -384,7 +399,7 @@ describe("SetlistService.countByMonthDay", () => {
   test("calls db.show.count with endsWith date filter scoped to stats shows", async () => {
     const db = makeMockDb();
     db.show.count.mockResolvedValue(7);
-    const service = new SetlistService(db as never);
+    const service = new SetlistService(db as never, makeRockOperaStub());
 
     const result = await service.countByMonthDay("04-08");
 
