@@ -47,6 +47,12 @@ export interface McpShowSummary {
 // keep parsing cleanly — see showNeedsUpdate for the "omit means no opinion"
 // drift semantics.
 export interface McpShow {
+  // Prod's Show.id, preserved cross-environment so rating/attendance rows
+  // (which reference show id) FK-resolve locally. Optional for back-compat
+  // with pre-deploy MCP responses; falls back to Prisma-generated UUID on
+  // local insert when missing — but in that case Show ratings and
+  // attendances on that show won't sync.
+  id?: string;
   slug: string;
   date: string;
   venueName: string | null;
@@ -70,6 +76,12 @@ export interface McpRockOpera {
 }
 
 export interface McpSetlistTrack {
+  // Prod's Track.id, preserved cross-environment so Track-type ratings
+  // FK-resolve locally. Optional for back-compat; when missing, local
+  // insert generates a fresh UUID and any prod ratings on that track will
+  // FK-skip. The setlist reconciler detects same-(set,position)-but-
+  // different-id and rebuilds the local track with prod's id.
+  id?: string;
   position: number;
   songTitle: string;
   songSlug: string;
@@ -310,6 +322,10 @@ export function buildShowCreateInput(
   opts: { venueId?: string | null; bandId?: string | null } = {},
 ): Prisma.ShowUncheckedCreateInput {
   return {
+    // Preserve prod's Show.id when present. Falls back to Prisma's
+    // default uuid() when MCP omits it (pre-deploy) — but then user
+    // activity referencing this show won't FK-resolve.
+    ...(show.id ? { id: show.id } : {}),
     slug: show.slug,
     date: show.date,
     averageRating: show.averageRating,
@@ -606,6 +622,10 @@ export interface TrackPatch {
 }
 
 export interface TrackInsertOp {
+  // Prod's Track.id when available, so the local insert preserves it.
+  // Undefined when MCP didn't return one (pre-deploy) — fall back to
+  // Prisma-generated UUID.
+  id?: string;
   set: string;
   position: number;
   songId: string;
@@ -687,6 +707,36 @@ export function buildSetlistReconciliation(
         continue;
       }
       toInsert.push({
+        id: track.id,
+        set,
+        position: track.position,
+        songId,
+        segue: track.segue,
+        note: track.note ?? null,
+        allTimer: track.allTimer ?? false,
+        annotationDescs: track.annotations ?? [],
+      });
+      structurallyChanged = true;
+      continue;
+    }
+    // Track-id mismatch: a previous sync inserted this track with a fresh
+    // local UUID (the buggy default before id preservation landed). Prod
+    // ratings reference prod's track id, so they FK-skip against the local
+    // mismatched id. Treat as structural: delete the local row (cascading
+    // annotations + Track-type ratings) and reinsert with prod's id so
+    // subsequent rating sync FK-resolves.
+    if (track.id && localTrack.id !== track.id) {
+      const songId = songSlugToId.get(track.songSlug);
+      if (!songId) {
+        unresolvedSongSlugs.push(track.songSlug);
+        continue;
+      }
+      toDelete.push({
+        trackId: localTrack.id,
+        annotationIds: localTrack.annotations.map((a) => a.id),
+      });
+      toInsert.push({
+        id: track.id,
         set,
         position: track.position,
         songId,
@@ -803,32 +853,62 @@ export function diffTrackAnnotations(
 
 // --- JSON-RPC transport ---
 
+// Bun's default fetch timeout has been observed to abort the bigger sync
+// calls (list_*_since pages and especially the list_all_*_ids dumps during
+// epoch-pull). 5 minutes per request is enough headroom for those without
+// silently hanging forever on a genuinely stuck request. Two-shot retry
+// keeps a transient network blip or upstream cold-start from blowing up
+// a 10-minute sync run.
+const MCP_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const MCP_MAX_ATTEMPTS = 3;
+
 async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Promise<T> {
-  const response = await fetch(MCP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    redirect: "follow",
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: { name: toolName, arguments: args },
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`MCP ${toolName} HTTP ${response.status}: ${await response.text()}`);
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MCP_MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), MCP_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(MCP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        redirect: "follow",
+        signal: controller.signal,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: toolName, arguments: args },
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`MCP ${toolName} HTTP ${response.status}: ${await response.text()}`);
+      }
+      const envelope = (await response.json()) as {
+        error?: { message: string };
+        result?: { content?: Array<{ type: string; text: string }>; isError?: boolean };
+      };
+      if (envelope.error) throw new Error(`MCP ${toolName} error: ${envelope.error.message}`);
+      if (envelope.result?.isError) {
+        throw new Error(`MCP ${toolName} tool error: ${envelope.result.content?.[0]?.text}`);
+      }
+      const text = envelope.result?.content?.[0]?.text;
+      if (!text) throw new Error(`MCP ${toolName} returned no content`);
+      return JSON.parse(text) as T;
+    } catch (err) {
+      lastErr = err;
+      const isLast = attempt === MCP_MAX_ATTEMPTS;
+      console.warn(`  ⚠️  MCP ${toolName} attempt ${attempt}/${MCP_MAX_ATTEMPTS} failed${isLast ? "" : "; retrying"}: ${err instanceof Error ? err.message : String(err)}`);
+      if (isLast) break;
+      // Linear backoff: 2s, 4s. Keeps the total wait small while still
+      // giving an upstream cold-start a chance to warm up.
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  const envelope = (await response.json()) as {
-    error?: { message: string };
-    result?: { content?: Array<{ type: string; text: string }>; isError?: boolean };
-  };
-  if (envelope.error) throw new Error(`MCP ${toolName} error: ${envelope.error.message}`);
-  if (envelope.result?.isError) {
-    throw new Error(`MCP ${toolName} tool error: ${envelope.result.content?.[0]?.text}`);
-  }
-  const text = envelope.result?.content?.[0]?.text;
-  if (!text) throw new Error(`MCP ${toolName} returned no content`);
-  return JSON.parse(text) as T;
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error(`MCP ${toolName} failed after ${MCP_MAX_ATTEMPTS} attempts: ${String(lastErr)}`);
 }
 
 // --- User activity sync (users + ratings + attendances) ---
@@ -848,7 +928,19 @@ interface UserActivityStats {
 
 interface SyncUserActivityOptions {
   isDryRun: boolean;
-  fullMode: boolean;
+  /**
+   * Pull every user/rating/attendance since epoch (vs the local MAX
+   * cursor). Needed when the local DB was seeded from a dump older than
+   * the current data — a cursor-only sync can't reach rows whose
+   * updatedAt sits below the current local MAX. Set by `--full-users`.
+   */
+  pullFromEpoch: boolean;
+  /**
+   * Pull every prod id and delete local rows that aren't on prod.
+   * Set by `--full-users` and `--prune-users`. Cheap cleanup when set
+   * alone (no extra wire traffic for re-fetch).
+   */
+  pruneOrphans: boolean;
   ratingService: RatingService;
   cacheInvalidation: CacheInvalidationService | null;
   changedSlugs: Set<string>;
@@ -882,7 +974,7 @@ export async function syncUserActivity(
   db: typeof prisma,
   options: SyncUserActivityOptions,
 ): Promise<UserActivityStats> {
-  const { isDryRun, fullMode, ratingService, now, changedSlugs } = options;
+  const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, now, changedSlugs } = options;
   const mcp = options.mcp ?? mcpCall;
   const stats: UserActivityStats = {
     usersCreated: 0,
@@ -898,8 +990,13 @@ export async function syncUserActivity(
   };
 
   // Cursor = local MAX(updatedAt). First run on a fresh table yields null;
-  // fall back to epoch so the first page pulls everything.
+  // fall back to epoch so the first page pulls everything. Full mode forces
+  // epoch on every table so missing-older rows get backfilled — the
+  // single-cursor approach can't pull rows whose updatedAt is below the
+  // current local MAX, which happens whenever the dump that seeded the DB
+  // didn't cover those rows.
   async function localMaxUpdatedAt(table: "user" | "rating" | "attendance"): Promise<Date> {
+    if (pullFromEpoch) return new Date(0);
     let row: { updatedAt: Date } | null;
     if (table === "user") row = await db.user.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
     else if (table === "rating") row = await db.rating.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
@@ -907,9 +1004,17 @@ export async function syncUserActivity(
     return row?.updatedAt ?? new Date(0);
   }
 
+  // Map from prod userId → local userId. The two diverge whenever a prod
+  // user is synced via username-match (their local row already existed under
+  // a different id, e.g. created independently in a prior dev session or
+  // present in an older prod dump under a different id). Downstream
+  // rating/attendance upserts consult this map to attach rows to the right
+  // local user, not to a stub that doesn't exist.
+  const prodIdToLocalId = new Map<string, string>();
+
   // --- Users ---
   const userCursor = await localMaxUpdatedAt("user");
-  console.log(`👤 Users: incremental since ${userCursor.toISOString()}`);
+  console.log(`👤 Users: ${pullFromEpoch ? "full epoch pull" : `incremental since ${userCursor.toISOString()}`}`);
   let pageCursor: string | null = null;
   do {
     const args: Record<string, unknown> = { since: userCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
@@ -918,43 +1023,93 @@ export async function syncUserActivity(
       "list_users_since",
       args,
     );
-    // Batched existence pre-check just to keep the +created vs ~updated
-    // counters honest. The upsert below would do the right thing either
-    // way, but we want the summary to distinguish first-time inserts.
+    // Batched local lookup by BOTH id and username. The two lookups together
+    // cover three dispatch cases per incoming prod user:
+    //   1. id matches a local row     → update by id, prod id == local id
+    //   2. username matches (no id)   → update the local row, remap prodId → its local id
+    //   3. neither matches            → create a stub with the prod id
+    // Case 2 is what keeps id drift from orphaning ratings/attendance: a
+    // local "evan" with a different id than prod's "evan" doesn't get
+    // double-inserted (would hit users_username_unique) and his future
+    // ratings remap onto his local id.
     const incomingUserIds = users.map((u) => u.id);
-    const existingUserRows = incomingUserIds.length > 0
-      ? await db.user.findMany({ where: { id: { in: incomingUserIds } }, select: { id: true } })
-      : [];
-    const existingUserIdSet = new Set(existingUserRows.map((row) => row.id));
+    const incomingUsernames = users.map((u) => u.username).filter((n): n is string => !!n);
+    const [existingByIdRows, existingByUsernameRows] = await Promise.all([
+      incomingUserIds.length > 0
+        ? db.user.findMany({ where: { id: { in: incomingUserIds } }, select: { id: true } })
+        : Promise.resolve([]),
+      incomingUsernames.length > 0
+        ? db.user.findMany({
+            where: { username: { in: incomingUsernames } },
+            select: { id: true, username: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const localIdSet = new Set(existingByIdRows.map((row) => row.id));
+    const localIdByUsername = new Map<string, string>();
+    for (const row of existingByUsernameRows) {
+      if (row.username) localIdByUsername.set(row.username, row.id);
+    }
 
     for (const u of users) {
+      const idMatch = localIdSet.has(u.id);
+      const usernameMatch = u.username ? localIdByUsername.get(u.username) : undefined;
+      // Only record prodId → localId for the username-match case where the
+      // two diverge. The rating/attendance loops fall back to prodId via
+      // `prodIdToLocalId.get(...) ?? r.userId`, so the common idMatch /
+      // stub-create cases (where prodId == localId) don't need an entry.
+      if (usernameMatch && usernameMatch !== u.id) prodIdToLocalId.set(u.id, usernameMatch);
       if (isDryRun) {
-        if (existingUserIdSet.has(u.id)) stats.usersUpdated++;
+        if (idMatch || (usernameMatch && usernameMatch !== u.id)) stats.usersUpdated++;
         else stats.usersCreated++;
         continue;
       }
       try {
-        await db.user.upsert({
-          where: { id: u.id },
-          update: {
-            username: u.username,
-            avatarFileId: u.avatarFileId,
-            avatarFileUrl: u.avatarFileUrl,
-            updatedAt: new Date(u.updatedAt),
-          },
-          create: {
-            id: u.id,
-            email: stubUserEmail(u.id),
-            passwordDigest: STUB_USER_PASSWORD_DIGEST,
-            username: u.username,
-            avatarFileId: u.avatarFileId,
-            avatarFileUrl: u.avatarFileUrl,
-            createdAt: new Date(u.createdAt),
-            updatedAt: new Date(u.updatedAt),
-          },
-        });
-        if (existingUserIdSet.has(u.id)) stats.usersUpdated++;
-        else stats.usersCreated++;
+        // avatarFileId is intentionally null: it FKs to File, and the File
+        // table isn't synced — every avatar File on prod that wasn't in the
+        // last db-restore dump would violate users_avatar_file_id_fkey.
+        // avatarFileUrl is a plain VarChar with no FK, so we still get the
+        // remote avatar URL for rendering.
+        if (idMatch) {
+          await db.user.update({
+            where: { id: u.id },
+            data: {
+              username: u.username,
+              avatarFileId: null,
+              avatarFileUrl: u.avatarFileUrl,
+              updatedAt: new Date(u.updatedAt),
+            },
+          });
+          stats.usersUpdated++;
+        } else if (usernameMatch) {
+          // No id match, but a different local row owns this username.
+          // Update that row in place (its id is the source of truth
+          // locally). The map entry above remaps prodId → localId so
+          // future rating/attendance syncs land here.
+          await db.user.update({
+            where: { id: usernameMatch },
+            data: {
+              avatarFileId: null,
+              avatarFileUrl: u.avatarFileUrl,
+              updatedAt: new Date(u.updatedAt),
+            },
+          });
+          stats.usersUpdated++;
+        } else {
+          await db.user.create({
+            data: {
+              id: u.id,
+              email: stubUserEmail(u.id),
+              passwordDigest: STUB_USER_PASSWORD_DIGEST,
+              username: u.username,
+              avatarFileId: null,
+              avatarFileUrl: u.avatarFileUrl,
+              createdAt: new Date(u.createdAt),
+              updatedAt: new Date(u.updatedAt),
+            },
+          });
+          stats.usersCreated++;
+        }
       } catch (err) {
         console.error(`  ❌ user ${u.id} sync failed:`, err);
       }
@@ -969,7 +1124,7 @@ export async function syncUserActivity(
   // resolve cache-invalidation slugs.
   const touchedRateables = new Map<string, { rateableId: string; rateableType: string }>();
   const ratingCursor = await localMaxUpdatedAt("rating");
-  console.log(`⭐ Ratings: incremental since ${ratingCursor.toISOString()}`);
+  console.log(`⭐ Ratings: ${pullFromEpoch ? "full epoch pull" : `incremental since ${ratingCursor.toISOString()}`}`);
   pageCursor = null;
   do {
     const args: Record<string, unknown> = { since: ratingCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
@@ -978,16 +1133,23 @@ export async function syncUserActivity(
       "list_ratings_since",
       args,
     );
-    // Batched FK existence check per page. The user pass just ran above, so
-    // a missing user is rare (race against a prod insert mid-sync). The
-    // realistic miss is show/track: a dev DB synced for a narrow --years
-    // window legitimately lacks older shows that older ratings reference.
-    const ratingUserIds = Array.from(new Set(ratings.map((r) => r.userId)));
+    // Resolve each rating's userId through prodIdToLocalId. The map is
+    // populated above for every prod user we saw this run; rows owned by
+    // users we didn't see fall through to their prod id (which equals the
+    // local id in the common case where local was seeded from prod).
+    const resolvedRatings = ratings.map((r) => ({
+      ...r,
+      localUserId: prodIdToLocalId.get(r.userId) ?? r.userId,
+    }));
+    // Batched FK existence check per page. The realistic miss is show/track:
+    // a dev DB synced for a narrow --years window legitimately lacks older
+    // shows that older ratings reference.
+    const ratingUserIds = Array.from(new Set(resolvedRatings.map((r) => r.localUserId)));
     const ratingShowIds = Array.from(
-      new Set(ratings.filter((r) => r.rateableType === "Show").map((r) => r.rateableId)),
+      new Set(resolvedRatings.filter((r) => r.rateableType === "Show").map((r) => r.rateableId)),
     );
     const ratingTrackIds = Array.from(
-      new Set(ratings.filter((r) => r.rateableType === "Track").map((r) => r.rateableId)),
+      new Set(resolvedRatings.filter((r) => r.rateableType === "Track").map((r) => r.rateableId)),
     );
     const [existingRatingUsers, existingRatingShows, existingRatingTracks] = await Promise.all([
       ratingUserIds.length > 0
@@ -1004,10 +1166,10 @@ export async function syncUserActivity(
     const localRatingShowSet = new Set(existingRatingShows.map((s) => s.id));
     const localRatingTrackSet = new Set(existingRatingTracks.map((t) => t.id));
 
-    for (const r of ratings) {
-      if (!localRatingUserSet.has(r.userId)) {
+    for (const r of resolvedRatings) {
+      if (!localRatingUserSet.has(r.localUserId)) {
         stats.ratingsFkSkipped++;
-        console.warn(`  ⚠️  rating ${r.id}: skipping — user ${r.userId} not local`);
+        console.warn(`  ⚠️  rating ${r.id}: skipping — user ${r.localUserId} not local`);
         continue;
       }
       if (r.rateableType === "Show" && !localRatingShowSet.has(r.rateableId)) {
@@ -1026,15 +1188,30 @@ export async function syncUserActivity(
         continue;
       }
       try {
+        // Upsert by the compound unique (userId, rateableId, rateableType)
+        // instead of id. Local DBs seeded from older prod dumps can hold a
+        // row with the same compound key but a different id; upserting by
+        // id would then hit ratings_user_id_rateable_id_rateable_type_unique
+        // on insert. Using the compound key as the upsert target lets the
+        // existing local row absorb the new value cleanly. The local id may
+        // drift from prod; --full-users converges by deleting the stale-id
+        // local row, after which the next incremental run inserts with the
+        // prod id.
         await db.rating.upsert({
-          where: { id: r.id },
+          where: {
+            userId_rateableId_rateableType: {
+              userId: r.localUserId,
+              rateableId: r.rateableId,
+              rateableType: r.rateableType,
+            },
+          },
           update: {
             value: r.value,
             updatedAt: new Date(r.updatedAt),
           },
           create: {
             id: r.id,
-            userId: r.userId,
+            userId: r.localUserId,
             value: r.value,
             rateableType: r.rateableType,
             rateableId: r.rateableId,
@@ -1057,7 +1234,7 @@ export async function syncUserActivity(
 
   // --- Attendances ---
   const attCursor = await localMaxUpdatedAt("attendance");
-  console.log(`🎫 Attendances: incremental since ${attCursor.toISOString()}`);
+  console.log(`🎫 Attendances: ${pullFromEpoch ? "full epoch pull" : `incremental since ${attCursor.toISOString()}`}`);
   pageCursor = null;
   do {
     const args: Record<string, unknown> = { since: attCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
@@ -1066,9 +1243,13 @@ export async function syncUserActivity(
       "list_attendances_since",
       args,
     );
-    // Same batched FK check as the ratings loop.
-    const attUserIds = Array.from(new Set(attendances.map((a) => a.userId)));
-    const attShowIds = Array.from(new Set(attendances.map((a) => a.showId)));
+    // Same userId remap + batched FK check as the ratings loop.
+    const resolvedAttendances = attendances.map((a) => ({
+      ...a,
+      localUserId: prodIdToLocalId.get(a.userId) ?? a.userId,
+    }));
+    const attUserIds = Array.from(new Set(resolvedAttendances.map((a) => a.localUserId)));
+    const attShowIds = Array.from(new Set(resolvedAttendances.map((a) => a.showId)));
     const [existingAttUsers, existingAttShows] = await Promise.all([
       attUserIds.length > 0
         ? db.user.findMany({ where: { id: { in: attUserIds } }, select: { id: true } })
@@ -1080,10 +1261,10 @@ export async function syncUserActivity(
     const localAttUserSet = new Set(existingAttUsers.map((u) => u.id));
     const localAttShowBySlug = new Map(existingAttShows.map((s) => [s.id, s.slug]));
 
-    for (const a of attendances) {
-      if (!localAttUserSet.has(a.userId)) {
+    for (const a of resolvedAttendances) {
+      if (!localAttUserSet.has(a.localUserId)) {
         stats.attendancesFkSkipped++;
-        console.warn(`  ⚠️  attendance ${a.id}: skipping — user ${a.userId} not local`);
+        console.warn(`  ⚠️  attendance ${a.id}: skipping — user ${a.localUserId} not local`);
         continue;
       }
       if (!localAttShowBySlug.has(a.showId)) {
@@ -1098,12 +1279,17 @@ export async function syncUserActivity(
         continue;
       }
       try {
+        // Same compound-key upsert reasoning as the rating loop above —
+        // local DBs from old prod dumps can hold (userId, showId) with a
+        // different id, which would violate attendances_user_id_show_id_unique
+        // on an id-keyed insert. --full-users converges the local id back
+        // to prod's over two runs.
         await db.attendance.upsert({
-          where: { id: a.id },
+          where: { userId_showId: { userId: a.localUserId, showId: a.showId } },
           update: { updatedAt: new Date(a.updatedAt) },
           create: {
             id: a.id,
-            userId: a.userId,
+            userId: a.localUserId,
             showId: a.showId,
             createdAt: new Date(a.createdAt),
             updatedAt: new Date(a.updatedAt),
@@ -1120,8 +1306,8 @@ export async function syncUserActivity(
   console.log(`🎫 Attendances: +${stats.attendancesUpserted} (skipped ${stats.attendancesFkSkipped} on missing FK)`);
 
   // --- Full-mode reconciliation: delete local rows not on prod ---
-  if (fullMode) {
-    console.log("🧹 Full mode: reconciling deletions");
+  if (pruneOrphans) {
+    console.log("🧹 Pruning local rows missing from prod");
 
     // Attendances first (no FK back to users/ratings, but we want a stable
     // order anyway).
@@ -1297,10 +1483,16 @@ Options:
   --no-users               Skip the user-activity pass (users, ratings,
                            attendances). The default pulls incrementally,
                            keyed on local MAX(updatedAt) per table.
-  --full-users             After the incremental user-activity pass, fetch all
-                           prod user / rating / attendance ids and delete any
-                           local rows missing from prod. Use occasionally for
-                           a true mirror; default skips deletes.
+  --full-users             Full bidirectional reconcile: pull every user /
+                           rating / attendance since epoch (catches rows
+                           older than the local MAX cursor) AND delete any
+                           local rows missing from prod. Use when the local
+                           DB is stale (e.g. seeded from an old dump and
+                           missing months of rating activity).
+  --prune-users            Delete-only reconcile: incremental cursor pull,
+                           then delete local rows missing from prod. Cheap
+                           cleanup when you know the data is current and
+                           just want to remove orphans. No epoch pull.
   --help, -h               Show this message and exit.
 
 Examples:
@@ -1308,6 +1500,7 @@ Examples:
   bun run scripts/sync-missing-shows.ts --years=2010-2026 --dry-run
   bun run scripts/sync-missing-shows.ts --years=2010-2026 --prune-ghost-shows
   bun run scripts/sync-missing-shows.ts --full-users
+  bun run scripts/sync-missing-shows.ts --prune-users
 `);
 }
 
@@ -1325,6 +1518,7 @@ async function syncMissingShows(): Promise<void> {
   const pruneGhostShows = process.argv.includes("--prune-ghost-shows");
   const skipUsers = process.argv.includes("--no-users");
   const fullUsers = process.argv.includes("--full-users");
+  const pruneUsers = process.argv.includes("--prune-users");
   const years = parseYearsArg(process.argv.slice(2), new Date());
   const now = new Date();
   const db = prisma;
@@ -1351,7 +1545,7 @@ async function syncMissingShows(): Promise<void> {
   // in REDIS-less local runs.
   const ratingService = new RatingService(
     prisma,
-    cacheInvalidation ?? (createNoopCacheInvalidation() as CacheInvalidationService),
+    cacheInvalidation ?? (createNoopCacheInvalidation() as unknown as CacheInvalidationService),
   );
   // SegueRun rows reference Track ids in a non-FK String[] array. When the
   // setlist reconcile inserts or deletes a track, those arrays go stale; we
@@ -1463,7 +1657,14 @@ async function syncMissingShows(): Promise<void> {
         dayOrder: true,
       },
     });
-    const existingBySlug = new Map(existingLocal.map((s) => [s.slug, s]));
+    // Local Show.slug is nullable in the schema, but every show this script
+    // touches has a slug (we filter the prod summary by slug earlier in step
+    // 2). Narrowing here keeps `existingBySlug` keyed by `string` so every
+    // downstream `changedSlugs.add(slug)` typechecks against the
+    // `Set<string>`.
+    const existingBySlug = new Map(
+      existingLocal.filter((s): s is typeof s & { slug: string } => s.slug !== null).map((s) => [s.slug, s]),
+    );
     stats.showsAlreadyLocal = existingBySlug.size;
     const missingShows = remoteFullShows.filter((s) => !existingBySlug.has(s.slug));
     const existingRemoteShows = remoteFullShows.filter((s) => existingBySlug.has(s.slug));
@@ -1869,7 +2070,11 @@ async function syncMissingShows(): Promise<void> {
       // those and diff against local for every in-scope show — captures both
       // newly-inserted shows (which have empty local tags) and existing
       // shows whose admin-curated tags changed on prod.
-      const remoteShowsBySlug = new Map(remoteFullShows.map((s) => [s.slug, s]));
+      // remoteFullShows comes from get_shows which only returns shows with
+      // a slug, so the explicit type assertion is safe.
+      const remoteShowsBySlug = new Map<string, (typeof remoteFullShows)[number]>(
+        remoteFullShows.map((s) => [s.slug, s]),
+      );
       for (const [slug, local] of existingBySlug) {
         const remote = remoteShowsBySlug.get(slug);
         if (!remote) continue;
@@ -2015,9 +2220,32 @@ async function syncMissingShows(): Promise<void> {
 
       try {
         await db.$transaction(async (tx) => {
+          // Deletes run before inserts so an id-mismatch reconcile (delete
+          // old (set, position) row then insert with same key under prod's
+          // id) doesn't transiently violate the (showId, set, position)
+          // unique. The buggy default before id preservation gave the same
+          // slot two different ids — this loop converges them.
+          for (const del of recon.toDelete) {
+            if (del.annotationIds.length > 0) {
+              await tx.annotation.deleteMany({ where: { id: { in: del.annotationIds } } });
+              stats.annotationsDeleted += del.annotationIds.length;
+            }
+            // Track-type ratings reference rateableId by Track.id. The local
+            // track id is going away; its ratings would orphan otherwise.
+            // Prod ratings will re-sync against the new (prod) id on the
+            // next rating pass, so this drop is recoverable.
+            await tx.rating.deleteMany({
+              where: { rateableType: "Track", rateableId: del.trackId },
+            });
+            await tx.track.delete({ where: { id: del.trackId } });
+            stats.tracksDeleted++;
+          }
           for (const ins of recon.toInsert) {
             await tx.track.create({
               data: {
+                // Preserve prod's Track.id when present so subsequent rating
+                // syncs FK-resolve cross-environment.
+                ...(ins.id ? { id: ins.id } : {}),
                 showId: local.id,
                 songId: ins.songId,
                 set: ins.set,
@@ -2060,14 +2288,6 @@ async function syncMissingShows(): Promise<void> {
               });
               stats.annotationsCreated += upd.annotationDiff.toCreateDescs.length;
             }
-          }
-          for (const del of recon.toDelete) {
-            if (del.annotationIds.length > 0) {
-              await tx.annotation.deleteMany({ where: { id: { in: del.annotationIds } } });
-              stats.annotationsDeleted += del.annotationIds.length;
-            }
-            await tx.track.delete({ where: { id: del.trackId } });
-            stats.tracksDeleted++;
           }
         });
         changedSlugs.add(slug);
@@ -2262,7 +2482,8 @@ async function syncMissingShows(): Promise<void> {
       try {
         const userActivityStats = await syncUserActivity(db, {
           isDryRun,
-          fullMode: fullUsers,
+          pullFromEpoch: fullUsers,
+          pruneOrphans: fullUsers || pruneUsers,
           ratingService,
           cacheInvalidation,
           changedSlugs,
@@ -2286,7 +2507,19 @@ async function syncMissingShows(): Promise<void> {
       for (const slug of changedSlugs) {
         await cacheInvalidation.invalidateShow(slug);
       }
-      if (changedSlugs.size > 0) await cacheInvalidation.invalidateShowListings();
+      if (changedSlugs.size > 0) {
+        // Derive the Cloudflare year-tag set from every changed slug (slugs
+        // start YYYY-MM-DD-…). User-activity sync can touch ratings on shows
+        // older than the --years window, so the year set is wider than
+        // `years` and we union both. invalidateShowListings purges the
+        // matching /shows/year/:year edge entries.
+        const yearsToPurge = new Set<number>(years);
+        for (const slug of changedSlugs) {
+          const y = Number(slug.slice(0, 4));
+          if (Number.isFinite(y)) yearsToPurge.add(y);
+        }
+        await cacheInvalidation.invalidateShowListings(Array.from(yearsToPurge));
+      }
       if (songsChanged) await cacheInvalidation.invalidateSongCaches();
     } else if (!isDryRun && !cacheInvalidation && (changedSlugs.size > 0 || songsChanged)) {
       console.warn("⚠️  REDIS_URL not set; skipping cache invalidation. Cached pages may show stale data until TTL expires or you restart the app.");
