@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   buildRockOperaAssignmentDiff,
   buildSetlistReconciliation,
@@ -15,6 +15,9 @@ import {
   matchVenue,
   parseYearsArg,
   showNeedsUpdate,
+  stubUserEmail,
+  STUB_USER_PASSWORD_DIGEST,
+  syncUserActivity,
   type LocalTrackForReconcile,
   type McpSearchVenueResult,
   type McpSetlist,
@@ -1591,5 +1594,545 @@ describe("buildSongDriftUpdate", () => {
     expect(patch).not.toHaveProperty("timesPlayed");
     expect(patch).not.toHaveProperty("dateFirstPlayed");
     expect(patch).not.toHaveProperty("dateLastPlayed");
+  });
+});
+
+describe("stubUserEmail / STUB_USER_PASSWORD_DIGEST", () => {
+  // Stub users' email and passwordDigest satisfy NOT NULL constraints
+  // without leaking real PII. The shape is asserted here as a regression
+  // guard — production sync output uses these values and changing them
+  // breaks existing local DBs.
+  test("stubUserEmail is deterministic and prefixed with stub-", () => {
+    expect(stubUserEmail("a1b2c3d4-e5f6-7890-abcd-ef1234567890")).toBe(
+      "stub-a1b2c3d4-e5f6-7890-abcd-ef1234567890@local.invalid",
+    );
+  });
+
+  test("STUB_USER_PASSWORD_DIGEST is a static placeholder, not a real digest", () => {
+    expect(STUB_USER_PASSWORD_DIGEST).toBe("STUB");
+  });
+});
+
+/**
+ * Build a stub prisma client that responds to the calls syncUserActivity
+ * makes. Each table is seeded with an array; lookups, upserts, and deletes
+ * mutate the array directly so assertions can read the final state.
+ */
+type StubUserRow = {
+  id: string;
+  email: string;
+  passwordDigest: string;
+  username: string | null;
+  avatarFileId: string | null;
+  avatarFileUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  _refs?: { ratings: number; attendances: number; reviews: number; blogPosts: number };
+};
+type StubRatingRow = {
+  id: string;
+  userId: string;
+  value: number;
+  rateableType: string;
+  rateableId: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+type StubAttendanceRow = {
+  id: string;
+  userId: string;
+  showId: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function makeStubDb(seed: {
+  users?: StubUserRow[];
+  ratings?: StubRatingRow[];
+  attendances?: StubAttendanceRow[];
+  shows?: Array<{ id: string; slug: string }>;
+  tracks?: Array<{ id: string; showId: string }>;
+}) {
+  const users = seed.users ?? [];
+  const ratings = seed.ratings ?? [];
+  const attendances = seed.attendances ?? [];
+  const shows = seed.shows ?? [];
+  const tracks = seed.tracks ?? [];
+
+  const findFirstByMaxUpdatedAt = <T extends { updatedAt: Date }>(rows: T[]) => {
+    if (rows.length === 0) return null;
+    return rows.slice().sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0];
+  };
+
+  const db = {
+    user: {
+      findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(users)),
+      findMany: vi.fn(async (args?: { where?: { id?: { in?: string[] } }; select?: Record<string, unknown> }) => {
+        const matching = args?.where?.id?.in
+          ? users.filter((u) => args.where?.id?.in?.includes(u.id))
+          : users;
+        if (args?.select && (args.select as Record<string, unknown>)._count) {
+          return matching.map((u) => ({
+            id: u.id,
+            _count: u._refs ?? { ratings: 0, attendances: 0, reviews: 0, blogPosts: 0 },
+          }));
+        }
+        return matching.map((u) => ({ id: u.id }));
+      }),
+      upsert: vi.fn(
+        async (args: {
+          where: { id: string };
+          create: StubUserRow;
+          update: Partial<StubUserRow>;
+        }) => {
+          const existing = users.find((u) => u.id === args.where.id);
+          if (existing) {
+            Object.assign(existing, args.update);
+            return existing;
+          }
+          users.push(args.create);
+          return args.create;
+        },
+      ),
+      deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        for (let i = users.length - 1; i >= 0; i--) {
+          if (ids.has(users[i].id)) users.splice(i, 1);
+        }
+        return { count: ids.size };
+      }),
+    },
+    rating: {
+      findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(ratings)),
+      findMany: vi.fn(async () => ratings.map((r) => ({ id: r.id, rateableId: r.rateableId, rateableType: r.rateableType }))),
+      upsert: vi.fn(async (args: { where: { id: string }; create: StubRatingRow; update: Partial<StubRatingRow> }) => {
+        const existing = ratings.find((r) => r.id === args.where.id);
+        if (existing) {
+          Object.assign(existing, args.update);
+          return existing;
+        }
+        ratings.push(args.create);
+        return args.create;
+      }),
+      deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        for (let i = ratings.length - 1; i >= 0; i--) {
+          if (ids.has(ratings[i].id)) ratings.splice(i, 1);
+        }
+        return { count: ids.size };
+      }),
+    },
+    attendance: {
+      findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(attendances)),
+      findMany: vi.fn(async () => attendances.map((a) => ({ id: a.id, showId: a.showId }))),
+      upsert: vi.fn(async (args: { where: { id: string }; create: StubAttendanceRow; update: Partial<StubAttendanceRow> }) => {
+        const existing = attendances.find((a) => a.id === args.where.id);
+        if (existing) {
+          Object.assign(existing, args.update);
+          return existing;
+        }
+        attendances.push(args.create);
+        return args.create;
+      }),
+      deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        for (let i = attendances.length - 1; i >= 0; i--) {
+          if (ids.has(attendances[i].id)) attendances.splice(i, 1);
+        }
+        return { count: ids.size };
+      }),
+    },
+    show: {
+      findUnique: vi.fn(async (args: { where: { id: string } }) => {
+        const s = shows.find((row) => row.id === args.where.id);
+        return s ? { id: s.id, slug: s.slug } : null;
+      }),
+      findMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        return shows.filter((s) => ids.has(s.id)).map((s) => ({ slug: s.slug, id: s.id }));
+      }),
+    },
+    track: {
+      findUnique: vi.fn(async (args: { where: { id: string } }) => {
+        const t = tracks.find((row) => row.id === args.where.id);
+        return t ? { id: t.id } : null;
+      }),
+      findMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        return tracks
+          .filter((t) => ids.has(t.id))
+          .map((t) => {
+            const show = shows.find((s) => s.id === t.showId);
+            return { show: { slug: show?.slug ?? null } };
+          });
+      }),
+    },
+  };
+
+  return { db, state: { users, ratings, attendances } };
+}
+
+/**
+ * Build a stub mcp() callback that returns the prepared responses for each
+ * (toolName, callIndex). Helps tests assemble fully-paginated mock streams.
+ */
+function makeStubMcp(responses: Record<string, unknown[]>) {
+  const indexes: Record<string, number> = {};
+  return async <T>(toolName: string, _args: Record<string, unknown>): Promise<T> => {
+    const queue = responses[toolName];
+    if (!queue) throw new Error(`No stub response for ${toolName}`);
+    const i = indexes[toolName] ?? 0;
+    indexes[toolName] = i + 1;
+    return queue[i] as T;
+  };
+}
+
+const stubRatingService = () => ({
+  rebuildAggregatesFor: vi.fn(async () => {}),
+}) as never;
+
+describe("syncUserActivity — incremental mode", () => {
+  // Stub user insert path: synthetic email + STUB digest, real id +
+  // username + avatar + timestamps from prod. Guards against future
+  // refactors leaking real email or names into the local DB.
+  test("inserts a new stub user with synthetic email/passwordDigest and prod username/avatar", async () => {
+    const { db, state } = makeStubDb({});
+    const mcp = makeStubMcp({
+      list_users_since: [
+        {
+          users: [
+            {
+              id: "u-marc",
+              username: "trance-marc",
+              avatarFileId: null,
+              avatarFileUrl: "https://cdn.example/marc.jpg",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.users).toHaveLength(1);
+    const created = state.users[0];
+    expect(created).toMatchObject({
+      id: "u-marc",
+      email: "stub-u-marc@local.invalid",
+      passwordDigest: "STUB",
+      username: "trance-marc",
+      avatarFileUrl: "https://cdn.example/marc.jpg",
+    });
+  });
+
+  // Rating insert path: upsert by id, then collect the (Show, showId) pair
+  // so the aggregate rebuild runs once at the end. The show's slug lands
+  // in changedSlugs so the outer cache-invalidation pass clears the cached
+  // show.data payload that embeds Show.averageRating.
+  test("upserts a Show rating and triggers aggregate rebuild + cache invalidation", async () => {
+    const ratingService = stubRatingService();
+    const changedSlugs = new Set<string>();
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-1",
+              userId: "u-marc",
+              value: 5,
+              rateableType: "Show",
+              rateableId: "show-1",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: false,
+      ratingService,
+      cacheInvalidation: null,
+      changedSlugs,
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.ratings).toHaveLength(1);
+    expect(state.ratings[0]).toMatchObject({ id: "r-1", userId: "u-marc", value: 5 });
+    expect(ratingService.rebuildAggregatesFor).toHaveBeenCalledWith([
+      { rateableId: "show-1", rateableType: "Show" },
+    ]);
+    expect(changedSlugs.has("2024-08-12-cap-theatre")).toBe(true);
+  });
+
+  // FK guard: ratings whose user / show / track isn't local must be
+  // warned-and-skipped, not crashed. Sync narrows the year window for the
+  // shows pass, so old shows referenced by ratings legitimately may not be
+  // local — silently dropping would be wrong, but raising would block the
+  // whole pass.
+  test("skips a Track rating whose track isn't local", async () => {
+    const ratingService = stubRatingService();
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      tracks: [], // No local tracks — the rating's rateableId can't resolve
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-orphan",
+              userId: "u-marc",
+              value: 4,
+              rateableType: "Track",
+              rateableId: "track-missing",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    const result = await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: false,
+      ratingService,
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.ratings).toHaveLength(0);
+    expect(result.ratingsFkSkipped).toBe(1);
+    expect(ratingService.rebuildAggregatesFor).not.toHaveBeenCalled();
+  });
+
+  // Attendance insert path: same upsert-by-id shape as ratings; show.slug
+  // lands in changedSlugs so the outer cache-invalidation pass clears the
+  // affected show's listing payload.
+  test("upserts an attendance and stamps the show slug into changedSlugs", async () => {
+    const changedSlugs = new Set<string>();
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [
+        {
+          attendances: [
+            {
+              id: "a-1",
+              userId: "u-marc",
+              showId: "show-1",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs,
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.attendances).toHaveLength(1);
+    expect(state.attendances[0]).toMatchObject({ id: "a-1", userId: "u-marc", showId: "show-1" });
+    expect(changedSlugs.has("2024-08-12-cap-theatre")).toBe(true);
+  });
+
+  // Cursor: MAX(updatedAt) on the local table is the implicit checkpoint.
+  // Repeated runs ask prod for rows newer than that — the first run pulls
+  // everything (cursor=epoch), the second pulls only the delta.
+  test("uses local MAX(updatedAt) as the incremental cursor", async () => {
+    const { db } = makeStubDb({
+      users: [
+        {
+          id: "u-1",
+          email: "stub-u-1@local.invalid",
+          passwordDigest: "STUB",
+          username: "user-1",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-08-12T00:00:00Z"),
+        },
+      ],
+    });
+    const calls: Array<{ tool: string; args: Record<string, unknown> }> = [];
+    const mcp = async <T>(toolName: string, args: Record<string, unknown>): Promise<T> => {
+      calls.push({ tool: toolName, args });
+      if (toolName === "list_users_since") return { users: [], nextCursor: null } as T;
+      if (toolName === "list_ratings_since") return { ratings: [], nextCursor: null } as T;
+      if (toolName === "list_attendances_since") return { attendances: [], nextCursor: null } as T;
+      throw new Error(`unexpected tool ${toolName}`);
+    };
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    const usersCall = calls.find((c) => c.tool === "list_users_since");
+    expect(usersCall?.args.since).toBe("2024-08-12T00:00:00.000Z");
+  });
+});
+
+describe("syncUserActivity — full-users mode", () => {
+  // Full mode reconciliation: ratings present locally but not on prod get
+  // deleted, and the affected rateable lands in the aggregate-rebuild set so
+  // its Show.averageRating / ratingsCount gets recomputed to zero.
+  test("deletes a local rating that's not on prod and triggers aggregate rebuild", async () => {
+    const ratingService = stubRatingService();
+    const { db, state } = makeStubDb({
+      users: [],
+      ratings: [
+        {
+          id: "r-stale",
+          userId: "u-marc",
+          value: 5,
+          rateableType: "Show",
+          rateableId: "show-1",
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+      list_all_attendance_ids: [{ ids: [] }],
+      list_all_rating_ids: [{ ids: [] }],
+      list_all_user_ids: [{ ids: [] }],
+    });
+
+    const result = await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: true,
+      ratingService,
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.ratings).toHaveLength(0);
+    expect(result.ratingsDeleted).toBe(1);
+    expect(ratingService.rebuildAggregatesFor).toHaveBeenCalledWith([
+      { rateableId: "show-1", rateableType: "Show" },
+    ]);
+  });
+
+  // Default (non-full) mode never deletes — additive sync is the safe
+  // default so locally-created test data isn't wiped on every run.
+  test("does NOT delete missing local rows in default incremental mode", async () => {
+    const { db, state } = makeStubDb({
+      ratings: [
+        {
+          id: "r-stale",
+          userId: "u-marc",
+          value: 5,
+          rateableType: "Show",
+          rateableId: "show-1",
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    const result = await syncUserActivity(db as never, {
+      isDryRun: false,
+      fullMode: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.ratings).toHaveLength(1);
+    expect(result.ratingsDeleted).toBe(0);
   });
 });

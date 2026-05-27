@@ -220,7 +220,95 @@ const tools = [
       required: [],
     },
   },
+  // Sync tools — for the local sync-missing-shows script. Strictly PII-free:
+  // user rows return only id/username/avatar/timestamps; ratings + attendance
+  // carry no user PII on the model itself.
+  {
+    name: "list_users_since",
+    description:
+      "Paginated listing of non-PII user fields (id, username, avatar, timestamps) for users updated after a given time. Used by the local sync script.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
+        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
+        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
+      },
+      required: ["since"],
+    },
+  },
+  {
+    name: "list_ratings_since",
+    description:
+      "Paginated listing of ratings (id, userId, value, rateableType, rateableId, timestamps) updated after a given time. Used by the local sync script.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
+        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
+        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
+      },
+      required: ["since"],
+    },
+  },
+  {
+    name: "list_attendances_since",
+    description:
+      "Paginated listing of attendance rows (id, userId, showId, timestamps) updated after a given time. Used by the local sync script.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
+        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
+        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
+      },
+      required: ["since"],
+    },
+  },
+  {
+    name: "list_all_user_ids",
+    description: "Every user id on prod. Used by the local sync script's --full-users reconciliation pass.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "list_all_rating_ids",
+    description: "Every rating id on prod. Used by the local sync script's --full-users reconciliation pass.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "list_all_attendance_ids",
+    description: "Every attendance id on prod. Used by the local sync script's --full-users reconciliation pass.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
 ];
+
+const DEFAULT_SYNC_LIMIT = 2000;
+const MAX_SYNC_LIMIT = 5000;
+
+// Opaque cursor for the sync list endpoints. Encodes the last-seen
+// (updatedAt, id) so the next page starts after that boundary regardless of
+// rows landing at the same timestamp.
+function encodeSyncCursor(updatedAt: Date, id: string): string {
+  return Buffer.from(`${updatedAt.toISOString()}|${id}`, "utf8").toString("base64");
+}
+
+function decodeSyncCursor(cursor: string | undefined): { updatedAt: Date; id: string } | null {
+  if (!cursor) return null;
+  try {
+    const decoded = Buffer.from(cursor, "base64").toString("utf8");
+    const [iso, id] = decoded.split("|");
+    if (!iso || !id) return null;
+    return { updatedAt: new Date(iso), id };
+  } catch {
+    return null;
+  }
+}
+
+function clampSyncLimit(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : DEFAULT_SYNC_LIMIT;
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_SYNC_LIMIT;
+  return Math.min(Math.floor(n), MAX_SYNC_LIMIT);
+}
 
 async function handleToolCall(name: string, args: Record<string, unknown>): Promise<unknown> {
   switch (name) {
@@ -658,6 +746,73 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       }
 
       return { venues, ...(errors.length > 0 && { errors }) };
+    }
+
+    // Sync tools. The service's `select` allowlist already enforces the
+    // PII-free shape — see UserService.listForSync. We pass through directly
+    // here (no re-mapping) so any future widening of the projection has to
+    // happen in one place, with the test guarding it.
+    case "list_users_since": {
+      const since = new Date(args.since as string);
+      const cursor = decodeSyncCursor(args.cursor as string | undefined);
+      const limit = clampSyncLimit(args.limit);
+      const rows = await services.users.listForSync({
+        since,
+        cursorId: cursor?.id,
+        cursorUpdatedAt: cursor?.updatedAt,
+        limit,
+      });
+      const last = rows[rows.length - 1];
+      return {
+        users: rows,
+        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
+      };
+    }
+
+    case "list_ratings_since": {
+      const since = new Date(args.since as string);
+      const cursor = decodeSyncCursor(args.cursor as string | undefined);
+      const limit = clampSyncLimit(args.limit);
+      const rows = await services.ratings.listForSync({
+        since,
+        cursorId: cursor?.id,
+        cursorUpdatedAt: cursor?.updatedAt,
+        limit,
+      });
+      const last = rows[rows.length - 1];
+      return {
+        ratings: rows,
+        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
+      };
+    }
+
+    case "list_attendances_since": {
+      const since = new Date(args.since as string);
+      const cursor = decodeSyncCursor(args.cursor as string | undefined);
+      const limit = clampSyncLimit(args.limit);
+      const rows = await services.attendances.listForSync({
+        since,
+        cursorId: cursor?.id,
+        cursorUpdatedAt: cursor?.updatedAt,
+        limit,
+      });
+      const last = rows[rows.length - 1];
+      return {
+        attendances: rows,
+        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
+      };
+    }
+
+    case "list_all_user_ids": {
+      return { ids: await services.users.listAllIdsForSync() };
+    }
+
+    case "list_all_rating_ids": {
+      return { ids: await services.ratings.listAllIdsForSync() };
+    }
+
+    case "list_all_attendance_ids": {
+      return { ids: await services.attendances.listAllIdsForSync() };
     }
 
     default:

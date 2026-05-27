@@ -71,7 +71,7 @@ db-restore:
 	@echo "Production data restored successfully."
 
 db-sync-missing-shows:
-	cd packages/core && doppler run -- bun run scripts/sync-missing-shows.ts $(if $(HELP),--help) $(if $(YEARS),--years=$(YEARS)) $(if $(DRY_RUN),--dry-run) $(if $(PRUNE_GHOST_SHOWS),--prune-ghost-shows)
+	cd packages/core && doppler run -- bun run scripts/sync-missing-shows.ts $(if $(HELP),--help) $(if $(YEARS),--years=$(YEARS)) $(if $(DRY_RUN),--dry-run) $(if $(PRUNE_GHOST_SHOWS),--prune-ghost-shows) $(if $(NO_USERS),--no-users) $(if $(FULL_USERS),--full-users)
 
 db-load-data-dump:
 	psql "$$(doppler secrets get DATABASE_URL --plain | sed 's|postgresql://postgres:|postgresql://supabase_admin:|')" -f $(PROD_DATA_PATH)

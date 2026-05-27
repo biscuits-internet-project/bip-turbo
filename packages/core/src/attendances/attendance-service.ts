@@ -165,4 +165,44 @@ export class AttendanceService {
       return false;
     }
   }
+
+  /**
+   * Sync export: page through attendances for the local sync script. No PII
+   * on the Attendance model itself — just user/show foreign keys. Stable
+   * cursor over (updatedAt, id); see RatingService.listForSync.
+   */
+  async listForSync(opts: {
+    since: Date;
+    cursorId?: string;
+    cursorUpdatedAt?: Date;
+    limit: number;
+  }): Promise<Array<Pick<Attendance, "id" | "userId" | "showId" | "createdAt" | "updatedAt">>> {
+    const { since, cursorId, cursorUpdatedAt, limit } = opts;
+    const where = cursorUpdatedAt
+      ? {
+          OR: [
+            { updatedAt: { gt: cursorUpdatedAt } },
+            { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: cursorId ?? "" } }] },
+          ],
+        }
+      : { updatedAt: { gt: since } };
+    const rows = await this.db.attendance.findMany({
+      where,
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: {
+        id: true,
+        userId: true,
+        showId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return rows;
+  }
+
+  async listAllIdsForSync(): Promise<string[]> {
+    const rows = await this.db.attendance.findMany({ select: { id: true } });
+    return rows.map((r) => r.id);
+  }
 }

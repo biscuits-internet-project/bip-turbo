@@ -147,3 +147,55 @@ describe("UserService.getUserProfileHeader", () => {
     expect(findFirst.mock.calls[1][0].orderBy).toMatchObject({ show: { date: "desc" } });
   });
 });
+
+describe("UserService.listForSync", () => {
+  // PII allowlist: the sync export MUST select only id/username/avatar/
+  // timestamps. Email, names, password digest, and auth tokens never leave
+  // prod. This test guards against a future refactor accidentally widening
+  // the projection.
+  test("selects only non-PII columns — never email, names, or auth fields", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const db = { user: { findMany } } as never;
+
+    const service = new UserService(db, logger);
+    await service.listForSync({ since: new Date(0), limit: 100 });
+
+    const select = findMany.mock.calls[0][0].select;
+    expect(select).toEqual({
+      id: true,
+      username: true,
+      avatarFileId: true,
+      avatarFileUrl: true,
+      createdAt: true,
+      updatedAt: true,
+    });
+    expect(select).not.toHaveProperty("email");
+    expect(select).not.toHaveProperty("firstName");
+    expect(select).not.toHaveProperty("lastName");
+    expect(select).not.toHaveProperty("passwordDigest");
+    expect(select).not.toHaveProperty("resetPasswordToken");
+    expect(select).not.toHaveProperty("confirmationToken");
+  });
+
+  // Same stable-cursor semantics as RatingService.listForSync: first page
+  // uses since-only, subsequent pages use the (updatedAt, id) tuple to avoid
+  // re-fetching or skipping rows landing at identical timestamps.
+  test("subsequent page uses (updatedAt, id) tuple as exclusive cursor", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const db = { user: { findMany } } as never;
+
+    const service = new UserService(db, logger);
+    const cursorUpdatedAt = new Date("2024-05-01T00:00:00Z");
+    await service.listForSync({
+      since: new Date(0),
+      cursorUpdatedAt,
+      cursorId: "u-uuid",
+      limit: 100,
+    });
+
+    expect(findMany.mock.calls[0][0].where).toEqual({
+      OR: [{ updatedAt: { gt: cursorUpdatedAt } }, { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: "u-uuid" } }] }],
+    });
+    expect(findMany.mock.calls[0][0].orderBy).toEqual([{ updatedAt: "asc" }, { id: "asc" }]);
+  });
+});
