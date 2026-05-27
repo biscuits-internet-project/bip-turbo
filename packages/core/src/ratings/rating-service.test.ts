@@ -448,6 +448,184 @@ describe("RatingService.clearForUser", () => {
   });
 });
 
+describe("RatingService.rebuildAggregatesFor", () => {
+  // Bulk version of updateRateableAverageRating used by the sync script after
+  // importing many ratings at once. Single groupBy per rateableType collapses
+  // N rateables to one query each; per-rateable .update writes the resulting
+  // averageRating / ratingsCount onto Show or Track.
+  test("recomputes Show.averageRating + ratingsCount in one groupBy per type", async () => {
+    const showGroupBy = vi.fn().mockResolvedValue([
+      { rateableId: "show-1", _avg: { value: 4.5 }, _count: { id: 2 } },
+      { rateableId: "show-2", _avg: { value: 3.0 }, _count: { id: 1 } },
+    ]);
+    const showUpdate = vi.fn().mockResolvedValue(undefined);
+    const trackUpdate = vi.fn();
+    const trackGroupBy = vi.fn();
+    const db = {
+      rating: {
+        groupBy: vi
+          .fn()
+          .mockImplementation((args: { where: { rateableType: string } }) =>
+            args.where.rateableType === "Show" ? showGroupBy(args) : trackGroupBy(args),
+          ),
+      },
+      show: { update: showUpdate },
+      track: { update: trackUpdate },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    await service.rebuildAggregatesFor([
+      { rateableId: "show-1", rateableType: "Show" },
+      { rateableId: "show-2", rateableType: "Show" },
+    ]);
+
+    expect(showUpdate).toHaveBeenCalledTimes(2);
+    expect(showUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "show-1" },
+        data: expect.objectContaining({ averageRating: 4.5, ratingsCount: 2 }),
+      }),
+    );
+    expect(showUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "show-2" },
+        data: expect.objectContaining({ averageRating: 3.0, ratingsCount: 1 }),
+      }),
+    );
+    expect(trackUpdate).not.toHaveBeenCalled();
+    expect(trackGroupBy).not.toHaveBeenCalled();
+  });
+
+  // Rateables whose ratings dropped to zero (deleted last rating in full
+  // mode) don't appear in the groupBy result. The bulk method must zero
+  // them out anyway, matching what updateRateableAverageRating does for the
+  // single-row delete path.
+  test("zeroes out rateables that no longer have any ratings", async () => {
+    const showUpdate = vi.fn();
+    const db = {
+      rating: {
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      show: { update: showUpdate },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    await service.rebuildAggregatesFor([{ rateableId: "show-abandoned", rateableType: "Show" }]);
+
+    expect(showUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "show-abandoned" },
+        data: expect.objectContaining({ averageRating: 0, ratingsCount: 0 }),
+      }),
+    );
+  });
+
+  // Mixed types in one call: one groupBy hits the Show table, one hits the
+  // Track table. Per-rateable updates land on the matching denormalized row.
+  test("dispatches Show + Track rateables to the right tables", async () => {
+    const showUpdate = vi.fn();
+    const trackUpdate = vi.fn();
+    const db = {
+      rating: {
+        groupBy: vi
+          .fn()
+          .mockImplementation(async (args: { where: { rateableType: string } }) =>
+            args.where.rateableType === "Show"
+              ? [{ rateableId: "show-1", _avg: { value: 5.0 }, _count: { id: 3 } }]
+              : [{ rateableId: "track-1", _avg: { value: 3.5 }, _count: { id: 2 } }],
+          ),
+      },
+      show: { update: showUpdate },
+      track: { update: trackUpdate },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    await service.rebuildAggregatesFor([
+      { rateableId: "show-1", rateableType: "Show" },
+      { rateableId: "track-1", rateableType: "Track" },
+    ]);
+
+    expect(showUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "show-1" } }));
+    expect(trackUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "track-1" } }));
+  });
+
+  test("no-ops on an empty pair list", async () => {
+    const groupBy = vi.fn();
+    const db = {
+      rating: { groupBy },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+    } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    await service.rebuildAggregatesFor([]);
+
+    expect(groupBy).not.toHaveBeenCalled();
+  });
+});
+
+describe("RatingService.listForSync", () => {
+  // Stable cursor over (updatedAt, id). First page uses since-only; subsequent
+  // pages use the (updatedAt, id) tuple so rows landing at the same timestamp
+  // don't get re-fetched or skipped.
+  test("first page filters by updatedAt > since", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const db = { rating: { findMany } } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    const since = new Date("2024-01-01T00:00:00Z");
+    await service.listForSync({ since, limit: 100 });
+
+    expect(findMany.mock.calls[0][0]).toMatchObject({
+      where: { updatedAt: { gt: since } },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: 100,
+    });
+  });
+
+  test("subsequent page uses (updatedAt, id) tuple as exclusive cursor", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const db = { rating: { findMany } } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    const cursorUpdatedAt = new Date("2024-05-01T00:00:00Z");
+    await service.listForSync({
+      since: new Date(0),
+      cursorUpdatedAt,
+      cursorId: "rating-uuid",
+      limit: 100,
+    });
+
+    expect(findMany.mock.calls[0][0].where).toEqual({
+      OR: [
+        { updatedAt: { gt: cursorUpdatedAt } },
+        { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: "rating-uuid" } }] },
+      ],
+    });
+  });
+
+  // Narrow projection — no rating field is PII, but the select-narrow guards
+  // against accidentally widening the shape in future refactors.
+  test("selects only the wire-safe columns", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const db = { rating: { findMany } } as never;
+
+    const service = new RatingService(db, cacheInvalidation);
+    await service.listForSync({ since: new Date(0), limit: 100 });
+
+    expect(findMany.mock.calls[0][0].select).toEqual({
+      id: true,
+      userId: true,
+      value: true,
+      rateableType: true,
+      rateableId: true,
+      createdAt: true,
+      updatedAt: true,
+    });
+  });
+});
+
 describe("RatingService.upsert", () => {
   // Same motivation as the Track-clear case in clearForUser: the show's
   // cached setlist embeds Track.averageRating/ratingsCount, so the upsert

@@ -465,6 +465,51 @@ export class UserService {
     return sortedStats.slice(0, limit);
   }
 
+  /**
+   * Sync export: page through users for the local sync script. Selects only
+   * the non-PII columns (id, username, avatar, timestamps). Email, names,
+   * password digest, and auth tokens are deliberately excluded — they must
+   * never leave prod. Stable cursor over (updatedAt, id).
+   */
+  async listForSync(opts: { since: Date; cursorId?: string; cursorUpdatedAt?: Date; limit: number }): Promise<
+    Array<{
+      id: string;
+      username: string | null;
+      avatarFileId: string | null;
+      avatarFileUrl: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  > {
+    const { since, cursorId, cursorUpdatedAt, limit } = opts;
+    const where = cursorUpdatedAt
+      ? {
+          OR: [
+            { updatedAt: { gt: cursorUpdatedAt } },
+            { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: cursorId ?? "" } }] },
+          ],
+        }
+      : { updatedAt: { gt: since } };
+    return this.db.user.findMany({
+      where,
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: {
+        id: true,
+        username: true,
+        avatarFileId: true,
+        avatarFileUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async listAllIdsForSync(): Promise<string[]> {
+    const rows = await this.db.user.findMany({ select: { id: true } });
+    return rows.map((r) => r.id);
+  }
+
   async getCommunityTotals(): Promise<{
     totalUsers: number;
     totalReviews: number;

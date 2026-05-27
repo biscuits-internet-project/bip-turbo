@@ -105,6 +105,108 @@ export class RatingService {
     return { averageRating, ratingsCount };
   }
 
+  /**
+   * Bulk-recompute denormalized averageRating/ratingsCount for a set of
+   * rateables in one pass. Used by the sync script after importing or
+   * deleting many ratings at once — single-row callers (upsert, clearForUser)
+   * keep using updateRateableAverageRating. Pairs whose ratings dropped to
+   * zero are zeroed out on the rateable row.
+   */
+  async rebuildAggregatesFor(pairs: Array<{ rateableId: string; rateableType: string }>): Promise<void> {
+    if (pairs.length === 0) return;
+    const showIds = new Set<string>();
+    const trackIds = new Set<string>();
+    for (const { rateableId, rateableType } of pairs) {
+      if (rateableType === "Show") showIds.add(rateableId);
+      else if (rateableType === "Track") trackIds.add(rateableId);
+    }
+
+    const now = new Date();
+
+    if (showIds.size > 0) {
+      const rows = await this.db.rating.groupBy({
+        by: ["rateableId"],
+        where: { rateableType: "Show", rateableId: { in: Array.from(showIds) } },
+        _avg: { value: true },
+        _count: { id: true },
+      });
+      const statsById = new Map(rows.map((r) => [r.rateableId, r]));
+      for (const id of showIds) {
+        const stats = statsById.get(id);
+        const averageRating = stats?._avg.value ?? 0;
+        const ratingsCount = stats?._count.id ?? 0;
+        await this.db.show.update({
+          where: { id },
+          data: { averageRating, ratingsCount, updatedAt: now },
+        });
+      }
+    }
+
+    if (trackIds.size > 0) {
+      const rows = await this.db.rating.groupBy({
+        by: ["rateableId"],
+        where: { rateableType: "Track", rateableId: { in: Array.from(trackIds) } },
+        _avg: { value: true },
+        _count: { id: true },
+      });
+      const statsById = new Map(rows.map((r) => [r.rateableId, r]));
+      for (const id of trackIds) {
+        const stats = statsById.get(id);
+        const averageRating = stats?._avg.value ?? 0;
+        const ratingsCount = stats?._count.id ?? 0;
+        await this.db.track.update({
+          where: { id },
+          data: { averageRating, ratingsCount, updatedAt: now },
+        });
+      }
+    }
+  }
+
+  /**
+   * Sync export: page through ratings for the local sync script. PII-free
+   * by construction — no user PII is on the Rating model itself. Order by
+   * (updatedAt ASC, id ASC) so the cursor is stable. `since` is exclusive
+   * on the (updatedAt, id) tuple to prevent re-fetching the boundary row.
+   */
+  async listForSync(opts: {
+    since: Date;
+    cursorId?: string;
+    cursorUpdatedAt?: Date;
+    limit: number;
+  }): Promise<
+    Array<Pick<Rating, "id" | "userId" | "value" | "rateableType" | "rateableId" | "createdAt" | "updatedAt">>
+  > {
+    const { since, cursorId, cursorUpdatedAt, limit } = opts;
+    const where = cursorUpdatedAt
+      ? {
+          OR: [
+            { updatedAt: { gt: cursorUpdatedAt } },
+            { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: cursorId ?? "" } }] },
+          ],
+        }
+      : { updatedAt: { gt: since } };
+    const rows = await this.db.rating.findMany({
+      where,
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: {
+        id: true,
+        userId: true,
+        value: true,
+        rateableType: true,
+        rateableId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return rows;
+  }
+
+  async listAllIdsForSync(): Promise<string[]> {
+    const rows = await this.db.rating.findMany({ select: { id: true } });
+    return rows.map((r) => r.id);
+  }
+
   async findManyByUserIdAndRateableIds(userId: string, rateableIds: string[], rateableType: string): Promise<Rating[]> {
     const results = await this.db.rating.findMany({
       where: { userId, rateableId: { in: rateableIds }, rateableType },

@@ -20,6 +20,7 @@ import { Prisma } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
+import { RatingService } from "../src/ratings/rating-service";
 import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
 import { createTestLogger } from "../src/_shared/test-logger";
@@ -139,6 +140,67 @@ export interface McpSearchVenueResult {
   city: string | null;
   state: string | null;
 }
+
+// User-activity sync shapes. Match apps/web/app/routes/mcp/index.tsx
+// list_users_since / list_ratings_since / list_attendances_since. Strictly
+// non-PII: no email, no real name, no auth secrets. The owning user row is
+// inserted locally as a stub (synthetic email + placeholder digest) so the
+// real ratings/attendance rows have a valid FK.
+export interface McpSyncUser {
+  id: string;
+  username: string | null;
+  avatarFileId: string | null;
+  avatarFileUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface McpSyncRating {
+  id: string;
+  userId: string;
+  value: number;
+  rateableType: string;
+  rateableId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface McpSyncAttendance {
+  id: string;
+  userId: string;
+  showId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const SYNC_PAGE_LIMIT = 2000;
+
+/**
+ * No-op CacheInvalidationService used when the script runs without REDIS.
+ * RatingService.rebuildAggregatesFor doesn't call any of these methods, but
+ * the constructor still requires the dependency.
+ */
+function createNoopCacheInvalidation(): Record<string, () => Promise<void>> {
+  const noop = async () => {};
+  return new Proxy({}, { get: () => noop }) as Record<string, () => Promise<void>>;
+}
+
+/**
+ * Synthetic email used for every stub user mirrored from prod. The real
+ * email never leaves prod, but User.email is NOT NULL UNIQUE, so we
+ * generate a deterministic placeholder from the prod uuid. Tests assert
+ * this shape — change with care.
+ */
+export function stubUserEmail(userId: string): string {
+  return `stub-${userId}@local.invalid`;
+}
+
+/**
+ * Placeholder for User.passwordDigest (NOT NULL). Matches the convention
+ * used by sync-supabase-users.ts which sets a literal placeholder for
+ * auth-provider-managed users.
+ */
+export const STUB_USER_PASSWORD_DIGEST = "STUB";
 
 // --- Pure helpers (unit-tested) ---
 
@@ -769,6 +831,410 @@ async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Prom
   return JSON.parse(text) as T;
 }
 
+// --- User activity sync (users + ratings + attendances) ---
+
+interface UserActivityStats {
+  usersCreated: number;
+  usersUpdated: number;
+  ratingsUpserted: number;
+  ratingsFkSkipped: number;
+  attendancesUpserted: number;
+  attendancesFkSkipped: number;
+  usersDeleted: number;
+  ratingsDeleted: number;
+  attendancesDeleted: number;
+  aggregatesRebuilt: number;
+}
+
+interface SyncUserActivityOptions {
+  isDryRun: boolean;
+  fullMode: boolean;
+  ratingService: RatingService;
+  cacheInvalidation: CacheInvalidationService | null;
+  changedSlugs: Set<string>;
+  now: Date;
+  // Injected to keep the function unit-testable without mocking globals.
+  // Defaults to the real mcpCall in the production wiring below.
+  mcp?: <T>(toolName: string, args: Record<string, unknown>) => Promise<T>;
+}
+
+/**
+ * Pull users / ratings / attendances from prod and reconcile locally.
+ *
+ * Default mode is incremental: cursor = MAX(updatedAt) on each local table,
+ * pull rows newer than that, upsert by id. Stateless — no `.sync-state.json`,
+ * no cursor table. Skips deletes.
+ *
+ * --full-users adds a reconciliation pass: pull every prod id, delete the
+ * local rows missing from prod. Run occasionally for a true mirror.
+ *
+ * Rating aggregates (Show.averageRating / Track.averageRating + ratingsCount)
+ * are recomputed at the end via RatingService.rebuildAggregatesFor for every
+ * (rateableType, rateableId) the sync touched. Affected show slugs are added
+ * to changedSlugs so the outer cache-invalidation pass clears them.
+ *
+ * Ratings/attendances that reference a missing local user, show, or track
+ * are warned and skipped — the shows pass should have already brought in
+ * every show, but a fresh DB synced for a narrow year window may genuinely
+ * lack older ones.
+ */
+export async function syncUserActivity(
+  db: typeof prisma,
+  options: SyncUserActivityOptions,
+): Promise<UserActivityStats> {
+  const { isDryRun, fullMode, ratingService, now, changedSlugs } = options;
+  const mcp = options.mcp ?? mcpCall;
+  const stats: UserActivityStats = {
+    usersCreated: 0,
+    usersUpdated: 0,
+    ratingsUpserted: 0,
+    ratingsFkSkipped: 0,
+    attendancesUpserted: 0,
+    attendancesFkSkipped: 0,
+    usersDeleted: 0,
+    ratingsDeleted: 0,
+    attendancesDeleted: 0,
+    aggregatesRebuilt: 0,
+  };
+
+  // Cursor = local MAX(updatedAt). First run on a fresh table yields null;
+  // fall back to epoch so the first page pulls everything.
+  async function localMaxUpdatedAt(table: "user" | "rating" | "attendance"): Promise<Date> {
+    let row: { updatedAt: Date } | null;
+    if (table === "user") row = await db.user.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    else if (table === "rating") row = await db.rating.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    else row = await db.attendance.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    return row?.updatedAt ?? new Date(0);
+  }
+
+  // --- Users ---
+  const userCursor = await localMaxUpdatedAt("user");
+  console.log(`👤 Users: incremental since ${userCursor.toISOString()}`);
+  let pageCursor: string | null = null;
+  do {
+    const args: Record<string, unknown> = { since: userCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+    if (pageCursor) args.cursor = pageCursor;
+    const { users, nextCursor } = await mcp<{ users: McpSyncUser[]; nextCursor: string | null }>(
+      "list_users_since",
+      args,
+    );
+    // Batched existence pre-check just to keep the +created vs ~updated
+    // counters honest. The upsert below would do the right thing either
+    // way, but we want the summary to distinguish first-time inserts.
+    const incomingUserIds = users.map((u) => u.id);
+    const existingUserRows = incomingUserIds.length > 0
+      ? await db.user.findMany({ where: { id: { in: incomingUserIds } }, select: { id: true } })
+      : [];
+    const existingUserIdSet = new Set(existingUserRows.map((row) => row.id));
+
+    for (const u of users) {
+      if (isDryRun) {
+        if (existingUserIdSet.has(u.id)) stats.usersUpdated++;
+        else stats.usersCreated++;
+        continue;
+      }
+      try {
+        await db.user.upsert({
+          where: { id: u.id },
+          update: {
+            username: u.username,
+            avatarFileId: u.avatarFileId,
+            avatarFileUrl: u.avatarFileUrl,
+            updatedAt: new Date(u.updatedAt),
+          },
+          create: {
+            id: u.id,
+            email: stubUserEmail(u.id),
+            passwordDigest: STUB_USER_PASSWORD_DIGEST,
+            username: u.username,
+            avatarFileId: u.avatarFileId,
+            avatarFileUrl: u.avatarFileUrl,
+            createdAt: new Date(u.createdAt),
+            updatedAt: new Date(u.updatedAt),
+          },
+        });
+        if (existingUserIdSet.has(u.id)) stats.usersUpdated++;
+        else stats.usersCreated++;
+      } catch (err) {
+        console.error(`  ❌ user ${u.id} sync failed:`, err);
+      }
+    }
+    pageCursor = nextCursor;
+  } while (pageCursor !== null);
+  console.log(`👤 Users: +${stats.usersCreated} ~${stats.usersUpdated}`);
+
+  // --- Ratings ---
+  // Affected (rateableType, rateableId) pairs — used after the loop to
+  // rebuild Show.averageRating / Track.averageRating + ratingsCount and to
+  // resolve cache-invalidation slugs.
+  const touchedRateables = new Map<string, { rateableId: string; rateableType: string }>();
+  const ratingCursor = await localMaxUpdatedAt("rating");
+  console.log(`⭐ Ratings: incremental since ${ratingCursor.toISOString()}`);
+  pageCursor = null;
+  do {
+    const args: Record<string, unknown> = { since: ratingCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+    if (pageCursor) args.cursor = pageCursor;
+    const { ratings, nextCursor } = await mcp<{ ratings: McpSyncRating[]; nextCursor: string | null }>(
+      "list_ratings_since",
+      args,
+    );
+    // Batched FK existence check per page. The user pass just ran above, so
+    // a missing user is rare (race against a prod insert mid-sync). The
+    // realistic miss is show/track: a dev DB synced for a narrow --years
+    // window legitimately lacks older shows that older ratings reference.
+    const ratingUserIds = Array.from(new Set(ratings.map((r) => r.userId)));
+    const ratingShowIds = Array.from(
+      new Set(ratings.filter((r) => r.rateableType === "Show").map((r) => r.rateableId)),
+    );
+    const ratingTrackIds = Array.from(
+      new Set(ratings.filter((r) => r.rateableType === "Track").map((r) => r.rateableId)),
+    );
+    const [existingRatingUsers, existingRatingShows, existingRatingTracks] = await Promise.all([
+      ratingUserIds.length > 0
+        ? db.user.findMany({ where: { id: { in: ratingUserIds } }, select: { id: true } })
+        : Promise.resolve([]),
+      ratingShowIds.length > 0
+        ? db.show.findMany({ where: { id: { in: ratingShowIds } }, select: { id: true } })
+        : Promise.resolve([]),
+      ratingTrackIds.length > 0
+        ? db.track.findMany({ where: { id: { in: ratingTrackIds } }, select: { id: true } })
+        : Promise.resolve([]),
+    ]);
+    const localRatingUserSet = new Set(existingRatingUsers.map((u) => u.id));
+    const localRatingShowSet = new Set(existingRatingShows.map((s) => s.id));
+    const localRatingTrackSet = new Set(existingRatingTracks.map((t) => t.id));
+
+    for (const r of ratings) {
+      if (!localRatingUserSet.has(r.userId)) {
+        stats.ratingsFkSkipped++;
+        console.warn(`  ⚠️  rating ${r.id}: skipping — user ${r.userId} not local`);
+        continue;
+      }
+      if (r.rateableType === "Show" && !localRatingShowSet.has(r.rateableId)) {
+        stats.ratingsFkSkipped++;
+        console.warn(`  ⚠️  rating ${r.id}: skipping — show ${r.rateableId} not local`);
+        continue;
+      }
+      if (r.rateableType === "Track" && !localRatingTrackSet.has(r.rateableId)) {
+        stats.ratingsFkSkipped++;
+        console.warn(`  ⚠️  rating ${r.id}: skipping — track ${r.rateableId} not local`);
+        continue;
+      }
+      if (isDryRun) {
+        stats.ratingsUpserted++;
+        touchedRateables.set(`${r.rateableType}|${r.rateableId}`, { rateableId: r.rateableId, rateableType: r.rateableType });
+        continue;
+      }
+      try {
+        await db.rating.upsert({
+          where: { id: r.id },
+          update: {
+            value: r.value,
+            updatedAt: new Date(r.updatedAt),
+          },
+          create: {
+            id: r.id,
+            userId: r.userId,
+            value: r.value,
+            rateableType: r.rateableType,
+            rateableId: r.rateableId,
+            createdAt: new Date(r.createdAt),
+            updatedAt: new Date(r.updatedAt),
+          },
+        });
+        stats.ratingsUpserted++;
+        touchedRateables.set(`${r.rateableType}|${r.rateableId}`, {
+          rateableId: r.rateableId,
+          rateableType: r.rateableType,
+        });
+      } catch (err) {
+        console.error(`  ❌ rating ${r.id} upsert failed:`, err);
+      }
+    }
+    pageCursor = nextCursor;
+  } while (pageCursor !== null);
+  console.log(`⭐ Ratings: +${stats.ratingsUpserted} (skipped ${stats.ratingsFkSkipped} on missing FK)`);
+
+  // --- Attendances ---
+  const attCursor = await localMaxUpdatedAt("attendance");
+  console.log(`🎫 Attendances: incremental since ${attCursor.toISOString()}`);
+  pageCursor = null;
+  do {
+    const args: Record<string, unknown> = { since: attCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+    if (pageCursor) args.cursor = pageCursor;
+    const { attendances, nextCursor } = await mcp<{ attendances: McpSyncAttendance[]; nextCursor: string | null }>(
+      "list_attendances_since",
+      args,
+    );
+    // Same batched FK check as the ratings loop.
+    const attUserIds = Array.from(new Set(attendances.map((a) => a.userId)));
+    const attShowIds = Array.from(new Set(attendances.map((a) => a.showId)));
+    const [existingAttUsers, existingAttShows] = await Promise.all([
+      attUserIds.length > 0
+        ? db.user.findMany({ where: { id: { in: attUserIds } }, select: { id: true } })
+        : Promise.resolve([]),
+      attShowIds.length > 0
+        ? db.show.findMany({ where: { id: { in: attShowIds } }, select: { id: true, slug: true } })
+        : Promise.resolve([]),
+    ]);
+    const localAttUserSet = new Set(existingAttUsers.map((u) => u.id));
+    const localAttShowBySlug = new Map(existingAttShows.map((s) => [s.id, s.slug]));
+
+    for (const a of attendances) {
+      if (!localAttUserSet.has(a.userId)) {
+        stats.attendancesFkSkipped++;
+        console.warn(`  ⚠️  attendance ${a.id}: skipping — user ${a.userId} not local`);
+        continue;
+      }
+      if (!localAttShowBySlug.has(a.showId)) {
+        stats.attendancesFkSkipped++;
+        console.warn(`  ⚠️  attendance ${a.id}: skipping — show ${a.showId} not local`);
+        continue;
+      }
+      const showSlug = localAttShowBySlug.get(a.showId) ?? null;
+      if (isDryRun) {
+        stats.attendancesUpserted++;
+        if (showSlug) changedSlugs.add(showSlug);
+        continue;
+      }
+      try {
+        await db.attendance.upsert({
+          where: { id: a.id },
+          update: { updatedAt: new Date(a.updatedAt) },
+          create: {
+            id: a.id,
+            userId: a.userId,
+            showId: a.showId,
+            createdAt: new Date(a.createdAt),
+            updatedAt: new Date(a.updatedAt),
+          },
+        });
+        stats.attendancesUpserted++;
+        if (showSlug) changedSlugs.add(showSlug);
+      } catch (err) {
+        console.error(`  ❌ attendance ${a.id} upsert failed:`, err);
+      }
+    }
+    pageCursor = nextCursor;
+  } while (pageCursor !== null);
+  console.log(`🎫 Attendances: +${stats.attendancesUpserted} (skipped ${stats.attendancesFkSkipped} on missing FK)`);
+
+  // --- Full-mode reconciliation: delete local rows not on prod ---
+  if (fullMode) {
+    console.log("🧹 Full mode: reconciling deletions");
+
+    // Attendances first (no FK back to users/ratings, but we want a stable
+    // order anyway).
+    const { ids: prodAttIds } = await mcp<{ ids: string[] }>("list_all_attendance_ids", {});
+    const prodAttSet = new Set(prodAttIds);
+    const localAtt = await db.attendance.findMany({ select: { id: true, showId: true } });
+    const localShowIdsForAtt = new Set<string>();
+    const attToDelete: string[] = [];
+    for (const a of localAtt) {
+      if (!prodAttSet.has(a.id)) {
+        attToDelete.push(a.id);
+        localShowIdsForAtt.add(a.showId);
+      }
+    }
+    if (attToDelete.length > 0) {
+      if (!isDryRun) {
+        await db.attendance.deleteMany({ where: { id: { in: attToDelete } } });
+      }
+      stats.attendancesDeleted = attToDelete.length;
+      const showsForDeleted = await db.show.findMany({
+        where: { id: { in: Array.from(localShowIdsForAtt) } },
+        select: { slug: true },
+      });
+      for (const s of showsForDeleted) if (s.slug) changedSlugs.add(s.slug);
+    }
+    console.log(`🎫 Attendances: -${stats.attendancesDeleted}`);
+
+    // Ratings — same pattern. Mark the rateables touched so the aggregate
+    // rebuild zeros them out if the last rating was deleted.
+    const { ids: prodRatingIds } = await mcp<{ ids: string[] }>("list_all_rating_ids", {});
+    const prodRatingSet = new Set(prodRatingIds);
+    const localRatings = await db.rating.findMany({
+      select: { id: true, rateableId: true, rateableType: true },
+    });
+    const ratingsToDelete: string[] = [];
+    for (const r of localRatings) {
+      if (!prodRatingSet.has(r.id)) {
+        ratingsToDelete.push(r.id);
+        touchedRateables.set(`${r.rateableType}|${r.rateableId}`, {
+          rateableId: r.rateableId,
+          rateableType: r.rateableType,
+        });
+      }
+    }
+    if (ratingsToDelete.length > 0) {
+      if (!isDryRun) {
+        await db.rating.deleteMany({ where: { id: { in: ratingsToDelete } } });
+      }
+      stats.ratingsDeleted = ratingsToDelete.length;
+    }
+    console.log(`⭐ Ratings: -${stats.ratingsDeleted}`);
+
+    // Users last. Two FKs (ratings, attendances) — we've already deleted any
+    // we're going to delete above, so a delete here for a user whose data
+    // is still local would FK-fail. In practice users on prod aren't deleted,
+    // but to be safe we only delete users with no remaining local refs.
+    const { ids: prodUserIds } = await mcp<{ ids: string[] }>("list_all_user_ids", {});
+    const prodUserSet = new Set(prodUserIds);
+    const localUsers = await db.user.findMany({
+      select: { id: true, _count: { select: { ratings: true, attendances: true, reviews: true, blogPosts: true } } },
+    });
+    const usersToDelete: string[] = [];
+    for (const u of localUsers) {
+      if (prodUserSet.has(u.id)) continue;
+      const hasRefs = u._count.ratings + u._count.attendances + u._count.reviews + u._count.blogPosts > 0;
+      if (hasRefs) {
+        console.warn(`  ⚠️  user ${u.id} not on prod but has local refs; skipping`);
+        continue;
+      }
+      usersToDelete.push(u.id);
+    }
+    if (usersToDelete.length > 0) {
+      if (!isDryRun) {
+        await db.user.deleteMany({ where: { id: { in: usersToDelete } } });
+      }
+      stats.usersDeleted = usersToDelete.length;
+    }
+    console.log(`👤 Users: -${stats.usersDeleted}`);
+  }
+
+  // --- Rating aggregate rebuild ---
+  if (touchedRateables.size > 0) {
+    const pairs = Array.from(touchedRateables.values());
+    console.log(`📐 Rebuilding rating aggregates for ${pairs.length} rateable(s)`);
+    if (!isDryRun) {
+      try {
+        await ratingService.rebuildAggregatesFor(pairs);
+        stats.aggregatesRebuilt = pairs.length;
+      } catch (err) {
+        console.error("  ❌ rating aggregate rebuild failed:", err);
+      }
+    }
+
+    // Add affected show slugs to changedSlugs so the outer cache-invalidation
+    // pass clears show.data + setlist.data (which embed Track.averageRating).
+    const showIds = pairs.filter((p) => p.rateableType === "Show").map((p) => p.rateableId);
+    const trackIds = pairs.filter((p) => p.rateableType === "Track").map((p) => p.rateableId);
+    if (showIds.length > 0) {
+      const shows = await db.show.findMany({ where: { id: { in: showIds } }, select: { slug: true } });
+      for (const s of shows) if (s.slug) changedSlugs.add(s.slug);
+    }
+    if (trackIds.length > 0) {
+      const tracks = await db.track.findMany({
+        where: { id: { in: trackIds } },
+        select: { show: { select: { slug: true } } },
+      });
+      for (const t of tracks) if (t.show.slug) changedSlugs.add(t.show.slug);
+    }
+  }
+
+  return stats;
+}
+
 // --- Main ---
 
 interface SyncStats {
@@ -800,6 +1266,7 @@ interface SyncStats {
   rockOperasUpserted: number;
   rockOperaAssignmentsAdded: number;
   rockOperaAssignmentsRemoved: number;
+  userActivity: UserActivityStats | null;
   errors: number;
 }
 
@@ -827,12 +1294,20 @@ Options:
                            shows on prod under the new slug still carry them).
                            Without this flag, ghost shows with user data are
                            logged and skipped.
+  --no-users               Skip the user-activity pass (users, ratings,
+                           attendances). The default pulls incrementally,
+                           keyed on local MAX(updatedAt) per table.
+  --full-users             After the incremental user-activity pass, fetch all
+                           prod user / rating / attendance ids and delete any
+                           local rows missing from prod. Use occasionally for
+                           a true mirror; default skips deletes.
   --help, -h               Show this message and exit.
 
 Examples:
   bun run scripts/sync-missing-shows.ts --years=2025
   bun run scripts/sync-missing-shows.ts --years=2010-2026 --dry-run
   bun run scripts/sync-missing-shows.ts --years=2010-2026 --prune-ghost-shows
+  bun run scripts/sync-missing-shows.ts --full-users
 `);
 }
 
@@ -848,6 +1323,8 @@ async function syncMissingShows(): Promise<void> {
   // DBs but blocks cleanup on dev DBs seeded from a prod dump (every old
   // show carries prod's user data, which then prevents rename cleanup).
   const pruneGhostShows = process.argv.includes("--prune-ghost-shows");
+  const skipUsers = process.argv.includes("--no-users");
+  const fullUsers = process.argv.includes("--full-users");
   const years = parseYearsArg(process.argv.slice(2), new Date());
   const now = new Date();
   const db = prisma;
@@ -865,6 +1342,17 @@ async function syncMissingShows(): Promise<void> {
   // StatsService is wired without a cache here — the script never reads
   // cached aggregates, only triggers the post-batch gap rebuild.
   const statsService = new StatsService(prisma, cache ?? undefined);
+  // RatingService.rebuildAggregatesFor is the bulk version of the per-row
+  // recompute used by the live mutation path. The user-activity pass calls
+  // it once at the end for every (rateableType, rateableId) it touched.
+  // cacheInvalidation is only used by the per-row mutation methods (upsert /
+  // clearForUser), not by rebuildAggregatesFor — the script does its own
+  // outer invalidation pass on changedSlugs — so a no-op stub is sufficient
+  // in REDIS-less local runs.
+  const ratingService = new RatingService(
+    prisma,
+    cacheInvalidation ?? (createNoopCacheInvalidation() as CacheInvalidationService),
+  );
   // SegueRun rows reference Track ids in a non-FK String[] array. When the
   // setlist reconcile inserts or deletes a track, those arrays go stale; we
   // call generateSegueRunsForShow per structurally-changed show to rebuild.
@@ -910,6 +1398,7 @@ async function syncMissingShows(): Promise<void> {
     rockOperasUpserted: 0,
     rockOperaAssignmentsAdded: 0,
     rockOperaAssignmentsRemoved: 0,
+    userActivity: null,
     errors: 0,
   };
 
@@ -1763,6 +2252,31 @@ async function syncMissingShows(): Promise<void> {
       }
     }
 
+    // Step 9: user-activity sync (users + ratings + attendances). Runs
+    // after the show/song/venue/track passes so FK lookups can resolve
+    // (every show/track a rating or attendance might reference is already
+    // local). The pass updates changedSlugs with the affected show slugs so
+    // the outer cache invalidation below clears the show.data + setlist.data
+    // payloads that embed Show.averageRating + Track.averageRating.
+    if (!skipUsers) {
+      try {
+        const userActivityStats = await syncUserActivity(db, {
+          isDryRun,
+          fullMode: fullUsers,
+          ratingService,
+          cacheInvalidation,
+          changedSlugs,
+          now,
+        });
+        stats.userActivity = userActivityStats;
+      } catch (err) {
+        console.error("💥 User activity sync failed:", err);
+        stats.errors++;
+      }
+    } else {
+      console.log("👤 Skipping user-activity pass (--no-users)");
+    }
+
     // Cache invalidation: mirrors what ShowService.create + TrackService.create
     // call on the canonical app paths. Per-slug `invalidateShow` clears
     // show.data + setlist.data; `invalidateShowListings` covers shows:list:* +
@@ -1828,6 +2342,15 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Unresolved song slugs: ${stats.unresolvedSongSlugs}`);
   console.log(`Rock operas upserted: ${stats.rockOperasUpserted}`);
   console.log(`Rock opera assignments added / removed: ${stats.rockOperaAssignmentsAdded} / ${stats.rockOperaAssignmentsRemoved}`);
+  if (stats.userActivity) {
+    const ua = stats.userActivity;
+    console.log(`Users (created / updated / deleted): ${ua.usersCreated} / ${ua.usersUpdated} / ${ua.usersDeleted}`);
+    console.log(`Ratings (upserted / deleted / FK skipped): ${ua.ratingsUpserted} / ${ua.ratingsDeleted} / ${ua.ratingsFkSkipped}`);
+    console.log(`Attendances (upserted / deleted / FK skipped): ${ua.attendancesUpserted} / ${ua.attendancesDeleted} / ${ua.attendancesFkSkipped}`);
+    console.log(`Rating aggregates rebuilt: ${ua.aggregatesRebuilt}`);
+  } else {
+    console.log(`User activity sync: skipped`);
+  }
   console.log(`Errors: ${stats.errors}`);
 }
 
