@@ -38,7 +38,7 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Set up SSH known hosts
-        run: ssh-keyscan -H 5.161.124.129 >> ~/.ssh/known_hosts
+        run: ssh-keyscan -t ed25519 5.161.124.129 >> ~/.ssh/known_hosts
 
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@v3
