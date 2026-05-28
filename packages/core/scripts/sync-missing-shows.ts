@@ -911,6 +911,42 @@ async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Prom
     : new Error(`MCP ${toolName} failed after ${MCP_MAX_ATTEMPTS} attempts: ${String(lastErr)}`);
 }
 
+// Max slugs per bulk MCP call (get_shows, get_setlists, get_songs,
+// get_venues). The upstream server computes one row per slug; passing the
+// full historical slug list (~1900 shows) hits Cloudflare's ~100s gateway
+// timeout. 100 keeps each round-trip well under that ceiling across all four
+// tools. Cost is roughly N/100 additional requests on the largest runs.
+const MCP_BULK_CHUNK = 100;
+
+/**
+ * Page through `mcpCall(toolName, { [argKey]: chunk, ...extraArgs })` for
+ * each `MCP_BULK_CHUNK`-sized slice of `items`, concatenating the per-page
+ * result arrays (and forwarding any per-page `errors`). Single-request
+ * envelope shape (one array under `resultKey`, optional `errors` array) is
+ * preserved so call sites stay unchanged.
+ */
+async function mcpBulkChunked<TItem, TRow>(
+  toolName: string,
+  argKey: string,
+  items: TItem[],
+  resultKey: string,
+  extraArgs: Record<string, unknown> = {},
+): Promise<{ rows: TRow[]; errors: Array<{ slug: string; error: string }> }> {
+  const rows: TRow[] = [];
+  const errors: Array<{ slug: string; error: string }> = [];
+  if (items.length === 0) return { rows, errors };
+  for (let i = 0; i < items.length; i += MCP_BULK_CHUNK) {
+    const chunk = items.slice(i, i + MCP_BULK_CHUNK);
+    const args = { ...extraArgs, [argKey]: chunk };
+    const page = await mcpCall<Record<string, unknown>>(toolName, args);
+    const pageRows = page[resultKey];
+    if (Array.isArray(pageRows)) rows.push(...(pageRows as TRow[]));
+    const pageErrors = page.errors;
+    if (Array.isArray(pageErrors)) errors.push(...(pageErrors as Array<{ slug: string; error: string }>));
+  }
+  return { rows, errors };
+}
+
 // --- User activity sync (users + ratings + attendances) ---
 
 interface UserActivityStats {
@@ -1501,6 +1537,39 @@ Examples:
   bun run scripts/sync-missing-shows.ts --years=2010-2026 --prune-ghost-shows
   bun run scripts/sync-missing-shows.ts --full-users
   bun run scripts/sync-missing-shows.ts --prune-users
+
+Recommended cadence:
+
+  Routine (daily / before testing against current data):
+    make db-sync-missing-shows PRUNE_USERS=1
+      Default --years=<current year>. Catches new shows, current-year
+      admin edits (notes, setlists, rock opera tags), all rating /
+      attendance inserts + updates via the incremental cursor, and all
+      rating / attendance DELETES via --prune-users. Fast (~30s typical).
+
+  Weekly / when an admin tells you they touched an older show:
+    make db-sync-missing-shows YEARS=2024-2026 PRUNE_USERS=1
+      Widen --years to span whatever was edited. Picks up note/setlist/
+      track changes on those older shows; still gets routine user
+      activity through the inherited flags.
+
+  Rare (clean-slate reconcile, e.g. after a fresh dump or suspected drift):
+    make db-sync-missing-shows YEARS=1995-2026 PRUNE_GHOST_SHOWS=1 FULL_USERS=1
+      Reconciles everything against prod in both directions.
+      --full-users does epoch-pull + delete (catches missing-older rows
+      the cursor can't reach). --prune-ghost-shows removes local shows
+      prod deleted/renamed. Rename-with-collision cases (a local row
+      under the prod-renamed-from slug that prod's new slug now claims)
+      still need manual SQL cleanup.
+
+  What you lose by skipping each flag in the routine run:
+    no --prune-users      → rating/attendance DELETES on prod stay local.
+                            Inserts + updates still come through.
+    default --years only  → admin edits to OLDER shows don't sync.
+                            Current-year edits still come through.
+    no --full-users       → not needed in steady state. Only required
+                            when local is missing rows older than the
+                            cursor (typically just after a stale dump).
 `);
 }
 
@@ -1630,11 +1699,13 @@ async function syncMissingShows(): Promise<void> {
     // sparse `get_shows_by_year` summary for inserts and enables drift detection
     // against existing local rows.
     const realSlugs = realShows.map((s) => s.slug).filter((s): s is string => !!s);
-    const { shows: remoteFullShows, errors: fullShowErrors } = await mcpCall<{
-      shows: McpShow[];
-      errors?: Array<{ slug: string; error: string }>;
-    }>("get_shows", { slugs: realSlugs });
-    if (fullShowErrors?.length) {
+    const { rows: remoteFullShows, errors: fullShowErrors } = await mcpBulkChunked<string, McpShow>(
+      "get_shows",
+      "slugs",
+      realSlugs,
+      "shows",
+    );
+    if (fullShowErrors.length) {
       console.warn(`⚠️  ${fullShowErrors.length} get_shows fetch errors:`, fullShowErrors);
       stats.errors += fullShowErrors.length;
     }
@@ -1679,11 +1750,13 @@ async function syncMissingShows(): Promise<void> {
     // setlist reconciliation below. Prod admins can add / remove / swap
     // tracks on already-local shows, so every show in scope needs its setlist
     // fetched, not just the inserts.
-    const { setlists, errors: setlistErrors } = await mcpCall<{
-      setlists: McpSetlist[];
-      errors?: Array<{ slug: string; error: string }>;
-    }>("get_setlists", { showSlugs: realSlugs });
-    if (setlistErrors?.length) {
+    const { rows: setlists, errors: setlistErrors } = await mcpBulkChunked<string, McpSetlist>(
+      "get_setlists",
+      "showSlugs",
+      realSlugs,
+      "setlists",
+    );
+    if (setlistErrors.length) {
       console.warn(`⚠️  ${setlistErrors.length} setlist fetch errors:`, setlistErrors);
       stats.errors += setlistErrors.length;
     }
@@ -1804,11 +1877,13 @@ async function syncMissingShows(): Promise<void> {
     // Fetch the full MCP venue shape for every in-scope slug — missing ones
     // get created, already-local ones get diffed against buildVenueDriftUpdate.
     if (neededVenueSlugs.length > 0) {
-      const { venues: remoteVenues, errors: venueErrors } = await mcpCall<{
-        venues: McpVenue[];
-        errors?: Array<{ slug: string; error: string }>;
-      }>("get_venues", { slugs: neededVenueSlugs });
-      if (venueErrors?.length) stats.errors += venueErrors.length;
+      const { rows: remoteVenues, errors: venueErrors } = await mcpBulkChunked<string, McpVenue>(
+        "get_venues",
+        "slugs",
+        neededVenueSlugs,
+        "venues",
+      );
+      if (venueErrors.length) stats.errors += venueErrors.length;
       for (const venue of remoteVenues) {
         const localId = venueSlugToId.get(venue.slug);
         if (localId === undefined) {
@@ -1929,12 +2004,14 @@ async function syncMissingShows(): Promise<void> {
     console.log(`🎵 ${allSongSlugs.length} distinct songs in setlists; ${missingSongSlugs.length} missing locally`);
 
     if (allSongSlugs.length > 0) {
-      const { songs: remoteSongs, errors: songErrors } = await mcpCall<{
-        songs: McpSong[];
-        errors?: Array<{ slug: string; error: string }>;
-      }>("get_songs", { slugs: allSongSlugs });
+      const { rows: remoteSongs, errors: songErrors } = await mcpBulkChunked<string, McpSong>(
+        "get_songs",
+        "slugs",
+        allSongSlugs,
+        "songs",
+      );
       stats.songsFetched = remoteSongs.length;
-      if (songErrors?.length) {
+      if (songErrors.length) {
         console.warn(`⚠️  ${songErrors.length} song fetch errors:`, songErrors);
         stats.errors += songErrors.length;
       }
@@ -2439,11 +2516,13 @@ async function syncMissingShows(): Promise<void> {
       select: { id: true, slug: true, title: true, _count: { select: { tracks: true } } },
     });
     if (localSongCountRows.length > 0) {
-      const { errors: orphanErrors } = await mcpCall<{
-        songs: McpSong[];
-        errors?: Array<{ slug: string; error: string }>;
-      }>("get_songs", { slugs: localSongCountRows.map((s) => s.slug) });
-      const orphanSlugs = new Set((orphanErrors ?? []).map((e) => e.slug));
+      const { errors: orphanErrors } = await mcpBulkChunked<string, McpSong>(
+        "get_songs",
+        "slugs",
+        localSongCountRows.map((s) => s.slug),
+        "songs",
+      );
+      const orphanSlugs = new Set(orphanErrors.map((e) => e.slug));
       const localSongBySlugMap = new Map(localSongCountRows.map((s) => [s.slug, s]));
       for (const orphanSlug of orphanSlugs) {
         const local = localSongBySlugMap.get(orphanSlug);
