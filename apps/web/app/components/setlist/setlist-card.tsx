@@ -11,6 +11,7 @@ import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { RockOperaAnnotations } from "./rock-opera-annotations";
+import { countSetlistEncores, formatSetLabel } from "./set-label";
 import { SetlistTable } from "./setlist-table";
 import { SetlistTablePersonal } from "./setlist-table-personal";
 import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-control";
@@ -193,6 +194,10 @@ function SetlistCardComponent({
   // Sort by index to maintain the order they were encountered
   const orderedAnnotations = Array.from(uniqueAnnotations.values()).sort((a, b) => a.index - b.index);
 
+  // Encore label collapse ("E1" → "E") fires only when the show has a
+  // single encore.
+  const encoresInSet = countSetlistEncores(setlist.sets);
+
   return (
     <Card className="card-premium relative overflow-hidden">
       <CardHeader
@@ -347,7 +352,9 @@ function SetlistCardComponent({
                       key={setlist.show.id + set.label}
                       className="inline-block w-full md:flex md:gap-4 md:items-baseline"
                     >
-                      <span className="inline text-base font-medium text-content-text-tertiary">{set.label}</span>
+                      <span className="inline text-base font-medium text-content-text-tertiary">
+                        {formatSetLabel(set.label, { encoresInSet })}
+                      </span>
                       <span className="inline ml-2 md:ml-0 md:flex-1">
                         {set.tracks.map((track, i) => (
                           <span key={track.id} className="inline">

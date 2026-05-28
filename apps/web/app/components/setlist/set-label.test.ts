@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { compareBySetThenPosition, countDistinctEncores, formatSetLabel, setSortKey } from "./set-label";
+import {
+  compareBySetThenPosition,
+  countDistinctEncores,
+  countSetlistEncores,
+  formatSetLabel,
+  setSortKey,
+} from "./set-label";
 
 describe("formatSetLabel", () => {
   // S-prefixed regular sets drop the "S" because the column header (or
@@ -49,26 +55,13 @@ describe("countDistinctEncores", () => {
   // Counts unique encore labels regardless of how many tracks share each
   // encore. Two tracks both labeled E1 still report "1 distinct encore".
   test("counts unique encore labels, not encore tracks", () => {
-    expect(
-      countDistinctEncores([
-        { set: "E1" },
-        { set: "E1" },
-        { set: "E1" },
-      ]),
-    ).toBe(1);
+    expect(countDistinctEncores([{ set: "E1" }, { set: "E1" }, { set: "E1" }])).toBe(1);
   });
 
   // Mixed-set rows: only encores contribute. Regular sets are ignored so
   // the result is safe to feed straight into `formatSetLabel({encoresInSet})`.
   test("ignores non-encore rows", () => {
-    expect(
-      countDistinctEncores([
-        { set: "S1" },
-        { set: "S2" },
-        { set: "E1" },
-        { set: "E2" },
-      ]),
-    ).toBe(2);
+    expect(countDistinctEncores([{ set: "S1" }, { set: "S2" }, { set: "E1" }, { set: "E2" }])).toBe(2);
   });
 
   // Empty list = 0 distinct encores. The collapse branch in formatSetLabel
@@ -82,6 +75,21 @@ describe("countDistinctEncores", () => {
   // don't have to pre-normalize input.
   test("normalizes lowercase encore labels for de-duplication", () => {
     expect(countDistinctEncores([{ set: "e1" }, { set: "E1" }])).toBe(1);
+  });
+});
+
+describe("countSetlistEncores", () => {
+  // Adapts set-grouped input (sets carry the label, not individual tracks)
+  // to the same distinct-encore count — one encore set yields 1.
+  test("counts distinct encores from set labels", () => {
+    expect(countSetlistEncores([{ label: "S1" }, { label: "S2" }, { label: "E1" }])).toBe(1);
+    expect(countSetlistEncores([{ label: "S1" }, { label: "E1" }, { label: "E2" }])).toBe(2);
+  });
+
+  // No encore set → 0, so formatSetLabel never collapses a non-existent
+  // encore.
+  test("returns 0 when there is no encore set", () => {
+    expect(countSetlistEncores([{ label: "S1" }, { label: "S2" }])).toBe(0);
   });
 });
 
