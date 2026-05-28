@@ -623,8 +623,8 @@ const ChemicalWarfareBrigade: React.FC = () => {
       <div className="space-y-4 text-content-text-secondary leading-relaxed text-base md:text-lg">
         <p>
           <strong className="text-content-text-primary">The Chemical Warfare Brigade</strong> is the Disco Biscuits'
-          second full-length rock opera, written by Marc Brownstein. It was first peformed by Marc's side project,
-          Electron, on August 18, 2000 at Trocadero Theatre in Philadelphia, It was debuted by The Disco Biscuits on{" "}
+          second full-length rock opera, written by Marc Brownstein. It was first performed by Marc's side project,
+          Electron, on August 18, 2000 at Trocadero Theatre in Philadelphia. It was debuted by The Disco Biscuits on{" "}
           <Link to="/shows/2000-12-30" className="text-brand-primary hover:text-brand-secondary">
             December 30, 2000
           </Link>{" "}
