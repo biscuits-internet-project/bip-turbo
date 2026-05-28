@@ -53,7 +53,35 @@ export const TRACK_BY_SHOW_ORDER_ASC: Prisma.TrackOrderByWithRelationInput[] = [
  * `day_order`, `id` (no renaming) so the helper output lines up.
  */
 type ShowAlias = "s" | "s2" | "shows";
+type TrackAlias = "t" | "tracks";
 type SortDirection = "ASC" | "DESC";
+
+/**
+ * Raw-SQL CASE expression mirroring `setSortKey` from
+ * apps/web/app/components/setlist/set-label.ts. Use in $queryRaw ORDER BY
+ * clauses so SQL-side ordering by set matches the in-memory
+ * `compareBySetThenPosition` comparator: Soundcheck → S1..S4 → E1..E3 →
+ * unknown. Pass the alias your tracks table has in the query (`t` or
+ * `tracks`).
+ *
+ * Keep the ordinals in sync with the TS function; drift produces
+ * inconsistent ordering between paginated server fetches and any
+ * client-side re-sort sharing the same rows.
+ */
+export function setSortKeySql(alias: TrackAlias): Prisma.Sql {
+  const a = Prisma.raw(alias);
+  return Prisma.sql`CASE LOWER(${a}.set)
+    WHEN 'soundcheck' THEN 0
+    WHEN 's1' THEN 10
+    WHEN 's2' THEN 20
+    WHEN 's3' THEN 30
+    WHEN 's4' THEN 40
+    WHEN 'e1' THEN 50
+    WHEN 'e2' THEN 60
+    WHEN 'e3' THEN 70
+    ELSE 999
+  END`;
+}
 
 /**
  * Raw-SQL `ORDER BY` fragment matching SHOW_ORDER_ASC/DESC, for use in

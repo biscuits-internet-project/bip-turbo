@@ -9,298 +9,397 @@ const cacheInvalidation = {
   invalidateShowComprehensive: vi.fn(),
 } as never;
 
-type MockRating = {
+// Flattens a $queryRaw mock call (TemplateStringsArray + Prisma.Sql
+// interpolations) into a single SQL string so tests can assert on the
+// composed ORDER BY clause. Prisma.Sql exposes its template parts under
+// `.strings`; nested Prisma.sql fragments are spliced in. Cribs the same
+// pattern used by song-page-composer.test.ts.
+function flattenSqlFromMockCall(call: unknown[]): string {
+  const [templateStrings, ...interpolations] = call as [readonly string[], ...unknown[]];
+  const parts: string[] = [];
+  for (let i = 0; i < templateStrings.length; i++) {
+    parts.push(templateStrings[i]);
+    if (i < interpolations.length) {
+      const v = interpolations[i];
+      if (v && typeof v === "object" && Array.isArray((v as { strings?: unknown[] }).strings)) {
+        parts.push((v as { strings: string[] }).strings.join(" ? "));
+      } else {
+        parts.push("?");
+      }
+    }
+  }
+  return parts.join("");
+}
+
+type ShowRatingRow = {
   id: string;
-  userId: string;
-  rateableId: string;
-  rateableType: string;
   value: number;
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: Date;
+  show_slug: string;
+  show_date: string;
+  venue_name: string | null;
+  venue_city: string | null;
+  venue_state: string | null;
 };
 
-function rating(overrides: Partial<MockRating>): MockRating {
+function showRatingRow(overrides: Partial<ShowRatingRow> = {}): ShowRatingRow {
   return {
     id: "r1",
-    userId: "u1",
-    rateableId: "x1",
-    rateableType: "Show",
     value: 5,
-    createdAt: new Date("2024-01-01T00:00:00Z"),
-    updatedAt: new Date("2024-01-01T00:00:00Z"),
+    created_at: new Date("2024-01-01T00:00:00Z"),
+    show_slug: "2024-08-12-cap-theatre",
+    show_date: "2024-08-12",
+    venue_name: "The Capitol Theatre",
+    venue_city: "Port Chester",
+    venue_state: "NY",
     ...overrides,
   };
 }
 
 describe("RatingService.findShowRatingsByUserId", () => {
-  // The user-profile show-ratings list only displays id/value/createdAt +
-  // nested slug/date/venue trio. Returning a Rating-extending shape with
-  // userId/rateableId/etc. forces ~1.7 MB of unused JSON onto heavy users
-  // (the heaviest user has ~1,700 show ratings). The slim shape strips those.
-  test("returns slim shape without userId, rateableId, rateableType, or updatedAt", async () => {
-    const db = {
-      rating: {
-        findMany: vi.fn().mockResolvedValue([rating({ id: "r1", rateableId: "show-1" })]),
-      },
-      show: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "show-1",
-            slug: "2024-08-12-cap-theatre",
-            date: "2024-08-12",
-            venue: { name: "The Capitol Theatre", city: "Port Chester", state: "NY" },
-          },
-        ]),
-      },
-    } as never;
-
+  // Default ordering is `date` desc, and same-day rows must break ties on
+  // `day_order` (NULLS FIRST under DESC) then `id` — the standard show
+  // ordering. Asserting `showOrderBySql` is wired in (not a hand-rolled
+  // `s.date DESC`) keeps same-day rated shows in canonical order across
+  // pages.
+  test("default sort=date desc orders via showOrderBySql with createdAt tiebreaker", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
     const service = new RatingService(db, cacheInvalidation);
-    const result = await service.findShowRatingsByUserId("u1");
 
-    expect(result).toHaveLength(1);
-    const row = result[0];
-    expect(row).toEqual({
-      id: "r1",
-      value: 5,
-      createdAt: new Date("2024-01-01T00:00:00Z"),
-      show: {
-        slug: "2024-08-12-cap-theatre",
-        date: "2024-08-12",
-        venue: { name: "The Capitol Theatre", city: "Port Chester", state: "NY" },
-      },
-    });
-    // Explicit negative assertions — these fields drove the bloat.
-    expect(row).not.toHaveProperty("userId");
-    expect(row).not.toHaveProperty("rateableId");
-    expect(row).not.toHaveProperty("rateableType");
-    expect(row).not.toHaveProperty("updatedAt");
+    await service.findShowRatingsByUserId("u1");
+
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/s\.date\s+DESC/);
+    expect(sql).toMatch(/COALESCE\(s\.day_order/);
+    expect(sql).toMatch(/r\.created_at\s+DESC/);
   });
 
-  // If the underlying show was deleted while the rating remained (data
-  // drift), we drop the orphan rather than crash. Mirrors the original
-  // .filter() behavior; protects the user profile from white-screening on
-  // dangling ratings.
-  test("skips ratings whose related show is missing", async () => {
-    const db = {
-      rating: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([rating({ id: "r1", rateableId: "missing" }), rating({ id: "r2", rateableId: "show-1" })]),
-      },
-      show: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "show-1",
-            slug: "show-slug",
-            date: "2024-08-12",
-            venue: null,
-          },
-        ]),
-      },
-    } as never;
-
+  // The slim shape — id/value/createdAt + nested slug/date/venue trio —
+  // is what the user-profile route renders. Anything wider re-bloats the
+  // heaviest users' page payload.
+  test("maps rows into the slim shape (no userId/rateableId/updatedAt)", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([showRatingRow()]);
+    const db = { $queryRaw: queryRaw } as never;
     const service = new RatingService(db, cacheInvalidation);
+
     const result = await service.findShowRatingsByUserId("u1");
 
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("r2");
+    expect(result).toEqual([
+      {
+        id: "r1",
+        value: 5,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        show: {
+          slug: "2024-08-12-cap-theatre",
+          date: "2024-08-12",
+          venue: { name: "The Capitol Theatre", city: "Port Chester", state: "NY" },
+        },
+      },
+    ]);
+    expect(result[0]).not.toHaveProperty("userId");
+    expect(result[0]).not.toHaveProperty("rateableId");
+    expect(result[0]).not.toHaveProperty("rateableType");
+    expect(result[0]).not.toHaveProperty("updatedAt");
+  });
+
+  // A null venue (rating against a show that's been venue-scrubbed)
+  // surfaces as `show.venue: null`, mirroring the previous two-query
+  // implementation. The route renders "Unknown Venue" against null.
+  test("returns show.venue = null when venue_name is null", async () => {
+    const queryRaw = vi
+      .fn()
+      .mockResolvedValue([showRatingRow({ venue_name: null, venue_city: null, venue_state: null })]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    const result = await service.findShowRatingsByUserId("u1");
+
     expect(result[0].show.venue).toBeNull();
   });
 
   // Heavy users (~1,700 show ratings) need server-side pagination —
   // shipping all rows on every load costs hundreds of KB. The service
-  // accepts skip/take and the caller is expected to combine with
-  // getUserTabCounts() for the total. Verifies the slice is applied at the
-  // DB level, not in JS.
-  test("supports skip/take pagination at the DB layer", async () => {
-    const ratingFindMany = vi.fn().mockResolvedValue([rating({ id: "r-page-3", rateableId: "show-page-3" })]);
-    const db = {
-      rating: { findMany: ratingFindMany },
-      show: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "show-page-3",
-            slug: "s",
-            date: "2024-01-01",
-            venue: null,
-          },
-        ]),
-      },
-    } as never;
-
+  // accepts skip/take and inlines them into LIMIT/OFFSET so the slice is
+  // applied at the DB level, not in JS.
+  test("supports skip/take pagination via LIMIT/OFFSET", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
     const service = new RatingService(db, cacheInvalidation);
-    const result = await service.findShowRatingsByUserId("u1", { skip: 200, take: 100 });
 
-    expect(ratingFindMany.mock.calls[0][0]).toMatchObject({ skip: 200, take: 100 });
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("r-page-3");
+    await service.findShowRatingsByUserId("u1", { skip: 200, take: 100 });
+
+    const call = queryRaw.mock.calls[0];
+    const sql = flattenSqlFromMockCall(call);
+    expect(sql).toMatch(/LIMIT\s+\$?\?/);
+    expect(sql).toMatch(/OFFSET\s+\$?\?/);
+    // 200 (skip) and 100 (take) bound as parameters; the user id is
+    // also bound, so we don't pin a specific index.
+    const interpolations = call.slice(1);
+    expect(interpolations).toContain(200);
+    expect(interpolations).toContain(100);
   });
 
-  // Narrowed Prisma projection: only select the columns the slim shape
-  // surfaces. Regression guard — accidentally going back to `include` re-bloats
-  // every load.
-  test("queries the DB with a narrow `select` (no full row projection)", async () => {
-    const showFindMany = vi.fn().mockResolvedValue([]);
-    const db = {
-      rating: { findMany: vi.fn().mockResolvedValue([rating({ rateableId: "show-1" })]) },
-      show: { findMany: showFindMany },
-    } as never;
-
+  // INNER JOIN against shows means orphaned ratings (show deleted but
+  // rating row remains) silently drop at the SQL layer rather than
+  // crashing the user profile.
+  test("uses INNER JOIN against shows so orphaned ratings drop", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
     const service = new RatingService(db, cacheInvalidation);
+
     await service.findShowRatingsByUserId("u1");
 
-    const args = showFindMany.mock.calls[0][0];
-    expect(args).toHaveProperty("select");
-    expect(args).not.toHaveProperty("include");
-    expect(args.select).toMatchObject({
-      id: true,
-      slug: true,
-      date: true,
-      venue: { select: { name: true, city: true, state: true } },
-    });
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/INNER\s+JOIN\s+shows\s+s\b/i);
+  });
+
+  // sort=rating desc: rating.value primary, show order DESC tiebreaker,
+  // rating.createdAt DESC as the final stability key. Spec lives in the
+  // plan file.
+  test("sort=rating desc orders by r.value then showOrderBySql DESC then createdAt", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findShowRatingsByUserId("u1", { sort: "rating", direction: "desc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/ORDER\s+BY[\s\S]*r\.value\s+DESC[\s\S]*s\.date\s+DESC[\s\S]*r\.created_at\s+DESC/i);
+  });
+
+  // Tiebreakers follow the primary direction — sort=modified asc means the
+  // showOrderBySql tiebreaker is ASC as well, so a "reverse sort" reverses
+  // the whole ordering top-to-bottom rather than mixing directions.
+  test("sort=modified asc orders by r.created_at then showOrderBySql ASC", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findShowRatingsByUserId("u1", { sort: "modified", direction: "asc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/ORDER\s+BY[\s\S]*r\.created_at\s+ASC[\s\S]*s\.date\s+ASC/i);
   });
 });
 
+type TrackRatingRow = {
+  id: string;
+  value: number;
+  created_at: Date;
+  track_slug: string | null;
+  track_position: number;
+  track_set: string;
+  encores_in_set: number | bigint;
+  show_slug: string | null;
+  show_date: string;
+  venue_name: string | null;
+  song_slug: string;
+  song_title: string;
+};
+
+function trackRatingRow(overrides: Partial<TrackRatingRow> = {}): TrackRatingRow {
+  return {
+    id: "r1",
+    value: 5,
+    created_at: new Date("2024-01-01T00:00:00Z"),
+    track_slug: "basis-for-a-day-2024-08-12",
+    track_position: 3,
+    track_set: "S1",
+    encores_in_set: 1,
+    show_slug: "2024-08-12-cap-theatre",
+    show_date: "2024-08-12",
+    venue_name: "The Capitol Theatre",
+    song_slug: "basis-for-a-day",
+    song_title: "Basis for a Day",
+    ...overrides,
+  };
+}
+
 describe("RatingService.findTrackRatingsByUserId", () => {
-  // The user-profile track-ratings list is the worst offender — 7,784 rows
-  // for the heaviest user. The slim shape drops every unused field, including venue
-  // city/state (which the track-rating row doesn't display, unlike the
-  // show-rating row above).
-  test("returns slim shape with no venue.city/state and no UUIDs", async () => {
-    const db = {
-      rating: {
-        findMany: vi.fn().mockResolvedValue([rating({ id: "r1", rateableId: "track-1", rateableType: "Track" })]),
-      },
-      track: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "track-1",
-            slug: "basis-for-a-day-2024-08-12",
-            position: 3,
-            set: "S1",
-            show: {
-              slug: "2024-08-12-cap-theatre",
-              date: "2024-08-12",
-              venue: { name: "The Capitol Theatre" },
-            },
-            song: { slug: "basis-for-a-day", title: "Basis for a Day" },
-          },
-        ]),
-      },
-    } as never;
-
+  // Default sort=date desc: show date primary via showOrderBySql, then
+  // set ordinal + track position as tiebreakers — and tiebreakers share
+  // the primary direction (DESC), so within a show the row order is
+  // encore-first / late-set-first when reading top-down.
+  test("default sort=date desc orders by showOrderBySql DESC then set + position DESC", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
     const service = new RatingService(db, cacheInvalidation);
-    const result = await service.findTrackRatingsByUserId("u1");
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toEqual({
-      id: "r1",
-      value: 5,
-      createdAt: new Date("2024-01-01T00:00:00Z"),
-      track: {
-        slug: "basis-for-a-day-2024-08-12",
-        position: 3,
-        set: "S1",
-        show: {
-          slug: "2024-08-12-cap-theatre",
-          date: "2024-08-12",
-          venue: { name: "The Capitol Theatre" },
-        },
-        song: { slug: "basis-for-a-day", title: "Basis for a Day" },
-      },
-    });
-    expect(result[0]).not.toHaveProperty("userId");
-    expect(result[0]).not.toHaveProperty("rateableType");
-    expect(result[0].track).not.toHaveProperty("id");
-    expect(result[0].track.show).not.toHaveProperty("id");
-    expect(result[0].track.show.venue).not.toHaveProperty("city");
-    expect(result[0].track.show.venue).not.toHaveProperty("state");
-    expect(result[0].track.song).not.toHaveProperty("id");
-  });
-
-  // Same orphan-protection as show ratings — if the joined track is gone we
-  // drop the row instead of crashing the user profile.
-  test("skips ratings whose related track is missing", async () => {
-    const db = {
-      rating: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            rating({ id: "r1", rateableId: "missing-track", rateableType: "Track" }),
-            rating({ id: "r2", rateableId: "track-1", rateableType: "Track" }),
-          ]),
-      },
-      track: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "track-1",
-            slug: "above-the-waves",
-            position: 1,
-            set: "S2",
-            show: { slug: "show-slug", date: "2024-01-01", venue: { name: "Some Venue" } },
-            song: { slug: "above-the-waves", title: "Above The Waves" },
-          },
-        ]),
-      },
-    } as never;
-
-    const service = new RatingService(db, cacheInvalidation);
-    const result = await service.findTrackRatingsByUserId("u1");
-
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("r2");
-  });
-
-  // Same pagination requirement as show ratings — the heaviest user has ~7,800 track
-  // ratings and a single full payload is ~4 MB. skip/take must reach the
-  // DB so we never marshal rows we don't render.
-  test("supports skip/take pagination at the DB layer", async () => {
-    const ratingFindMany = vi
-      .fn()
-      .mockResolvedValue([rating({ id: "r-tracks-page-2", rateableId: "track-page-2", rateableType: "Track" })]);
-    const db = {
-      rating: { findMany: ratingFindMany },
-      track: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            id: "track-page-2",
-            slug: "basis-for-a-day",
-            position: 1,
-            set: "S1",
-            show: { slug: "s", date: "2024-01-01", venue: { name: "v" } },
-            song: { slug: "basis-for-a-day", title: "Basis for a Day" },
-          },
-        ]),
-      },
-    } as never;
-
-    const service = new RatingService(db, cacheInvalidation);
-    const result = await service.findTrackRatingsByUserId("u1", { skip: 100, take: 100 });
-
-    expect(ratingFindMany.mock.calls[0][0]).toMatchObject({ skip: 100, take: 100 });
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe("r-tracks-page-2");
-  });
-
-  // Same Prisma narrowing regression guard as show ratings — the track
-  // method must use `select` (not `include`) and limit nested venue/song.
-  test("queries the DB with a narrow `select`", async () => {
-    const trackFindMany = vi.fn().mockResolvedValue([]);
-    const db = {
-      rating: { findMany: vi.fn().mockResolvedValue([rating({ rateableType: "Track", rateableId: "track-1" })]) },
-      track: { findMany: trackFindMany },
-    } as never;
-
-    const service = new RatingService(db, cacheInvalidation);
     await service.findTrackRatingsByUserId("u1");
 
-    const args = trackFindMany.mock.calls[0][0];
-    expect(args).toHaveProperty("select");
-    expect(args).not.toHaveProperty("include");
-    // Venue should expose only `name` — city/state would re-introduce bloat.
-    expect(args.select.show.select.venue.select).toEqual({ name: true });
-    // Song should expose only slug/title — no UUID.
-    expect(args.select.song.select).toEqual({ slug: true, title: true });
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/s\.date\s+DESC/);
+    expect(sql).toMatch(/COALESCE\(s\.day_order/);
+    expect(sql).toMatch(/CASE\s+LOWER\(t\.set\)[\s\S]*DESC/);
+    expect(sql).toMatch(/t\.position\s+DESC/);
+  });
+
+  // Slim shape: id/value/createdAt + nested track {slug, position, set,
+  // show {slug, date, venue {name}}, song {slug, title}}. Anything wider
+  // re-bloats the heaviest users' payload (~7,800 rows).
+  test("maps rows into the slim shape", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([trackRatingRow()]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    const result = await service.findTrackRatingsByUserId("u1");
+
+    expect(result).toEqual([
+      {
+        id: "r1",
+        value: 5,
+        createdAt: new Date("2024-01-01T00:00:00Z"),
+        track: {
+          slug: "basis-for-a-day-2024-08-12",
+          position: 3,
+          set: "S1",
+          encoresInSet: 1,
+          show: {
+            slug: "2024-08-12-cap-theatre",
+            date: "2024-08-12",
+            venue: { name: "The Capitol Theatre" },
+          },
+          song: { slug: "basis-for-a-day", title: "Basis for a Day" },
+        },
+      },
+    ]);
+    expect(result[0]).not.toHaveProperty("userId");
+    expect(result[0].track).not.toHaveProperty("id");
+    expect(result[0].track.show.venue).not.toHaveProperty("city");
+    expect(result[0].track.show.venue).not.toHaveProperty("state");
+  });
+
+  test("returns track.show.venue = null when venue_name is null", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([trackRatingRow({ venue_name: null })]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    const result = await service.findTrackRatingsByUserId("u1");
+
+    expect(result[0].track.show.venue).toBeNull();
+  });
+
+  test("supports skip/take pagination via LIMIT/OFFSET", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1", { skip: 100, take: 100 });
+
+    const interpolations = queryRaw.mock.calls[0].slice(1);
+    expect(interpolations).toContain(100);
+  });
+
+  // sort=set asc: set ordinal primary, position next, show order last —
+  // all share ASC so reversing the sort reverses the entire reading.
+  test("sort=set asc orders by setSortKeySql ASC then position ASC then showOrderBySql ASC", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1", { sort: "set", direction: "asc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(
+      /ORDER\s+BY[\s\S]*CASE\s+LOWER\(t\.set\)[\s\S]*ASC[\s\S]*t\.position\s+ASC[\s\S]*s\.date\s+ASC/i,
+    );
+  });
+
+  // sort=track asc: position primary, set ordinal next, all ASC.
+  test("sort=track asc orders by position ASC then setSortKeySql ASC then showOrderBySql ASC", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1", { sort: "track", direction: "asc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(
+      /ORDER\s+BY[\s\S]*t\.position\s+ASC[\s\S]*CASE\s+LOWER\(t\.set\)[\s\S]*ASC[\s\S]*s\.date\s+ASC/i,
+    );
+  });
+
+  // sort=song asc: case-insensitive title alphabetic.
+  test("sort=song asc orders by LOWER(song.title)", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1", { sort: "song", direction: "asc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/ORDER\s+BY[\s\S]*LOWER\(sg\.title\)\s+ASC/i);
+  });
+
+  // sort=rating desc: value primary, show order DESC, set/position tiebreakers.
+  test("sort=rating desc orders by r.value then showOrderBySql then set/position", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1", { sort: "rating", direction: "desc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(
+      /ORDER\s+BY[\s\S]*r\.value\s+DESC[\s\S]*s\.date\s+DESC[\s\S]*CASE\s+LOWER\(t\.set\)[\s\S]*t\.position/i,
+    );
+  });
+
+  test("sort=modified asc orders by r.created_at then showOrderBySql ASC", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1", { sort: "modified", direction: "asc" });
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/ORDER\s+BY[\s\S]*r\.created_at\s+ASC[\s\S]*s\.date\s+ASC/i);
+  });
+
+  // The cell renderer needs to know how many distinct encores the show
+  // has so it can collapse "E1" → "E" on single-encore shows. The query
+  // computes that via a per-row scalar subquery counting distinct
+  // /^E\d+$/ set labels on the row's show.
+  test("projects encores_in_set via a per-row tracks subquery", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1");
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/COUNT\(DISTINCT\s+t2\.set\)/i);
+    expect(sql).toMatch(/t2\.show_id\s*=\s*t\.show_id/i);
+    expect(sql).toMatch(/'\^E\[0-9\]\+\$'/);
+    expect(sql).toMatch(/AS\s+encores_in_set/i);
+  });
+
+  // Verify the projected count actually threads through to track.encoresInSet
+  // on the returned row shape, so the cell can pass it to formatSetLabel.
+  test("exposes encoresInSet on the returned track shape", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([trackRatingRow({ track_set: "E1", encores_in_set: 1 })]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    const result = await service.findTrackRatingsByUserId("u1");
+
+    expect(result[0].track.encoresInSet).toBe(1);
+  });
+
+  test("INNER JOINs tracks/shows/songs so orphan ratings drop", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { $queryRaw: queryRaw } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    await service.findTrackRatingsByUserId("u1");
+
+    const sql = flattenSqlFromMockCall(queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/INNER\s+JOIN\s+tracks\s+t\b/i);
+    expect(sql).toMatch(/INNER\s+JOIN\s+shows\s+s\b/i);
+    expect(sql).toMatch(/INNER\s+JOIN\s+songs\s+sg\b/i);
   });
 });
 

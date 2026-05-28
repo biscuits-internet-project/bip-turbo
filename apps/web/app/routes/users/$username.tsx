@@ -1,8 +1,11 @@
+import type { RatingWithShow, RatingWithTrack, ShowRatingsSort, TrackRatingsSort } from "@bip/core";
 import { CacheKeys, compareByShowDate } from "@bip/domain";
 import { dehydrate } from "@tanstack/react-query";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
+import { formatHalfStep } from "~/components/rating/rating";
+import { formatSetLabel } from "~/components/setlist/set-label";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Badge } from "~/components/ui/badge";
@@ -10,14 +13,37 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { PaginationControls } from "~/components/ui/pagination-controls";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { UrlSortableHeader } from "~/components/ui/url-sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
-import { formatDateLong } from "~/lib/utils";
+import { formatDateLong, formatDateShort, formatDateShortMobile } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
+
+const SHOW_RATINGS_SORTS = ["date", "rating", "modified"] as const satisfies readonly ShowRatingsSort[];
+const TRACK_RATINGS_SORTS = [
+  "date",
+  "set",
+  "track",
+  "song",
+  "rating",
+  "modified",
+] as const satisfies readonly TrackRatingsSort[];
+
+function parseShowRatingsSort(raw: string | null): ShowRatingsSort {
+  return (SHOW_RATINGS_SORTS as readonly string[]).includes(raw ?? "") ? (raw as ShowRatingsSort) : "date";
+}
+
+function parseTrackRatingsSort(raw: string | null): TrackRatingsSort {
+  return (TRACK_RATINGS_SORTS as readonly string[]).includes(raw ?? "") ? (raw as TrackRatingsSort) : "date";
+}
+
+function parseDirection(raw: string | null): "asc" | "desc" {
+  return raw === "asc" ? "asc" : "desc";
+}
 
 const ATTENDED_SHOWS_PAGE_SIZE = 50;
 const RATINGS_PAGE_SIZE = 100;
@@ -39,6 +65,9 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
   const rawPage = Number.parseInt(url.searchParams.get("page") ?? "1", 10);
   const pageParam = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
   const activeTab = parseTab(url.searchParams.get("tab"));
+  const showRatingsSort = parseShowRatingsSort(url.searchParams.get("sort"));
+  const trackRatingsSort = parseTrackRatingsSort(url.searchParams.get("sort"));
+  const ratingsDirection = parseDirection(url.searchParams.get("dir"));
 
   const sessionUser = context.currentUser ?? null;
 
@@ -84,11 +113,21 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
 
   const showRatings =
     activeTab === "show-ratings"
-      ? await services.ratings.findShowRatingsByUserId(user.id, { skip: ratingsSkip, take: RATINGS_PAGE_SIZE })
+      ? await services.ratings.findShowRatingsByUserId(user.id, {
+          skip: ratingsSkip,
+          take: RATINGS_PAGE_SIZE,
+          sort: showRatingsSort,
+          direction: ratingsDirection,
+        })
       : [];
   const trackRatings =
     activeTab === "track-ratings"
-      ? await services.ratings.findTrackRatingsByUserId(user.id, { skip: ratingsSkip, take: RATINGS_PAGE_SIZE })
+      ? await services.ratings.findTrackRatingsByUserId(user.id, {
+          skip: ratingsSkip,
+          take: RATINGS_PAGE_SIZE,
+          sort: trackRatingsSort,
+          direction: ratingsDirection,
+        })
       : [];
 
   const totalRatings = tabCounts.showRatingsCount + tabCounts.trackRatingsCount;
@@ -156,6 +195,9 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
       totalPages: ratingsTotalPages,
       total: ratingsTotal,
     },
+    showRatingsSort,
+    trackRatingsSort,
+    ratingsDirection,
     activeTab,
     attendanceCount,
     reviewCount: tabCounts.reviewCount,
@@ -199,6 +241,9 @@ export default function UserProfile() {
     showRatings,
     trackRatings,
     ratingsPagination,
+    showRatingsSort,
+    trackRatingsSort,
+    ratingsDirection,
     activeTab,
     attendanceCount,
     reviewCount,
@@ -219,7 +264,22 @@ export default function UserProfile() {
   // the user clicked Next/Prev — otherwise React Router yanks them back
   // to the top of the page on every pagination click.
   const handlePageChange = (nextPage: number) => {
-    navigate(`?tab=${activeTab}&page=${nextPage}`, { preventScrollReset: true });
+    const sortSuffix =
+      activeTab === "show-ratings" || activeTab === "track-ratings"
+        ? `&sort=${activeTab === "show-ratings" ? showRatingsSort : trackRatingsSort}&dir=${ratingsDirection}`
+        : "";
+    navigate(`?tab=${activeTab}&page=${nextPage}${sortSuffix}`, { preventScrollReset: true });
+  };
+
+  // Sort changes drop the page back to 1: a sort against page 2 lands the
+  // user in the middle of the freshly-ordered list, which is rarely what
+  // they want. Both tabs share the handler shape; only the URL fragment
+  // changes per tab.
+  const handleShowRatingsSortChange = (sort: ShowRatingsSort, direction: "asc" | "desc") => {
+    navigate(`?tab=show-ratings&sort=${sort}&dir=${direction}`, { preventScrollReset: true });
+  };
+  const handleTrackRatingsSortChange = (sort: TrackRatingsSort, direction: "asc" | "desc") => {
+    navigate(`?tab=track-ratings&sort=${sort}&dir=${direction}`, { preventScrollReset: true });
   };
 
   return (
@@ -478,45 +538,13 @@ export default function UserProfile() {
             />
           )}
           {showRatings.length > 0 ? (
-            <div className="space-y-4">
-              {showRatings.map((rating) => (
-                <Card key={rating.id} className="card-premium">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">
-                        {rating.show.slug ? (
-                          <Link
-                            to={`/shows/${rating.show.slug}`}
-                            className="text-brand-primary hover:text-brand-secondary transition-colors hover:underline"
-                          >
-                            {rating.show.venue?.name || "Unknown Venue"}
-                          </Link>
-                        ) : (
-                          <span className="text-brand-primary">{rating.show.venue?.name || "Unknown Venue"}</span>
-                        )}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-rating-gold fill-rating-gold" />
-                          <span className="font-bold text-rating-gold">{rating.value}</span>
-                        </div>
-                        <span className="text-sm text-content-text-tertiary">
-                          {formatDateLong(rating.createdAt.toISOString())}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-content-text-secondary mt-1">
-                      <CalendarDays className="w-4 h-4" />
-                      <span>{formatDateLong(rating.show.date)}</span>
-                      {rating.show.venue?.city && rating.show.venue?.state && (
-                        <span>
-                          • {rating.show.venue.city}, {rating.show.venue.state}
-                        </span>
-                      )}
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
+            <div className="w-fit max-w-full mx-auto">
+              <ShowRatingsTable
+                rows={showRatings}
+                sort={showRatingsSort}
+                direction={ratingsDirection}
+                onSort={handleShowRatingsSortChange}
+              />
             </div>
           ) : (
             <Card className="card-premium">
@@ -554,55 +582,13 @@ export default function UserProfile() {
             />
           )}
           {trackRatings.length > 0 ? (
-            <div className="space-y-4">
-              {trackRatings.map((rating) => (
-                <Card key={rating.id} className="card-premium">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">
-                        {rating.track.slug ? (
-                          <Link
-                            to={`/tracks/${rating.track.slug}`}
-                            className="text-brand-primary hover:text-brand-secondary transition-colors hover:underline"
-                          >
-                            {rating.track.song.title}
-                          </Link>
-                        ) : (
-                          <Link
-                            to={`/songs/${rating.track.song.slug}`}
-                            className="text-brand-primary hover:text-brand-secondary transition-colors hover:underline"
-                          >
-                            {rating.track.song.title}
-                          </Link>
-                        )}
-                      </CardTitle>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-rating-gold fill-rating-gold" />
-                          <span className="font-bold text-rating-gold">{rating.value}</span>
-                        </div>
-                        <span className="text-sm text-content-text-tertiary">
-                          {formatDateLong(rating.createdAt.toISOString())}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-content-text-secondary mt-1">
-                      <span className="bg-content-bg px-2 py-1 rounded text-xs font-medium">
-                        Set {rating.track.set} • #{rating.track.position}
-                      </span>
-                      {rating.track.show.slug ? (
-                        <Link to={`/shows/${rating.track.show.slug}`} className="hover:underline">
-                          {rating.track.show.venue?.name || "Unknown Venue"} • {formatDateLong(rating.track.show.date)}
-                        </Link>
-                      ) : (
-                        <span>
-                          {rating.track.show.venue?.name || "Unknown Venue"} • {formatDateLong(rating.track.show.date)}
-                        </span>
-                      )}
-                    </div>
-                  </CardHeader>
-                </Card>
-              ))}
+            <div className="w-fit max-w-full mx-auto">
+              <TrackRatingsTable
+                rows={trackRatings}
+                sort={trackRatingsSort}
+                direction={ratingsDirection}
+                onSort={handleTrackRatingsSortChange}
+              />
             </div>
           ) : (
             <Card className="card-premium">
@@ -720,6 +706,178 @@ export default function UserProfile() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Modified-date cell: compact M/D/YY on mobile so it fits beside the other
+// columns, full "Month D, YYYY" once there's room at sm+.
+function ModifiedDate({ createdAt }: { createdAt: Date | string }) {
+  const iso = createdAt instanceof Date ? createdAt.toISOString() : createdAt;
+  return (
+    <>
+      <span className="sm:hidden">{formatDateShortMobile(iso)}</span>
+      <span className="hidden sm:inline">{formatDateLong(iso)}</span>
+    </>
+  );
+}
+
+function StarValue({ value }: { value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <Star className="h-3 w-3 sm:h-4 sm:w-4 text-rating-gold" />
+      <span className="font-medium text-xs sm:text-sm text-content-text-primary">{formatHalfStep(value)}</span>
+    </span>
+  );
+}
+
+// Show date cell with venue line below on sm+ viewports. Uses plain media
+// queries (not the @container/datecell variant in ShowDate) so the column
+// width and the date-format swap don't fight each other inside a table
+// with table-layout: auto.
+function DateVenueLink({ date, slug, venueLine }: { date: string; slug: string | null; venueLine: string | null }) {
+  const body = (
+    <>
+      <div className="font-medium text-base whitespace-nowrap">
+        <span className="sm:hidden">{formatDateShortMobile(date)}</span>
+        <span className="hidden sm:inline">{formatDateShort(date)}</span>
+      </div>
+      {venueLine && (
+        <div className="text-xs text-content-text-tertiary mt-0.5 hidden sm:block whitespace-nowrap">{venueLine}</div>
+      )}
+    </>
+  );
+  if (!slug) {
+    return <div className="text-content-text-secondary">{body}</div>;
+  }
+  return (
+    <Link to={`/shows/${slug}`} className="block text-brand-primary hover:text-brand-secondary">
+      {body}
+    </Link>
+  );
+}
+
+const tableCellClass = "px-2 py-2 sm:px-3 sm:py-2.5 align-top border-t border-glass-border/30";
+const tableHeadClass = "px-2 py-2 sm:px-3 sm:py-2.5 text-xs sm:text-sm text-content-text-secondary text-left align-top";
+
+interface ShowRatingsTableProps {
+  rows: RatingWithShow[];
+  sort: ShowRatingsSort;
+  direction: "asc" | "desc";
+  onSort: (sort: ShowRatingsSort, direction: "asc" | "desc") => void;
+}
+
+function ShowRatingsTable({ rows, sort, direction, onSort }: ShowRatingsTableProps) {
+  const header = (sortKey: ShowRatingsSort, label: string, defaultDirection?: "asc" | "desc") => (
+    <UrlSortableHeader<ShowRatingsSort>
+      sortKey={sortKey}
+      label={label}
+      currentSort={sort}
+      currentDirection={direction}
+      defaultDirection={defaultDirection}
+      onSortChange={onSort}
+    />
+  );
+  return (
+    <div className="w-fit max-w-full overflow-x-auto">
+      <table className="table-auto border-collapse text-sm">
+        <thead>
+          <tr>
+            <th className={tableHeadClass}>{header("date", "Show")}</th>
+            <th className={tableHeadClass}>{header("rating", "Rating")}</th>
+            <th className={tableHeadClass}>{header("modified", "Modified")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const venueLine = row.show.venue?.name
+              ? [row.show.venue.name, row.show.venue.city, row.show.venue.state].filter(Boolean).join(", ")
+              : null;
+            return (
+              <tr key={row.id} className="hover:bg-hover-glass">
+                <td className={tableCellClass}>
+                  <DateVenueLink date={row.show.date} slug={row.show.slug} venueLine={venueLine} />
+                </td>
+                <td className={tableCellClass}>
+                  <StarValue value={row.value} />
+                </td>
+                <td className={`${tableCellClass} text-content-text-tertiary whitespace-nowrap`}>
+                  <ModifiedDate createdAt={row.createdAt} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface TrackRatingsTableProps {
+  rows: RatingWithTrack[];
+  sort: TrackRatingsSort;
+  direction: "asc" | "desc";
+  onSort: (sort: TrackRatingsSort, direction: "asc" | "desc") => void;
+}
+
+function TrackRatingsTable({ rows, sort, direction, onSort }: TrackRatingsTableProps) {
+  const header = (sortKey: TrackRatingsSort, label: string, defaultDirection?: "asc" | "desc") => (
+    <UrlSortableHeader<TrackRatingsSort>
+      sortKey={sortKey}
+      label={label}
+      currentSort={sort}
+      currentDirection={direction}
+      defaultDirection={defaultDirection}
+      onSortChange={onSort}
+    />
+  );
+  return (
+    <div className="w-fit max-w-full overflow-x-auto">
+      <table className="table-auto border-collapse text-sm">
+        <thead>
+          <tr>
+            <th className={tableHeadClass}>{header("date", "Show")}</th>
+            <th className={`${tableHeadClass} hidden sm:table-cell`}>{header("set", "Set", "asc")}</th>
+            <th className={`${tableHeadClass} hidden sm:table-cell`}>{header("track", "#", "asc")}</th>
+            <th className={tableHeadClass}>{header("song", "Song", "asc")}</th>
+            <th className={tableHeadClass}>{header("rating", "Rating")}</th>
+            <th className={tableHeadClass}>{header("modified", "Modified")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="hover:bg-hover-glass">
+              <td className={tableCellClass}>
+                <DateVenueLink
+                  date={row.track.show.date}
+                  slug={row.track.show.slug}
+                  venueLine={row.track.show.venue?.name ?? null}
+                />
+              </td>
+              <td className={`${tableCellClass} hidden sm:table-cell text-content-text-secondary tabular-nums`}>
+                {formatSetLabel(row.track.set, { encoresInSet: row.track.encoresInSet })}
+              </td>
+              <td className={`${tableCellClass} hidden sm:table-cell text-content-text-secondary tabular-nums`}>
+                {row.track.position}
+              </td>
+              <td className={tableCellClass}>
+                <Link
+                  to={`/songs/${row.track.song.slug}`}
+                  className="text-brand-primary hover:text-brand-secondary font-medium block max-w-[6.5rem] sm:max-w-[14rem] break-words"
+                >
+                  {row.track.song.title}
+                </Link>
+              </td>
+              <td className={tableCellClass}>
+                <StarValue value={row.value} />
+              </td>
+              <td className={`${tableCellClass} text-content-text-tertiary whitespace-nowrap`}>
+                <ModifiedDate createdAt={row.createdAt} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

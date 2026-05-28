@@ -34,6 +34,17 @@ export function countDistinctEncores(rows: ReadonlyArray<{ set: string }>): numb
 }
 
 /**
+ * Distinct-encore count from a setlist's set groupings, where the set value
+ * lives on each group's `label` rather than on individual tracks. Adapts to
+ * {@link countDistinctEncores} so callers holding a `Setlist`-shaped object
+ * (sets with labels) get the `encoresInSet` value without re-deriving the
+ * set→`{ set }` mapping at the call site.
+ */
+export function countSetlistEncores(sets: ReadonlyArray<{ label: string }>): number {
+  return countDistinctEncores(sets.map((s) => ({ set: s.label })));
+}
+
+/**
  * Numeric sort key for a set label so callers can sort tracks by canonical
  * narrative order: soundcheck first, then S1..S4, then E1..E3, unknowns
  * last. Pairs with {@link compareBySetThenPosition} for full row ordering.

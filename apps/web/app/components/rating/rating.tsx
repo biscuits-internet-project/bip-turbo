@@ -16,7 +16,7 @@ interface RatingProps {
  * Formats a rating using whole numbers + ½ glyph since the rating UI only
  * supports whole and half increments. 4.5 → "4½", 5 → "5", 0.5 → "½".
  */
-function formatHalfStep(value: number): string {
+export function formatHalfStep(value: number): string {
   const whole = Math.floor(value);
   const hasHalf = value - whole >= 0.25; // tolerate float drift
   if (hasHalf) return whole === 0 ? "½" : `${whole}½`;

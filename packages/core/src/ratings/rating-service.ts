@@ -1,6 +1,53 @@
 import type { Rating } from "@bip/domain";
+import { Prisma } from "@prisma/client";
 import { type CacheInvalidationService, yearFromShowSlug } from "../_shared/cache";
 import type { DbClient, DbRating } from "../_shared/database/models";
+import { setSortKeySql, showOrderBySql } from "../_shared/show-ordering";
+
+export type ShowRatingsSort = "date" | "rating" | "modified";
+export type TrackRatingsSort = "date" | "set" | "track" | "song" | "rating" | "modified";
+export type SortDirection = "asc" | "desc";
+
+function sqlDirection(direction: SortDirection): Prisma.Sql {
+  return direction === "asc" ? Prisma.raw("ASC") : Prisma.raw("DESC");
+}
+
+// Tiebreakers always share the primary sort's direction. Asking for date
+// DESC means same-day rows further sort set DESC + position DESC, so an
+// "encore-first" reading within each show. Asking for date ASC reverses
+// it (set/position ASC) so the typical chronological top-down reading.
+function showRatingsOrderBy(sort: ShowRatingsSort, direction: SortDirection): Prisma.Sql {
+  const dir = sqlDirection(direction);
+  const showOrder = showOrderBySql("s", direction === "asc" ? "ASC" : "DESC");
+  switch (sort) {
+    case "rating":
+      return Prisma.sql`r.value ${dir}, ${showOrder}, r.created_at ${dir}`;
+    case "modified":
+      return Prisma.sql`r.created_at ${dir}, ${showOrder}`;
+    default:
+      return Prisma.sql`${showOrder}, r.created_at ${dir}`;
+  }
+}
+
+function trackRatingsOrderBy(sort: TrackRatingsSort, direction: SortDirection): Prisma.Sql {
+  const dir = sqlDirection(direction);
+  const setKey = setSortKeySql("t");
+  const showOrder = showOrderBySql("s", direction === "asc" ? "ASC" : "DESC");
+  switch (sort) {
+    case "set":
+      return Prisma.sql`${setKey} ${dir}, t.position ${dir}, ${showOrder}`;
+    case "track":
+      return Prisma.sql`t.position ${dir}, ${setKey} ${dir}, ${showOrder}`;
+    case "song":
+      return Prisma.sql`LOWER(sg.title) ${dir}, ${showOrder}, ${setKey} ${dir}, t.position ${dir}`;
+    case "rating":
+      return Prisma.sql`r.value ${dir}, ${showOrder}, ${setKey} ${dir}, t.position ${dir}`;
+    case "modified":
+      return Prisma.sql`r.created_at ${dir}, ${showOrder}`;
+    default:
+      return Prisma.sql`${showOrder}, ${setKey} ${dir}, t.position ${dir}`;
+  }
+}
 
 /**
  * Slim show-rating row for list views — only fields the user-profile page
@@ -36,6 +83,13 @@ export interface RatingWithTrack {
     slug: string | null;
     position: number;
     set: string;
+    /**
+     * Number of distinct encore labels (E1, E2, ...) in the same show.
+     * Surfaced so the cell renderer can collapse "E1" → "E" via
+     * `formatSetLabel({ encoresInSet })` when the show has only one
+     * encore — the rest of the time, the numeral disambiguates.
+     */
+    encoresInSet: number;
     show: {
       slug: string | null;
       date: string;
@@ -312,123 +366,132 @@ export class RatingService {
     return result ? mapRatingToDomainEntity(result) : null;
   }
 
-  async findShowRatingsByUserId(userId: string, options?: { skip?: number; take?: number }): Promise<RatingWithShow[]> {
-    const results = await this.db.rating.findMany({
-      where: {
-        userId,
-        rateableType: "Show",
-        value: { gte: 1, lte: 5 }, // Only valid ratings
+  async findShowRatingsByUserId(
+    userId: string,
+    options?: { skip?: number; take?: number; sort?: ShowRatingsSort; direction?: SortDirection },
+  ): Promise<RatingWithShow[]> {
+    const sort = options?.sort ?? "date";
+    const direction = options?.direction ?? "desc";
+    const take = options?.take ?? 100;
+    const skip = options?.skip ?? 0;
+    const orderBy = showRatingsOrderBy(sort, direction);
+
+    const rows = await this.db.$queryRaw<
+      Array<{
+        id: string;
+        value: number;
+        created_at: Date;
+        show_slug: string | null;
+        show_date: string;
+        venue_name: string | null;
+        venue_city: string | null;
+        venue_state: string | null;
+      }>
+    >`
+      SELECT
+        r.id AS id,
+        r.value AS value,
+        r.created_at AS created_at,
+        s.slug AS show_slug,
+        s.date AS show_date,
+        v.name AS venue_name,
+        v.city AS venue_city,
+        v.state AS venue_state
+      FROM ratings r
+      INNER JOIN shows s ON s.id = r.rateable_id
+      LEFT JOIN venues v ON v.id = s.venue_id
+      WHERE r.user_id = ${userId}::uuid
+        AND r.rateable_type = 'Show'
+        AND r.value BETWEEN 1 AND 5
+      ORDER BY ${orderBy}
+      LIMIT ${take} OFFSET ${skip}
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      value: row.value,
+      createdAt: row.created_at,
+      show: {
+        slug: row.show_slug,
+        date: row.show_date,
+        venue: row.venue_name === null ? null : { name: row.venue_name, city: row.venue_city, state: row.venue_state },
       },
-      orderBy: { createdAt: "desc" },
-      skip: options?.skip,
-      take: options?.take,
-    });
-
-    // Get show data for all ratings — narrow projection (slug/date/venue
-    // trio) since the user-profile list cards don't use any other field.
-    const showIds = results.map((r) => r.rateableId);
-    const shows = await this.db.show.findMany({
-      where: { id: { in: showIds } },
-      select: {
-        id: true,
-        slug: true,
-        date: true,
-        venue: { select: { name: true, city: true, state: true } },
-      },
-    });
-
-    const showMap = new Map(shows.map((show) => [show.id, show]));
-
-    return results
-      .map((rating): RatingWithShow | null => {
-        const show = showMap.get(rating.rateableId);
-        if (!show) return null;
-
-        return {
-          id: rating.id,
-          value: rating.value,
-          createdAt: rating.createdAt,
-          show: {
-            slug: show.slug,
-            date: show.date,
-            venue: show.venue
-              ? {
-                  name: show.venue.name,
-                  city: show.venue.city,
-                  state: show.venue.state,
-                }
-              : null,
-          },
-        };
-      })
-      .filter((rating): rating is RatingWithShow => rating !== null);
+    }));
   }
 
   async findTrackRatingsByUserId(
     userId: string,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sort?: TrackRatingsSort; direction?: SortDirection },
   ): Promise<RatingWithTrack[]> {
-    const results = await this.db.rating.findMany({
-      where: {
-        userId,
-        rateableType: "Track",
-        value: { gte: 1, lte: 5 }, // Only valid ratings
-      },
-      orderBy: { createdAt: "desc" },
-      skip: options?.skip,
-      take: options?.take,
-    });
+    const sort = options?.sort ?? "date";
+    const direction = options?.direction ?? "desc";
+    const take = options?.take ?? 100;
+    const skip = options?.skip ?? 0;
+    const orderBy = trackRatingsOrderBy(sort, direction);
 
-    // Get track data with show and song info — narrow projection: the
-    // user-profile track-rating cards only display set/position + nested
-    // slug/date/venue.name + song.slug/title.
-    const trackIds = results.map((r) => r.rateableId);
-    const tracks = await this.db.track.findMany({
-      where: { id: { in: trackIds } },
-      select: {
-        id: true,
-        slug: true,
-        position: true,
-        set: true,
+    const rows = await this.db.$queryRaw<
+      Array<{
+        id: string;
+        value: number;
+        created_at: Date;
+        track_slug: string | null;
+        track_position: number;
+        track_set: string;
+        encores_in_set: bigint | number;
+        show_slug: string | null;
+        show_date: string;
+        venue_name: string | null;
+        song_slug: string;
+        song_title: string;
+      }>
+    >`
+      SELECT
+        r.id AS id,
+        r.value AS value,
+        r.created_at AS created_at,
+        t.slug AS track_slug,
+        t.position AS track_position,
+        t.set AS track_set,
+        (
+          SELECT COUNT(DISTINCT t2.set)
+          FROM tracks t2
+          WHERE t2.show_id = t.show_id
+            AND t2.set ~* '^E[0-9]+$'
+        ) AS encores_in_set,
+        s.slug AS show_slug,
+        s.date AS show_date,
+        v.name AS venue_name,
+        sg.slug AS song_slug,
+        sg.title AS song_title
+      FROM ratings r
+      INNER JOIN tracks t ON t.id = r.rateable_id
+      INNER JOIN shows s ON s.id = t.show_id
+      LEFT JOIN venues v ON v.id = s.venue_id
+      INNER JOIN songs sg ON sg.id = t.song_id
+      WHERE r.user_id = ${userId}::uuid
+        AND r.rateable_type = 'Track'
+        AND r.value BETWEEN 1 AND 5
+      ORDER BY ${orderBy}
+      LIMIT ${take} OFFSET ${skip}
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      value: row.value,
+      createdAt: row.created_at,
+      track: {
+        slug: row.track_slug,
+        position: row.track_position,
+        set: row.track_set,
+        encoresInSet: Number(row.encores_in_set),
         show: {
-          select: {
-            slug: true,
-            date: true,
-            venue: { select: { name: true } },
-          },
+          slug: row.show_slug,
+          date: row.show_date,
+          venue: row.venue_name === null ? null : { name: row.venue_name },
         },
-        song: { select: { slug: true, title: true } },
+        song: { slug: row.song_slug, title: row.song_title },
       },
-    });
-
-    const trackMap = new Map(tracks.map((track) => [track.id, track]));
-
-    return results
-      .map((rating): RatingWithTrack | null => {
-        const track = trackMap.get(rating.rateableId);
-        if (!track) return null;
-
-        return {
-          id: rating.id,
-          value: rating.value,
-          createdAt: rating.createdAt,
-          track: {
-            slug: track.slug,
-            position: track.position,
-            set: track.set,
-            show: {
-              slug: track.show.slug,
-              date: track.show.date,
-              venue: track.show.venue ? { name: track.show.venue.name } : null,
-            },
-            song: {
-              slug: track.song.slug,
-              title: track.song.title,
-            },
-          },
-        };
-      })
-      .filter((rating): rating is RatingWithTrack => rating !== null);
+    }));
   }
 
   async deleteByRateableId(rateableId: string, rateableType: string): Promise<void> {
