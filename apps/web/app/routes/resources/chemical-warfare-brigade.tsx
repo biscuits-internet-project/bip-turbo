@@ -1,8 +1,10 @@
 import type React from "react";
 import { Link } from "react-router-dom";
 import { SetlistList } from "~/components/setlist/setlist-list";
+import { Card, CardHeader } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 import { slugifyAnchor } from "~/lib/utils";
 import { getRockOperaPerformances, type RockOperaPerformancesLoaderData } from "./rock-opera-performances";
@@ -450,6 +452,44 @@ const songs = [
   },
 ];
 
+const electronPerformances = [
+  {
+    date: "8/18/2000",
+    venue: "Trocadero Theatre",
+    city: "Philadelphia",
+    state: "PA",
+    archiveUrl: "https://archive.org/details/etron2000-08-18.shnf",
+  },
+  {
+    date: "5/11/2008",
+    venue: "Cervantes' Masterpiece Ballroom",
+    city: "Denver",
+    state: "CO",
+    archiveUrl: null,
+  },
+  {
+    date: "5/11/2013",
+    venue: "Toad's Place",
+    city: "New Haven",
+    state: "CT",
+    archiveUrl: null,
+  },
+  {
+    date: "3/26/2017",
+    venue: "Barkley Ballroom",
+    city: "Frisco",
+    state: "CO",
+    archiveUrl: "https://archive.org/details/Electron2017-03-26.multitrack.flac",
+  },
+  {
+    date: "4/21/2017",
+    venue: "Highline Ballroom",
+    city: "New York",
+    state: "NY",
+    archiveUrl: "https://archive.org/details/Electron2017-04-21.multitrack.flac",
+  },
+];
+
 // ─── Components ──────────────────────────────────────────────────────────────
 
 function CharacterCard({ character }: { character: (typeof characters)[number] }) {
@@ -583,11 +623,9 @@ const ChemicalWarfareBrigade: React.FC = () => {
       <div className="space-y-4 text-content-text-secondary leading-relaxed text-base md:text-lg">
         <p>
           <strong className="text-content-text-primary">The Chemical Warfare Brigade</strong> is the Disco Biscuits'
-          second full-length rock opera, written by Marc Brownstein, and debuted on{" "}
-          <Link
-            to="/shows/2000-12-30-vanderbilt-plainview-ny"
-            className="text-brand-primary hover:text-brand-secondary"
-          >
+          second full-length rock opera, written by Marc Brownstein. It was first performed by Marc's side project,
+          Electron, on August 18, 2000 at Trocadero Theatre in Philadelphia. It was debuted by The Disco Biscuits on{" "}
+          <Link to="/shows/2000-12-30" className="text-brand-primary hover:text-brand-secondary">
             December 30, 2000
           </Link>{" "}
           at the Vanderbilt on Long Island.
@@ -611,6 +649,9 @@ const ChemicalWarfareBrigade: React.FC = () => {
           </a>
           <a href="#full-performances" className="text-brand-primary hover:text-brand-secondary">
             Full Performances
+          </a>
+          <a href="#electron-performances" className="text-brand-primary hover:text-brand-secondary">
+            Electron Performances
           </a>
           <div>
             <a href="#the-story" className="text-brand-primary hover:text-brand-secondary font-medium">
@@ -691,6 +732,57 @@ const ChemicalWarfareBrigade: React.FC = () => {
         </div>
       </section>
 
+      {/* ── Electron Performances ── */}
+      <section id="electron-performances" className="scroll-mt-20">
+        <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-2">
+          Electron Performances
+        </h2>
+        <p className="text-sm text-content-text-tertiary mb-5">
+          Full performances by Marc Brownstein's side project, Electron.
+        </p>
+        <div className="space-y-2">
+          {electronPerformances.map((perf, index) => (
+            <div key={`${perf.date}-${perf.venue}`} className="flex items-start gap-4">
+              <div
+                aria-hidden
+                className="hidden md:flex shrink-0 w-14 pt-3 justify-end font-bold text-4xl text-content-text-tertiary/40 tabular-nums"
+              >
+                {index + 1}
+              </div>
+              <Card className="card-premium relative overflow-hidden flex-1 min-w-0">
+                <CardHeader className="relative z-10 px-3 md:px-6 py-1 md:py-1">
+                  <div className="flex flex-col gap-1">
+                    <div className="text-lg md:text-2xl font-medium text-content-text-primary">{perf.date}</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-base md:text-xl text-content-text-primary">
+                        {perf.venue} - {perf.city}, {perf.state}
+                      </div>
+                      {perf.archiveUrl && (
+                        <div className="pr-2 sm:pr-3">
+                          <a
+                            href={perf.archiveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Available on archive.org"
+                            className="inline-flex items-center transition-transform hover:scale-110 hover:-translate-y-0.5 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.55)]"
+                          >
+                            <img
+                              src={faviconSrc(EXTERNAL_SOURCE_DOMAINS.archive)}
+                              alt="Available on archive.org"
+                              className="h-5 w-5 shrink-0"
+                            />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── Related Links ── */}
       <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-950/40 to-purple-900/10 p-5 md:p-8">
         <h2 className="text-base font-semibold tracking-[4px] text-purple-400/60 uppercase mb-4">Related</h2>
@@ -701,14 +793,6 @@ const ChemicalWarfareBrigade: React.FC = () => {
           >
             The Hot Air Balloon
           </Link>
-          <a
-            href="https://archive.org/details/db2000-12-30.shnf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-brand-primary hover:text-brand-secondary block"
-          >
-            Listen to the Debut Performance
-          </a>
         </div>
       </section>
     </div>
