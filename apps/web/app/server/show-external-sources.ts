@@ -26,8 +26,9 @@ export async function computeShowExternalSources(shows: ShowLike[]): Promise<Rec
   if (shows.length === 0) return result;
 
   const showIds = shows.map((s) => s.id);
-  const [nugsUrlsByDate, archiveUrlsByDate, youtubeUrlsByShowId] = await Promise.all([
+  const [nugsUrlsByDate, relistenUrlsByDate, archiveUrlsByDate, youtubeUrlsByShowId] = await Promise.all([
     services.nugs.getReleaseUrlsByDate(),
+    services.relisten.getUrlsByDate(),
     services.archiveDotOrg.getPrimaryUrlsByDate(),
     services.youtube.getFirstVideoUrlByShowIds(showIds),
   ]);
@@ -35,6 +36,7 @@ export async function computeShowExternalSources(shows: ShowLike[]): Promise<Rec
   for (const show of shows) {
     result[show.id] = {
       nugsUrls: nugsUrlsByDate[show.date],
+      relistenUrl: relistenUrlsByDate[show.date],
       archiveUrl: archiveUrlsByDate[show.date],
       youtubeUrl: youtubeUrlsByShowId[show.id],
     };

@@ -183,20 +183,6 @@ export function ShowForm({
 
         <FormField
           control={form.control}
-          name="relistenUrl"
-          render={({ field }: { field: ControllerRenderProps<ShowFormValues, "relistenUrl"> }) => (
-            <FormItem>
-              <FormLabel className="text-content-text-secondary">Relisten URL</FormLabel>
-              <FormControl>
-                <Input placeholder="Enter Relisten URL" {...field} className={formInputClass} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
           name="countForStats"
           render={({ field }: { field: ControllerRenderProps<ShowFormValues, "countForStats"> }) => (
             <FormItem className="flex items-center gap-3">

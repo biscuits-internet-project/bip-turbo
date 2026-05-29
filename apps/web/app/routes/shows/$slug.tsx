@@ -37,6 +37,7 @@ interface ShowLoaderData {
   reviews: ReviewMinimal[];
   archiveRecordings: ArchiveDotOrgRecording[];
   nugsLinks: ExternalLink[];
+  relistenLinks: ExternalLink[];
   youtubeLinks: ExternalLink[];
   externalSources: ShowExternalSources;
   photos: ShowFile[];
@@ -80,9 +81,10 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
 
   logger.info(`Show data loaded for ${slug} - setlist cached, reviews fresh`);
 
-  const [archiveRecordings, nugsReleases, youtubeVideoUrls, externalSourcesMap] = await Promise.all([
+  const [archiveRecordings, nugsReleases, relistenUrl, youtubeVideoUrls, externalSourcesMap] = await Promise.all([
     services.archiveDotOrg.findRecordingsForDate(setlist.show.date),
     services.nugs.findReleasesForDate(setlist.show.date),
+    services.relisten.findUrlForDate(setlist.show.date),
     services.youtube.getVideoUrlsForShow(setlist.show.id),
     computeShowExternalSources([setlist.show]),
   ]);
@@ -101,6 +103,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     url: release.url,
     label: `Listen on nugs.net${release.artistName === "Tractorbeam" ? " (Tractorbeam)" : ""}`,
   }));
+  const relistenLinks: ExternalLink[] = relistenUrl ? [{ url: relistenUrl, label: "Listen on Relisten" }] : [];
   const youtubeLinks: ExternalLink[] = youtubeVideoUrls.map((url, i) => ({
     url,
     label: `Watch on YouTube${youtubeVideoUrls.length > 1 ? ` (${i + 1})` : ""}`,
@@ -111,6 +114,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     reviews,
     archiveRecordings,
     nugsLinks,
+    relistenLinks,
     youtubeLinks,
     externalSources: externalSourcesMap[setlist.show.id] ?? {},
     photos,
@@ -124,8 +128,17 @@ export function meta({ data }: { data: ShowLoaderData }) {
 }
 
 export default function Show() {
-  const { setlist, reviews, archiveRecordings, nugsLinks, youtubeLinks, externalSources, photos, adjacentShows } =
-    useSerializedLoaderData<ShowLoaderData>();
+  const {
+    setlist,
+    reviews,
+    archiveRecordings,
+    nugsLinks,
+    relistenLinks,
+    youtubeLinks,
+    externalSources,
+    photos,
+    adjacentShows,
+  } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
   const [setlistView, setSetlistView] = useSetlistView();
@@ -320,6 +333,7 @@ export default function Show() {
             <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.nugs} title="Official release" items={nugsLinks} />
             <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.youtube} title="Video" items={youtubeLinks} />
             <ArchiveRecordingsCard items={archiveRecordings} />
+            <ExternalLinkCard faviconDomain={EXTERNAL_SOURCE_DOMAINS.relisten} title="Relisten" items={relistenLinks} />
 
             {/* Highlights panel */}
             <SetlistHighlights setlist={setlist} />

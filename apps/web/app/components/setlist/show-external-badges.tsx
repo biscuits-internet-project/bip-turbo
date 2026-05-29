@@ -1,6 +1,6 @@
 import { Camera } from "lucide-react";
 import { Link } from "react-router-dom";
-import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
+import { EXTERNAL_FAVICON_LINK_CLASS, EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { cn } from "~/lib/utils";
 
 /**
@@ -17,6 +17,8 @@ export interface ShowExternalSources {
    * release so users can tell a rare two-release night at a glance.
    */
   nugsUrls?: string[];
+  /** relisten.net link for the show date, or undefined when Relisten lacks it. */
+  relistenUrl?: string;
   archiveUrl?: string;
   youtubeUrl?: string;
 }
@@ -57,8 +59,6 @@ interface PhotosBadgeProps {
   count: number | undefined;
 }
 
-const BADGE_LINK_CLASS =
-  "inline-flex items-center transition-transform hover:scale-110 hover:-translate-y-0.5 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.55)]";
 const BADGE_ICON_CLASS = "h-5 w-5 shrink-0";
 
 /**
@@ -69,7 +69,7 @@ const BADGE_ICON_CLASS = "h-5 w-5 shrink-0";
 function FaviconLink({ domain, href, label }: FaviconLinkProps) {
   if (!href) return null;
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" title={label} className={BADGE_LINK_CLASS}>
+    <a href={href} target="_blank" rel="noopener noreferrer" title={label} className={EXTERNAL_FAVICON_LINK_CLASS}>
       <img src={faviconSrc(domain)} alt={label} className={BADGE_ICON_CLASS} />
     </a>
   );
@@ -82,7 +82,7 @@ function FaviconLink({ domain, href, label }: FaviconLinkProps) {
 function PhotosBadge({ href, count }: PhotosBadgeProps) {
   if (!href || !count || count <= 0) return null;
   return (
-    <Link to={href} title={`${count} photos`} className={cn(BADGE_LINK_CLASS, "gap-1")}>
+    <Link to={href} title={`${count} photos`} className={cn(EXTERNAL_FAVICON_LINK_CLASS, "gap-1")}>
       <Camera className={BADGE_ICON_CLASS} />
       <span className="text-sm">{count}</span>
     </Link>
@@ -98,7 +98,11 @@ function PhotosBadge({ href, count }: PhotosBadgeProps) {
 export function ShowExternalBadges({ sources, photosHref, photosCount }: ShowExternalBadgesProps) {
   const nugsUrls = sources.nugsUrls ?? [];
   const hasAny =
-    nugsUrls.length > 0 || sources.archiveUrl || sources.youtubeUrl || (photosHref && photosCount && photosCount > 0);
+    nugsUrls.length > 0 ||
+    sources.relistenUrl ||
+    sources.archiveUrl ||
+    sources.youtubeUrl ||
+    (photosHref && photosCount && photosCount > 0);
   if (!hasAny) return null;
 
   return (
@@ -121,6 +125,7 @@ export function ShowExternalBadges({ sources, photosHref, photosCount }: ShowExt
         href={sources.archiveUrl}
         label="Available on archive.org"
       />
+      <FaviconLink domain={EXTERNAL_SOURCE_DOMAINS.relisten} href={sources.relistenUrl} label="Available on Relisten" />
       <PhotosBadge href={photosHref} count={photosCount} />
     </div>
   );

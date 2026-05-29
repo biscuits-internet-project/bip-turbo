@@ -20,6 +20,7 @@ export function faviconSrc(domain: string): string {
  */
 export const EXTERNAL_SOURCE_DOMAINS = {
   nugs: "nugs.net",
+  relisten: "relisten.net",
   youtube: "youtube.com",
   archive: "archive.org",
   spotify: "spotify.com",
@@ -28,3 +29,12 @@ export const EXTERNAL_SOURCE_DOMAINS = {
   // we link to when we want listeners on Tidal / Deezer / Amazon / etc.
   songLink: "song.link",
 } as const;
+
+/**
+ * Shared chrome for a favicon-as-link: the lift-and-glow hover used wherever
+ * an external source renders as a clickable icon (setlist badge strip,
+ * resource-page performance rows). Centralized so the hover treatment stays
+ * identical across surfaces.
+ */
+export const EXTERNAL_FAVICON_LINK_CLASS =
+  "inline-flex items-center transition-transform hover:scale-110 hover:-translate-y-0.5 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.55)]";
