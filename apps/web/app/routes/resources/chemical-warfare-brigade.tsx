@@ -4,7 +4,7 @@ import { SetlistList } from "~/components/setlist/setlist-list";
 import { Card, CardHeader } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
+import { EXTERNAL_FAVICON_LINK_CLASS, EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 import { slugifyAnchor } from "~/lib/utils";
 import { getRockOperaPerformances, type RockOperaPerformancesLoaderData } from "./rock-opera-performances";
@@ -459,6 +459,7 @@ const electronPerformances = [
     city: "Philadelphia",
     state: "PA",
     archiveUrl: "https://archive.org/details/etron2000-08-18.shnf",
+    relistenUrl: null,
   },
   {
     date: "5/11/2008",
@@ -466,6 +467,7 @@ const electronPerformances = [
     city: "Denver",
     state: "CO",
     archiveUrl: null,
+    relistenUrl: null,
   },
   {
     date: "5/11/2013",
@@ -473,6 +475,7 @@ const electronPerformances = [
     city: "New Haven",
     state: "CT",
     archiveUrl: null,
+    relistenUrl: null,
   },
   {
     date: "3/26/2017",
@@ -480,6 +483,7 @@ const electronPerformances = [
     city: "Frisco",
     state: "CO",
     archiveUrl: "https://archive.org/details/Electron2017-03-26.multitrack.flac",
+    relistenUrl: "https://relisten.net/electron/2017/03/26",
   },
   {
     date: "4/21/2017",
@@ -487,6 +491,7 @@ const electronPerformances = [
     city: "New York",
     state: "NY",
     archiveUrl: "https://archive.org/details/Electron2017-04-21.multitrack.flac",
+    relistenUrl: "https://relisten.net/electron/2017/04/21",
   },
 ];
 
@@ -757,21 +762,38 @@ const ChemicalWarfareBrigade: React.FC = () => {
                       <div className="text-base md:text-xl text-content-text-primary">
                         {perf.venue} - {perf.city}, {perf.state}
                       </div>
-                      {perf.archiveUrl && (
-                        <div className="pr-2 sm:pr-3">
-                          <a
-                            href={perf.archiveUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Available on archive.org"
-                            className="inline-flex items-center transition-transform hover:scale-110 hover:-translate-y-0.5 hover:drop-shadow-[0_0_6px_rgba(167,139,250,0.55)]"
-                          >
-                            <img
-                              src={faviconSrc(EXTERNAL_SOURCE_DOMAINS.archive)}
-                              alt="Available on archive.org"
-                              className="h-5 w-5 shrink-0"
-                            />
-                          </a>
+                      {(perf.archiveUrl || perf.relistenUrl) && (
+                        <div className="flex items-center gap-2 pr-2 sm:pr-3">
+                          {perf.archiveUrl && (
+                            <a
+                              href={perf.archiveUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Available on archive.org"
+                              className={EXTERNAL_FAVICON_LINK_CLASS}
+                            >
+                              <img
+                                src={faviconSrc(EXTERNAL_SOURCE_DOMAINS.archive)}
+                                alt="Available on archive.org"
+                                className="h-5 w-5 shrink-0"
+                              />
+                            </a>
+                          )}
+                          {perf.relistenUrl && (
+                            <a
+                              href={perf.relistenUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Available on Relisten"
+                              className={EXTERNAL_FAVICON_LINK_CLASS}
+                            >
+                              <img
+                                src={faviconSrc(EXTERNAL_SOURCE_DOMAINS.relisten)}
+                                alt="Available on Relisten"
+                                className="h-5 w-5 shrink-0"
+                              />
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>

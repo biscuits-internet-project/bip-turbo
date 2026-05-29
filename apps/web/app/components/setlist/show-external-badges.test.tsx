@@ -19,6 +19,7 @@ describe("ShowExternalBadges", () => {
       <ShowExternalBadges
         sources={{
           nugsUrls: ["https://play.nugs.net/release/1"],
+          relistenUrl: "https://relisten.net/disco-biscuits/2004/12/31",
           archiveUrl: "https://archive.org/details/db2004",
           youtubeUrl: "https://youtube.com/watch?v=aaa",
         }}
@@ -28,6 +29,10 @@ describe("ShowExternalBadges", () => {
     expect(screen.getByRole("link", { name: "Available on nugs.net" })).toHaveAttribute(
       "href",
       "https://play.nugs.net/release/1",
+    );
+    expect(screen.getByRole("link", { name: "Available on Relisten" })).toHaveAttribute(
+      "href",
+      "https://relisten.net/disco-biscuits/2004/12/31",
     );
     expect(screen.getByRole("link", { name: "Available on archive.org" })).toHaveAttribute(
       "href",
@@ -93,6 +98,7 @@ describe("ShowExternalBadges", () => {
     await setupWithRouter(<ShowExternalBadges sources={{ nugsUrls: ["https://play.nugs.net/release/1"] }} />);
 
     expect(screen.getByRole("link", { name: "Available on nugs.net" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Available on Relisten" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Available on archive.org" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Video on YouTube" })).not.toBeInTheDocument();
   });

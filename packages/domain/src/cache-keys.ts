@@ -64,6 +64,13 @@ export const CacheKeys = {
   },
 
   /**
+   * Relisten full-catalog cache (date-indexed map of all Disco Biscuits shows)
+   */
+  relisten: {
+    catalog: () => "relisten-catalog-disco-biscuits",
+  },
+
+  /**
    * Song-related cache keys
    */
   songs: {
@@ -102,7 +109,7 @@ export const CacheKeys = {
      * have 400+ attended shows and the un-paginated payload is large enough
      * to be slow to deserialize/transport even from Redis.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v5`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v6`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -127,7 +134,7 @@ export const CacheKeys = {
    */
   rockOperas: {
     /** Resource-page list payload: setlists + external sources for one rock opera. */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v3`,
+    performances: (slug: string) => `rock-operas:performances:${slug}:v4`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },

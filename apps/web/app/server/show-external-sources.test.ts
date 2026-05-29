@@ -4,10 +4,12 @@ import { computeShowExternalSources } from "./show-external-sources";
 const getReleaseUrlsByDate = vi.fn();
 const getPrimaryUrlsByDate = vi.fn();
 const getFirstVideoUrlByShowIds = vi.fn();
+const getRelistenUrlsByDate = vi.fn();
 
 vi.mock("~/server/services", () => ({
   services: {
     nugs: { getReleaseUrlsByDate: () => getReleaseUrlsByDate() },
+    relisten: { getUrlsByDate: () => getRelistenUrlsByDate() },
     archiveDotOrg: { getPrimaryUrlsByDate: () => getPrimaryUrlsByDate() },
     youtube: { getFirstVideoUrlByShowIds: (ids: string[]) => getFirstVideoUrlByShowIds(ids) },
   },
@@ -19,6 +21,7 @@ describe("computeShowExternalSources", () => {
     getReleaseUrlsByDate.mockResolvedValue({});
     getPrimaryUrlsByDate.mockResolvedValue({});
     getFirstVideoUrlByShowIds.mockResolvedValue({});
+    getRelistenUrlsByDate.mockResolvedValue({});
   });
 
   // Empty input short-circuits so loaders can pass whatever list they have
@@ -30,6 +33,7 @@ describe("computeShowExternalSources", () => {
     expect(getReleaseUrlsByDate).not.toHaveBeenCalled();
     expect(getPrimaryUrlsByDate).not.toHaveBeenCalled();
     expect(getFirstVideoUrlByShowIds).not.toHaveBeenCalled();
+    expect(getRelistenUrlsByDate).not.toHaveBeenCalled();
   });
 
   // Shows are keyed by id in the result; nugs/archive URLs lookup by date,
@@ -38,12 +42,14 @@ describe("computeShowExternalSources", () => {
     getReleaseUrlsByDate.mockResolvedValue({ "2004-12-31": ["https://play.nugs.net/release/1"] });
     getPrimaryUrlsByDate.mockResolvedValue({ "2004-12-31": "https://archive.org/details/db2004" });
     getFirstVideoUrlByShowIds.mockResolvedValue({ "show-nye04": "https://youtube.com/watch?v=aaa" });
+    getRelistenUrlsByDate.mockResolvedValue({ "2004-12-31": "https://relisten.net/disco-biscuits/2004/12/31" });
 
     const result = await computeShowExternalSources([{ id: "show-nye04", date: "2004-12-31" }]);
 
     expect(result).toEqual({
       "show-nye04": {
         nugsUrls: ["https://play.nugs.net/release/1"],
+        relistenUrl: "https://relisten.net/disco-biscuits/2004/12/31",
         archiveUrl: "https://archive.org/details/db2004",
         youtubeUrl: "https://youtube.com/watch?v=aaa",
       },
@@ -62,6 +68,7 @@ describe("computeShowExternalSources", () => {
 
     expect(result["show-lockn"]).toEqual({
       nugsUrls: undefined,
+      relistenUrl: undefined,
       archiveUrl: "https://archive.org/details/db2019",
       youtubeUrl: undefined,
     });

@@ -13,6 +13,7 @@ import { SearchHistoryService } from "../search/search-history-service";
 import { SetlistService } from "../setlists/setlist-service";
 import { ArchiveDotOrgService } from "../shows/archive-dot-org-service";
 import { NugsService } from "../shows/nugs-service";
+import { RelistenService } from "../shows/relisten-service";
 import { ShowService } from "../shows/show-service";
 import { TourDatesService } from "../shows/tour-dates-service";
 import { YoutubeService } from "../shows/youtube-service";
@@ -46,6 +47,7 @@ export interface Services {
   songPageComposer: SongPageComposer;
   tourDatesService: TourDatesService;
   nugs: NugsService;
+  relisten: RelistenService;
   archiveDotOrg: ArchiveDotOrgService;
   youtube: YoutubeService;
   files: FileService;
@@ -92,6 +94,7 @@ export function createServices(container: ServiceContainer): Services {
     songPageComposer: new SongPageComposer(container.db, songService, statsService),
     tourDatesService: new TourDatesService(container.redis),
     nugs: new NugsService(container.redis, container.logger),
+    relisten: new RelistenService(container.redis, container.logger),
     archiveDotOrg: new ArchiveDotOrgService(container.redis, container.logger),
     youtube: new YoutubeService(container.db, container.cacheInvalidation),
     files: new FileService(container.db, container.logger, {
