@@ -37,7 +37,10 @@ describe("TrackDurationService — nugs releases combine", () => {
       ),
     };
     const archive = { findRecordingsForDate: vi.fn().mockResolvedValue([]) };
-    const cacheInvalidation = { invalidateShowComprehensive: vi.fn().mockResolvedValue(undefined) };
+    const cacheInvalidation = {
+      invalidateShowComprehensive: vi.fn().mockResolvedValue(undefined),
+      invalidatePerformanceListings: vi.fn().mockResolvedValue(undefined),
+    };
 
     const service = new TrackDurationService(
       db as never,
@@ -55,5 +58,8 @@ describe("TrackDurationService — nugs releases combine", () => {
     expect(updates.get("tb")).toMatchObject({ duration: 1200, durationSource: "nugs" });
     // Archive is the fallback; nugs covered everything, so it's never consulted.
     expect(archive.findRecordingsForDate).not.toHaveBeenCalled();
+    // Writing a duration must wipe the All-Timers / Jam Charts / On-This-Day
+    // listings, which render the same Time column from their own caches.
+    expect(cacheInvalidation.invalidatePerformanceListings).toHaveBeenCalled();
   });
 });

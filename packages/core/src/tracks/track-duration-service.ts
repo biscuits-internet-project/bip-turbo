@@ -131,9 +131,14 @@ export class TrackDurationService {
 
     await this.db.show.update({ where: { id: showId }, data: { durationCheckedAt: new Date() } });
 
-    if (wroteAnyTrack && slug) {
-      const year = yearFromShowDate(date);
-      await this.cacheInvalidation.invalidateShowComprehensive(showId, slug, [year]);
+    if (wroteAnyTrack) {
+      // The Time column also rides the All-Timers / Jam Charts / On-This-Day
+      // listings, which key off their own caches independent of this show.
+      await this.cacheInvalidation.invalidatePerformanceListings();
+      if (slug) {
+        const year = yearFromShowDate(date);
+        await this.cacheInvalidation.invalidateShowComprehensive(showId, slug, [year]);
+      }
     }
   }
 

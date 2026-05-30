@@ -66,9 +66,9 @@ export class TrackService {
     }
   }
 
-  private async invalidateAllTimersCache(): Promise<void> {
+  private async invalidatePerformanceListings(): Promise<void> {
     if (!this.cacheInvalidation) return;
-    await this.cacheInvalidation.invalidateAllTimers();
+    await this.cacheInvalidation.invalidatePerformanceListings();
   }
 
   private async generateTrackSlug(
@@ -205,10 +205,9 @@ export class TrackService {
       await this.invalidateShowCaches(data.showId);
     }
 
-    // Invalidate all-timers cache if this track is an all-timer
-    if (data.allTimer) {
-      await this.invalidateAllTimersCache();
-    }
+    // A new track's duration, all_timer flag, or note can all surface on the
+    // All-Timers / Jam Charts / On-This-Day listings — wipe them.
+    await this.invalidatePerformanceListings();
 
     return track;
   }
@@ -254,10 +253,9 @@ export class TrackService {
       await this.invalidateShowCaches(currentTrack.showId);
     }
 
-    // Invalidate all-timers cache if allTimer field was changed
-    if (data.allTimer !== undefined) {
-      await this.invalidateAllTimersCache();
-    }
+    // An edited duration, all_timer flag, or note can all surface on the
+    // All-Timers / Jam Charts / On-This-Day listings — wipe them.
+    await this.invalidatePerformanceListings();
 
     return track;
   }
@@ -316,7 +314,8 @@ export class TrackService {
       await this.invalidateShowCaches(track.showId);
     }
 
-    // Invalidate all-timers cache (deleted track may have been an all-timer)
-    await this.invalidateAllTimersCache();
+    // A deleted track may have appeared on the All-Timers / Jam Charts /
+    // On-This-Day listings — wipe them.
+    await this.invalidatePerformanceListings();
   }
 }
