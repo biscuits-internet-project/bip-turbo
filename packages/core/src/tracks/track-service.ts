@@ -4,6 +4,7 @@ import type { DbAnnotation, DbClient, DbSong, DbTrack } from "../_shared/databas
 import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
+import { recomputeShowDuration } from "./show-duration";
 
 // Database query result that includes song and annotations
 type DbTrackWithSongAndAnnotations = DbTrack & {
@@ -180,13 +181,24 @@ export class TrackService {
       }
     }
 
-    const dbData = mapTrackToDbModel({ ...data, slug });
+    // An explicit duration at create time is an admin entry — mark it `manual`
+    // so live resolution leaves it alone.
+    const dbData = mapTrackToDbModel({
+      ...data,
+      slug,
+      ...(data.duration != null ? { durationSource: "manual" } : {}),
+    });
     const result = await this.db.track.create({
       // biome-ignore lint/suspicious/noExplicitAny: Prisma type requires any for dynamic data mapping
       data: dbData as any,
     });
 
     const track = mapTrackToDomainEntity(result);
+
+    // Keep the denormalized show total consistent when a duration was set.
+    if (data.duration != null && data.showId) {
+      await recomputeShowDuration(this.db, data.showId);
+    }
 
     // Invalidate show caches (track changes affect setlist data)
     if (this.cacheInvalidation && data.showId) {
@@ -206,11 +218,23 @@ export class TrackService {
     const { ...updateableData } = data;
     const updateData = mapTrackToDbModel(updateableData);
 
-    // Get current track info for cache invalidation
+    // Get current track info for cache invalidation + duration-change detection.
     const currentTrack = await this.db.track.findUnique({
       where: { id },
-      select: { showId: true },
+      select: { showId: true, duration: true },
     });
+
+    // The edit form always re-sends the duration, even when an admin only
+    // touched the song/segue/note — so flip provenance only when the value
+    // actually changed. A new value is a manual edit; clearing it resets the
+    // source to null so live resolution can refill it; an unchanged value
+    // leaves both the duration and its source untouched.
+    const durationChanged = data.duration !== undefined && data.duration !== (currentTrack?.duration ?? null);
+    if (durationChanged) {
+      updateData.durationSource = data.duration === null ? null : "manual";
+    } else {
+      updateData.duration = undefined;
+    }
 
     const result = await this.db.track.update({
       where: { id },
@@ -219,6 +243,11 @@ export class TrackService {
     });
 
     const track = mapTrackToDomainEntity(result);
+
+    // Keep the denormalized show total in step with an edited track duration.
+    if (durationChanged && currentTrack?.showId) {
+      await recomputeShowDuration(this.db, currentTrack.showId);
+    }
 
     // Invalidate show caches
     if (currentTrack?.showId) {

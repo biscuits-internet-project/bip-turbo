@@ -1,5 +1,6 @@
 import { RotateCcw, Star } from "lucide-react";
 import { GapIcon } from "~/components/gap-icon";
+import { NumberCell } from "~/components/ui/number-cell";
 
 /**
  * Discriminated union for the three possible states of a Gap or Your-Gap
@@ -52,10 +53,22 @@ export function GapCell({
   thisShowLabel: string;
 }) {
   if (state.kind === "debut") {
-    return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label={debutLabel} />;
+    return (
+      <NumberCell width="3ch">
+        <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label={debutLabel} />
+      </NumberCell>
+    );
   }
   if (state.kind === "this-show") {
-    return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label={thisShowLabel} />;
+    return (
+      <NumberCell width="3ch">
+        <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label={thisShowLabel} />
+      </NumberCell>
+    );
   }
-  return <span className="text-content-text-secondary tabular-nums">{state.value}</span>;
+  return (
+    <NumberCell width="3ch" className="text-content-text-secondary">
+      {state.value}
+    </NumberCell>
+  );
 }

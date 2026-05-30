@@ -28,6 +28,8 @@ export const trackSchema = z.object({
   ratingsCount: z.number().default(0),
   gap: z.number().nullable(),
   previousPerformanceShowId: z.string().uuid().nullable(),
+  duration: z.number().nullable(),
+  durationSource: z.string().nullable(),
   previousPerformanceShow: previousPerformanceShowSchema,
   song: songSchema.optional(),
   annotations: z.array(annotationSchema).optional(),
@@ -67,6 +69,8 @@ export const trackLightSchema = z.object({
   ratingsCount: z.number().default(0),
   gap: z.number().nullable(),
   previousPerformanceShowId: z.string().uuid().nullable(),
+  duration: z.number().nullable(),
+  durationSource: z.string().nullable(),
   previousPerformanceShow: previousPerformanceShowSchema,
   song: songLightSchema.optional(),
 });
@@ -81,6 +85,7 @@ export const trackUpdateSchema = trackSchema
     segue: true,
     note: true,
     allTimer: true,
+    duration: true,
   })
   .extend({
     annotationDesc: z.string().nullable().optional(),

@@ -45,6 +45,8 @@ const BASE_FORM = {
   note: null,
   annotationDesc: null,
   allTimer: false,
+  duration: "",
+  durationSource: null,
 };
 
 function setupHook(initialTracks: Track[] = []) {
@@ -226,6 +228,24 @@ describe("useTrackApi", () => {
       });
 
       expect(getTracks().map((t) => t.id)).toEqual(["t-2", "t-1"]);
+    });
+
+    // The admin types a human duration ("8:42"); it must reach the API as
+    // whole seconds, and an empty field must clear it (null), not send "".
+    test("parses the duration field to seconds on save, and clears it when blank", async () => {
+      const { hook } = setupHook([makeTrack({ id: "t-1" })]);
+
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      await act(async () => {
+        await hook.result.current.updateTrack({ ...BASE_FORM, id: "t-1", duration: "8:42" });
+      });
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body).duration).toBe(522);
+
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      await act(async () => {
+        await hook.result.current.updateTrack({ ...BASE_FORM, id: "t-1", duration: "" });
+      });
+      expect(JSON.parse(fetchMock.mock.calls[1][1].body).duration).toBeNull();
     });
   });
 

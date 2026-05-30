@@ -1,4 +1,5 @@
 import type { Track } from "@bip/domain";
+import { parseDuration } from "@bip/domain";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { compareSets } from "./track-constants";
@@ -13,6 +14,10 @@ export interface TrackFormData {
   song?: Track["song"];
   annotationDesc?: string | null;
   allTimer: boolean;
+  /** Raw admin input ("8:42" / "1:04:18" / "522"); parsed to seconds on save. */
+  duration: string;
+  /** Where the current duration came from (nugs/archive/manual); display only. */
+  durationSource: string | null;
 }
 
 type SetTracks = (updater: (prev: Track[]) => Track[]) => void;
@@ -27,11 +32,16 @@ function sortTracks(tracks: Track[]): Track[] {
 // Translates the form's "none" sentinels to the shape the API expects.
 // "none" songId → undefined (omitted), "none" segue → null (explicitly cleared).
 function buildSavePayload(data: TrackFormData) {
+  // durationSource is display-only — the server stamps "manual" on save.
+  const { duration, durationSource: _durationSource, ...rest } = data;
   return {
-    ...data,
+    ...rest,
     songId: data.songId === "none" ? undefined : data.songId,
     segue: data.segue === "none" ? null : data.segue,
     annotationDesc: data.annotationDesc,
+    // Empty clears the duration; a non-empty value is pre-validated by the
+    // caller, so parseDuration is guaranteed to succeed here.
+    duration: duration.trim() === "" ? null : parseDuration(duration),
   };
 }
 

@@ -4,19 +4,17 @@ import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
 import { ShowDate } from "~/components/show-date";
-import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { RockOperaAnnotations } from "./rock-opera-annotations";
-import { countSetlistEncores, formatSetLabel } from "./set-label";
+import { SetlistFlow } from "./setlist-flow";
 import { SetlistTable } from "./setlist-table";
 import { SetlistTablePersonal } from "./setlist-table-personal";
 import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-control";
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
-import { TrackRatingOverlay } from "./track-rating-overlay";
 
 export type SetlistView = "setlist" | "gap-chart" | "personal";
 
@@ -142,61 +140,6 @@ function SetlistCardComponent({
       },
     );
   };
-
-  // Create a map to store unique annotations by description
-  const uniqueAnnotations = new Map<string, { index: number; desc: string }>();
-
-  // Create a map of trackId to array of annotation indices for quick lookup
-  const trackAnnotationMap = new Map<string, number[]>();
-
-  // Process annotations in order of tracks in the setlist
-  let annotationIndex = 1;
-
-  // Create a flat array of all tracks in order
-  const allTracks = [];
-  for (const set of setlist.sets) {
-    for (const track of set.tracks) {
-      allTracks.push(track);
-    }
-  }
-
-  // First pass: identify all unique annotations and assign indices in order of appearance
-  for (const track of allTracks) {
-    // Get annotations for this track
-    const trackAnnotations = setlist.annotations.filter((a) => a.trackId === track.id);
-    const trackIndices: number[] = [];
-
-    for (const annotation of trackAnnotations) {
-      if (annotation.desc) {
-        // If this description hasn't been seen before, assign a new index
-        if (!uniqueAnnotations.has(annotation.desc)) {
-          uniqueAnnotations.set(annotation.desc, {
-            index: annotationIndex++,
-            desc: annotation.desc,
-          });
-        }
-
-        // Add this annotation index to the track's indices array
-        const index = uniqueAnnotations.get(annotation.desc)?.index;
-        if (index) {
-          trackIndices.push(index);
-        }
-      }
-    }
-
-    // Map this track to all its annotation indices
-    if (trackIndices.length > 0) {
-      trackAnnotationMap.set(track.id, trackIndices);
-    }
-  }
-
-  // Convert the unique annotations map to an array for display
-  // Sort by index to maintain the order they were encountered
-  const orderedAnnotations = Array.from(uniqueAnnotations.values()).sort((a, b) => a.index - b.index);
-
-  // Encore label collapse ("E1" → "E") fires only when the show has a
-  // single encore.
-  const encoresInSet = countSetlistEncores(setlist.sets);
 
   return (
     <Card className="card-premium relative overflow-hidden">
@@ -346,63 +289,7 @@ function SetlistCardComponent({
               </div>
             ) : (
               <>
-                <div className="space-y-2 md:space-y-4">
-                  {setlist.sets.map((set, setIndex) => (
-                    <span
-                      key={setlist.show.id + set.label}
-                      className="inline-block w-full md:flex md:gap-4 md:items-baseline"
-                    >
-                      <span className="inline text-base font-medium text-content-text-tertiary">
-                        {formatSetLabel(set.label, { encoresInSet })}
-                      </span>
-                      <span className="inline ml-2 md:ml-0 md:flex-1">
-                        {set.tracks.map((track, i) => (
-                          <span key={track.id} className="inline">
-                            <TrackRatingOverlay track={track}>
-                              <span
-                                className={cn(
-                                  "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
-                                  track.allTimer && "font-medium",
-                                )}
-                              >
-                                <NoteworthyMarker
-                                  track={track}
-                                  iconClassName="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5"
-                                />
-                                <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
-                                {trackAnnotationMap.has(track.id) && (
-                                  <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
-                                    {trackAnnotationMap.get(track.id)?.map((index, i) => (
-                                      <span key={index} className={i > 0 ? "ml-1" : ""}>
-                                        {index}
-                                      </span>
-                                    ))}
-                                  </sup>
-                                )}
-                              </span>
-                            </TrackRatingOverlay>
-                            {i < set.tracks.length - 1 && (
-                              <span className="text-content-text-secondary mx-1 font-medium text-base">
-                                {track.segue ? " > " : ", "}
-                              </span>
-                            )}
-                          </span>
-                        ))}
-                      </span>
-                      {setIndex < setlist.sets.length - 1 && <span className="hidden"> </span>}
-                    </span>
-                  ))}
-                </div>
-
-                {orderedAnnotations.length > 0 && (
-                  <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
-                    {orderedAnnotations.map((annotation) => (
-                      <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-                        <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <SetlistFlow setlist={setlist} />
                 <div className="mt-4">
                   <SetlistViewControl
                     view={view}

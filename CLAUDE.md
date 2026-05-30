@@ -47,7 +47,7 @@ cd apps/web && bun run test:watch    # Watch mode
 
 Test files are colocated with source: `*.test.{ts,tsx}`. Shared test helpers live in `apps/web/test/test-utils.tsx` (import via `@test/*` alias, e.g. `import { setup } from "@test/test-utils"`).
 
-**Skip tests the typechecker covers.** Don't test helper signatures, argument counts, or type-enforced shapes. Add only wiring assertions where the typechecker can't verify a value gets pulled from the right source (e.g. the right field threads through a call chain).
+**Skip tests the typechecker covers — but "type-covered" means the shape is checkable, not the behavior.** Don't test helper signatures, argument counts, or type-enforced shapes. DO test behavior the typechecker can't see: conditional rendering (what appears under which props/state), formatting and derivation branches (e.g. em-dash vs value), edge cases, and user interactions — plus wiring assertions where a value must thread from the right source. A component that renders differently by props, or a function with a branch, still needs a test even though its types check. Don't let "skip type-covered" bleed into "skip behavioral."
 
 **Git Hooks:**
 Custom hooks live in `.githooks/`. Enable them once per clone:

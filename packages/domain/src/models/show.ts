@@ -21,6 +21,7 @@ export const showSchema = z.object({
   reviewsCount: z.number().default(0),
   countForStats: z.boolean().default(true),
   dayOrder: z.number().nullable().optional(),
+  duration: z.number().nullable().optional(),
   tracks: z.array(trackSchema).nullable().optional(),
   venue: venueSchema.optional(),
 });

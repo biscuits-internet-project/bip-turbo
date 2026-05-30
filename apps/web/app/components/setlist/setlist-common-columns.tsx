@@ -3,6 +3,8 @@ import { type ColumnDef, createColumnHelper, type Row, type SortingFn } from "@t
 import { TrackRatingCell } from "~/components/performance/track-rating-cell";
 import { ShowDateLink } from "~/components/show-date-link";
 import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
+import { DurationValue } from "~/components/track/duration-cell";
+import { NumberCell } from "~/components/ui/number-cell";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { GapCell, type GapCellState } from "./gap-cell";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
@@ -137,7 +139,11 @@ export function createCountColumn<T extends TrackLight>(opts: {
     sortDescFirst: false,
     cell: (info) => {
       const value = opts.accessor(info.row.original);
-      return <span className="text-content-text-secondary tabular-nums">{value === null ? "—" : value}</span>;
+      return (
+        <NumberCell width="4ch" className="text-content-text-secondary">
+          {value === null ? "—" : value}
+        </NumberCell>
+      );
     },
   }) as ColumnDef<T, unknown>;
 }
@@ -268,6 +274,32 @@ export function createGapColumn<T extends TrackLight>(opts: {
   ) as ColumnDef<T, unknown>;
 }
 
+/**
+ * "Time" column for the gap-chart views: each track's duration, with
+ * archive-sourced values shown as estimates. Reused by both the catalog and
+ * personal column factories. Sorts numerically (longest first on the first
+ * click) with the canonical set+position tiebreak; unknown durations cluster
+ * at the bottom on descending sort.
+ */
+export function createDurationColumn<T extends TrackLight>(): ColumnDef<T, unknown> {
+  const columnHelper = createColumnHelper<T>();
+  return columnHelper.accessor((row) => row.duration ?? Number.NEGATIVE_INFINITY, {
+    id: "duration",
+    header: ({ column }) => <SortableHeader column={column} label="Time" />,
+    // Wide enough for the h:mm:ss form ("1:04:18"). Hidden on mobile — the
+    // gap-chart already runs out of width there.
+    meta: { fixedWidth: "5.25rem", hideOnMobile: true },
+    enableSorting: true,
+    sortingFn: withSetPositionTiebreak<T>((a, b) => (a.duration ?? -1) - (b.duration ?? -1)),
+    sortDescFirst: true,
+    cell: (info) => (
+      <NumberCell width="5ch">
+        <DurationValue seconds={info.row.original.duration} />
+      </NumberCell>
+    ),
+  }) as ColumnDef<T, unknown>;
+}
+
 export function createSetlistCommonColumns<T extends TrackLight>(options?: {
   /** Optional query suffix appended to every Song-cell `/songs/{slug}` link. */
   songLinkSearchParams?: string;
@@ -292,15 +324,16 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
         />
       ),
       // Set values max out at "E2" (2 chars). Bounded content → fixed
-      // 3rem on desktop. On mobile the column also doubles as the home
+      // 2.25rem on desktop. On mobile the column also doubles as the home
       // for the all-timer flame icon (standalone AllTimer column is
       // hidden on mobile to save space), so it's wide enough for either
-      // the flame or "E1" stacked vertically.
+      // the flame or "E1" stacked vertically. Tighter desktop padding
+      // (px-1) keeps the left-edge columns from stealing width from Song.
       meta: {
-        fixedWidth: "2.5rem",
+        fixedWidth: "2.25rem",
         mobileFixedWidth: "1.25rem",
-        cellClassName: "!px-0 sm:!px-2",
-        headerClassName: "!px-0 sm:!px-2",
+        cellClassName: "!px-0",
+        headerClassName: "!px-0 sm:!px-1",
       },
       enableSorting: true,
       sortingFn: (a, b) => compareBySetThenPosition(a.original, b.original),
@@ -324,7 +357,9 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
         return (
           <div className="flex flex-col items-center sm:items-start gap-0.5">
             {!hideSetLabel && (
-              <span className="text-content-text-secondary">{formatSetLabel(raw, { encoresInSet })}</span>
+              <NumberCell width="2ch" className="text-content-text-secondary">
+                {formatSetLabel(raw, { encoresInSet })}
+              </NumberCell>
             )}
             <span className="sm:hidden">
               <AllTimerCell track={row} />
@@ -335,14 +370,20 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
     }) as ColumnDef<T, unknown>,
     columnHelper.display({
       id: "track",
-      header: ({ column }) => <SortableHeader column={column} label="Track" />,
+      // No header of its own — it reads as one "Set" heading spanning the two
+      // adjacent number columns. Sorting lives on the Set column (same
+      // set+position order), so this column needs no sort affordance.
+      header: () => null,
       // Drops on narrow viewports — the Set column already orients the row,
       // and a tiny Track column would steal width from Song on mobile.
-      // Track # (position within set) — bounded to 3 digits max. 3.5rem
-      // accommodates the "Track" header word + sort arrow + tighter
-      // padding on desktop.
-      meta: { fixedWidth: "3.5rem", hideOnMobile: true },
-      enableSorting: true,
+      // Track # (position within set) — 1.75rem holds up to 2 digits flush
+      // against the Set column with zero horizontal padding.
+      meta: {
+        fixedWidth: "1.75rem",
+        hideOnMobile: true,
+        cellClassName: "!px-0",
+      },
+      enableSorting: false,
       // Track # = position-within-set, computed at render time from the
       // unsorted row model. The comparator falls through to the canonical
       // set+position order so sorting either restores narrative order.
@@ -352,7 +393,11 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
         const allRows = info.table.getCoreRowModel().rows;
         const trackNumber =
           allRows.filter((r) => r.original.set === row.set && r.original.position < row.position).length + 1;
-        return <span className="text-content-text-secondary tabular-nums">{trackNumber}</span>;
+        return (
+          <NumberCell width="2ch" className="text-content-text-secondary">
+            {trackNumber}
+          </NumberCell>
+        );
       },
     }) as ColumnDef<T, unknown>,
     columnHelper.display({

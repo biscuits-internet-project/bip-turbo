@@ -40,6 +40,7 @@ export const action = adminAction(async ({ request }) => {
         segue: data.segue,
         note: data.note,
         allTimer: data.allTimer,
+        duration: data.duration ?? null,
       });
 
       // Create annotations if provided

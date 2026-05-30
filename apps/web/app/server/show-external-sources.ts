@@ -26,6 +26,12 @@ export async function computeShowExternalSources(shows: ShowLike[]): Promise<Rec
   if (shows.length === 0) return result;
 
   const showIds = shows.map((s) => s.id);
+
+  // Lazily self-populate track durations for this batch from nugs/archive.
+  // Fire-and-forget and capped inside the service so a list page never blocks
+  // on (or bursts) external fetches; resolved durations appear on later loads.
+  void services.trackDurations.resolvePending(showIds).catch(() => {});
+
   const [nugsUrlsByDate, relistenUrlsByDate, archiveUrlsByDate, youtubeUrlsByShowId] = await Promise.all([
     services.nugs.getReleaseUrlsByDate(),
     services.relisten.getUrlsByDate(),

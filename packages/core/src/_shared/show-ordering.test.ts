@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setSortKeySql, showOrderBySql } from "./show-ordering";
+import { setSortKey, setSortKeySql, showOrderBySql } from "./show-ordering";
 
 function renderSql(fragment: { strings: readonly string[]; values: unknown[] }): string {
   const parts: string[] = [];
@@ -28,12 +28,30 @@ describe("showOrderBySql", () => {
   });
 });
 
+describe("setSortKey", () => {
+  // The in-memory rank track-ordering code sorts by. Encores must rank after
+  // sets even though "E1" precedes "S1" alphabetically.
+  test("ranks Soundcheck before sets before encores", () => {
+    expect(setSortKey("Soundcheck")).toBeLessThan(setSortKey("S1"));
+    expect(setSortKey("S1")).toBeLessThan(setSortKey("S4"));
+    expect(setSortKey("S4")).toBeLessThan(setSortKey("E1"));
+    expect(setSortKey("E1")).toBeLessThan(setSortKey("E3"));
+  });
+
+  test("is case-insensitive on the label", () => {
+    expect(setSortKey("e1")).toBe(setSortKey("E1"));
+  });
+
+  test("sorts unrecognized labels last", () => {
+    expect(setSortKey("encore-jam")).toBeGreaterThan(setSortKey("E3"));
+  });
+});
+
 describe("setSortKeySql", () => {
-  // Mirrors apps/web/app/components/setlist/set-label.ts:setSortKey so
-  // SQL ORDER BY and the in-memory comparator agree on canonical order:
-  // Soundcheck → S1..S4 → E1..E3 → unknown. The numeric arms have to
-  // line up with the TS function — drift means table rows sort one way
-  // server-side and another client-side on a re-sort.
+  // Built from the same SET_SORT_ORDER map as setSortKey, so SQL ORDER BY and
+  // the in-memory comparator agree on canonical order: Soundcheck → S1..S4 →
+  // E1..E3 → unknown. Drift means table rows sort one way server-side and
+  // another client-side on a re-sort.
   test("renders a CASE expression keyed by the alias's set column", () => {
     const sql = renderSql(setSortKeySql("t") as never);
     expect(sql).toMatch(/CASE/);

@@ -7,7 +7,7 @@ import type { RedisService } from "../redis";
  * releases and remasters trickle in over days, not minutes — while still
  * bounding the window where a stale cache hides a newly-added show.
  */
-const TTL_SECONDS = 60 * 60 * 24;
+export const CATALOG_TTL_SECONDS = 60 * 60 * 24;
 
 /**
  * Shared caching layer for external catalogs that are small enough to fetch in
@@ -75,7 +75,7 @@ export class DateIndexedCatalog<T> {
     try {
       const map = await this.fetcher();
       if (Object.keys(map).length > 0) {
-        await this.redis.set<Record<string, T>>(this.cacheKey, map, { EX: TTL_SECONDS });
+        await this.redis.set<Record<string, T>>(this.cacheKey, map, { EX: CATALOG_TTL_SECONDS });
       }
       return map;
     } catch (error) {

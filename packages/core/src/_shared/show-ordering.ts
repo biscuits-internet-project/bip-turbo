@@ -57,30 +57,48 @@ type TrackAlias = "t" | "tracks";
 type SortDirection = "ASC" | "DESC";
 
 /**
- * Raw-SQL CASE expression mirroring `setSortKey` from
- * apps/web/app/components/setlist/set-label.ts. Use in $queryRaw ORDER BY
- * clauses so SQL-side ordering by set matches the in-memory
- * `compareBySetThenPosition` comparator: Soundcheck → S1..S4 → E1..E3 →
- * unknown. Pass the alias your tracks table has in the query (`t` or
- * `tracks`).
- *
- * Keep the ordinals in sync with the TS function; drift produces
- * inconsistent ordering between paginated server fetches and any
- * client-side re-sort sharing the same rows.
+ * Play-order rank for each set label: Soundcheck → S1..S4 → E1..E3. The single
+ * source of truth shared by the in-memory `setSortKey` and the raw-SQL
+ * `setSortKeySql`, so server-side `ORDER BY` and any client re-sort of the same
+ * rows can't drift. Labels are matched case-insensitively; anything unlisted
+ * sorts last via `UNKNOWN_SET_RANK`.
+ */
+const SET_SORT_ORDER: Record<string, number> = {
+  soundcheck: 0,
+  s1: 10,
+  s2: 20,
+  s3: 30,
+  s4: 40,
+  e1: 50,
+  e2: 60,
+  e3: 70,
+};
+const UNKNOWN_SET_RANK = 999;
+
+/**
+ * In-memory play-order rank for a set label. Encores don't sort alphabetically
+ * into play order ("E1" would precede "S1"), so callers ordering tracks by set
+ * must rank through this rather than comparing labels directly.
+ */
+export function setSortKey(label: string): number {
+  return SET_SORT_ORDER[label.toLowerCase()] ?? UNKNOWN_SET_RANK;
+}
+
+/**
+ * Raw-SQL CASE expression equivalent to `setSortKey`, built from the same
+ * `SET_SORT_ORDER` map. Use in $queryRaw ORDER BY clauses so SQL-side ordering
+ * by set matches the in-memory `compareBySetThenPosition` comparator. Pass the
+ * alias your tracks table has in the query (`t` or `tracks`).
  */
 export function setSortKeySql(alias: TrackAlias): Prisma.Sql {
   const a = Prisma.raw(alias);
-  return Prisma.sql`CASE LOWER(${a}.set)
-    WHEN 'soundcheck' THEN 0
-    WHEN 's1' THEN 10
-    WHEN 's2' THEN 20
-    WHEN 's3' THEN 30
-    WHEN 's4' THEN 40
-    WHEN 'e1' THEN 50
-    WHEN 'e2' THEN 60
-    WHEN 'e3' THEN 70
-    ELSE 999
-  END`;
+  // SET_SORT_ORDER holds fixed, module-private labels (never user input), so the
+  // arms inline as literals, matching how the comparator compares lowercased
+  // labels and keeping the rendered CASE readable.
+  const arms = Object.entries(SET_SORT_ORDER)
+    .map(([label, rank]) => `WHEN '${label}' THEN ${rank}`)
+    .join(" ");
+  return Prisma.sql`CASE LOWER(${a}.set) ${Prisma.raw(arms)} ELSE ${UNKNOWN_SET_RANK} END`;
 }
 
 /**

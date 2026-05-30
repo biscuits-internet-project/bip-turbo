@@ -19,6 +19,7 @@ import { TourDatesService } from "../shows/tour-dates-service";
 import { YoutubeService } from "../shows/youtube-service";
 import { SongService } from "../songs/song-service";
 import { StatsService } from "../stats/stats-service";
+import { TrackDurationService } from "../tracks/track-duration-service";
 import { TrackService } from "../tracks/track-service";
 import { PersonalSongHistoryService } from "../users/personal-song-history-service";
 import { UserService } from "../users/user-service";
@@ -36,6 +37,7 @@ export interface Services {
   songs: SongService;
   stats: StatsService;
   tracks: TrackService;
+  trackDurations: TrackDurationService;
   setlists: SetlistService;
   venues: VenueService;
   users: UserService;
@@ -75,6 +77,11 @@ export function createServices(container: ServiceContainer): Services {
   // lookup — SetlistService takes RockOperaService as a constructor dep.
   const rockOperaService = new RockOperaService(container.db, container.logger, statsService);
 
+  // nugs/archive are shared by their own service slots and by the duration
+  // resolver, which reads each source's per-show track lists.
+  const nugsService = new NugsService(container.redis, container.logger);
+  const archiveDotOrgService = new ArchiveDotOrgService(container.redis, container.logger);
+
   return {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
     authors: new AuthorService(container.db, container.logger),
@@ -83,6 +90,13 @@ export function createServices(container: ServiceContainer): Services {
     songs: songService,
     stats: statsService,
     tracks: new TrackService(container.db, container.logger, container.cacheInvalidation),
+    trackDurations: new TrackDurationService(
+      container.db,
+      nugsService,
+      archiveDotOrgService,
+      container.cacheInvalidation,
+      container.logger,
+    ),
     setlists: new SetlistService(container.db, rockOperaService),
     venues: new VenueService(container.db, container.logger),
     users: new UserService(container.db, container.logger),
@@ -93,9 +107,9 @@ export function createServices(container: ServiceContainer): Services {
     attendances: new AttendanceService(container.db, container.logger),
     songPageComposer: new SongPageComposer(container.db, songService, statsService),
     tourDatesService: new TourDatesService(container.redis),
-    nugs: new NugsService(container.redis, container.logger),
+    nugs: nugsService,
     relisten: new RelistenService(container.redis, container.logger),
-    archiveDotOrg: new ArchiveDotOrgService(container.redis, container.logger),
+    archiveDotOrg: archiveDotOrgService,
     youtube: new YoutubeService(container.db, container.cacheInvalidation),
     files: new FileService(container.db, container.logger, {
       accountId: container.env.CLOUDFLARE_ACCOUNT_ID,

@@ -58,6 +58,8 @@ function makeTrack(overrides: Partial<TrackLight> & { id: string; songId: string
     ratingsCount: 0,
     gap: null,
     previousPerformanceShowId: null,
+    duration: overrides.duration ?? null,
+    durationSource: overrides.durationSource ?? null,
     previousPerformanceShow: null,
     song: overrides.song ?? { id: overrides.songId, title: "Tractorbeam", slug: "tractorbeam" },
   };

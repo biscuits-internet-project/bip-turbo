@@ -28,6 +28,8 @@ export type SongPagePerformance = {
   songSlug?: string;
   cover?: boolean;
   authorId?: string | null;
+  duration?: number | null;
+  durationSource?: string | null;
   gap?: number | null;
   // Gap measured against the previous performance of this song within the
   // currently-applied filter scope. Populated server-side only when a

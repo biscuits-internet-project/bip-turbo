@@ -50,6 +50,9 @@ doppler:
 migrate:
 	cd packages/core && bun prisma:migrate:dev
 
+migrate-deploy:
+	cd packages/core && bun prisma:migrate:deploy
+
 migrate-create:
 	@if [ -z "$(NAME)" ]; then echo "Usage: make migrate-create NAME=add_foo_index" && exit 1; fi
 	cd packages/core && bun prisma:migrate:create -- --name $(NAME)

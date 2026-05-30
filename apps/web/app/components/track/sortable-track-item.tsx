@@ -1,4 +1,5 @@
 import type { Track } from "@bip/domain";
+import { formatDuration } from "@bip/domain";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Edit2, GripVertical, Trash } from "lucide-react";
@@ -48,6 +49,14 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
               <span className="text-white font-medium">{track.song?.title || "Unknown Song"}</span>
               <TrackIcon track={track} iconClassName="h-4 w-4" />
               {track.segue && <span className="text-content-text-secondary text-sm">{track.segue}</span>}
+              {track.duration != null && (
+                <span className="text-content-text-secondary text-sm tabular-nums">
+                  {formatDuration(track.duration)}
+                  {track.durationSource && (
+                    <span className="ml-1 text-xs text-content-text-tertiary">({track.durationSource})</span>
+                  )}
+                </span>
+              )}
             </div>
           </div>
 

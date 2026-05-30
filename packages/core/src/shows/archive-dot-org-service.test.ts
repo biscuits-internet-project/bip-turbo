@@ -1,7 +1,29 @@
 import type { ArchiveDotOrgRecording } from "@bip/domain";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { RedisService } from "../_shared/redis";
-import { ArchiveDotOrgService } from "./archive-dot-org-service";
+import { ArchiveDotOrgService, parseArchiveLength } from "./archive-dot-org-service";
+
+describe("parseArchiveLength", () => {
+  // archive.org reports FLAC lengths as fractional seconds and mp3/ogg lengths
+  // as mm:ss / h:mm:ss; both must reduce to whole seconds.
+
+  test("rounds fractional-second (FLAC) values", () => {
+    expect(parseArchiveLength("179.51")).toBe(180);
+    expect(parseArchiveLength("822.0")).toBe(822);
+  });
+
+  test("parses mm:ss and h:mm:ss (mp3/ogg) values", () => {
+    expect(parseArchiveLength("13:43")).toBe(823);
+    expect(parseArchiveLength("1:02:03")).toBe(3723);
+  });
+
+  test("rejects zero, negative, and unparseable values", () => {
+    expect(parseArchiveLength("0")).toBeNull();
+    expect(parseArchiveLength("0:00")).toBeNull();
+    expect(parseArchiveLength("-5")).toBeNull();
+    expect(parseArchiveLength("abc")).toBeNull();
+  });
+});
 
 function makeRedisMock() {
   const store = new Map<string, unknown>();
@@ -233,5 +255,56 @@ describe("ArchiveDotOrgService.hasRecordings", () => {
 
   test("returns false when no recording matches", async () => {
     expect(await service.hasRecordings("1999-04-09")).toBe(false);
+  });
+});
+
+describe("ArchiveDotOrgService.fetchRecordingTracks", () => {
+  let redis: ReturnType<typeof makeRedisMock>;
+  let service: ArchiveDotOrgService;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    redis = makeRedisMock();
+    service = new ArchiveDotOrgService(redis);
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Fixture mirrors archive.org's metadata `files` array: each track repeats
+  // across audio formats (flac/mp3), non-audio files lack title/length, and a
+  // multi-disc show reuses track numbers per disc (d1t01 / d2t01).
+  function makeMetadataResponse(
+    files: Array<{ name?: string; title?: string; track?: string; length?: string; format?: string }>,
+  ) {
+    return { ok: true, json: async () => ({ files }) } as unknown as Response;
+  }
+
+  test("dedups formats (FLAC wins), keeps multi-disc tracks distinct, drops non-audio", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeMetadataResponse([
+        { name: "db_d1t01_helicopters.mp3", title: "Helicopters", track: "01", length: "8:40", format: "VBR MP3" },
+        { name: "db_d1t01_helicopters.flac", title: "Helicopters", track: "01", length: "520.0", format: "Flac" },
+        // Disc 2 reuses track "01" — must NOT collapse into Helicopters.
+        { name: "db_d2t01_spaga.flac", title: "Spaga", track: "01", length: "410.5", format: "Flac" },
+        { name: "db_cover.jpg", format: "JPEG" },
+        { name: "db_meta.xml", format: "Metadata" },
+      ]),
+    );
+
+    const tracks = await service.fetchRecordingTracks("db-show");
+
+    expect(tracks).toEqual([
+      { title: "Helicopters", seconds: 520 },
+      { title: "Spaga", seconds: 411 },
+    ]);
+  });
+
+  test("returns [] without throwing on a non-ok response", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 404 } as unknown as Response);
+    expect(await service.fetchRecordingTracks("missing")).toEqual([]);
   });
 });

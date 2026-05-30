@@ -5,6 +5,7 @@ const getReleaseUrlsByDate = vi.fn();
 const getPrimaryUrlsByDate = vi.fn();
 const getFirstVideoUrlByShowIds = vi.fn();
 const getRelistenUrlsByDate = vi.fn();
+const resolvePending = vi.fn();
 
 vi.mock("~/server/services", () => ({
   services: {
@@ -12,6 +13,7 @@ vi.mock("~/server/services", () => ({
     relisten: { getUrlsByDate: () => getRelistenUrlsByDate() },
     archiveDotOrg: { getPrimaryUrlsByDate: () => getPrimaryUrlsByDate() },
     youtube: { getFirstVideoUrlByShowIds: (ids: string[]) => getFirstVideoUrlByShowIds(ids) },
+    trackDurations: { resolvePending: (ids: string[]) => resolvePending(ids) },
   },
 }));
 
@@ -22,6 +24,7 @@ describe("computeShowExternalSources", () => {
     getPrimaryUrlsByDate.mockResolvedValue({});
     getFirstVideoUrlByShowIds.mockResolvedValue({});
     getRelistenUrlsByDate.mockResolvedValue({});
+    resolvePending.mockResolvedValue(undefined);
   });
 
   // Empty input short-circuits so loaders can pass whatever list they have
@@ -34,6 +37,14 @@ describe("computeShowExternalSources", () => {
     expect(getPrimaryUrlsByDate).not.toHaveBeenCalled();
     expect(getFirstVideoUrlByShowIds).not.toHaveBeenCalled();
     expect(getRelistenUrlsByDate).not.toHaveBeenCalled();
+    expect(resolvePending).not.toHaveBeenCalled();
+  });
+
+  // The pass doubles as the lazy duration-resolution trigger: it hands the
+  // batch's show ids to the (fire-and-forget) resolver.
+  test("triggers lazy duration resolution for the batch's show ids", async () => {
+    await computeShowExternalSources([{ id: "show-nye04", date: "2004-12-31" }]);
+    expect(resolvePending).toHaveBeenCalledWith(["show-nye04"]);
   });
 
   // Shows are keyed by id in the result; nugs/archive URLs lookup by date,

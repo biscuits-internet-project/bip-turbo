@@ -21,6 +21,7 @@
     "prisma:generate": "doppler run -- prisma generate --config=./src/_shared/prisma/prisma.config.ts",
     "prisma:generate:prod": "prisma generate --config=./src/_shared/prisma/prisma.config.ts",
     "prisma:migrate:dev": "doppler run -- prisma migrate dev --config=./src/_shared/prisma/prisma.config.ts",
+    "prisma:migrate:deploy": "doppler run -- prisma migrate deploy --config=./src/_shared/prisma/prisma.config.ts",
     "prisma:migrate:create": "doppler run -- prisma migrate dev --create-only --config=./src/_shared/prisma/prisma.config.ts",
     "prisma:migrate:baseline": "doppler run -- prisma migrate resolve --applied 20250301154946_init --config=./src/_shared/prisma/prisma.config.ts",
     "prisma:introspect": "doppler run -- prisma db pull --config=./src/_shared/prisma/prisma.config.ts",

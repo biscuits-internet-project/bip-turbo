@@ -12,7 +12,7 @@ export const CacheKeys = {
    */
   show: {
     /** Complete show + setlist data for show page */
-    data: (slug: string) => `show:${slug}:data:v5`,
+    data: (slug: string) => `show:${slug}:data:v6`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
@@ -31,7 +31,7 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      return `shows:list:${filterHash}:v5`;
+      return `shows:list:${filterHash}:v6`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -46,7 +46,7 @@ export const CacheKeys = {
    */
   setlist: {
     /** Complete setlist data with tracks and annotations */
-    data: (slug: string) => `setlist:${slug}:data:v5`,
+    data: (slug: string) => `setlist:${slug}:data:v6`,
   },
 
   /**
@@ -54,13 +54,19 @@ export const CacheKeys = {
    */
   archiveDotOrg: {
     catalog: () => "archive-dot-org-catalog-disco-biscuits",
+    /** Per-recording track list (title + duration seconds) from the metadata API. */
+    recording: (identifier: string) => `archive-dot-org-recording:${identifier}:v1`,
   },
 
   /**
    * nugs.net catalog cache keys (keyed by nugs artist id)
    */
   nugs: {
-    catalog: (artistId: number) => `nugs-catalog-artist-${artistId}`,
+    // :v2 — NugsRelease gained `containerId` (needed to fetch per-track
+    // running times); pre-bump cached entries lack it.
+    catalog: (artistId: number) => `nugs-catalog-artist-${artistId}:v2`,
+    /** Per-container track list (title + totalRunningTime seconds) from catalog.container. */
+    container: (containerId: number) => `nugs-container:${containerId}:v1`,
   },
 
   /**
@@ -109,7 +115,7 @@ export const CacheKeys = {
      * have 400+ attended shows and the un-paginated payload is large enough
      * to be slow to deserialize/transport even from Redis.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v6`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v7`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -134,7 +140,7 @@ export const CacheKeys = {
    */
   rockOperas: {
     /** Resource-page list payload: setlists + external sources for one rock opera. */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v4`,
+    performances: (slug: string) => `rock-operas:performances:${slug}:v5`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },
@@ -144,7 +150,7 @@ export const CacheKeys = {
    */
   home: {
     /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v5`,
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v6`,
   },
 
   /**

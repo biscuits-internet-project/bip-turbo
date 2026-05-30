@@ -1,4 +1,5 @@
 import type { Track } from "@bip/domain";
+import { formatDuration, parseDuration } from "@bip/domain";
 import {
   closestCenter,
   DndContext,
@@ -43,6 +44,8 @@ const INITIAL_FORM: TrackFormData = {
   note: null,
   annotationDesc: null,
   allTimer: false,
+  duration: "",
+  durationSource: null,
 };
 
 /**
@@ -92,6 +95,8 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
           .filter((desc) => desc)
           .join("\n") || null,
       allTimer: track.allTimer ?? false,
+      duration: track.duration != null ? formatDuration(track.duration) : "",
+      durationSource: track.durationSource,
     });
   };
 
@@ -104,6 +109,11 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
   const handleSubmit = async () => {
     if (formData.songId === "none") {
       toast.error("Please select a song");
+      return;
+    }
+
+    if (formData.duration.trim() !== "" && parseDuration(formData.duration) === null) {
+      toast.error("Duration must look like 8:42, 1:04:18, or a number of seconds");
       return;
     }
 

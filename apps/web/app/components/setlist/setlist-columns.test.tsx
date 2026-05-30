@@ -33,6 +33,8 @@ function makeTrack(
     ratingsCount: overrides.ratingsCount ?? 0,
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
+    duration: overrides.duration ?? null,
+    durationSource: overrides.durationSource ?? null,
     previousPerformanceShow: overrides.previousPerformanceShow ?? null,
     song: overrides.song ?? { id: overrides.songId, title: "Basis for a Day", slug: "basis-for-a-day" },
     priorPerformanceCount: overrides.priorPerformanceCount ?? 0,
@@ -82,13 +84,14 @@ describe("createSetlistColumns", () => {
   // older Last Played date and prior-play count. Rating anchors the right
   // edge — it's the action column (click to rate) so it lives where the
   // eye lands at the end of the row scan.
-  test("returns columns in order [Set, Track, All-timer, Song, Gap, Last Played, Played Before, Rating]", () => {
+  test("returns columns in order [Set, Track, All-timer, Song, Time, Gap, Last Played, Played Before, Rating]", () => {
     const columns = createSetlistColumns();
     expect(columns.map((c) => c.id)).toEqual([
       "set",
       "track",
       "allTimer",
       "song",
+      "duration",
       "gap",
       "lastPlayed",
       "priorPerformanceCount",
@@ -96,12 +99,13 @@ describe("createSetlistColumns", () => {
     ]);
   });
 
-  // Every column is sortable.
-  test("Set, Track, Song, Gap, Last Played, Played Before, and Rating are all sortable", () => {
+  // Every column is sortable except Track #, which shares Set's set+position
+  // order and so carries no sort affordance of its own.
+  test("Set, Song, Gap, Last Played, Played Before, and Rating are sortable; Track is not", () => {
     const columns = createSetlistColumns();
     const sortable = new Map(columns.map((c) => [c.id, c.enableSorting]));
     expect(sortable.get("set")).toBe(true);
-    expect(sortable.get("track")).toBe(true);
+    expect(sortable.get("track")).toBe(false);
     expect(sortable.get("song")).toBe(true);
     expect(sortable.get("gap")).toBe(true);
     expect(sortable.get("lastPlayed")).toBe(true);
@@ -124,7 +128,7 @@ describe("createSetlistColumns", () => {
     // the Set header puts the table into "sorted by set" mode.
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^Set$/i }));
-    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 0);
+    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 0);
     expect(setCells.map((c) => c.textContent)).toEqual(["1", "", "2", ""]);
   });
 
@@ -151,7 +155,7 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "c", position: 3, set: "S2", gap: 20, song: { id: "c", title: "Confrontation", slug: "z" } }),
     ]);
     await user.click(screen.getByRole("button", { name: /Gap/i }));
-    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 0);
+    const setCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 0);
     // After asc-by-gap: gap=5 (S1), gap=10 (S1), gap=20 (S2). Every row
     // displays its set label.
     expect(setCells.map((c) => c.textContent)).toEqual(["1", "1", "2"]);
@@ -187,7 +191,7 @@ describe("createSetlistColumns", () => {
     ]);
     // Label is split into stacked spans; accessible name is "LastPlayed".
     await user.click(screen.getByRole("button", { name: /LastPlayed/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 3);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -218,7 +222,7 @@ describe("createSetlistColumns", () => {
       }),
     ]);
     await user.click(screen.getByRole("button", { name: /Gap/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 3);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -263,7 +267,7 @@ describe("createSetlistColumns", () => {
     ]);
     // First click on Rating sorts descending ("best first" via sortDescFirst).
     await user.click(screen.getByRole("button", { name: /Rating/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 3);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
     // 4.5/50 (Confrontation) > 4.5/3 (Crickets) > 3.0 (Above the Waves).
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Confrontation",
@@ -307,7 +311,7 @@ describe("createSetlistColumns", () => {
       }),
     ]);
     await user.click(screen.getByRole("button", { name: /Rating/i }));
-    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 3);
+    const songCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
     // All three tied → set+position takes over, inverted by desc → 3, 2, 1.
     expect(songCells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Crickets",
@@ -326,11 +330,11 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "d", position: 4, set: "E1", song: { id: "d", title: "Crickets", slug: "w" } }),
     ]);
     const cells = screen.getAllByRole("cell");
-    // Each row produces 8 cells; cells[1], cells[9], cells[17], cells[25] are Track #.
+    // Each row produces 9 cells; cells[1], cells[10], cells[19], cells[28] are Track #.
     expect(cells[1].textContent).toBe("1");
-    expect(cells[9].textContent).toBe("2");
-    expect(cells[17].textContent).toBe("1");
-    expect(cells[25].textContent).toBe("1");
+    expect(cells[10].textContent).toBe("2");
+    expect(cells[19].textContent).toBe("1");
+    expect(cells[28].textContent).toBe("1");
   });
 
   // Set column drops the "S" prefix (S1 → 1, S2 → 2, etc.) — the column
@@ -343,9 +347,9 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "b", position: 2, set: "S2", song: { id: "b", title: "Tempest", slug: "t" } }),
     ]);
     const cells = screen.getAllByRole("cell");
-    // 8 cells per row; cells[0] = Set of row 0, cells[8] = Set of row 1.
+    // 9 cells per row; cells[0] = Set of row 0, cells[9] = Set of row 1.
     expect(cells[0].textContent).toBe("1");
-    expect(cells[8].textContent).toBe("2");
+    expect(cells[9].textContent).toBe("2");
   });
 
   // Single encore collapses E1 → E because there's no second encore to
@@ -357,9 +361,9 @@ describe("createSetlistColumns", () => {
       makeTrack({ songId: "b", position: 2, set: "E1", song: { id: "b", title: "Crickets", slug: "c" } }),
     ]);
     const singleCells = screen.getAllByRole("cell");
-    // 8 cells per row; cells[0] = Set row 0, cells[8] = Set row 1.
+    // 9 cells per row; cells[0] = Set row 0, cells[9] = Set row 1.
     expect(singleCells[0].textContent).toBe("1");
-    expect(singleCells[8].textContent).toBe("E");
+    expect(singleCells[9].textContent).toBe("E");
 
     // Re-render with two encores to confirm we keep the numbering.
     document.body.innerHTML = "";
@@ -369,7 +373,7 @@ describe("createSetlistColumns", () => {
     ]);
     const multiCells = screen.getAllByRole("cell");
     expect(multiCells[0].textContent).toBe("E1");
-    expect(multiCells[8].textContent).toBe("E2");
+    expect(multiCells[9].textContent).toBe("E2");
   });
 
   // Normal row: gap renders as the integer; Last Played renders the prior

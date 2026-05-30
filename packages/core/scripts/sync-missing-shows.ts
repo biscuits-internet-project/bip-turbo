@@ -23,6 +23,7 @@ import { RedisService } from "../src/_shared/redis";
 import { RatingService } from "../src/ratings/rating-service";
 import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
+import { recomputeShowDuration } from "../src/tracks/show-duration";
 import { createTestLogger } from "../src/_shared/test-logger";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
@@ -89,6 +90,12 @@ export interface McpSetlistTrack {
   // Admin-curated; optional on the wire so older MCP responses parse cleanly.
   allTimer?: boolean | null;
   note?: string | null;
+  // Track duration (seconds) + its provenance, mirrored from prod so local
+  // dev DBs get the durations prod resolved from nugs/archive without each
+  // dev re-hitting those APIs. Optional on the wire = "no opinion" (pre-deploy
+  // MCP) so a sparse upstream can't clobber locally resolved/edited values.
+  duration?: number | null;
+  durationSource?: string | null;
   // Per-track annotations from the Annotation table. `undefined` means
   // "no opinion" (pre-deploy MCP); an explicit empty array means "prod has
   // zero". Replace-not-merge semantics on sync — see diffTrackAnnotations.
@@ -611,6 +618,8 @@ export interface LocalTrackForReconcile {
   segue: string | null;
   note: string | null;
   allTimer: boolean | null;
+  duration: number | null;
+  durationSource: string | null;
   annotations: Array<{ id: string; desc: string | null }>;
 }
 
@@ -619,6 +628,8 @@ export interface TrackPatch {
   segue?: string | null;
   note?: string | null;
   allTimer?: boolean;
+  duration?: number | null;
+  durationSource?: string | null;
 }
 
 export interface TrackInsertOp {
@@ -632,6 +643,8 @@ export interface TrackInsertOp {
   segue: string | null;
   note: string | null;
   allTimer: boolean;
+  duration: number | null;
+  durationSource: string | null;
   annotationDescs: string[];
 }
 
@@ -714,6 +727,8 @@ export function buildSetlistReconciliation(
         segue: track.segue,
         note: track.note ?? null,
         allTimer: track.allTimer ?? false,
+        duration: track.duration ?? null,
+        durationSource: track.durationSource ?? null,
         annotationDescs: track.annotations ?? [],
       });
       structurallyChanged = true;
@@ -743,6 +758,8 @@ export function buildSetlistReconciliation(
         segue: track.segue,
         note: track.note ?? null,
         allTimer: track.allTimer ?? false,
+        duration: track.duration ?? null,
+        durationSource: track.durationSource ?? null,
         annotationDescs: track.annotations ?? [],
       });
       structurallyChanged = true;
@@ -773,6 +790,13 @@ export function buildSetlistReconciliation(
         patch.allTimer = remoteFlag;
         cosmeticallyChanged = true;
       }
+    }
+    // Duration + its provenance move together; `undefined` remote = "no
+    // opinion" so a pre-deploy MCP can't wipe locally resolved durations.
+    if (track.duration !== undefined && localTrack.duration !== track.duration) {
+      patch.duration = track.duration;
+      patch.durationSource = track.durationSource ?? null;
+      cosmeticallyChanged = true;
     }
     const annotationDiff = diffTrackAnnotations(localTrack.annotations, track.annotations);
     if (annotationDiff.toCreateDescs.length > 0 || annotationDiff.toDeleteIds.length > 0) {
@@ -2228,6 +2252,8 @@ async function syncMissingShows(): Promise<void> {
           segue: true,
           note: true,
           allTimer: true,
+          duration: true,
+          durationSource: true,
           annotations: { select: { id: true, desc: true } },
         },
       });
@@ -2241,6 +2267,8 @@ async function syncMissingShows(): Promise<void> {
           segue: row.segue,
           note: row.note,
           allTimer: row.allTimer,
+          duration: row.duration,
+          durationSource: row.durationSource,
           annotations: row.annotations,
         };
         if (arr) arr.push(tr);
@@ -2330,6 +2358,8 @@ async function syncMissingShows(): Promise<void> {
                 segue: ins.segue,
                 note: ins.note,
                 allTimer: ins.allTimer,
+                duration: ins.duration,
+                durationSource: ins.durationSource,
                 createdAt: now,
                 updatedAt: now,
                 annotations: ins.annotationDescs.length > 0
@@ -2368,6 +2398,9 @@ async function syncMissingShows(): Promise<void> {
           }
         });
         changedSlugs.add(slug);
+        // Keep the denormalized Show.duration in step with the mirrored track
+        // durations. Cheap (one aggregate + one update) and idempotent.
+        await recomputeShowDuration(db, local.id);
         console.log(
           `  📝 ${slug}: +${recon.toInsert.length} ~${recon.toUpdate.length} -${recon.toDelete.length} track(s)`,
         );

@@ -1,5 +1,6 @@
 export * from "./archive-dot-org";
 export * from "./cache-keys";
+export * from "./duration";
 export * from "./math";
 export * from "./models/annotation";
 export * from "./models/attendance";
