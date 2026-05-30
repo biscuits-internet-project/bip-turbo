@@ -611,6 +611,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
                   // and to drift-update existing rows.
                   note: t.note,
                   allTimer: t.allTimer ?? false,
+                  // Track length (seconds) + provenance, so local dev DBs
+                  // mirror the durations prod resolved from nugs/archive.
+                  duration: t.duration ?? null,
+                  durationSource: t.durationSource ?? null,
                   annotations: annotationsByTrackId.get(t.id) ?? [],
                 })),
               })),

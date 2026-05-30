@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
+import { NumberCell } from "~/components/ui/number-cell";
 
 /**
  * Inline funnel icon used to mark "this column / control is the filtered
@@ -199,24 +200,6 @@ function DateVenueCell({ date, show }: { date: Date | null; show?: Show | null }
 function dashOrSpan(content: ReactNode | null | undefined, className = "text-content-text-primary"): ReactNode {
   if (content === null || content === undefined) return <span className="text-content-text-tertiary text-sm">—</span>;
   return <span className={className}>{content}</span>;
-}
-
-/**
- * Right-aligns digits inside an inline-block sized to the column's widest
- * realistic value, so 1 / 10 / 100 stack with their ones digit aligned and
- * larger numbers extend further left. The block itself sits flush-left in
- * the cell (cells are left-aligned), so the whole column reads as
- * "left-anchored numbers with right-aligned digits" rather than as a
- * right-aligned column. `width` is the min-width of the slot in `ch`
- * units; tabular-nums makes every digit the same `0`-glyph width so the
- * digit columns actually align.
- */
-function NumberCell({ width, className, children }: { width: string; className?: string; children: ReactNode }) {
-  return (
-    <span className={`inline-block text-right tabular-nums ${className ?? ""}`} style={{ minWidth: width }}>
-      {children}
-    </span>
-  );
 }
 
 interface GetSongsColumnsOptions {

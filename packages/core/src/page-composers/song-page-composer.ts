@@ -561,6 +561,8 @@ export class SongPageComposer {
         tracks.ratings_count,
         tracks.note,
         tracks.gap,
+        tracks.duration,
+        tracks.duration_source,
         tracks.previous_performance_show_id,
         prevShows.slug as previous_show_slug,
         prevShows.date as previous_show_date
@@ -834,6 +836,8 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     position: row.position,
     cover: row.song_cover ?? undefined,
     authorId: row.song_author_id ?? null,
+    duration: row.duration ?? null,
+    durationSource: row.duration_source ?? null,
     gap: row.gap,
     previousPerformanceShowId: row.previous_performance_show_id,
     previousShow:
@@ -916,6 +920,8 @@ export type PerformanceDto = {
   ratings_count: number;
   note: string | null;
   gap: number | null;
+  duration: number | null;
+  duration_source: string | null;
   previous_performance_show_id: string | null;
   previous_show_slug: string | null;
   previous_show_date: string | null;

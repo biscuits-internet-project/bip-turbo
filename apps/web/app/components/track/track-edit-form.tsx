@@ -3,6 +3,7 @@ import { SongSearch } from "~/components/song/song-search";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import { GlassSelect } from "~/components/ui/glass-select";
+import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { formInputClass, formLabelClass } from "~/lib/form-styles";
 import { SEGUE_OPTIONS, SET_OPTIONS } from "./track-constants";
@@ -70,6 +71,25 @@ export function TrackEditForm({
             onValueChange={(value) => onFormDataChange((prev) => ({ ...prev, segue: value }))}
             options={SEGUE_OPTIONS}
             className="w-full"
+          />
+        </div>
+
+        <div className="w-28">
+          <label htmlFor="track-duration" className={formLabelClass}>
+            Duration
+            {formData.durationSource && (
+              <span className="ml-1 text-xs font-normal text-content-text-tertiary">({formData.durationSource})</span>
+            )}
+          </label>
+          <Input
+            id="track-duration"
+            value={formData.duration}
+            onChange={(e) => {
+              const value = e.target.value;
+              onFormDataChange((prev) => ({ ...prev, duration: value }));
+            }}
+            placeholder="8:42"
+            className={formInputClass}
           />
         </div>
 

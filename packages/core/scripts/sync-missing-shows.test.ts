@@ -981,6 +981,8 @@ describe("buildSetlistReconciliation", () => {
         segue: ">",
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];
@@ -1022,6 +1024,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];
@@ -1070,6 +1074,8 @@ describe("buildSetlistReconciliation", () => {
         segue: ">",
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];
@@ -1111,6 +1117,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
       {
@@ -1121,6 +1129,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [
           { id: "ann-a-uuid", desc: "stray" },
           { id: "ann-b-uuid", desc: "still stray" },
@@ -1157,6 +1167,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];
@@ -1178,6 +1190,61 @@ describe("buildSetlistReconciliation", () => {
     expect(recon.cosmeticallyChanged).toBe(false);
   });
 
+  // Duration drift: prod resolved a duration our local row lacks. Patches the
+  // value and its provenance together, counted as cosmetic (no SegueRun regen).
+  test("patches a track duration mirrored from prod", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-1-uuid",
+        set: "S1",
+        position: 1,
+        songId: "song-crystal-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        duration: null,
+        durationSource: null,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [
+            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: null, duration: 845, durationSource: "nugs" },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toUpdate[0]?.patch).toEqual({ duration: 845, durationSource: "nugs" });
+    expect(recon.structurallyChanged).toBe(false);
+    expect(recon.cosmeticallyChanged).toBe(true);
+  });
+
+  // A duration on a remote-only track rides onto the insert op.
+  test("carries duration onto an inserted track", () => {
+    const remote: McpSetlist = {
+      showSlug: "show",
+      showDate: "2025-08-30",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [
+            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: null, duration: 845, durationSource: "archive" },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation([], remote, songMap);
+    expect(recon.toInsert[0]).toMatchObject({ duration: 845, durationSource: "archive" });
+  });
+
   // Cosmetic-only drift: segue / note / allTimer changed, songId is unchanged.
   // Must NOT flip structurallyChanged (no SegueRun regen needed for a segue
   // marker change — the trackIds array is still valid).
@@ -1191,6 +1258,8 @@ describe("buildSetlistReconciliation", () => {
         segue: ">",
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];
@@ -1226,6 +1295,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: "kept locally",
         allTimer: true,
+        duration: null,
+        durationSource: null,
         annotations: [{ id: "ann-a-uuid", desc: "still here" }],
       },
     ];
@@ -1259,6 +1330,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [{ id: "ann-keep-uuid", desc: "first time played" }, { id: "ann-drop-uuid", desc: "to remove" }],
       },
     ];
@@ -1367,6 +1440,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];
@@ -1407,6 +1482,8 @@ describe("buildSetlistReconciliation", () => {
         segue: ">",
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [{ id: "ann-local", desc: "explosive intro" }],
       },
     ];
@@ -1462,6 +1539,8 @@ describe("buildSetlistReconciliation", () => {
         segue: null,
         note: null,
         allTimer: false,
+        duration: null,
+        durationSource: null,
         annotations: [],
       },
     ];

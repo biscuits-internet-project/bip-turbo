@@ -13,6 +13,8 @@ const BASE_FORM: TrackFormData = {
   note: null,
   annotationDesc: null,
   allTimer: false,
+  duration: "",
+  durationSource: null,
 };
 
 describe("TrackEditForm", () => {

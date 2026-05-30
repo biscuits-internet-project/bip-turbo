@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { PersonalSetlistRow } from "~/lib/personal-setlist-columns";
 import {
   createCountColumn,
+  createDurationColumn,
   createGapColumn,
   createRatingColumn,
   createSetlistCommonColumns,
@@ -31,6 +32,7 @@ export function createPersonalSetlistColumns(
   };
   return [
     ...createSetlistCommonColumns<PersonalSetlistTableRow>({ songLinkSearchParams: "attended=attended" }),
+    createDurationColumn<PersonalSetlistTableRow>(),
     createGapColumn<PersonalSetlistTableRow>({
       id: "yourGap",
       label: "Your Gap",
@@ -41,9 +43,11 @@ export function createPersonalSetlistColumns(
     }),
     createShowDateLinkColumn<PersonalSetlistTableRow>({
       id: "lastSeen",
+      // 5rem → compact M/D/YY date (see the Last Played note), freeing width
+      // for the Song column.
       label: "Last Seen",
       accessor: (row) => row.personal.lastSeen,
-      fixedWidth: "7.5rem",
+      fixedWidth: "5rem",
       hideOnMobile: true,
     }),
     // "Seen Before" — attended performances strictly before this show.

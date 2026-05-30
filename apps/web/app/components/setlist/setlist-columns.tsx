@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { buildGapCellState, isWithinShowRepeat } from "./gap-cell";
 import {
   createCountColumn,
+  createDurationColumn,
   createGapColumn,
   createRatingColumn,
   createSetlistCommonColumns,
@@ -34,6 +35,7 @@ export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): Colum
   };
   return [
     ...createSetlistCommonColumns<SetlistTableRow>(),
+    createDurationColumn<SetlistTableRow>(),
     createGapColumn<SetlistTableRow>({
       id: "gap",
       label: "Gap",
@@ -44,9 +46,12 @@ export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): Colum
     }),
     createShowDateLinkColumn<SetlistTableRow>({
       id: "lastPlayed",
+      // 5rem keeps the cell under the ~6rem @container threshold, so ShowDate
+      // renders the compact M/D/YY form (matching the performance table) and
+      // the freed width flows to Song.
       label: "Last Played",
       accessor: (row) => row.previousPerformanceShow,
-      fixedWidth: "7.5rem",
+      fixedWidth: "5rem",
     }),
     // Desktop-only "Played Before" — the personal view's Seen Before peer
     // stays visible on mobile because that's its existing layout; the

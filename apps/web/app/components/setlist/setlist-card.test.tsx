@@ -91,6 +91,8 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
             ratingsCount: 0,
             gap: null,
             previousPerformanceShowId: null,
+            duration: null,
+            durationSource: null,
             previousPerformanceShow: null,
             song: { id: "song-1", title: "Basis for a Day", slug: "basis-for-a-day" },
           },

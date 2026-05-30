@@ -331,6 +331,8 @@ model Show {
   reviewsCount      Int                      @default(0) @map("reviews_count")
   countForStats     Boolean                  @default(true) @map("count_for_stats")
   dayOrder          Int?                     @map("day_order")
+  duration          Int?
+  durationCheckedAt DateTime?                @map("duration_checked_at") @db.Timestamp(6)
   searchText        String?                  @map("search_text") @db.Text
   searchVector      Unsupported("tsvector")? @map("search_vector")
   attendances       Attendance[]
@@ -506,10 +508,13 @@ model Track {
   searchVector    Unsupported("tsvector")? @map("search_vector")
   gap                       Int?
   previousPerformanceShowId String?         @map("previous_performance_show_id") @db.Uuid
+  duration        Int?
+  durationSource  String?                  @map("duration_source") @db.VarChar
   annotations     Annotation[]
   show            Show                     @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_shows_show_id")
   song            Song                     @relation(fields: [songId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_songs_song_id")
   previousPerformanceShow   Show?           @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
+  durationSourceRef         DurationSource? @relation(fields: [durationSource], references: [name], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_duration_source")
 
   @@index([likesCount])
   @@index([nextTrackId])
@@ -518,6 +523,20 @@ model Track {
   @@index([previousPerformanceShowId])
   @@index([showId, set, position], map: "tracks_show_set_position_idx")
   @@map("tracks")
+}
+
+/// Canonical list of where a Track.duration came from. A lookup table (rather
+/// than a bare string column) so the values are defined in one place and the
+/// FK rejects typos. The `name` is the natural key the app code writes
+/// ("nugs" | "archive" | "manual").
+model DurationSource {
+  name        String   @id @db.VarChar
+  description String?  @db.VarChar
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  tracks      Track[]
+
+  @@map("duration_sources")
 }
 
 model User {

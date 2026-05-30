@@ -6,6 +6,8 @@ import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
 import { ShowDateLink } from "~/components/show-date-link";
 import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
+import { DurationValue } from "~/components/track/duration-cell";
+import { NumberCell } from "~/components/ui/number-cell";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -126,12 +128,24 @@ export const songAfterSortingFn = makeAdjacentSongSortingFn(
  */
 function renderGapCell({ value, isRepeat }: { value: number | null | undefined; isRepeat: boolean }) {
   if (isRepeat) {
-    return <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />;
+    return (
+      <NumberCell width="3ch">
+        <GapIcon icon={<RotateCcw className="h-4 w-4 text-content-text-secondary" />} label="Same Show" />
+      </NumberCell>
+    );
   }
   if (value == null) {
-    return <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />;
+    return (
+      <NumberCell width="3ch">
+        <GapIcon icon={<Star className="h-4 w-4 text-content-text-secondary" />} label="Debut" />
+      </NumberCell>
+    );
   }
-  return <span className="text-content-text-secondary tabular-nums">{value}</span>;
+  return (
+    <NumberCell width="3ch" className="text-content-text-secondary">
+      {value}
+    </NumberCell>
+  );
 }
 
 /**
@@ -297,6 +311,30 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
     }) as ColumnDef<SongPagePerformance, unknown>,
   );
 
+  // Track length, sitting between Date and Gap. Hidden on mobile — the row is
+  // already dense. Always present (incl. cross-song surfaces like all-timers /
+  // on-this-day); rows without a resolved duration render an em-dash.
+  columns.push(
+    columnHelper.accessor((row) => row.duration ?? Number.NEGATIVE_INFINITY, {
+      id: "duration",
+      meta: { fixedWidth: "4.5rem", hideOnMobile: true },
+      header: ({ column }) => <SortableHeader column={column} label="Time" />,
+      enableSorting: true,
+      sortingFn: (a, b) => {
+        const av = a.original.duration ?? -1;
+        const bv = b.original.duration ?? -1;
+        if (av !== bv) return av - bv;
+        return compareByShowDate(a.original, b.original);
+      },
+      sortDescFirst: true,
+      cell: (info) => (
+        <NumberCell width="5ch">
+          <DurationValue seconds={info.row.original.duration} />
+        </NumberCell>
+      ),
+    }) as ColumnDef<SongPagePerformance, unknown>,
+  );
+
   if (includeGapColumns) {
     columns.push(
       columnHelper.accessor((row) => row.gap ?? Number.NEGATIVE_INFINITY, {
@@ -369,8 +407,11 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         enableSorting: false,
         cell: (info) => {
           const set = info.getValue();
-          if (!set) return <span className="text-content-text-tertiary">—</span>;
-          return <span className="text-content-text-secondary">{formatSetLabel(set)}</span>;
+          return (
+            <NumberCell width="2ch" className={set ? "text-content-text-secondary" : "text-content-text-tertiary"}>
+              {set ? formatSetLabel(set) : "—"}
+            </NumberCell>
+          );
         },
       }) as ColumnDef<SongPagePerformance, unknown>,
     );

@@ -71,3 +71,72 @@ describe("TrackService — Cloudflare year-tag wiring", () => {
     expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "2018-07-12-red-rocks", [2018]);
   });
 });
+
+describe("TrackService — duration provenance", () => {
+  // The edit form always re-sends the duration, so the service must decide
+  // provenance from whether the value actually changed — not from its mere
+  // presence. Otherwise editing a song/segue/note would silently convert a
+  // nugs/archive time to `manual` and freeze it against future resolution.
+  function makeDb(currentDuration: number | null) {
+    const update = vi.fn().mockResolvedValue({
+      id: "track-id",
+      slug: "slug",
+      showId: "show-id",
+      songId: "song-id",
+      position: 1,
+      set: "S1",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      duration: 700,
+      durationSource: "manual",
+    });
+    const db = {
+      track: {
+        findUnique: vi.fn().mockResolvedValue({ showId: "show-id", duration: currentDuration }),
+        update,
+        aggregate: vi.fn().mockResolvedValue({ _sum: { duration: 700 } }),
+      },
+      show: {
+        findUnique: vi.fn().mockResolvedValue({ slug: "2024-01-01-x", date: "2024-01-01" }),
+        update: vi.fn().mockResolvedValue(undefined),
+      },
+    };
+    return { db, update };
+  }
+
+  test("leaves duration + source untouched when the value is resent unchanged", async () => {
+    const { db, update } = makeDb(690);
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await service.update("track-id", { duration: 690, note: "fixed a typo" });
+
+    const data = update.mock.calls[0][0].data;
+    expect(data.duration).toBeUndefined();
+    expect(data.durationSource).toBeUndefined();
+    // No show-total recompute when the duration didn't move.
+    expect(db.track.aggregate).not.toHaveBeenCalled();
+  });
+
+  test("stamps manual when the duration changes to a new value", async () => {
+    const { db, update } = makeDb(690);
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await service.update("track-id", { duration: 700 });
+
+    const data = update.mock.calls[0][0].data;
+    expect(data.duration).toBe(700);
+    expect(data.durationSource).toBe("manual");
+    expect(db.track.aggregate).toHaveBeenCalled();
+  });
+
+  test("resets source to null when the duration is cleared", async () => {
+    const { db, update } = makeDb(690);
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await service.update("track-id", { duration: null });
+
+    const data = update.mock.calls[0][0].data;
+    expect(data.duration).toBeNull();
+    expect(data.durationSource).toBeNull();
+  });
+});

@@ -43,6 +43,8 @@ function makeTrack(overrides: Partial<Track> = {}): Track {
     ratingsCount: 0,
     gap: null,
     previousPerformanceShowId: null,
+    duration: null,
+    durationSource: null,
     previousPerformanceShow: null,
     // Component only reads `song.title`; the rest of the Song shape is
     // irrelevant for these tests, so cast through `unknown` to avoid

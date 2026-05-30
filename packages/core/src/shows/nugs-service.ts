@@ -2,11 +2,15 @@ import type { Logger } from "@bip/domain";
 import { CacheKeys } from "@bip/domain";
 import { DateIndexedCatalog } from "../_shared/catalog/date-indexed-catalog";
 import type { RedisService } from "../_shared/redis";
+import type { ExternalDurationTrack } from "../tracks/duration-matching";
 
 export const NUGS_ARTIST_IDS = {
   discoBiscuits: 128,
   tractorbeam: 514,
 } as const;
+
+/** Per-container track-list cache lifetime — these never change once posted. */
+const CONTAINER_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 /**
  * A single official release on nugs.net. `artistName` matters when the same
@@ -18,6 +22,8 @@ export interface NugsRelease {
   artistName: string;
   /** Fully-qualified `play.nugs.net/release/{containerID}` link. */
   url: string;
+  /** Container id, needed to fetch the per-track running times. */
+  containerId: number;
 }
 
 /**
@@ -34,6 +40,26 @@ interface NugsApiContainer {
 interface NugsApiResponse {
   Response?: {
     containers?: NugsApiContainer[];
+  };
+}
+
+/** One track row from the catalog.container detail endpoint. */
+interface NugsApiTrack {
+  songTitle?: string;
+  /** Running time in whole seconds. */
+  totalRunningTime?: number;
+  discNum?: number;
+  trackNum?: number;
+}
+
+/**
+ * Envelope shape from nugs.net's catalog.container endpoint. The per-track
+ * running times live on `Response.tracks`; the sibling `Response.songs` array
+ * is the catalog-style listing WITHOUT durations, so it must not be read here.
+ */
+interface NugsContainerResponse {
+  Response?: {
+    tracks?: NugsApiTrack[];
   };
 }
 
@@ -55,6 +81,7 @@ function buildFetcher(artistId: number, logger?: Logger) {
       map[isoDate] = {
         artistName: c.artistName,
         url: `https://play.nugs.net/release/${c.containerID}`,
+        containerId: c.containerID,
       };
     }
     return map;
@@ -78,14 +105,17 @@ export class NugsService {
    * @param logger Optional logger; fetch failures are swallowed so a show page
    *   renders even when nugs.net is unreachable.
    */
-  constructor(redis: RedisService, logger?: Logger) {
+  constructor(
+    private readonly redis: RedisService,
+    private readonly logger?: Logger,
+  ) {
     this.catalogs = Object.values(NUGS_ARTIST_IDS).map(
       (artistId) =>
         new DateIndexedCatalog<NugsRelease>(
-          redis,
+          this.redis,
           CacheKeys.nugs.catalog(artistId),
-          buildFetcher(artistId, logger),
-          logger,
+          buildFetcher(artistId, this.logger),
+          this.logger,
         ),
     );
   }
@@ -119,5 +149,44 @@ export class NugsService {
       }
     }
     return urls;
+  }
+
+  /**
+   * Fetch the ordered track list (title + running time in seconds) for one
+   * release via the catalog.container detail endpoint, the authoritative
+   * source of per-track durations. Cached per container in Redis since the
+   * track list of a posted release never changes. Returns an empty list on any
+   * failure so duration resolution degrades to the next source.
+   */
+  async fetchContainerTracks(containerId: number): Promise<ExternalDurationTrack[]> {
+    const cacheKey = CacheKeys.nugs.container(containerId);
+    const cached = await this.redis.get<ExternalDurationTrack[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const url = `https://streamapi.nugs.net/api.aspx?method=catalog.container&containerID=${containerId}&vdisp=1`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch nugs container ${containerId}: ${response.status}`);
+      }
+      const data: NugsContainerResponse = await response.json();
+      const containerTracks = data.Response?.tracks ?? [];
+
+      const tracks = containerTracks
+        .filter(
+          (t): t is Required<Pick<NugsApiTrack, "songTitle" | "totalRunningTime">> & NugsApiTrack =>
+            Boolean(t.songTitle) && typeof t.totalRunningTime === "number" && t.totalRunningTime > 0,
+        )
+        .sort((a, b) => (a.discNum ?? 0) - (b.discNum ?? 0) || (a.trackNum ?? 0) - (b.trackNum ?? 0))
+        .map((t) => ({ title: t.songTitle, seconds: t.totalRunningTime }));
+
+      if (tracks.length > 0) {
+        await this.redis.set<ExternalDurationTrack[]>(cacheKey, tracks, { EX: CONTAINER_TTL_SECONDS });
+      }
+      return tracks;
+    } catch (error) {
+      this.logger?.error("nugs container fetch failed", { containerId, error });
+      return [];
+    }
   }
 }

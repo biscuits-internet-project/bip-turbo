@@ -57,6 +57,8 @@ type DbTrackLight = {
   ratingsCount: number;
   gap: number | null;
   previousPerformanceShowId: string | null;
+  duration: number | null;
+  durationSource: string | null;
   previousPerformanceShow: { date: string; slug: string | null } | null;
   song: { id: string; title: string; slug: string } | null;
   annotations: DbAnnotation[];
@@ -285,6 +287,8 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
     ratingsCount: track.ratingsCount,
     gap: track.gap,
     previousPerformanceShowId: track.previousPerformanceShowId,
+    duration: track.duration,
+    durationSource: track.durationSource,
     previousPerformanceShow: previousPerformanceShowFromDb(track.previousPerformanceShow),
     song: track.song ?? undefined,
   };
@@ -594,6 +598,8 @@ export class SetlistService {
             ratingsCount: true,
             gap: true,
             previousPerformanceShowId: true,
+            duration: true,
+            durationSource: true,
             previousPerformanceShow: { select: { date: true, slug: true } },
             song: {
               select: {

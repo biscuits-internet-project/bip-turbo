@@ -63,7 +63,9 @@ describe("NugsService.findReleasesForDate", () => {
 
     const releases = await service.findReleasesForDate("2007-12-28");
 
-    expect(releases).toEqual([{ artistName: "The Disco Biscuits", url: "https://play.nugs.net/release/2189" }]);
+    expect(releases).toEqual([
+      { artistName: "The Disco Biscuits", url: "https://play.nugs.net/release/2189", containerId: 2189 },
+    ]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][0]).toContain(`artistID=${NUGS_ARTIST_IDS.discoBiscuits}`);
     expect(fetchMock.mock.calls[1][0]).toContain(`artistID=${NUGS_ARTIST_IDS.tractorbeam}`);
@@ -82,7 +84,9 @@ describe("NugsService.findReleasesForDate", () => {
 
     const releases = await service.findReleasesForDate("2026-03-20");
 
-    expect(releases).toEqual([{ artistName: "Tractorbeam", url: "https://play.nugs.net/release/47100" }]);
+    expect(releases).toEqual([
+      { artistName: "Tractorbeam", url: "https://play.nugs.net/release/47100", containerId: 47100 },
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -117,10 +121,12 @@ describe("NugsService.findReleasesForDate", () => {
     expect(releases).toContainEqual({
       artistName: "The Disco Biscuits",
       url: "https://play.nugs.net/release/9999",
+      containerId: 9999,
     });
     expect(releases).toContainEqual({
       artistName: "Tractorbeam",
       url: "https://play.nugs.net/release/47100",
+      containerId: 47100,
     });
   });
 
@@ -146,7 +152,9 @@ describe("NugsService.findReleasesForDate", () => {
       .mockResolvedValueOnce(makeCatalogResponse([]));
     const releases = await service.findReleasesForDate("2007-12-28");
 
-    expect(releases).toEqual([{ artistName: "The Disco Biscuits", url: "https://play.nugs.net/release/2189" }]);
+    expect(releases).toEqual([
+      { artistName: "The Disco Biscuits", url: "https://play.nugs.net/release/2189", containerId: 2189 },
+    ]);
   });
 
   // The catalog map is persisted under the same cache key the domain layer
@@ -165,5 +173,73 @@ describe("NugsService.findReleasesForDate", () => {
     for (const call of setCalls) {
       expect(call[2]).toEqual({ EX: 60 * 60 * 24 });
     }
+  });
+});
+
+describe("NugsService.fetchContainerTracks", () => {
+  let redis: ReturnType<typeof makeRedisMock>;
+  let service: NugsService;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    redis = makeRedisMock();
+    service = new NugsService(redis);
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Fixture mirrors the real catalog.container shape: per-track running times
+  // live on Response.tracks (songTitle + totalRunningTime whole seconds +
+  // disc/track ordinals). The sibling Response.songs array has NO durations
+  // and must be ignored — reading it was the bug this fixture now guards.
+  function makeContainerResponse(
+    tracks: Array<{ songTitle?: string; totalRunningTime?: number; discNum?: number; trackNum?: number }>,
+  ) {
+    return {
+      ok: true,
+      json: async () => ({ Response: { tracks, songs: tracks.map((t) => ({ songTitle: t.songTitle })) } }),
+    } as unknown as Response;
+  }
+
+  test("parses titles + running times in disc/track order, dropping non-timed rows", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeContainerResponse([
+        { songTitle: "Plan B", totalRunningTime: 745, discNum: 2, trackNum: 2 },
+        { songTitle: "Mishawaka Jam", totalRunningTime: 3858, discNum: 1, trackNum: 1 },
+        { songTitle: "Crowd", totalRunningTime: 36, discNum: 2, trackNum: 1 },
+        { songTitle: "Missing Time", discNum: 2, trackNum: 3 },
+        { songTitle: "Zero Time", totalRunningTime: 0, discNum: 2, trackNum: 4 },
+      ]),
+    );
+
+    const tracks = await service.fetchContainerTracks(48634);
+
+    expect(tracks).toEqual([
+      { title: "Mishawaka Jam", seconds: 3858 },
+      { title: "Crowd", seconds: 36 },
+      { title: "Plan B", seconds: 745 },
+    ]);
+  });
+
+  test("returns [] without throwing on a non-ok response", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 500 } as unknown as Response);
+    expect(await service.fetchContainerTracks(1)).toEqual([]);
+  });
+
+  test("serves the second call from cache without re-fetching", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeContainerResponse([{ songTitle: "Spaga", totalRunningTime: 410, discNum: 1, trackNum: 1 }]),
+    );
+    await service.fetchContainerTracks(99);
+    fetchMock.mockClear();
+
+    const again = await service.fetchContainerTracks(99);
+
+    expect(again).toEqual([{ title: "Spaga", seconds: 410 }]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

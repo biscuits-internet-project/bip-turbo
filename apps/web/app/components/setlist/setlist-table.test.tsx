@@ -41,6 +41,8 @@ function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: 
     ratingsCount: 0,
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
+    duration: overrides.duration ?? null,
+    durationSource: overrides.durationSource ?? null,
     previousPerformanceShow: overrides.previousPerformanceShow ?? null,
     song: overrides.song ?? { id: overrides.songId, title: "Basis for a Day", slug: "basis-for-a-day" },
   };
@@ -85,7 +87,7 @@ describe("SetlistTable", () => {
         ]}
       />,
     );
-    const cells = screen.getAllByRole("cell").filter((_, i) => i % 8 === 3);
+    const cells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
     expect(cells.map((c) => c.textContent?.replace(">", "").trim())).toEqual([
       "Basis for a Day",
       "Above the Waves",
@@ -195,10 +197,10 @@ describe("SetlistTable", () => {
       />,
     );
 
-    // Each row has 8 cells; Played Before is index 6. Cells 6 + 14 are the
+    // Each row has 9 cells; Played Before is index 7. Cells 7 + 16 are the
     // Played Before cells for the two rows respectively.
     const cells = screen.getAllByRole("cell");
-    expect(cells[6].textContent).toBe("3");
-    expect(cells[14].textContent).toBe("0");
+    expect(cells[7].textContent).toBe("3");
+    expect(cells[16].textContent).toBe("0");
   });
 });

@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "~/components/ui/button";
+import { NumberCell } from "~/components/ui/number-cell";
 
 const formatDate = (date: Date) => {
   return new Date(date).toLocaleDateString("en-US", {
@@ -66,7 +67,11 @@ export const authorColumns: ColumnDef<AuthorWithSongCount>[] = [
     },
     cell: ({ row }) => {
       const count = row.original.songCount ?? 0;
-      return <span className="text-content-text-primary font-semibold">{count}</span>;
+      return (
+        <NumberCell width="4ch" className="text-content-text-primary font-semibold">
+          {count}
+        </NumberCell>
+      );
     },
   },
   {

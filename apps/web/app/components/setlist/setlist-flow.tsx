@@ -1,0 +1,135 @@
+import type { Setlist, SetlistLight } from "@bip/domain";
+import { formatDuration } from "@bip/domain";
+import { Link } from "react-router-dom";
+import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
+import { cn } from "~/lib/utils";
+import { countSetlistEncores } from "./set-label";
+import { formatSetHeading, summarizeDurations } from "./setlist-duration";
+import { TrackRatingOverlay } from "./track-rating-overlay";
+
+/**
+ * The default "flow" rendering of a setlist: each set's tracks inline with
+ * segue markers, per-set and total running times, and the footnoted track
+ * annotations. Extracted from SetlistCard so this (the bulk of the card body)
+ * can be rendered and tested on its own, apart from the rating/attendance/
+ * view-toggle machinery around it.
+ */
+export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
+  // Number annotations in track order: each distinct description gets the next
+  // index, and each track maps to the indices it carries, so the inline `sup`
+  // markers and the footnote list agree.
+  const uniqueAnnotations = new Map<string, { index: number; desc: string }>();
+  const trackAnnotationMap = new Map<string, number[]>();
+  let annotationIndex = 1;
+  const allTracks = setlist.sets.flatMap((set) => set.tracks);
+  for (const track of allTracks) {
+    const trackIndices: number[] = [];
+    for (const annotation of setlist.annotations.filter((a) => a.trackId === track.id)) {
+      if (!annotation.desc) continue;
+      if (!uniqueAnnotations.has(annotation.desc)) {
+        uniqueAnnotations.set(annotation.desc, { index: annotationIndex++, desc: annotation.desc });
+      }
+      const index = uniqueAnnotations.get(annotation.desc)?.index;
+      if (index) trackIndices.push(index);
+    }
+    if (trackIndices.length > 0) trackAnnotationMap.set(track.id, trackIndices);
+  }
+  const orderedAnnotations = Array.from(uniqueAnnotations.values()).sort((a, b) => a.index - b.index);
+
+  const encoresInSet = countSetlistEncores(setlist.sets);
+  const showDuration = summarizeDurations(allTracks);
+  // A single-set show (no encore) needs no heading — its time is the Total.
+  const showSetHeadings = setlist.sets.length > 1;
+
+  return (
+    <>
+      <div className="space-y-3 md:space-y-4">
+        {setlist.sets.map((set) => {
+          const setDuration = summarizeDurations(set.tracks);
+          return (
+            <div key={setlist.show.id + set.label}>
+              {showSetHeadings && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-base font-medium text-content-text-tertiary">
+                    {formatSetHeading(set.label, encoresInSet)}
+                  </span>
+                  {setDuration.known > 0 && (
+                    <span
+                      className="text-sm text-content-text-tertiary tabular-nums"
+                      title={
+                        setDuration.missing > 0
+                          ? `Partial: ${setDuration.missing} track${setDuration.missing > 1 ? "s" : ""} not yet timed`
+                          : undefined
+                      }
+                    >
+                      {formatDuration(setDuration.seconds)}
+                      {setDuration.missing > 0 && "*"}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className={showSetHeadings ? "text-base pl-4" : "text-base"}>
+                {set.tracks.map((track, i) => (
+                  <span key={track.id} className="inline">
+                    <TrackRatingOverlay track={track}>
+                      <span
+                        className={cn(
+                          "relative text-brand-primary hover:text-brand-secondary hover:underline transition-colors text-base",
+                          track.allTimer && "font-medium",
+                        )}
+                      >
+                        <NoteworthyMarker
+                          track={track}
+                          iconClassName="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5"
+                        />
+                        <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
+                        {trackAnnotationMap.has(track.id) && (
+                          <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
+                            {trackAnnotationMap.get(track.id)?.map((index, markerPosition) => (
+                              <span key={index} className={markerPosition > 0 ? "ml-1" : ""}>
+                                {index}
+                              </span>
+                            ))}
+                          </sup>
+                        )}
+                      </span>
+                    </TrackRatingOverlay>
+                    {i < set.tracks.length - 1 && (
+                      <span className="text-content-text-secondary mx-1 font-medium text-base">
+                        {track.segue ? " > " : ", "}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {(showDuration.known > 0 || orderedAnnotations.length > 0) && (
+        <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
+          {showDuration.known > 0 && (
+            <div className="text-sm text-content-text-secondary">
+              <span className="font-medium text-content-text-tertiary">Total</span>{" "}
+              <span className="tabular-nums">
+                {formatDuration(showDuration.seconds)}
+                {showDuration.missing > 0 && "*"}
+              </span>
+            </div>
+          )}
+          {showDuration.known > 0 && showDuration.missing > 0 && (
+            <div className="text-xs text-content-text-tertiary">
+              * Partial: {showDuration.missing} track{showDuration.missing > 1 ? "s" : ""} not yet timed
+            </div>
+          )}
+          {orderedAnnotations.map((annotation) => (
+            <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
+              <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

@@ -81,6 +81,8 @@ function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
     ratings_count: 12,
     note: null,
     gap: null,
+    duration: null,
+    duration_source: null,
     previous_performance_show_id: null,
     previous_show_slug: null,
     previous_show_date: null,
