@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
+import { SegmentButton } from "~/components/ui/segment-button";
 import { CHART_COLORS } from "~/lib/chart-colors";
 import { START_YEAR } from "~/lib/song-filters";
-import { cn } from "~/lib/utils";
 import {
   buildYearlyChartData,
   expandPlayedYears,
@@ -40,22 +41,22 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
         <div className="flex items-center flex-wrap gap-y-2">
           <fieldset className="flex border-0 p-0 m-0">
             <legend className="sr-only">Chart units</legend>
-            <ToggleButton active={mode === "count"} onClick={() => setMode("count")}>
+            <SegmentButton size="md" active={mode === "count"} onClick={() => setMode("count")}>
               # Plays
-            </ToggleButton>
-            <ToggleButton active={isPercent} onClick={() => setMode("percent")}>
+            </SegmentButton>
+            <SegmentButton size="md" active={isPercent} onClick={() => setMode("percent")}>
               % of Shows
-            </ToggleButton>
+            </SegmentButton>
           </fieldset>
           <div className="mx-3 h-5 w-px bg-content-text-tertiary/30" aria-hidden="true" />
           <fieldset className="flex border-0 p-0 m-0">
             <legend className="sr-only">Year scope</legend>
-            <ToggleButton active={yearScope === "played"} onClick={() => setYearScope("played")}>
+            <SegmentButton size="md" active={yearScope === "played"} onClick={() => setYearScope("played")}>
               Years Played
-            </ToggleButton>
-            <ToggleButton active={yearScope === "all"} onClick={() => setYearScope("all")}>
+            </SegmentButton>
+            <SegmentButton size="md" active={yearScope === "all"} onClick={() => setYearScope("all")}>
               All Years
-            </ToggleButton>
+            </SegmentButton>
           </fieldset>
         </div>
       </div>
@@ -107,43 +108,12 @@ export function YearlyChartTooltip({ active, payload }: YearlyChartTooltipProps)
   const percentText = percent > 0 ? `${Math.round(percent * 100)}% of shows` : null;
 
   return (
-    <div
-      className="rounded-md border px-3 py-2 text-sm"
-      style={{
-        backgroundColor: CHART_COLORS.tooltipBg,
-        borderColor: CHART_COLORS.tooltipBorder,
-        color: CHART_COLORS.tooltipText,
-      }}
-    >
+    <ChartTooltipCard>
       <div className="font-medium">{year}</div>
       <div>
         {count} {playsLabel}
         {percentText ? <span className="text-content-text-tertiary"> · {percentText}</span> : null}
       </div>
-    </div>
-  );
-}
-
-interface ToggleButtonProps {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}
-
-function ToggleButton({ active, onClick, children }: ToggleButtonProps) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "px-3 py-1.5 text-sm font-medium border-b-2 transition-colors cursor-pointer",
-        active
-          ? "border-brand-primary text-content-text-primary"
-          : "border-transparent text-content-text-tertiary hover:text-content-text-secondary",
-      )}
-    >
-      {children}
-    </button>
+    </ChartTooltipCard>
   );
 }
