@@ -102,6 +102,19 @@ export interface RatingWithTrack {
   };
 }
 
+/**
+ * One cell of a user's rating distribution: how many ratings of a given
+ * star value land on shows from a given concert year. The user-profile
+ * charts derive every view (all-time histogram, per-year compare,
+ * average/median line) from this single grouped shape, so we never ship
+ * the thousands of individual rating rows the table query paginates.
+ */
+export interface RatingYearBucket {
+  year: number;
+  value: number;
+  count: number;
+}
+
 // Mapper functions
 function mapRatingToDomainEntity(dbRating: DbRating): Rating {
   return {
@@ -492,6 +505,45 @@ export class RatingService {
         song: { slug: row.song_slug, title: row.song_title },
       },
     }));
+  }
+
+  /**
+   * Distribution of a user's show ratings by concert year and star value,
+   * for the profile charts. Unlike the table queries this includes 0.5
+   * ratings (value >= 0.5, not BETWEEN 1 AND 5) so the histogram reflects
+   * every rating, and it aggregates server-side: ~250 bucket rows instead
+   * of the user's full (often thousands) rating set.
+   */
+  async getShowRatingDistribution(userId: string): Promise<RatingYearBucket[]> {
+    const rows = await this.db.$queryRaw<Array<{ year: number; value: number; count: number }>>`
+      SELECT LEFT(s.date, 4)::int AS year, r.value AS value, COUNT(*)::int AS count
+      FROM ratings r
+      INNER JOIN shows s ON s.id = r.rateable_id
+      WHERE r.user_id = ${userId}::uuid
+        AND r.rateable_type = 'Show'
+        AND r.value >= 0.5
+      GROUP BY LEFT(s.date, 4)::int, r.value
+    `;
+    return rows.map((row) => ({ year: row.year, value: row.value, count: Number(row.count) }));
+  }
+
+  /**
+   * Distribution of a user's track (song-version) ratings by concert year
+   * and star value. Same shape and motivation as getShowRatingDistribution;
+   * the concert year comes from the track's show.
+   */
+  async getTrackRatingDistribution(userId: string): Promise<RatingYearBucket[]> {
+    const rows = await this.db.$queryRaw<Array<{ year: number; value: number; count: number }>>`
+      SELECT LEFT(s.date, 4)::int AS year, r.value AS value, COUNT(*)::int AS count
+      FROM ratings r
+      INNER JOIN tracks t ON t.id = r.rateable_id
+      INNER JOIN shows s ON s.id = t.show_id
+      WHERE r.user_id = ${userId}::uuid
+        AND r.rateable_type = 'Track'
+        AND r.value >= 0.5
+      GROUP BY LEFT(s.date, 4)::int, r.value
+    `;
+    return rows.map((row) => ({ year: row.year, value: row.value, count: Number(row.count) }));
   }
 
   async deleteByRateableId(rateableId: string, rateableType: string): Promise<void> {

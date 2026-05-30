@@ -1,5 +1,5 @@
 import { mockShallowComponent } from "@test/test-utils";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -83,8 +83,41 @@ vi.mock("~/components/setlist/setlist-list", () => ({
   },
 }));
 
+// Stub the charts view — it's the default on the rating tabs, but it renders
+// recharts (unreliable in jsdom) and these tests cover routing/table/pagination
+// wiring, not the chart internals (those are unit-tested in rating-charts.test.ts).
+vi.mock("~/components/rating/rating-charts", () => ({
+  RatingCharts: () => <div data-testid="RatingCharts" />,
+}));
+
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import UserProfile from "./$username";
+
+// Minimal rating rows so the rating tabs render their table (the tab is empty,
+// not paginated, when the list is empty). Disco Biscuits song per convention.
+const showRatingRow = {
+  id: "sr1",
+  value: 5,
+  createdAt: new Date("2024-01-02T00:00:00Z"),
+  show: {
+    slug: "2024-08-12-port-chester-ny",
+    date: "2024-08-12",
+    venue: { name: "The Cap", city: "Port Chester", state: "NY" },
+  },
+};
+const trackRatingRow = {
+  id: "tr1",
+  value: 4.5,
+  createdAt: new Date("2024-01-02T00:00:00Z"),
+  track: {
+    slug: "basis-for-a-day-t1",
+    position: 1,
+    set: "S1",
+    encoresInSet: 0,
+    show: { slug: "2024-08-12-port-chester-ny", date: "2024-08-12", venue: { name: "The Cap" } },
+    song: { slug: "basis-for-a-day", title: "Basis for a Day" },
+  },
+};
 
 function renderProfile(initialEntry = "/users/evan") {
   return render(
@@ -250,30 +283,36 @@ describe("UserProfile", () => {
   // rendered DOM small on heavy users (~7,800 track ratings at the top end). The
   // loader provides `ratingsPagination` whenever the active tab is one of
   // the rating tabs; component renders PaginationControls below the list.
-  test("renders rating-tab pagination when activeTab is show-ratings and totalPages > 1", () => {
+  test("shows show-ratings pagination in the table view when totalPages > 1", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValue({
       ...baseLoaderData,
       activeTab: "show-ratings",
-      showRatings: [],
+      showRatings: [showRatingRow],
       ratingsPagination: { page: 1, pageSize: 100, totalPages: 18, total: 1739 },
     });
 
     renderProfile("/users/evan?tab=show-ratings");
-    // Pagination chrome renders both above and below the list.
+    // Charts is the default view, so pagination isn't shown until the user
+    // switches to the table.
+    expect(screen.queryByText(/Showing 1 to 100 of 1739 results/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^table$/i }));
+    // Pagination chrome renders both above and below the table.
     expect(screen.getAllByText(/Showing 1 to 100 of 1739 results/)).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /next/i })).toHaveLength(2);
   });
 
   // Same for track-ratings — pagination chrome is shared infrastructure.
-  test("renders rating-tab pagination when activeTab is track-ratings and totalPages > 1", () => {
+  test("shows track-ratings pagination in the table view when totalPages > 1", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValue({
       ...baseLoaderData,
       activeTab: "track-ratings",
-      trackRatings: [],
+      trackRatings: [trackRatingRow],
       ratingsPagination: { page: 2, pageSize: 100, totalPages: 78, total: 7784 },
     });
 
     renderProfile("/users/evan?tab=track-ratings");
+    fireEvent.click(screen.getByRole("button", { name: /^table$/i }));
     expect(screen.getAllByText(/Showing 101 to 200 of 7784 results/)).toHaveLength(2);
   });
 
@@ -284,11 +323,12 @@ describe("UserProfile", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValue({
       ...baseLoaderData,
       activeTab: "show-ratings",
-      showRatings: [],
+      showRatings: [showRatingRow],
       ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 5 },
     });
 
     renderProfile("/users/evan?tab=show-ratings");
+    fireEvent.click(screen.getByRole("button", { name: /^table$/i }));
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
 

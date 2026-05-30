@@ -2,8 +2,9 @@ import { average, median } from "@bip/domain";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
-import { CHART_COLORS } from "~/lib/chart-colors";
+import { CHART_BAR_CURSOR, CHART_COLORS } from "~/lib/chart-colors";
 import { START_YEAR } from "~/lib/song-filters";
 
 type SongRef = { title: string; slug: string };
@@ -135,7 +136,7 @@ export function DebutYearChart({ setlist }: DebutYearChartProps) {
             <BarChart data={distribution} margin={{ top: 4, right: 4, left: -16, bottom: 4 }} barCategoryGap="10%">
               <XAxis dataKey="year" stroke={CHART_COLORS.axis} fontSize={10} interval={labelInterval} />
               <YAxis stroke={CHART_COLORS.axis} fontSize={10} allowDecimals={false} width={28} />
-              <Tooltip content={<DebutYearTooltip />} isAnimationActive={false} />
+              <Tooltip content={<DebutYearTooltip />} cursor={CHART_BAR_CURSOR} isAnimationActive={false} />
               <Bar dataKey="count" fill={CHART_COLORS.accent} />
             </BarChart>
           </ResponsiveContainer>
@@ -196,14 +197,7 @@ function DebutYearTooltip({ active, payload }: DebutYearTooltipProps) {
   if (count === 0) return null;
   const songsLabel = count === 1 ? "song" : "songs";
   return (
-    <div
-      className="rounded-md border px-3 py-2 text-sm"
-      style={{
-        backgroundColor: CHART_COLORS.tooltipBg,
-        borderColor: CHART_COLORS.tooltipBorder,
-        color: CHART_COLORS.tooltipText,
-      }}
-    >
+    <ChartTooltipCard>
       <div className="font-medium">{year}</div>
       <div className="text-content-text-tertiary">
         {count} {songsLabel}
@@ -213,6 +207,6 @@ function DebutYearTooltip({ active, payload }: DebutYearTooltipProps) {
           <li key={song.slug}>{song.title}</li>
         ))}
       </ul>
-    </div>
+    </ChartTooltipCard>
   );
 }

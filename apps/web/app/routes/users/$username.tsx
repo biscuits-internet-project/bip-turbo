@@ -2,9 +2,11 @@ import type { RatingWithShow, RatingWithTrack, ShowRatingsSort, TrackRatingsSort
 import { CacheKeys, compareByShowDate } from "@bip/domain";
 import { dehydrate } from "@tanstack/react-query";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
+import { useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { formatHalfStep } from "~/components/rating/rating";
+import { RatingCharts } from "~/components/rating/rating-charts";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
@@ -12,6 +14,7 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { PaginationControls } from "~/components/ui/pagination-controls";
+import { SegmentButton } from "~/components/ui/segment-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { UrlSortableHeader } from "~/components/ui/url-sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -130,6 +133,14 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
         })
       : [];
 
+  // Aggregate distribution for the active ratings tab's Charts view. Tiny
+  // (~250 {year,value,count} rows) vs the paginated table rows, so it ships
+  // with the page rather than lazy-loading on toggle.
+  const showRatingBuckets =
+    activeTab === "show-ratings" ? await services.ratings.getShowRatingDistribution(user.id) : [];
+  const trackRatingBuckets =
+    activeTab === "track-ratings" ? await services.ratings.getTrackRatingDistribution(user.id) : [];
+
   const totalRatings = tabCounts.showRatingsCount + tabCounts.trackRatingsCount;
 
   // Total attended pages comes straight from the count — no full-list fetch
@@ -189,6 +200,8 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     },
     showRatings,
     trackRatings,
+    showRatingBuckets,
+    trackRatingBuckets,
     ratingsPagination: {
       page: clampedRatingsPage,
       pageSize: RATINGS_PAGE_SIZE,
@@ -240,6 +253,8 @@ export default function UserProfile() {
     attendedPagination,
     showRatings,
     trackRatings,
+    showRatingBuckets,
+    trackRatingBuckets,
     ratingsPagination,
     showRatingsSort,
     trackRatingsSort,
@@ -281,6 +296,11 @@ export default function UserProfile() {
   const handleTrackRatingsSortChange = (sort: TrackRatingsSort, direction: "asc" | "desc") => {
     navigate(`?tab=track-ratings&sort=${sort}&dir=${direction}`, { preventScrollReset: true });
   };
+
+  // Table vs. Charts is a per-view client toggle, shared by both ratings
+  // tabs — it must not touch the URL or the loader would refetch the table
+  // rows on every switch.
+  const [ratingsView, setRatingsView] = useState<"table" | "charts">("charts");
 
   return (
     <div className="w-full space-y-6">
@@ -528,24 +548,42 @@ export default function UserProfile() {
 
         {/* Show Ratings Tab */}
         <TabsContent value="show-ratings" className="space-y-4">
-          {activeTab === "show-ratings" && ratingsPagination.totalPages > 1 && (
-            <PaginationControls
-              page={ratingsPagination.page}
-              totalPages={ratingsPagination.totalPages}
-              total={ratingsPagination.total}
-              pageSize={ratingsPagination.pageSize}
-              onPageChange={handlePageChange}
-            />
-          )}
           {showRatings.length > 0 ? (
-            <div className="w-fit max-w-full mx-auto">
-              <ShowRatingsTable
-                rows={showRatings}
-                sort={showRatingsSort}
-                direction={ratingsDirection}
-                onSort={handleShowRatingsSortChange}
-              />
-            </div>
+            <>
+              <RatingsViewToggle view={ratingsView} onChange={setRatingsView} label="Show ratings view" />
+              {ratingsView === "charts" ? (
+                <RatingCharts buckets={showRatingBuckets} kind="show" />
+              ) : (
+                <>
+                  {ratingsPagination.totalPages > 1 && (
+                    <PaginationControls
+                      page={ratingsPagination.page}
+                      totalPages={ratingsPagination.totalPages}
+                      total={ratingsPagination.total}
+                      pageSize={ratingsPagination.pageSize}
+                      onPageChange={handlePageChange}
+                    />
+                  )}
+                  <div className="w-fit max-w-full mx-auto">
+                    <ShowRatingsTable
+                      rows={showRatings}
+                      sort={showRatingsSort}
+                      direction={ratingsDirection}
+                      onSort={handleShowRatingsSortChange}
+                    />
+                  </div>
+                  {ratingsPagination.totalPages > 1 && (
+                    <PaginationControls
+                      page={ratingsPagination.page}
+                      totalPages={ratingsPagination.totalPages}
+                      total={ratingsPagination.total}
+                      pageSize={ratingsPagination.pageSize}
+                      onPageChange={handlePageChange}
+                    />
+                  )}
+                </>
+              )}
+            </>
           ) : (
             <Card className="card-premium">
               <CardContent className="py-12 text-center">
@@ -559,37 +597,46 @@ export default function UserProfile() {
               </CardContent>
             </Card>
           )}
-          {activeTab === "show-ratings" && ratingsPagination.totalPages > 1 && (
-            <PaginationControls
-              page={ratingsPagination.page}
-              totalPages={ratingsPagination.totalPages}
-              total={ratingsPagination.total}
-              pageSize={ratingsPagination.pageSize}
-              onPageChange={handlePageChange}
-            />
-          )}
         </TabsContent>
 
         {/* Song Version Ratings Tab */}
         <TabsContent value="track-ratings" className="space-y-4">
-          {activeTab === "track-ratings" && ratingsPagination.totalPages > 1 && (
-            <PaginationControls
-              page={ratingsPagination.page}
-              totalPages={ratingsPagination.totalPages}
-              total={ratingsPagination.total}
-              pageSize={ratingsPagination.pageSize}
-              onPageChange={handlePageChange}
-            />
-          )}
           {trackRatings.length > 0 ? (
-            <div className="w-fit max-w-full mx-auto">
-              <TrackRatingsTable
-                rows={trackRatings}
-                sort={trackRatingsSort}
-                direction={ratingsDirection}
-                onSort={handleTrackRatingsSortChange}
-              />
-            </div>
+            <>
+              <RatingsViewToggle view={ratingsView} onChange={setRatingsView} label="Song version ratings view" />
+              {ratingsView === "charts" ? (
+                <RatingCharts buckets={trackRatingBuckets} kind="track" />
+              ) : (
+                <>
+                  {ratingsPagination.totalPages > 1 && (
+                    <PaginationControls
+                      page={ratingsPagination.page}
+                      totalPages={ratingsPagination.totalPages}
+                      total={ratingsPagination.total}
+                      pageSize={ratingsPagination.pageSize}
+                      onPageChange={handlePageChange}
+                    />
+                  )}
+                  <div className="w-fit max-w-full mx-auto">
+                    <TrackRatingsTable
+                      rows={trackRatings}
+                      sort={trackRatingsSort}
+                      direction={ratingsDirection}
+                      onSort={handleTrackRatingsSortChange}
+                    />
+                  </div>
+                  {ratingsPagination.totalPages > 1 && (
+                    <PaginationControls
+                      page={ratingsPagination.page}
+                      totalPages={ratingsPagination.totalPages}
+                      total={ratingsPagination.total}
+                      pageSize={ratingsPagination.pageSize}
+                      onPageChange={handlePageChange}
+                    />
+                  )}
+                </>
+              )}
+            </>
           ) : (
             <Card className="card-premium">
               <CardContent className="py-12 text-center">
@@ -602,15 +649,6 @@ export default function UserProfile() {
                 </p>
               </CardContent>
             </Card>
-          )}
-          {activeTab === "track-ratings" && ratingsPagination.totalPages > 1 && (
-            <PaginationControls
-              page={ratingsPagination.page}
-              totalPages={ratingsPagination.totalPages}
-              total={ratingsPagination.total}
-              pageSize={ratingsPagination.pageSize}
-              onPageChange={handlePageChange}
-            />
           )}
         </TabsContent>
 
@@ -706,6 +744,32 @@ export default function UserProfile() {
           )}
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Table/Charts switch shared by both ratings tabs. Centered above the
+// content so it reads as a view selector for the whole panel.
+function RatingsViewToggle({
+  view,
+  onChange,
+  label,
+}: {
+  view: "table" | "charts";
+  onChange: (view: "table" | "charts") => void;
+  label: string;
+}) {
+  return (
+    <div className="flex justify-center">
+      <fieldset className="flex border-0 p-0 m-0">
+        <legend className="sr-only">{label}</legend>
+        <SegmentButton size="md" active={view === "charts"} onClick={() => onChange("charts")}>
+          Charts
+        </SegmentButton>
+        <SegmentButton size="md" active={view === "table"} onClick={() => onChange("table")}>
+          Table
+        </SegmentButton>
+      </fieldset>
     </div>
   );
 }
