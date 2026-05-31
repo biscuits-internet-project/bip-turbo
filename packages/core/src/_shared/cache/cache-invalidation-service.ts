@@ -141,11 +141,18 @@ export class CacheInvalidationService {
   }
 
   /**
-   * Invalidate the all-timers cache
+   * Invalidate the performance-listing caches — All-Timers, Jam Charts, and
+   * the per-day On-This-Day all-timer lists. Each renders a per-track row (the
+   * Time column, plus all_timer / note membership), so any track mutation that
+   * changes a duration, the all_timer flag, or a note can stale them.
    */
-  async invalidateAllTimers(): Promise<void> {
-    this.logger.info("Invalidating all-timers cache");
-    await this.cache.del(CacheKeys.songs.allTimers());
+  async invalidatePerformanceListings(): Promise<void> {
+    this.logger.info("Invalidating performance-listing caches (all-timers, jam-charts, on-this-day)");
+    await Promise.all([
+      this.cache.del(CacheKeys.songs.allTimers()),
+      this.cache.del(CacheKeys.songs.jamCharts()),
+      this.cache.delPattern(CacheKeys.songs.allTimersOnThisDayAll()),
+    ]);
   }
 
   /**

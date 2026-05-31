@@ -17,7 +17,7 @@ function makeCacheInvalidationStub(): CacheInvalidationService & {
     invalidateShowListings: vi.fn(),
     invalidateShowComprehensive: vi.fn(),
     invalidateSongCaches: vi.fn(),
-    invalidateAllTimers: vi.fn(),
+    invalidatePerformanceListings: vi.fn(),
     invalidateRockOperaAssignment: vi.fn(),
   } as unknown as CacheInvalidationService & { invalidateRockOperaAssignment: Mock };
 }

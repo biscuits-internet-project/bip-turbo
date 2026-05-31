@@ -41,6 +41,24 @@ describe("CacheInvalidationService.invalidateAttendanceCaches", () => {
   });
 });
 
+describe("CacheInvalidationService.invalidatePerformanceListings", () => {
+  // The per-track Time column renders on three listing pages that each key off
+  // their own cache: All-Timers, Jam Charts, and the per-day On-This-Day
+  // all-timer list. A track duration save (manual or nugs/archive) must wipe
+  // all three, or those pages keep showing stale times even after the show
+  // detail page updates.
+  test("wipes all-timers, jam-charts, and every on-this-day cache", async () => {
+    const cache = makeCache();
+    const service = new CacheInvalidationService(cache as never, logger);
+
+    await service.invalidatePerformanceListings();
+
+    expect(cache.del).toHaveBeenCalledWith(CacheKeys.songs.allTimers());
+    expect(cache.del).toHaveBeenCalledWith(CacheKeys.songs.jamCharts());
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.songs.allTimersOnThisDayAll());
+  });
+});
+
 describe("CacheInvalidationService.invalidateShowListings", () => {
   // Admin edits to show metadata (date, venue, etc.) bubble through here.
   // Per-user attended-setlists caches embed that metadata, so they must be

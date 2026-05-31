@@ -90,6 +90,8 @@ export const CacheKeys = {
     histories: () => "songs:histories:v3",
     /** All-timers for a specific calendar day (On This Day page) */
     allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v3`,
+    /** Every On-This-Day all-timer cache across all calendar days (for pattern deletion). */
+    allTimersOnThisDayAll: () => "songs:all-timers:on-this-day:*",
     /** Filtered song results by era/author/cover/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);

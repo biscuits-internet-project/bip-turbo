@@ -6,14 +6,14 @@ const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } 
 
 function makeCacheInvalidationStub(): CacheInvalidationService & {
   invalidateShowComprehensive: Mock;
-  invalidateAllTimers: Mock;
+  invalidatePerformanceListings: Mock;
 } {
   return {
     invalidateShowComprehensive: vi.fn().mockResolvedValue(undefined),
-    invalidateAllTimers: vi.fn().mockResolvedValue(undefined),
+    invalidatePerformanceListings: vi.fn().mockResolvedValue(undefined),
   } as unknown as CacheInvalidationService & {
     invalidateShowComprehensive: Mock;
-    invalidateAllTimers: Mock;
+    invalidatePerformanceListings: Mock;
   };
 }
 
@@ -127,6 +127,19 @@ describe("TrackService — duration provenance", () => {
     expect(data.duration).toBe(700);
     expect(data.durationSource).toBe("manual");
     expect(db.track.aggregate).toHaveBeenCalled();
+  });
+
+  // The Time column also renders on the All-Timers / Jam Charts / On-This-Day
+  // listings, which key off their own caches — a manual duration edit must
+  // wipe them or those pages keep the stale time.
+  test("invalidates the performance listings on a duration edit", async () => {
+    const { db } = makeDb(690);
+    const cache = makeCacheInvalidationStub();
+    const service = new TrackService(db as never, logger, cache);
+
+    await service.update("track-id", { duration: 700 });
+
+    expect(cache.invalidatePerformanceListings).toHaveBeenCalled();
   });
 
   test("resets source to null when the duration is cleared", async () => {
