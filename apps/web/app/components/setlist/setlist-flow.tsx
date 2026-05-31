@@ -38,8 +38,12 @@ export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
 
   const encoresInSet = countSetlistEncores(setlist.sets);
   const showDuration = summarizeDurations(allTracks);
-  // A single-set show (no encore) needs no heading — its time is the Total.
-  const showSetHeadings = setlist.sets.length > 1;
+  // One regular (non-encore) set reads just "Set" (no number), whether or not
+  // an encore follows.
+  const isSoleRegularSet = setlist.sets.filter((set) => /^S\d+$/i.test(set.label)).length === 1;
+  // A truly single-set show (no encore) also skips the redundant Total — its
+  // set time already is the show time.
+  const isSoleSet = setlist.sets.length === 1;
 
   return (
     <>
@@ -48,27 +52,25 @@ export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
           const setDuration = summarizeDurations(set.tracks);
           return (
             <div key={setlist.show.id + set.label}>
-              {showSetHeadings && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-base font-medium text-content-text-tertiary">
-                    {formatSetHeading(set.label, encoresInSet)}
+              <div className="flex items-baseline gap-2">
+                <span className="text-base font-medium text-content-text-tertiary">
+                  {formatSetHeading(set.label, encoresInSet, isSoleRegularSet)}
+                </span>
+                {setDuration.known > 0 && (
+                  <span
+                    className="text-sm text-content-text-tertiary tabular-nums"
+                    title={
+                      setDuration.missing > 0
+                        ? `Partial: ${setDuration.missing} track${setDuration.missing > 1 ? "s" : ""} not yet timed`
+                        : undefined
+                    }
+                  >
+                    {formatDuration(setDuration.seconds)}
+                    {setDuration.missing > 0 && "*"}
                   </span>
-                  {setDuration.known > 0 && (
-                    <span
-                      className="text-sm text-content-text-tertiary tabular-nums"
-                      title={
-                        setDuration.missing > 0
-                          ? `Partial: ${setDuration.missing} track${setDuration.missing > 1 ? "s" : ""} not yet timed`
-                          : undefined
-                      }
-                    >
-                      {formatDuration(setDuration.seconds)}
-                      {setDuration.missing > 0 && "*"}
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className={showSetHeadings ? "text-base pl-4" : "text-base"}>
+                )}
+              </div>
+              <div className="text-base pl-4">
                 {set.tracks.map((track, i) => (
                   <span key={track.id} className="inline">
                     <TrackRatingOverlay track={track}>
@@ -107,22 +109,23 @@ export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
         })}
       </div>
 
-      {(showDuration.known > 0 || orderedAnnotations.length > 0) && (
+      {showDuration.known > 0 && !isSoleSet && (
+        <div className="mt-4 text-sm text-content-text-secondary">
+          <span className="font-medium text-content-text-tertiary">Total</span>{" "}
+          <span className="tabular-nums">
+            {formatDuration(showDuration.seconds)}
+            {showDuration.missing > 0 && "*"}
+          </span>
+        </div>
+      )}
+      {showDuration.known > 0 && showDuration.missing > 0 && (
+        <div className={cn(isSoleSet ? "mt-4" : "mt-1", "text-xs text-content-text-tertiary")}>
+          * Partial: {showDuration.missing} track{showDuration.missing > 1 ? "s" : ""} not yet timed
+        </div>
+      )}
+
+      {orderedAnnotations.length > 0 && (
         <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
-          {showDuration.known > 0 && (
-            <div className="text-sm text-content-text-secondary">
-              <span className="font-medium text-content-text-tertiary">Total</span>{" "}
-              <span className="tabular-nums">
-                {formatDuration(showDuration.seconds)}
-                {showDuration.missing > 0 && "*"}
-              </span>
-            </div>
-          )}
-          {showDuration.known > 0 && showDuration.missing > 0 && (
-            <div className="text-xs text-content-text-tertiary">
-              * Partial: {showDuration.missing} track{showDuration.missing > 1 ? "s" : ""} not yet timed
-            </div>
-          )}
           {orderedAnnotations.map((annotation) => (
             <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
               <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}

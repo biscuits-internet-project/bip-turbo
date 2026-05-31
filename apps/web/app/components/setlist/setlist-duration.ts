@@ -30,13 +30,15 @@ export function summarizeDurations(tracks: ReadonlyArray<{ duration: number | nu
 /**
  * Block-style set heading for the flow view: spelled-out "Set 1" / "Encore" /
  * "Encore 2" (vs the compact "1" / "E" the table views use). A lone encore
- * drops its number, so pass the show's distinct-encore count. Unknown labels
- * (e.g. "Soundcheck") render verbatim.
+ * drops its number, so pass the show's distinct-encore count. A show with a
+ * single regular set drops the number too, reading just "Set" (even when an
+ * encore follows), so pass isSoleRegularSet. Unknown labels (e.g.
+ * "Soundcheck") render verbatim.
  */
-export function formatSetHeading(label: string, encoresInSet: number): string {
+export function formatSetHeading(label: string, encoresInSet: number, isSoleRegularSet = false): string {
   const upper = label.toUpperCase();
   const setMatch = upper.match(/^S(\d+)$/);
-  if (setMatch) return `Set ${setMatch[1]}`;
+  if (setMatch) return isSoleRegularSet ? "Set" : `Set ${setMatch[1]}`;
   const encoreMatch = upper.match(/^E(\d+)$/);
   if (encoreMatch) return encoresInSet === 1 ? "Encore" : `Encore ${encoreMatch[1]}`;
   return label;
