@@ -49,15 +49,37 @@ function flowSetlist(
 }
 
 describe("SetlistFlow", () => {
-  // A single-set show drops the "Set 1" heading; its time reads only as the
-  // show Total.
-  test("a single-set show shows the Total but suppresses the set heading", async () => {
+  // A single-set show labels its one set "Set" (no number) with its duration
+  // inline, and drops the redundant Total.
+  test("a single-set show labels it 'Set' with inline duration and no Total", async () => {
     await setupWithRouter(
-      <SetlistFlow setlist={flowSetlist([{ label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1), durTrack("b", "Spaga", 410, "S1", 2)] }])} />,
+      <SetlistFlow
+        setlist={flowSetlist([
+          { label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1), durTrack("b", "Spaga", 410, "S1", 2)] },
+        ])}
+      />,
     );
-    expect(screen.getByText("Total")).toBeInTheDocument();
+    expect(screen.getByText("Set")).toBeInTheDocument();
     expect(screen.getByText("15:32")).toBeInTheDocument();
     expect(screen.queryByText("Set 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total")).not.toBeInTheDocument();
+  });
+
+  // With one regular set plus an encore, the regular set still reads "Set"
+  // (no number), but the Total returns since the show spans multiple sets.
+  test("a one-set-plus-encore show labels the set 'Set' and keeps the Total", async () => {
+    await setupWithRouter(
+      <SetlistFlow
+        setlist={flowSetlist([
+          { label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1)] },
+          { label: "E1", tracks: [durTrack("b", "Spaga", 410, "E1", 1)] },
+        ])}
+      />,
+    );
+    expect(screen.getByText("Set")).toBeInTheDocument();
+    expect(screen.queryByText("Set 1")).not.toBeInTheDocument();
+    expect(screen.getByText("Encore")).toBeInTheDocument();
+    expect(screen.getByText("Total")).toBeInTheDocument();
   });
 
   test("a multi-set show shows per-set headings and the Total", async () => {
@@ -74,9 +96,36 @@ describe("SetlistFlow", () => {
     expect(screen.getByText("Total")).toBeInTheDocument();
   });
 
+  // The Total sits directly under the sets, above the divider that fronts the
+  // annotation footnotes — not bundled in the bordered footnote block.
+  test("renders the Total above the footnote divider", async () => {
+    const { container } = await setupWithRouter(
+      <SetlistFlow
+        setlist={flowSetlist(
+          [
+            { label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1)] },
+            { label: "S2", tracks: [durTrack("b", "Spaga", 410, "S2", 1)] },
+          ],
+          [{ trackId: "a", desc: "Glow-stick war peak" }],
+        )}
+      />,
+    );
+    const total = screen.getByText("Total");
+    const divider = container.querySelector(".border-t");
+    expect(divider).not.toBeNull();
+    // Total is not nested inside the bordered footnote block...
+    expect(divider?.contains(total)).toBe(false);
+    // ...and precedes it in document order.
+    expect(total.compareDocumentPosition(divider as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   test("flags a partial total when some tracks are untimed", async () => {
     await setupWithRouter(
-      <SetlistFlow setlist={flowSetlist([{ label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1), durTrack("b", "Spaga", null, "S1", 2)] }])} />,
+      <SetlistFlow
+        setlist={flowSetlist([
+          { label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1), durTrack("b", "Spaga", null, "S1", 2)] },
+        ])}
+      />,
     );
     expect(screen.getByText(/Partial: 1 track not yet timed/)).toBeInTheDocument();
   });

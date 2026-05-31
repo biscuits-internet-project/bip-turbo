@@ -84,7 +84,8 @@ function PhotosBadge({ href, count }: PhotosBadgeProps) {
   return (
     <Link to={href} title={`${count} photos`} className={cn(EXTERNAL_FAVICON_LINK_CLASS, "gap-1")}>
       <Camera className={BADGE_ICON_CLASS} />
-      <span className="text-sm">{count}</span>
+      {/* Count crowds the icon strip on mobile; show it from `sm` up. */}
+      <span className="hidden sm:inline text-sm">{count}</span>
     </Link>
   );
 }
