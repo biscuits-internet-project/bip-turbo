@@ -43,6 +43,13 @@ COPY --from=builder /app/packages/core/src ./packages/core/src
 # Copy deploy-time scripts run from docker-entrypoint.sh.
 COPY --from=builder /app/packages/core/scripts ./packages/core/scripts
 
+# The dev @bip/domain package.json points main/exports at ./src/index.ts, but the
+# runner only ships packages/domain/dist (not src). When the deploy-time script
+# runs core's raw TS, its `import "@bip/domain"` must resolve to the built dist —
+# rewrite the runner copy's entry points to dist so resolution succeeds.
+RUN cd packages/domain && \
+    sed -i 's#"./src/index.ts"#"./dist/index.js"#g' package.json
+
 # Copy web app
 COPY --from=builder /app/apps/web/build ./apps/web/build
 COPY --from=builder /app/apps/web/package.json ./apps/web/
