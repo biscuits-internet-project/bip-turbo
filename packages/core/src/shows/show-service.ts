@@ -14,6 +14,7 @@ import {
   showOrderTuple,
 } from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
+import { MARLON_LINEUP_SLUGS } from "../musicians/musician-constants";
 import type { StatsService } from "../stats/stats-service";
 
 export interface ShowFilter {
@@ -45,6 +46,11 @@ export interface ShowServiceCreateInput {
 }
 
 export type ShowCreateInput = Prisma.ShowCreateInput;
+
+export interface LineupEntry {
+  musicianId: string;
+  instrumentId?: string | null;
+}
 
 // Mapper functions
 function mapShowToDomainEntity(show: DbShow): Show {
@@ -358,6 +364,11 @@ export class ShowService {
 
     const show = mapShowToDomainEntity(result);
 
+    // New shows default to the current band makeup. Resolve the seeded
+    // musicians lazily so an unseeded environment degrades to an empty lineup
+    // (logged) rather than failing show creation.
+    await this.applyDefaultLineup(result.id);
+
     // Invalidate show listing caches (new show affects listings)
     await this.cacheInvalidation.invalidateShowListings([yearFromShowDate(createInput.date)]);
 
@@ -370,6 +381,72 @@ export class ShowService {
     await this.stats.rebuildGapsAndSongStatsSince(String(data.date));
 
     return show;
+  }
+
+  /**
+   * Resolve the Marlon-era default lineup from its seed slugs and write the
+   * ShowMusician rows. Never throws: if the seeds are missing (fresh DB, or a
+   * sync that ran before the seed), it logs a warning and leaves the lineup
+   * empty so show creation still succeeds. Stats are untouched — lineup data
+   * does not feed gap/play math.
+   */
+  private async applyDefaultLineup(showId: string): Promise<void> {
+    const musicians = await this.db.musician.findMany({
+      where: { slug: { in: [...MARLON_LINEUP_SLUGS] } },
+      select: { id: true, slug: true, defaultInstrumentId: true },
+    });
+
+    if (musicians.length < MARLON_LINEUP_SLUGS.length) {
+      this.logger.warn(
+        `Default lineup seeds missing (found ${musicians.length}/${MARLON_LINEUP_SLUGS.length}); show ${showId} created with an empty lineup`,
+      );
+    }
+
+    if (musicians.length === 0) return;
+
+    const entries: LineupEntry[] = musicians.map((musician) => ({
+      musicianId: musician.id,
+      instrumentId: musician.defaultInstrumentId ?? null,
+    }));
+
+    // No cache invalidation here: the caller (create) is about to run its own
+    // listing invalidation, and a just-created show has nothing comprehensively
+    // cached yet.
+    await this.replaceLineupRows(showId, entries);
+  }
+
+  /** Diff-replace the ShowMusician rows for a show in a single transaction. */
+  private async replaceLineupRows(showId: string, entries: LineupEntry[]): Promise<void> {
+    await this.db.$transaction([
+      this.db.showMusician.deleteMany({ where: { showId } }),
+      ...entries.map((entry) =>
+        this.db.showMusician.create({
+          data: {
+            showId,
+            musicianId: entry.musicianId,
+            instrumentId: entry.instrumentId ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }),
+      ),
+    ]);
+  }
+
+  /**
+   * Full-set replace of a show's lineup, then a comprehensive cache bust.
+   * Used by the admin lineup editor where the show already exists and its
+   * pages may be cached.
+   */
+  async setLineup(showId: string, entries: LineupEntry[]): Promise<void> {
+    await this.replaceLineupRows(showId, entries);
+
+    const show = await this.db.show.findUnique({ where: { id: showId }, select: { slug: true, date: true } });
+    if (show?.slug) {
+      await this.cacheInvalidation.invalidateShowComprehensive(showId, show.slug, [
+        yearFromShowDate(String(show.date)),
+      ]);
+    }
   }
 
   async update(slug: string, data: ShowServiceCreateInput): Promise<Show> {

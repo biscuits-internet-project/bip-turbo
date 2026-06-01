@@ -4,6 +4,7 @@ import { AttendanceService } from "../attendances/attendance-service";
 import { AuthorService } from "../authors/author-service";
 import { BlogPostService } from "../blog-posts/blog-post-service";
 import { FileService } from "../files/file-service";
+import { InstrumentService, MusicianService } from "../musicians/musician-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
 import { RatingService } from "../ratings/rating-service";
 import { ReviewService } from "../reviews/review-service";
@@ -33,6 +34,8 @@ export interface Services {
   annotations: AnnotationService;
   authors: AuthorService;
   blogPosts: BlogPostService;
+  instruments: InstrumentService;
+  musicians: MusicianService;
   shows: ShowService;
   songs: SongService;
   stats: StatsService;
@@ -86,6 +89,8 @@ export function createServices(container: ServiceContainer): Services {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
     authors: new AuthorService(container.db, container.logger),
     blogPosts: new BlogPostService(container.db, container.redis, container.logger),
+    instruments: new InstrumentService(container.db, container.logger),
+    musicians: new MusicianService(container.db, container.logger),
     shows: new ShowService(container.db, container.logger, container.cacheInvalidation, statsService),
     songs: songService,
     stats: statsService,

@@ -45,3 +45,20 @@ describe("formatVenueLocation", () => {
     expect(formatVenueLocation({ city: "", state: "NY", country: "USA" })).toBe("");
   });
 });
+
+/**
+ * Country code for a venue's schema.org PostalAddress. A missing country
+ * defaults to "US" because the catalog is US-majority and a NULL historically
+ * meant a domestic venue.
+ */
+describe("venueAddressCountry", () => {
+  it("returns the venue's country when present", () => {
+    expect(venueAddressCountry("Canada")).toBe("Canada");
+  });
+
+  it("defaults to US when the country is null, undefined, or empty", () => {
+    expect(venueAddressCountry(null)).toBe("US");
+    expect(venueAddressCountry(undefined)).toBe("US");
+    expect(venueAddressCountry("")).toBe("US");
+  });
+});

@@ -347,6 +347,7 @@ model Show {
   segueRuns         SegueRun[]
   files             ShowToFile[]
   rockOperaPerformances RockOperaPerformance[]
+  showMusicians         ShowMusician[]
 
   @@index([likesCount])
   @@index([date])
@@ -377,6 +378,72 @@ model RockOperaPerformance {
   @@unique([showId, rockOperaId], map: "rock_opera_performances_show_rock_opera_unique")
   @@index([rockOperaId])
   @@map("rock_opera_performances")
+}
+
+model Instrument {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar
+  slug      String   @unique(map: "instruments_slug_unique") @db.VarChar
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  musicians       Musician[]
+  showMusicians   ShowMusician[]
+  trackMusicians  TrackMusician[]
+
+  @@map("instruments")
+}
+
+model Musician {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String   @db.VarChar
+  slug                String   @unique(map: "musicians_slug_unique") @db.VarChar
+  defaultInstrumentId String?  @map("default_instrument_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  defaultInstrument Instrument?     @relation(fields: [defaultInstrumentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_musicians_default_instrument_id")
+  showMusicians     ShowMusician[]
+  trackMusicians    TrackMusician[]
+
+  @@index([slug])
+  @@map("musicians")
+}
+
+model ShowMusician {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showId       String   @map("show_id") @db.Uuid
+  musicianId   String   @map("musician_id") @db.Uuid
+  instrumentId String?  @map("instrument_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  show       Show        @relation(fields: [showId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musicians_shows_show_id")
+  musician   Musician    @relation(fields: [musicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musicians_musicians_musician_id")
+  instrument Instrument? @relation(fields: [instrumentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_show_musicians_instruments_instrument_id")
+
+  @@unique([showId, musicianId], map: "show_musicians_show_musician_unique")
+  @@index([musicianId])
+  @@map("show_musicians")
+}
+
+model TrackMusician {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackId      String   @map("track_id") @db.Uuid
+  musicianId   String   @map("musician_id") @db.Uuid
+  present      Boolean
+  instrumentId String?  @map("instrument_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  track      Track       @relation(fields: [trackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musicians_tracks_track_id")
+  musician   Musician    @relation(fields: [musicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musicians_musicians_musician_id")
+  instrument Instrument? @relation(fields: [instrumentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_track_musicians_instruments_instrument_id")
+
+  @@unique([trackId, musicianId], map: "track_musicians_track_musician_unique")
+  @@index([musicianId])
+  @@index([trackId])
+  @@map("track_musicians")
 }
 
 model SideProject {
@@ -515,6 +582,7 @@ model Track {
   song            Song                     @relation(fields: [songId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_songs_song_id")
   previousPerformanceShow   Show?           @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
   durationSourceRef         DurationSource? @relation(fields: [durationSource], references: [name], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_duration_source")
+  trackMusicians            TrackMusician[]
 
   @@index([likesCount])
   @@index([nextTrackId])

@@ -153,3 +153,66 @@ describe("TrackService — duration provenance", () => {
     expect(data.durationSource).toBeNull();
   });
 });
+
+describe("TrackService.setTrackMusicianDeltas", () => {
+  function makeDeltaDb(lineupMatches: Array<{ musicianId: string }> = []) {
+    // biome-ignore lint/suspicious/noExplicitAny: test mock
+    const db: any = {
+      track: {
+        findUnique: vi.fn().mockResolvedValue({ showId: "show-id" }),
+      },
+      showMusician: {
+        findMany: vi.fn().mockResolvedValue(lineupMatches),
+      },
+      trackMusician: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({}),
+      },
+      show: {
+        findUnique: vi.fn().mockResolvedValue({ slug: "2018-07-12-red-rocks", date: "2018-07-12" }),
+      },
+    };
+    db.$transaction = vi.fn((calls: Array<Promise<unknown>>) => Promise.all(calls));
+    return db;
+  }
+
+  // Full-set replace: existing deltas are deleted, then the passed ones
+  // inserted, and the show's caches invalidated.
+  test("deletes existing deltas, inserts the new ones, and invalidates show caches", async () => {
+    const db = makeDeltaDb();
+    const cache = makeCacheInvalidationStub();
+    const service = new TrackService(db as never, logger, cache);
+
+    await service.setTrackMusicianDeltas("track-id", [{ musicianId: "m-sam", present: true, instrumentId: "i-drums" }]);
+
+    expect(db.trackMusician.deleteMany).toHaveBeenCalledWith({ where: { trackId: "track-id" } });
+    expect(db.trackMusician.create).toHaveBeenCalledTimes(1);
+    expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "2018-07-12-red-rocks", [2018]);
+  });
+
+  // A sit-in for a musician already in the show lineup is redundant and would
+  // double-render — reject it without writing anything.
+  test("rejects a sit-in delta for a musician already in the show lineup", async () => {
+    const db = makeDeltaDb([{ musicianId: "m-marlon" }]);
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await expect(
+      service.setTrackMusicianDeltas("track-id", [{ musicianId: "m-marlon", present: true }]),
+    ).rejects.toThrow(/already in the show lineup/);
+
+    expect(db.trackMusician.deleteMany).not.toHaveBeenCalled();
+    expect(db.trackMusician.create).not.toHaveBeenCalled();
+  });
+
+  // A sat-out (present=false) for a lineup member is the expected case and
+  // must NOT trip the sit-in guard.
+  test("allows a sat-out delta for a musician in the lineup", async () => {
+    const db = makeDeltaDb();
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await service.setTrackMusicianDeltas("track-id", [{ musicianId: "m-marlon", present: false }]);
+
+    expect(db.showMusician.findMany).not.toHaveBeenCalled();
+    expect(db.trackMusician.create).toHaveBeenCalledTimes(1);
+  });
+});

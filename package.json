@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "bun --cwd apps/web run dev",
     "build": "cd apps/web && bun run build",
-    "lint": "biome lint .",
+    "lint": "biome lint --error-on-warnings .",
     "format": "biome format . --write",
     "typecheck": "cd apps/web && bun react-router typegen && cd ../.. && bun tsc --noEmit",
     "typecheck:all": "bun run -F '*' typecheck",

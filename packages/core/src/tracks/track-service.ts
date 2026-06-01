@@ -6,6 +6,13 @@ import type { QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
 import { recomputeShowDuration } from "./show-duration";
 
+export interface TrackMusicianDelta {
+  musicianId: string;
+  /** true → sat in (also played); false → sat out. */
+  present: boolean;
+  instrumentId?: string | null;
+}
+
 // Database query result that includes song and annotations
 type DbTrackWithSongAndAnnotations = DbTrack & {
   song?: DbSong | null;
@@ -317,5 +324,56 @@ export class TrackService {
     // A deleted track may have appeared on the All-Timers / Jam Charts /
     // On-This-Day listings — wipe them.
     await this.invalidatePerformanceListings();
+  }
+
+  /**
+   * Full-set replace of a track's performer deltas (sit-ins / sat-outs).
+   * Deletes the track's existing TrackMusician rows, then inserts the passed
+   * ones. Rejects a `present=true` (sat-in) delta for a musician already in
+   * the show's lineup — that musician is already implied, so a sit-in row
+   * would be redundant and would double-render in footnotes. Mirrors the
+   * delete-all-then-insert shape of AnnotationService.upsertMultipleForTrack.
+   */
+  async setTrackMusicianDeltas(trackId: string, deltas: TrackMusicianDelta[]): Promise<void> {
+    const track = await this.db.track.findUnique({
+      where: { id: trackId },
+      select: { showId: true },
+    });
+    if (!track) {
+      throw new Error(`Track with id "${trackId}" not found`);
+    }
+
+    const satInIds = deltas.filter((delta) => delta.present).map((delta) => delta.musicianId);
+    if (satInIds.length > 0) {
+      const alreadyInLineup = await this.db.showMusician.findMany({
+        where: { showId: track.showId, musicianId: { in: satInIds } },
+        select: { musicianId: true },
+      });
+      if (alreadyInLineup.length > 0) {
+        throw new Error(
+          `Cannot add a sit-in delta for musician(s) already in the show lineup: ${alreadyInLineup
+            .map((row) => row.musicianId)
+            .join(", ")}`,
+        );
+      }
+    }
+
+    await this.db.$transaction([
+      this.db.trackMusician.deleteMany({ where: { trackId } }),
+      ...deltas.map((delta) =>
+        this.db.trackMusician.create({
+          data: {
+            trackId,
+            musicianId: delta.musicianId,
+            present: delta.present,
+            instrumentId: delta.instrumentId ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }),
+      ),
+    ]);
+
+    await this.invalidateShowCaches(track.showId);
   }
 }

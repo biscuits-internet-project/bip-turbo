@@ -11,12 +11,16 @@ import type {
   Author as PrismaAuthor,
   BlogPost as PrismaBlogPost,
   PrismaClient,
+  Instrument as PrismaInstrument,
+  Musician as PrismaMusician,
   Rating as PrismaRating,
   Review as PrismaReview,
   SearchHistory as PrismaSearchHistory,
   Show as PrismaShow,
+  ShowMusician as PrismaShowMusician,
   Song as PrismaSong,
   Track as PrismaTrack,
+  TrackMusician as PrismaTrackMusician,
   User as PrismaUser,
   Venue as PrismaVenue,
 } from "@prisma/client";
@@ -29,6 +33,10 @@ export type DbReview = PrismaReview;
 export type DbSearchHistory = PrismaSearchHistory;
 export type DbSong = PrismaSong;
 export type DbAuthor = PrismaAuthor;
+export type DbInstrument = PrismaInstrument;
+export type DbMusician = PrismaMusician;
+export type DbShowMusician = PrismaShowMusician;
+export type DbTrackMusician = PrismaTrackMusician;
 export type DbShow = PrismaShow;
 export type DbTrack = PrismaTrack;
 export type DbVenue = PrismaVenue;

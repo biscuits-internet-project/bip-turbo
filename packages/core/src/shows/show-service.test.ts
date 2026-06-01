@@ -76,6 +76,15 @@ function makeMockDb() {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    // Default: no seeded musicians, so create() applies an empty lineup. The
+    // lineup-specific tests below override musician.findMany to seed the four.
+    musician: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    showMusician: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: vi.fn().mockResolvedValue({}),
+    },
   };
   db.$transaction = vi.fn(async (input: unknown) => {
     // Two forms: an array of pre-built calls, or a callback that receives
@@ -601,5 +610,61 @@ describe("ShowService — gap rebuild on mutation", () => {
     await service.delete("show-id");
 
     expect(rebuild).toHaveBeenCalledWith("1999-12-31");
+  });
+});
+
+describe("ShowService — default lineup on create", () => {
+  // A new show inherits the current band makeup. With the four Marlon-era
+  // members seeded, create() writes a ShowMusician row per member using each
+  // musician's default instrument.
+  test("applies the four seeded members as the new show's lineup", async () => {
+    const db = makeMockDb();
+    db.musician.findMany.mockResolvedValue([
+      { id: "m-jon", slug: "jon-gutwillig", defaultInstrumentId: "i-guitar" },
+      { id: "m-marc", slug: "marc-brownstein", defaultInstrumentId: "i-bass" },
+      { id: "m-aron", slug: "aron-magner", defaultInstrumentId: "i-keys" },
+      { id: "m-marlon", slug: "marlon-lewis", defaultInstrumentId: "i-drums" },
+    ]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.create({ date: "1999-12-31" });
+
+    expect(db.showMusician.create).toHaveBeenCalledTimes(4);
+    const written = db.showMusician.create.mock.calls.map((c: [{ data: Record<string, unknown> }]) => ({
+      musicianId: c[0].data.musicianId,
+      instrumentId: c[0].data.instrumentId,
+    }));
+    expect(written).toContainEqual({ musicianId: "m-marlon", instrumentId: "i-drums" });
+    expect(written).toContainEqual({ musicianId: "m-jon", instrumentId: "i-guitar" });
+  });
+
+  // Missing seeds (fresh DB, or a sync that ran before seeding) must not break
+  // show creation — the lineup is left empty and a warning is logged.
+  test("creates with an empty lineup and warns when seeds are missing", async () => {
+    const db = makeMockDb();
+    db.musician.findMany.mockResolvedValue([]);
+    const warn = vi.fn();
+    const partialLogger = { info: vi.fn(), warn, error: vi.fn(), debug: vi.fn() } as never;
+    const service = new ShowService(db as never, partialLogger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await expect(service.create({ date: "1999-12-31" })).resolves.toBeTruthy();
+
+    expect(db.showMusician.create).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  // setLineup is a full-set replace: existing rows are deleted, then the new
+  // entries inserted, and the show's caches invalidated.
+  test("setLineup deletes existing rows, inserts the new entries, and invalidates", async () => {
+    const db = makeMockDb();
+    db.show.findUnique.mockResolvedValue({ slug: "1999-12-31-test", date: "1999-12-31" });
+    const cache = makeCacheInvalidationStub();
+    const service = new ShowService(db as never, logger, cache, makeStatsStub());
+
+    await service.setLineup("show-id", [{ musicianId: "m-1", instrumentId: "i-1" }]);
+
+    expect(db.showMusician.deleteMany).toHaveBeenCalledWith({ where: { showId: "show-id" } });
+    expect(db.showMusician.create).toHaveBeenCalledTimes(1);
+    expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "1999-12-31-test", [1999]);
   });
 });
