@@ -20,6 +20,7 @@ import { UrlSortableHeader } from "~/components/ui/url-sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey } from "~/lib/query-keys";
+import { formatVenueLocation } from "~/lib/format-venue";
 import { createPrefetchClient } from "~/lib/query-prefetch";
 import { formatDateLong, formatDateShort, formatDateShortMobile } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -515,10 +516,8 @@ export default function UserProfile() {
                       <div className="flex items-center gap-2 text-sm text-content-text-secondary mt-1">
                         <CalendarDays className="w-4 h-4" />
                         <span>{formatDateLong(review.show.date)}</span>
-                        {review.show.venue.city && review.show.venue.state && (
-                          <span>
-                            • {review.show.venue.city}, {review.show.venue.state}
-                          </span>
+                        {review.show.venue.city && (
+                          <span>• {formatVenueLocation(review.show.venue)}</span>
                         )}
                       </div>
                     )}
@@ -855,7 +854,7 @@ function ShowRatingsTable({ rows, sort, direction, onSort }: ShowRatingsTablePro
         <tbody>
           {rows.map((row) => {
             const venueLine = row.show.venue?.name
-              ? [row.show.venue.name, row.show.venue.city, row.show.venue.state].filter(Boolean).join(", ")
+              ? [row.show.venue.name, formatVenueLocation(row.show.venue)].filter(Boolean).join(", ")
               : null;
             return (
               <tr key={row.id} className="hover:bg-hover-glass">

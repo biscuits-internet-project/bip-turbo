@@ -378,7 +378,7 @@ export class ShowService {
     // Get current show data for cache invalidation
     const currentShow = await this.db.show.findUnique({
       where: { slug },
-      select: { id: true, date: true, venueId: true },
+      select: { id: true, date: true, venueId: true, countForStats: true },
     });
 
     if (!currentShow) {
@@ -435,13 +435,14 @@ export class ShowService {
       await this.syncRockOperaAssignments(currentShow.id, data.rockOperaIds);
     }
 
-    // Show edits that move the show in time (or later: count_for_stats /
-    // day_order toggles) can change the gap denominator. Rebuild from the
-    // earlier of the old and new dates so chains spanning either side are
-    // recomputed. Skip when the date didn't change — notes / relistenUrl /
-    // venue edits don't affect gap.
-    if (data.date && String(data.date) !== currentShow.date) {
-      const sinceDate = String(data.date) < currentShow.date ? String(data.date) : currentShow.date;
+    // A date move or a count_for_stats flip both change the gap denominator (the
+    // universe of stats-eligible shows whose dates "shows between" counts). Rebuild
+    // from the earliest affected date so chains spanning either side are recomputed.
+    // Notes / relistenUrl / venue edits don't affect gap, so they skip the rebuild.
+    const dateChanged = !!data.date && String(data.date) !== currentShow.date;
+    const statsFlagChanged = data.countForStats != null && data.countForStats !== currentShow.countForStats;
+    if (dateChanged || statsFlagChanged) {
+      const sinceDate = dateChanged && String(data.date) < currentShow.date ? String(data.date) : currentShow.date;
       await this.stats.rebuildGapsAndSongStatsSince(sinceDate);
     }
 
@@ -534,6 +535,11 @@ export class ShowService {
     );
 
     await this.cacheInvalidation.invalidateShowListings([yearFromShowDate(date)]);
+
+    // day_order is a same-date tiebreaker in the gap walk, so reordering can flip
+    // which of two same-day performances of a song comes first — rebuild from this
+    // date forward to keep Track.gap / previousPerformanceShowId consistent.
+    await this.stats.rebuildGapsAndSongStatsSince(date);
   }
 
   async delete(id: string): Promise<boolean> {

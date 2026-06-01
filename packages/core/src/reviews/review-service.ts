@@ -12,6 +12,7 @@ export interface ReviewWithShow extends Omit<Review, "showId"> {
       name: string;
       city: string | null;
       state: string | null;
+      country: string | null;
     };
   } | null;
 }
@@ -127,6 +128,9 @@ export class ReviewService {
               name: ((result.show as Record<string, unknown>).venue as Record<string, unknown>).name as string,
               city: ((result.show as Record<string, unknown>).venue as Record<string, unknown>).city as string | null,
               state: ((result.show as Record<string, unknown>).venue as Record<string, unknown>).state as string | null,
+              country: ((result.show as Record<string, unknown>).venue as Record<string, unknown>).country as
+                | string
+                | null,
             },
           }
         : null,

@@ -4,9 +4,11 @@ import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
 import { ShowDate } from "~/components/show-date";
+import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
+import { formatVenueLocation } from "~/lib/format-venue";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { RockOperaAnnotations } from "./rock-opera-annotations";
@@ -104,6 +106,12 @@ function SetlistCardComponent({
   // Derived state for whether user is attending
   const isAttending = !!localAttendance;
 
+  // Soundchecks, radio sessions, late-night side sets, etc. are flagged
+  // count_for_stats=false. Mark them in the header (muted + tag) the same way
+  // muted table rows signal it, so list scanning catches it without pulling the
+  // full show-page banner into the card.
+  const notForStats = setlist.show.countForStats === false;
+
   // Resolve the user's rating from either of the supported prop shapes
   // (a Rating object or a bare number) into a single value for the badge.
   const resolvedUserRating = typeof userRating === "number" ? userRating : (userRating?.value ?? null);
@@ -158,6 +166,7 @@ function SetlistCardComponent({
         className={cn(
           "relative z-10 px-3 md:px-6 border-b border-glass-border/30",
           collapsible ? "py-1 md:py-1 cursor-pointer" : "py-3 md:py-5",
+          notForStats && "opacity-60 text-content-text-tertiary",
         )}
       >
         <div className="flex justify-between items-start gap-3">
@@ -170,10 +179,18 @@ function SetlistCardComponent({
                 <ShowDate date={setlist.show.date} />
               </Link>
               <AnniversaryBadge showDate={setlist.show.date} />
+              {notForStats && (
+                <Badge
+                  variant="outline"
+                  className="border-content-text-tertiary/40 bg-content-text-tertiary/10 text-content-text-tertiary text-[11px] font-semibold px-2 py-0"
+                >
+                  Not for stats
+                </Badge>
+              )}
             </div>
             <div className="text-base md:text-xl text-content-text-primary">
               <Link to={`/venues/${setlist.venue.slug}`} className="hover:text-brand-secondary transition-colors">
-                {setlist.venue.name} - {setlist.venue.city}, {setlist.venue.state}
+                {setlist.venue.name} - {formatVenueLocation(setlist.venue)}
               </Link>
             </div>
           </div>

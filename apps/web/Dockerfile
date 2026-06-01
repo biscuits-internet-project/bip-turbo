@@ -37,8 +37,11 @@ COPY --from=builder /app/packages/domain/package.json ./packages/domain/
 COPY --from=builder /app/packages/core/dist ./packages/core/dist
 COPY --from=builder /app/packages/domain/dist ./packages/domain/dist
 
-# Copy Prisma schema and migrations
-COPY --from=builder /app/packages/core/src/_shared/prisma ./packages/core/src/_shared/prisma
+# Copy core source: Prisma schema + migrations, plus the services that
+# deploy-time scripts (scripts/recompute-pending.ts) import and bun runs directly.
+COPY --from=builder /app/packages/core/src ./packages/core/src
+# Copy deploy-time scripts run from docker-entrypoint.sh.
+COPY --from=builder /app/packages/core/scripts ./packages/core/scripts
 
 # Copy web app
 COPY --from=builder /app/apps/web/build ./apps/web/build

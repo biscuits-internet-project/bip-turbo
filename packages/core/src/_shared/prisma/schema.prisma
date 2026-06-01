@@ -616,6 +616,17 @@ model Youtube {
   @@ignore
 }
 
+/// Signal table bridging SQL data migrations to the TypeScript stats recompute.
+/// A migration that changes stats-relevant data inserts the earliest affected
+/// date here; scripts/recompute-pending.ts consumes it on deploy.
+model StatsRecomputeRequest {
+  id        String   @id @db.Uuid
+  sinceDate DateTime @map("since_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("stats_recompute_requests")
+}
+
 model File {
   id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   path         String           @db.VarChar
