@@ -10,6 +10,7 @@ export * from "./models/blog-post";
 export * from "./models/cloudflare-images";
 export * from "./models/file";
 export * from "./models/logger";
+export * from "./models/musician";
 export * from "./models/rating";
 export * from "./models/review";
 export * from "./models/rock-opera";
