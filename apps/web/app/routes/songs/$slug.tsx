@@ -20,6 +20,7 @@ import { publicLoader } from "~/lib/base-loaders";
 import { pickGapTier } from "~/lib/gap-tier";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
+import { formatVenueLocation } from "~/lib/format-venue";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -163,6 +164,17 @@ function lastPlayedSublabel(
     tier === "danger" ? "text-red-500 font-semibold" : tier === "warn" ? "text-amber-500 font-medium" : "";
 
   return tierClass ? <span className={tierClass}>{text}</span> : text;
+}
+
+/**
+ * "Venue Name, City, State[, Country]" line under the First/Last Played stat
+ * boxes. International venues (no state) fall back to the country via
+ * formatVenueLocation so the line doesn't dangle a comma; a bare name with no
+ * location stays just the name.
+ */
+function venueSublabel(venue: { name: string; city?: string; state?: string; country?: string }): string {
+  const location = formatVenueLocation(venue);
+  return location ? `${venue.name}, ${location}` : venue.name;
 }
 
 const percentFormatter = new Intl.NumberFormat("en-US", {
@@ -312,13 +324,7 @@ export default function SongPage() {
                   ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                   : undefined
               }
-              sublabel2={
-                song.lastVenue
-                  ? song.lastVenue.city && song.lastVenue.state
-                    ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
-                    : song.lastVenue.name
-                  : undefined
-              }
+              sublabel2={song.lastVenue ? venueSublabel(song.lastVenue) : undefined}
             />
           </Link>
         ) : (
@@ -330,13 +336,7 @@ export default function SongPage() {
                 ? lastPlayedSublabel(song.showsSinceLastPlayed, song.averageGapShows, song.longestGapShows)
                 : undefined
             }
-            sublabel2={
-              song.lastVenue
-                ? song.lastVenue.city && song.lastVenue.state
-                  ? `${song.lastVenue.name}, ${song.lastVenue.city}, ${song.lastVenue.state}`
-                  : song.lastVenue.name
-                : undefined
-            }
+            sublabel2={song.lastVenue ? venueSublabel(song.lastVenue) : undefined}
           />
         )}
         {song.firstShowSlug ? (
@@ -344,26 +344,14 @@ export default function SongPage() {
             <StatBox
               label="First Played"
               value={song.dateFirstPlayed ? <ShowDate date={song.dateFirstPlayed} /> : "Never"}
-              sublabel2={
-                song.firstVenue
-                  ? song.firstVenue.city && song.firstVenue.state
-                    ? `${song.firstVenue.name}, ${song.firstVenue.city}, ${song.firstVenue.state}`
-                    : song.firstVenue.name
-                  : undefined
-              }
+              sublabel2={song.firstVenue ? venueSublabel(song.firstVenue) : undefined}
             />
           </Link>
         ) : (
           <StatBox
             label="First Played"
             value={song.dateFirstPlayed ? <ShowDate date={song.dateFirstPlayed} /> : "Never"}
-            sublabel2={
-              song.firstVenue
-                ? song.firstVenue.city && song.firstVenue.state
-                  ? `${song.firstVenue.name}, ${song.firstVenue.city}, ${song.firstVenue.state}`
-                  : song.firstVenue.name
-                : undefined
-            }
+            sublabel2={song.firstVenue ? venueSublabel(song.firstVenue) : undefined}
           />
         )}
         <StatBox label="% of All Shows" value={formatPercent(song.percentOfAllShows)} />

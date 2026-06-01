@@ -66,6 +66,7 @@ export interface RatingWithShow {
       name: string | null;
       city: string | null;
       state: string | null;
+      country: string | null;
     } | null;
   };
 }
@@ -399,6 +400,7 @@ export class RatingService {
         venue_name: string | null;
         venue_city: string | null;
         venue_state: string | null;
+        venue_country: string | null;
       }>
     >`
       SELECT
@@ -409,7 +411,8 @@ export class RatingService {
         s.date AS show_date,
         v.name AS venue_name,
         v.city AS venue_city,
-        v.state AS venue_state
+        v.state AS venue_state,
+        v.country AS venue_country
       FROM ratings r
       INNER JOIN shows s ON s.id = r.rateable_id
       LEFT JOIN venues v ON v.id = s.venue_id
@@ -427,7 +430,10 @@ export class RatingService {
       show: {
         slug: row.show_slug,
         date: row.show_date,
-        venue: row.venue_name === null ? null : { name: row.venue_name, city: row.venue_city, state: row.venue_state },
+        venue:
+          row.venue_name === null
+            ? null
+            : { name: row.venue_name, city: row.venue_city, state: row.venue_state, country: row.venue_country },
       },
     }));
   }

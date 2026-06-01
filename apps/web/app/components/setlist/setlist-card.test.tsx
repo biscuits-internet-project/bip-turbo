@@ -149,6 +149,16 @@ describe("SetlistCard", () => {
     expect(screen.getByText(/Philadelphia, PA/)).toBeInTheDocument();
   });
 
+  // International venues have an empty state, so the country must fill in —
+  // otherwise the header reads "Harpa Concert Hall - Reykjavik," with a
+  // dangling comma instead of "Reykjavik, Iceland".
+  test("renders the country for an international venue with no state", async () => {
+    const setlist = makeSetlist();
+    setlist.venue = { ...setlist.venue, name: "Harpa Concert Hall", city: "Reykjavik", state: "", country: "Iceland" };
+    await setupWithRouter(<SetlistCard setlist={setlist} userAttendance={null} userRating={null} showRating={null} />);
+    expect(screen.getByText(/Harpa Concert Hall - Reykjavik, Iceland/)).toBeInTheDocument();
+  });
+
   // The venue name is a clickable link to the venue page so users can
   // navigate directly from any setlist card.
   test("venue is a clickable link to the venue page", async () => {

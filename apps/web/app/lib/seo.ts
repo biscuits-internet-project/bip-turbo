@@ -1,4 +1,5 @@
 import type { Setlist, Song, Venue } from "@bip/domain";
+import { formatVenueLocation, venueAddressCountry } from "./format-venue";
 
 // SEO configuration
 export const SEO_CONFIG = {
@@ -85,7 +86,7 @@ export function getShowMeta(setlist: Setlist) {
       : show.date;
 
   const venue = show.venue?.name || "Unknown Venue";
-  const location = show.venue ? `${show.venue.city}, ${show.venue.state}` : "";
+  const location = show.venue ? formatVenueLocation(show.venue) : "";
 
   const title = `${date} - ${venue} ${location ? `- ${location}` : ""} | ${SEO_CONFIG.siteName}`;
   const description = `View setlist, reviews, and recordings from ${SEO_CONFIG.bandName} show at ${venue}${location ? ` in ${location}` : ""} on ${date}. ${setlist.sets?.length || 0} sets.`;
@@ -223,7 +224,7 @@ export function getVenuesMeta() {
 
 // Generate meta tags for a venue detail page
 export function getVenueMeta(venue: Venue & { showCount?: number; firstShowYear?: number; lastShowYear?: number }) {
-  const location = `${venue.city}, ${venue.state}`;
+  const location = formatVenueLocation(venue);
   const title = `${venue.name} - ${location} | ${SEO_CONFIG.siteName}`;
   const showHistory =
     venue.showCount && venue.firstShowYear && venue.lastShowYear
@@ -325,7 +326,7 @@ export function getShowStructuredData(setlist: Setlist) {
             "@type": "PostalAddress",
             addressLocality: venue.city,
             addressRegion: venue.state,
-            addressCountry: "US",
+            addressCountry: venueAddressCountry(venue.country),
           },
         }
       : undefined,
@@ -352,10 +353,10 @@ export function getVenueStructuredData(venue: Venue) {
       "@type": "PostalAddress",
       addressLocality: venue.city,
       addressRegion: venue.state,
-      addressCountry: "US",
+      addressCountry: venueAddressCountry(venue.country),
     },
     url: `${SEO_CONFIG.url}/venues/${venue.slug}`,
-    description: `${venue.name} - Music venue in ${venue.city}, ${venue.state}`,
+    description: `${venue.name} - Music venue in ${formatVenueLocation(venue)}`,
   };
 
   return JSON.stringify(venueData);

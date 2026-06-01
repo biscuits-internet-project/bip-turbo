@@ -6,6 +6,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { EXTERNAL_FAVICON_LINK_CLASS, EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
+import { formatVenueLocation } from "~/lib/format-venue";
 import { slugifyAnchor } from "~/lib/utils";
 import { getRockOperaPerformances, type RockOperaPerformancesLoaderData } from "./rock-opera-performances";
 
@@ -760,7 +761,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
                     <div className="text-lg md:text-2xl font-medium text-content-text-primary">{perf.date}</div>
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-base md:text-xl text-content-text-primary">
-                        {perf.venue} - {perf.city}, {perf.state}
+                        {perf.venue} - {formatVenueLocation(perf)}
                       </div>
                       {(perf.archiveUrl || perf.relistenUrl) && (
                         <div className="flex items-center gap-2 pr-2 sm:pr-3">

@@ -37,6 +37,7 @@ export const songSchema = z.object({
       name: z.string(),
       city: z.string().optional(),
       state: z.string().optional(),
+      country: z.string().optional(),
     })
     .nullable(),
   firstVenue: z
@@ -44,6 +45,7 @@ export const songSchema = z.object({
       name: z.string(),
       city: z.string().optional(),
       state: z.string().optional(),
+      country: z.string().optional(),
     })
     .nullable(),
   firstShowSlug: z.string().nullable(),

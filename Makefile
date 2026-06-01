@@ -73,6 +73,9 @@ db-restore:
 	pg_restore --no-owner --no-acl --data-only -d "$$(doppler secrets get DATABASE_URL --plain)" $(PROD_DATA_PATH) || true
 	@echo "Production data restored successfully."
 
+recompute-pending:
+	cd packages/core && doppler run -- bun run scripts/recompute-pending.ts
+
 db-sync-missing-shows:
 	cd packages/core && doppler run -- bun run scripts/sync-missing-shows.ts $(if $(HELP),--help) $(if $(YEARS),--years=$(YEARS)) $(if $(DRY_RUN),--dry-run) $(if $(PRUNE_GHOST_SHOWS),--prune-ghost-shows) $(if $(NO_USERS),--no-users) $(if $(FULL_USERS),--full-users) $(if $(PRUNE_USERS),--prune-users)
 
