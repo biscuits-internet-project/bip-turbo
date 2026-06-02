@@ -49,7 +49,8 @@ export type ShowCreateInput = Prisma.ShowCreateInput;
 
 export interface LineupEntry {
   musicianId: string;
-  instrumentId?: string | null;
+  /** Instruments this musician played in the show's lineup (e.g. guitar + vocals). */
+  instrumentIds?: string[];
 }
 
 // Mapper functions
@@ -406,7 +407,7 @@ export class ShowService {
 
     const entries: LineupEntry[] = musicians.map((musician) => ({
       musicianId: musician.id,
-      instrumentId: musician.defaultInstrumentId ?? null,
+      instrumentIds: musician.defaultInstrumentId ? [musician.defaultInstrumentId] : [],
     }));
 
     // No cache invalidation here: the caller (create) is about to run its own
@@ -424,9 +425,15 @@ export class ShowService {
           data: {
             showId,
             musicianId: entry.musicianId,
-            instrumentId: entry.instrumentId ?? null,
             createdAt: new Date(),
             updatedAt: new Date(),
+            instruments: {
+              create: (entry.instrumentIds ?? []).map((instrumentId) => ({
+                instrumentId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })),
+            },
           },
         }),
       ),

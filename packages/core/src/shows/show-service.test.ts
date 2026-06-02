@@ -630,12 +630,14 @@ describe("ShowService — default lineup on create", () => {
     await service.create({ date: "1999-12-31" });
 
     expect(db.showMusician.create).toHaveBeenCalledTimes(4);
-    const written = db.showMusician.create.mock.calls.map((c: [{ data: Record<string, unknown> }]) => ({
-      musicianId: c[0].data.musicianId,
-      instrumentId: c[0].data.instrumentId,
-    }));
-    expect(written).toContainEqual({ musicianId: "m-marlon", instrumentId: "i-drums" });
-    expect(written).toContainEqual({ musicianId: "m-jon", instrumentId: "i-guitar" });
+    const written = db.showMusician.create.mock.calls.map(
+      (c: [{ data: { musicianId: string; instruments?: { create: { instrumentId: string }[] } } }]) => ({
+        musicianId: c[0].data.musicianId,
+        instrumentIds: (c[0].data.instruments?.create ?? []).map((i) => i.instrumentId),
+      }),
+    );
+    expect(written).toContainEqual({ musicianId: "m-marlon", instrumentIds: ["i-drums"] });
+    expect(written).toContainEqual({ musicianId: "m-jon", instrumentIds: ["i-guitar"] });
   });
 
   // Missing seeds (fresh DB, or a sync that ran before seeding) must not break
@@ -661,7 +663,7 @@ describe("ShowService — default lineup on create", () => {
     const cache = makeCacheInvalidationStub();
     const service = new ShowService(db as never, logger, cache, makeStatsStub());
 
-    await service.setLineup("show-id", [{ musicianId: "m-1", instrumentId: "i-1" }]);
+    await service.setLineup("show-id", [{ musicianId: "m-1", instrumentIds: ["i-1"] }]);
 
     expect(db.showMusician.deleteMany).toHaveBeenCalledWith({ where: { showId: "show-id" } });
     expect(db.showMusician.create).toHaveBeenCalledTimes(1);

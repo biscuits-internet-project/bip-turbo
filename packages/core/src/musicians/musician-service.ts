@@ -10,6 +10,7 @@ export interface CreateInstrumentInput {
 
 export interface CreateMusicianInput {
   name: string;
+  knownFrom?: string | null;
   defaultInstrumentId?: string | null;
 }
 
@@ -28,6 +29,7 @@ function mapMusicianToDomainEntity(db: DbMusician): Musician {
     id: db.id,
     name: db.name,
     slug: db.slug,
+    knownFrom: db.knownFrom ?? null,
     defaultInstrumentId: db.defaultInstrumentId ?? null,
     createdAt: new Date(db.createdAt),
     updatedAt: new Date(db.updatedAt),
@@ -155,6 +157,7 @@ export class MusicianService {
       data: {
         name,
         slug,
+        knownFrom: data.knownFrom ?? null,
         defaultInstrumentId: data.defaultInstrumentId ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),

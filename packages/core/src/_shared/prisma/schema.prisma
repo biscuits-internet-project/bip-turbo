@@ -387,9 +387,9 @@ model Instrument {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  musicians       Musician[]
-  showMusicians   ShowMusician[]
-  trackMusicians  TrackMusician[]
+  musicians                Musician[]
+  showMusicianInstruments  ShowMusicianInstrument[]
+  trackMusicianInstruments TrackMusicianInstrument[]
 
   @@map("instruments")
 }
@@ -398,6 +398,7 @@ model Musician {
   id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                String   @db.VarChar
   slug                String   @unique(map: "musicians_slug_unique") @db.VarChar
+  knownFrom           String?  @map("known_from") @db.VarChar
   defaultInstrumentId String?  @map("default_instrument_id") @db.Uuid
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -411,16 +412,15 @@ model Musician {
 }
 
 model ShowMusician {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  showId       String   @map("show_id") @db.Uuid
-  musicianId   String   @map("musician_id") @db.Uuid
-  instrumentId String?  @map("instrument_id") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showId     String   @map("show_id") @db.Uuid
+  musicianId String   @map("musician_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  show       Show        @relation(fields: [showId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musicians_shows_show_id")
-  musician   Musician    @relation(fields: [musicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musicians_musicians_musician_id")
-  instrument Instrument? @relation(fields: [instrumentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_show_musicians_instruments_instrument_id")
+  show        Show                     @relation(fields: [showId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musicians_shows_show_id")
+  musician    Musician                 @relation(fields: [musicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musicians_musicians_musician_id")
+  instruments ShowMusicianInstrument[]
 
   @@unique([showId, musicianId], map: "show_musicians_show_musician_unique")
   @@index([musicianId])
@@ -428,22 +428,51 @@ model ShowMusician {
 }
 
 model TrackMusician {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  trackId      String   @map("track_id") @db.Uuid
-  musicianId   String   @map("musician_id") @db.Uuid
-  present      Boolean
-  instrumentId String?  @map("instrument_id") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackId    String   @map("track_id") @db.Uuid
+  musicianId String   @map("musician_id") @db.Uuid
+  present    Boolean
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  track      Track       @relation(fields: [trackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musicians_tracks_track_id")
-  musician   Musician    @relation(fields: [musicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musicians_musicians_musician_id")
-  instrument Instrument? @relation(fields: [instrumentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_track_musicians_instruments_instrument_id")
+  track       Track                     @relation(fields: [trackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musicians_tracks_track_id")
+  musician    Musician                  @relation(fields: [musicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musicians_musicians_musician_id")
+  instruments TrackMusicianInstrument[]
 
   @@unique([trackId, musicianId], map: "track_musicians_track_musician_unique")
   @@index([musicianId])
   @@index([trackId])
   @@map("track_musicians")
+}
+
+model ShowMusicianInstrument {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showMusicianId String   @map("show_musician_id") @db.Uuid
+  instrumentId   String   @map("instrument_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  showMusician ShowMusician @relation(fields: [showMusicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musician_instruments_show_musician_id")
+  instrument   Instrument   @relation(fields: [instrumentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_show_musician_instruments_instrument_id")
+
+  @@unique([showMusicianId, instrumentId], map: "show_musician_instruments_unique")
+  @@index([instrumentId])
+  @@map("show_musician_instruments")
+}
+
+model TrackMusicianInstrument {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackMusicianId String   @map("track_musician_id") @db.Uuid
+  instrumentId    String   @map("instrument_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  trackMusician TrackMusician @relation(fields: [trackMusicianId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musician_instruments_track_musician_id")
+  instrument    Instrument    @relation(fields: [instrumentId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_musician_instruments_instrument_id")
+
+  @@unique([trackMusicianId, instrumentId], map: "track_musician_instruments_unique")
+  @@index([instrumentId])
+  @@map("track_musician_instruments")
 }
 
 model SideProject {
