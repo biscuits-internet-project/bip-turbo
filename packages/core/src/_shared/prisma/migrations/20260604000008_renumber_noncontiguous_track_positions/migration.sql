@@ -22,12 +22,13 @@ UPDATE "tracks" t
 -- Renumbering changes within-set order resolution, which feeds segue-in
 -- detection and therefore the derived gap / recurrence rows. Queue a
 -- full-catalog recompute so the next deploy's recompute-pending run rebuilds
--- them. Idempotent via the NOT EXISTS guard.
+-- them. The dedup guard is a HAVING clause, not WHERE ... NOT EXISTS: the latter
+-- empties the set when the request already exists, so MIN("date") aggregates to
+-- NULL and inserts a bogus (uuid, NULL) row that violates the NOT NULL
+-- constraint. HAVING filters the aggregate row, inserting zero rows instead.
 INSERT INTO "stats_recompute_requests" ("id", "since_date")
 SELECT gen_random_uuid(), MIN("date")::date
 FROM "shows"
 WHERE "date" IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM "stats_recompute_requests"
-    WHERE "since_date" = (SELECT MIN("date")::date FROM "shows" WHERE "date" IS NOT NULL)
-  );
+HAVING MIN("date") IS NOT NULL
+   AND MIN("date")::date NOT IN (SELECT "since_date" FROM "stats_recompute_requests" WHERE "since_date" IS NOT NULL);
