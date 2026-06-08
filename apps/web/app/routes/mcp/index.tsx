@@ -707,7 +707,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               // Curated admin fields the lyrics/info page surfaces. Sync
               // mirrors them on insert + drift-update (see
               // buildSongDriftUpdate).
-              cover: song.cover,
+              kind: song.kind,
               legacyAuthor: song.legacyAuthor,
               featuredLyric: song.featuredLyric,
               tabs: song.tabs,

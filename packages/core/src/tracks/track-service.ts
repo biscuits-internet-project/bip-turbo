@@ -34,6 +34,11 @@ function mapTrackToDomainEntity(
     previousPerformanceShow: previousPerformanceShow?.slug
       ? { date: String(previousPerformanceShow.date), slug: previousPerformanceShow.slug }
       : null,
+    flags: [],
+    flagRecurrences: [],
+    segueRecurrences: [],
+    completes: [],
+    completedBy: [],
   };
 }
 

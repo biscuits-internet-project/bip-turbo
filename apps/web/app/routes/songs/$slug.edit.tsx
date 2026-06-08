@@ -1,4 +1,4 @@
-import type { Song } from "@bip/domain";
+import { narrowSongKind, type Song } from "@bip/domain";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs } from "react-router";
@@ -35,7 +35,7 @@ export const action = adminAction(async ({ request, params }: ActionFunctionArgs
   const lyrics = formData.get("lyrics") as string;
   const tabs = formData.get("tabs") as string;
   const notes = formData.get("notes") as string;
-  const cover = formData.get("cover") === "on";
+  const kind = narrowSongKind(formData.get("kind") as string | null);
   const history = formData.get("history") as string;
   const featuredLyric = formData.get("featuredLyric") as string;
   const guitarTabsUrl = formData.get("guitarTabsUrl") as string;
@@ -46,7 +46,7 @@ export const action = adminAction(async ({ request, params }: ActionFunctionArgs
     lyrics: lyrics || null,
     tabs: tabs || null,
     notes: notes || null,
-    cover,
+    kind,
     history: history || null,
     featuredLyric: featuredLyric || null,
     guitarTabsUrl: guitarTabsUrl || null,
@@ -69,7 +69,7 @@ export default function EditSong() {
         lyrics: song.lyrics,
         tabs: song.tabs,
         notes: song.notes,
-        cover: song.cover,
+        kind: song.kind ?? "original",
         history: song.history,
         featuredLyric: song.featuredLyric,
         guitarTabsUrl: song.guitarTabsUrl,

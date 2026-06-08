@@ -344,6 +344,8 @@ model Show {
   venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_venues_venue_id")
   tracks            Track[]
   previousPerformanceTracks Track[]            @relation("TrackPreviousPerformance")
+  flagRecurrencePrevious    TrackFlagAssignment[]  @relation("TrackFlagPreviousShow")
+  segueRecurrencePrevious   TrackSegueRecurrence[] @relation("TrackSeguePreviousShow")
   segueRuns         SegueRun[]
   files             ShowToFile[]
   rockOperaPerformances RockOperaPerformance[]
@@ -525,6 +527,7 @@ model Song {
   legacyAbbr      String?                  @map("legacy_abbr") @db.VarChar
   legacyId        Int?                     @map("legacy_id")
   cover           Boolean?                 @default(false)
+  kind            String?
   authorId        String?                  @map("author_id") @db.Uuid
   legacyAuthor    String?                  @map("legacy_author")
   history         String?
@@ -612,6 +615,10 @@ model Track {
   previousPerformanceShow   Show?           @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
   durationSourceRef         DurationSource? @relation(fields: [durationSource], references: [name], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_duration_source")
   trackMusicians            TrackMusician[]
+  trackFlags                TrackFlagAssignment[]
+  segueRecurrences          TrackSegueRecurrence[]
+  completionAsEarlier       TrackCompletion?  @relation("CompletionEarlier")
+  completionsAsLater        TrackCompletion[] @relation("CompletionLater")
 
   @@index([likesCount])
   @@index([nextTrackId])
@@ -634,6 +641,97 @@ model DurationSource {
   tracks      Track[]
 
   @@map("duration_sources")
+}
+
+/// Structured performance markers on a track, replacing free-text annotation
+/// parsing for the dyslexic/inverted/unfinished filters. An enum (not a string
+/// column) so the vocabulary is fixed in one place and adding a value is a
+/// single migration.
+enum TrackFlag {
+  DYSLEXIC
+  INVERTED
+  UNFINISHED
+  ENDING_ONLY
+  MIDDLE_ONLY
+  BEGINNING_ONLY
+
+  @@map("track_flag")
+}
+
+/// Join table giving a track its set of TrackFlags. One row per (track, flag).
+/// The recurrence of THIS flag for the song: `flagVersionGap` = versions of the
+/// song between this flagged performance and the prior flagged one (the gating
+/// denominator), `flagGap` = shows between (kept for reference), and
+/// `flagPreviousShowId` the prior flagged show (null ⇒ first time this flag
+/// applied). Derived by the stats rebuild, not entered by hand.
+model TrackFlagAssignment {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackId            String    @map("track_id") @db.Uuid
+  flag               TrackFlag
+  flagGap            Int?      @map("flag_gap")
+  flagVersionGap     Int?      @map("flag_version_gap")
+  flagPreviousShowId String?   @map("flag_previous_show_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  track            Track @relation(fields: [trackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_flags_tracks_track_id")
+  flagPreviousShow Show? @relation("TrackFlagPreviousShow", fields: [flagPreviousShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_track_flags_previous_show_id")
+
+  @@unique([trackId, flag], map: "track_flags_track_flag_unique")
+  @@index([flag])
+  @@index([flagPreviousShowId])
+  @@map("track_flags")
+}
+
+/// The three segue-shape recurrence series a track can belong to. See
+/// SegueRecurrenceKind in @bip/domain for the semantics.
+enum SegueRecurrenceKind {
+  STANDALONE
+  NOT_SEGUED_IN
+  NOT_SEGUED_OUT
+
+  @@map("segue_recurrence_kind")
+}
+
+/// Recurrence of a track's segue shape (standalone / not-segued-in /
+/// not-segued-out): `versionGap` = versions of the song between this shaped
+/// performance and the prior same-shape one (the gating denominator), `gap` =
+/// shows between (kept for reference), and `previousShowId` the prior same-shape
+/// show (null prev ⇒ first such version). A narrow bridge so the hot `tracks`
+/// table stays clean. Derived by the stats rebuild.
+model TrackSegueRecurrence {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackId        String              @map("track_id") @db.Uuid
+  kind           SegueRecurrenceKind
+  gap            Int?
+  versionGap     Int?                @map("version_gap")
+  previousShowId String?             @map("previous_show_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  track        Track @relation(fields: [trackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_segue_recurrence_track_id")
+  previousShow Show? @relation("TrackSeguePreviousShow", fields: [previousShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_track_segue_recurrence_previous_show_id")
+
+  @@unique([trackId, kind], map: "track_segue_recurrence_track_kind_unique")
+  @@index([previousShowId])
+  @@map("track_segue_recurrence")
+}
+
+/// Directed cross-show link: the later track "completes" an earlier, unfinished
+/// version of the same song. The earlier track is completed at most once, so
+/// earlier_track_id is unique; both directions render a dated, linked footnote.
+model TrackCompletion {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  earlierTrackId String   @unique(map: "track_completions_earlier_track_unique") @map("earlier_track_id") @db.Uuid
+  laterTrackId   String   @map("later_track_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  earlierTrack Track @relation("CompletionEarlier", fields: [earlierTrackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_completions_earlier_track_id")
+  laterTrack   Track @relation("CompletionLater", fields: [laterTrackId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_track_completions_later_track_id")
+
+  @@index([laterTrackId])
+  @@map("track_completions")
 }
 
 model User {

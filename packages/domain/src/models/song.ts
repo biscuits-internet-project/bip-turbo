@@ -9,7 +9,12 @@ export const songSchema = z.object({
   lyrics: z.string().nullable(),
   tabs: z.string().nullable(),
   notes: z.string().nullable(),
+  // Dormant: superseded by `kind`, dropped in a follow-up migration. New code
+  // reads `kind`, not this.
   cover: z.boolean().nullable().default(false),
+  // The song's origin/form in one axis. null = unclassified (treated as original
+  // for debut text). A mashup is neither a pure original nor a single cover.
+  kind: z.enum(["original", "cover", "mashup", "improvisation"]).nullable().optional(),
   authorId: z.string().uuid().nullable(),
   // Optional — mirrors prod's legacy_author column, surfaced via sync.
   legacyAuthor: z.string().nullable().optional(),
@@ -67,6 +72,19 @@ export const songSchema = z.object({
   // Relations
   authorName: z.string().nullable().optional(),
 });
+
+export type SongKind = "original" | "cover" | "mashup" | "improvisation";
+
+const SONG_KINDS: readonly SongKind[] = ["original", "cover", "mashup", "improvisation"];
+
+/**
+ * Narrow a raw kind string from the DB (a plain text column) to the known
+ * union, mapping any unexpected value to null. Lets mappers feed the DB value
+ * straight into the typed Song without an unchecked cast.
+ */
+export function narrowSongKind(value: string | null | undefined): SongKind | null {
+  return SONG_KINDS.includes(value as SongKind) ? (value as SongKind) : null;
+}
 
 export const songMinimalSchema = songSchema.pick({
   id: true,

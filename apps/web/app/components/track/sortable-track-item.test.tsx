@@ -46,6 +46,11 @@ function makeTrack(overrides: Partial<Track> = {}): Track {
     duration: null,
     durationSource: null,
     previousPerformanceShow: null,
+    flags: [],
+    flagRecurrences: [],
+    segueRecurrences: [],
+    completes: [],
+    completedBy: [],
     // Component only reads `song.title`; the rest of the Song shape is
     // irrelevant for these tests, so cast through `unknown` to avoid
     // tracking every field on the domain model.

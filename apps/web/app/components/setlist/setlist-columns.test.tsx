@@ -36,6 +36,11 @@ function makeTrack(
     duration: overrides.duration ?? null,
     durationSource: overrides.durationSource ?? null,
     previousPerformanceShow: overrides.previousPerformanceShow ?? null,
+    flags: overrides.flags ?? [],
+    flagRecurrences: overrides.flagRecurrences ?? [],
+    segueRecurrences: overrides.segueRecurrences ?? [],
+    completes: overrides.completes ?? [],
+    completedBy: overrides.completedBy ?? [],
     song: overrides.song ?? { id: overrides.songId, title: "Basis for a Day", slug: "basis-for-a-day" },
     priorPerformanceCount: overrides.priorPerformanceCount ?? 0,
   };

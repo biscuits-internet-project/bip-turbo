@@ -1,7 +1,195 @@
 import { average, median } from "@bip/domain";
 import { describe, expect, test, vi } from "vitest";
 import type { RockOperaService } from "../rock-operas/rock-opera-service";
-import { computeDebutCount, eligibleGapsForAggregation, SetlistService } from "./setlist-service";
+import {
+  computeDebutCount,
+  eligibleGapsForAggregation,
+  gateFlagRecurrences,
+  gateSegueRecurrences,
+  SetlistService,
+} from "./setlist-service";
+
+describe("recurrence server-gating", () => {
+  // Compound rule per kind: fire when versionGap >= version OR
+  // (versionGap > minVersions AND showGap > minShows).
+  const rule = { version: 20, minVersions: 10, minShows: 100 };
+  const thresholds = { DYSLEXIC: rule, STANDALONE: rule };
+  const NOT_DEBUT = false;
+
+  // A first-ever flag on a NON-debut track passes; with few prior versions
+  // (below threshold) the projected versionGap is null → footnote stays "1st time".
+  test("a first-time flag recurrence on a non-debut track is projected, versionGap nulled below threshold", () => {
+    const gated = gateFlagRecurrences(
+      [{ flag: "DYSLEXIC", flagVersionGap: 3, flagGap: null, flagPreviousShow: null }],
+      NOT_DEBUT,
+      thresholds,
+    );
+    expect(gated).toEqual([{ flag: "DYSLEXIC", versionGap: null, gap: null, lastPlayed: null }]);
+  });
+
+  // A first-ever flag that arrives LATE (versions-before clears the threshold)
+  // projects the count → footnote reads "1st time (after X versions)".
+  test("a first-time flag after many versions projects versions-before", () => {
+    const gated = gateFlagRecurrences(
+      [{ flag: "DYSLEXIC", flagVersionGap: 47, flagGap: null, flagPreviousShow: null }],
+      NOT_DEBUT,
+      thresholds,
+    );
+    expect(gated).toEqual([{ flag: "DYSLEXIC", versionGap: 47, gap: null, lastPlayed: null }]);
+  });
+
+  // On the song's DEBUT, a first-ever recurrence is noise — suppressed.
+  test("a first-time flag recurrence on the song's debut is suppressed", () => {
+    const gated = gateFlagRecurrences(
+      [{ flag: "DYSLEXIC", flagVersionGap: null, flagGap: null, flagPreviousShow: null }],
+      true, // isDebut
+      thresholds,
+    );
+    expect(gated).toEqual([]);
+  });
+
+  // A version gap at/over the kind's threshold passes; both gaps thread through.
+  test("an over-threshold flag recurrence is projected with both gaps and its prior show", () => {
+    const gated = gateFlagRecurrences(
+      [
+        {
+          flag: "DYSLEXIC",
+          flagVersionGap: 25,
+          flagGap: 140,
+          flagPreviousShow: { date: "2024-05-02", slug: "2024-05-02-foo" },
+        },
+      ],
+      NOT_DEBUT,
+      thresholds,
+    );
+    expect(gated).toEqual([
+      { flag: "DYSLEXIC", versionGap: 25, gap: 140, lastPlayed: { date: "2024-05-02", slug: "2024-05-02-foo" } },
+    ]);
+  });
+
+  // A small version gap (<= minVersions) is omitted even with a huge show gap —
+  // it failed both clauses of the rule.
+  test("a small version gap is omitted despite a large show gap", () => {
+    const gated = gateFlagRecurrences(
+      [
+        {
+          flag: "DYSLEXIC",
+          flagVersionGap: 5,
+          flagGap: 200,
+          flagPreviousShow: { date: "2024-05-02", slug: "2024-05-02-foo" },
+        },
+      ],
+      NOT_DEBUT,
+      thresholds,
+    );
+    expect(gated).toEqual([]);
+  });
+
+  // Compound rule (the Catalyst case): a moderate version gap (> minVersions but
+  // < version) FIRES when the show gap also clears minShows. 18 versions / 303
+  // shows → fires even though 18 < 20.
+  test("a moderate version gap fires when the show gap is large enough", () => {
+    const gated = gateFlagRecurrences(
+      [
+        {
+          flag: "INVERTED",
+          flagVersionGap: 18,
+          flagGap: 303,
+          flagPreviousShow: { date: "2021-04-23", slug: "2021-04-23-foo" },
+        },
+      ],
+      NOT_DEBUT,
+      { INVERTED: rule },
+    );
+    expect(gated).toEqual([
+      { flag: "INVERTED", versionGap: 18, gap: 303, lastPlayed: { date: "2021-04-23", slug: "2021-04-23-foo" } },
+    ]);
+  });
+
+  // The same moderate version gap is suppressed when the show gap is short — a
+  // recently-but-rarely-played song flipping shape isn't notable.
+  test("a moderate version gap is suppressed when the show gap is short", () => {
+    const gated = gateFlagRecurrences(
+      [
+        {
+          flag: "INVERTED",
+          flagVersionGap: 18,
+          flagGap: 60,
+          flagPreviousShow: { date: "2025-01-01", slug: "2025-01-01-foo" },
+        },
+      ],
+      NOT_DEBUT,
+      { INVERTED: rule },
+    );
+    expect(gated).toEqual([]);
+  });
+
+  // A flag not in the threshold map (display-disabled) never projects.
+  test("a display-disabled flag is omitted even when first-time", () => {
+    const gated = gateFlagRecurrences(
+      [{ flag: "UNFINISHED", flagVersionGap: null, flagGap: null, flagPreviousShow: null }],
+      NOT_DEBUT,
+      thresholds,
+    );
+    expect(gated).toEqual([]);
+  });
+
+  // HEADLINE (the Bazaar regression): the prior version was already the same
+  // shape (versionGap 0 — no shape change), so even though the song was absent
+  // for many SHOWS (large show-gap), no footnote fires.
+  test("a versionGap-0 recurrence is suppressed even with a large show gap", () => {
+    const gated = gateSegueRecurrences(
+      [{ kind: "NOT_SEGUED_IN", versionGap: 0, gap: 166, previousShow: { date: "2023-06-14", slug: "2023-06-14-x" } }],
+      NOT_DEBUT,
+      { NOT_SEGUED_IN: rule },
+    );
+    expect(gated).toEqual([]);
+  });
+
+  // Segue recurrence gates the same way, keyed by kind.
+  test("a first-time standalone segue recurrence is projected; a disabled kind is omitted", () => {
+    const gated = gateSegueRecurrences(
+      [
+        { kind: "STANDALONE", versionGap: null, gap: null, previousShow: null },
+        { kind: "NOT_SEGUED_IN", versionGap: null, gap: null, previousShow: null },
+      ],
+      NOT_DEBUT,
+      thresholds,
+    );
+    expect(gated).toEqual([{ kind: "STANDALONE", versionGap: null, gap: null, lastPlayed: null }]);
+  });
+
+  // "1st standalone version" already implies not-segued-in and not-segued-out,
+  // so when standalone is shown its narrower siblings are suppressed.
+  test("a qualifying standalone recurrence suppresses NOT_SEGUED_IN / NOT_SEGUED_OUT", () => {
+    const allKinds = { STANDALONE: rule, NOT_SEGUED_IN: rule, NOT_SEGUED_OUT: rule };
+    const gated = gateSegueRecurrences(
+      [
+        { kind: "STANDALONE", versionGap: null, gap: null, previousShow: null },
+        { kind: "NOT_SEGUED_IN", versionGap: null, gap: null, previousShow: null },
+        { kind: "NOT_SEGUED_OUT", versionGap: null, gap: null, previousShow: null },
+      ],
+      NOT_DEBUT,
+      allKinds,
+    );
+    expect(gated).toEqual([{ kind: "STANDALONE", versionGap: null, gap: null, lastPlayed: null }]);
+  });
+
+  // When standalone itself doesn't qualify (under threshold), its siblings are
+  // NOT suppressed — they stand on their own.
+  test("a non-qualifying standalone does not suppress its siblings", () => {
+    const allKinds = { STANDALONE: rule, NOT_SEGUED_IN: rule, NOT_SEGUED_OUT: rule };
+    const gated = gateSegueRecurrences(
+      [
+        { kind: "STANDALONE", versionGap: 5, gap: 30, previousShow: { date: "2024-01-01", slug: "2024-01-01-x" } },
+        { kind: "NOT_SEGUED_IN", versionGap: null, gap: null, previousShow: null },
+      ],
+      NOT_DEBUT,
+      allKinds,
+    );
+    expect(gated).toEqual([{ kind: "NOT_SEGUED_IN", versionGap: null, gap: null, lastPlayed: null }]);
+  });
+});
 
 // Minimal mock DbClient — only the paths used by tests
 function makeMockDb() {
@@ -66,6 +254,21 @@ describe("SetlistService.findManyLight", () => {
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.date).toBeUndefined();
+  });
+
+  // Regression: listing pages synthesize "with <guest> on <instrument>" footnotes
+  // from the show lineup + per-track deltas. The light query used to omit those
+  // relations, so the footnotes silently dropped from year/on-this-day listings
+  // even though the single-show page showed them. The query must load both.
+  test("loads show lineup + track performer deltas so listing footnotes render", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findManyLight({ filters: { year: 2024 } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.include.showMusicians).toBeDefined();
+    expect(call.include.tracks.select.trackMusicians).toBeDefined();
   });
 
   // hasYoutube=true maps to showYoutubesCount > 0 — same pattern as hasPhotos
@@ -372,6 +575,155 @@ describe("SetlistService.findByShowSlug", () => {
       slug: "2024-06-15-some-venue",
     });
   });
+
+  // The debut footnote suppresses improvisations, so the song's kind must
+  // survive the mapper onto the track. A jam mapped without it renders a
+  // bogus "debut (original)".
+  test("carries the song kind through onto the track", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+    db.show.findUnique.mockResolvedValue({
+      id: "show-1",
+      slug: "2026-05-24",
+      date: "2026-05-24",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      venueId: "v-1",
+      bandId: "b-1",
+      tracks: [
+        {
+          id: "t-1",
+          showId: "show-1",
+          songId: "song-jam",
+          set: "S1",
+          position: 1,
+          segue: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          likesCount: 0,
+          slug: "t-1",
+          note: null,
+          allTimer: false,
+          previousTrackId: null,
+          nextTrackId: null,
+          averageRating: 0,
+          ratingsCount: 0,
+          gap: null,
+          previousPerformanceShowId: null,
+          previousPerformanceShow: null,
+          song: {
+            id: "song-jam",
+            title: "Mishawaka Improv Jam",
+            slug: "mishawaka-improv-jam",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            kind: "improvisation",
+            authorId: null,
+            yearlyPlayData: {},
+            longestGapsData: {},
+            lyrics: null,
+            tabs: null,
+            notes: null,
+            history: null,
+            featuredLyric: null,
+            timesPlayed: 0,
+            guitarTabsUrl: null,
+            dateLastPlayed: null,
+            dateFirstPlayed: null,
+            author: null,
+          },
+          annotations: [],
+        },
+      ],
+      venue: {
+        id: "v-1",
+        name: "Mishawaka",
+        slug: "mishawaka",
+        city: "Bellvue",
+        country: "US",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    const setlist = await service.findByShowSlug("2026-05-24");
+    const track = setlist?.sets.flatMap((s) => s.tracks).find((t) => t.id === "t-1");
+    expect(track?.song?.kind).toBe("improvisation");
+  });
+
+  // A cover-debut footnote names the original artist, so authorName must flow
+  // from the joined Author relation onto the track's song.
+  test("flattens authorName from the joined author onto the track", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+    db.show.findUnique.mockResolvedValue({
+      id: "show-1",
+      slug: "2026-03-20",
+      date: "2026-03-20",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      venueId: "v-1",
+      bandId: "b-1",
+      tracks: [
+        {
+          id: "t-1",
+          showId: "show-1",
+          songId: "song-cover",
+          set: "S1",
+          position: 1,
+          segue: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          likesCount: 0,
+          slug: "t-1",
+          note: null,
+          allTimer: false,
+          previousTrackId: null,
+          nextTrackId: null,
+          averageRating: 0,
+          ratingsCount: 0,
+          gap: null,
+          previousPerformanceShowId: null,
+          previousPerformanceShow: null,
+          song: {
+            id: "song-cover",
+            title: "In This Bih’",
+            slug: "in-this-bih",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            kind: "cover",
+            authorId: "author-1",
+            yearlyPlayData: {},
+            longestGapsData: {},
+            lyrics: null,
+            tabs: null,
+            notes: null,
+            history: null,
+            featuredLyric: null,
+            timesPlayed: 0,
+            guitarTabsUrl: null,
+            dateLastPlayed: null,
+            dateFirstPlayed: null,
+            author: { name: "Chris Lorenzo" },
+          },
+          annotations: [],
+        },
+      ],
+      venue: {
+        id: "v-1",
+        name: "Okeechobee",
+        slug: "okeechobee",
+        city: "Okeechobee",
+        country: "US",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    const setlist = await service.findByShowSlug("2026-03-20");
+    const track = setlist?.sets.flatMap((s) => s.tracks).find((t) => t.id === "t-1");
+    expect(track?.song?.authorName).toBe("Chris Lorenzo");
+  });
 });
 
 describe("SetlistService.findManyLight", () => {
@@ -389,6 +741,48 @@ describe("SetlistService.findManyLight", () => {
     });
     expect(call.include.tracks.select.gap).toBe(true);
     expect(call.include.tracks.select.previousPerformanceShowId).toBe(true);
+  });
+});
+
+describe("SetlistService.findMany stub filtering", () => {
+  // findMany dropped venueless stub shows in JS *after* pagination, so a stub
+  // landing on a page silently shrank it below the page size. Filter at the SQL
+  // boundary instead (mirroring findManyLight) so pagination counts stay exact
+  // and stubs never reach the listing.
+  test("excludes venueless stubs at the SQL boundary when no venue filter is given", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findMany({ filters: { year: 2024 } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.venueId).toEqual({ not: null });
+  });
+
+  // The venue-detail page passes an explicit venueId; that must win over the
+  // stub default (a real venue is never null anyway).
+  test("uses the caller's venueId when one is supplied", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findMany({ filters: { venueId: "venue-1" } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.venueId).toBe("venue-1");
+  });
+});
+
+describe("SetlistService.findManyByShowIds stub filtering", () => {
+  // Same post-pagination undercount as findMany: the id list can include a stub
+  // (e.g. top-rated joins), so exclude venueless shows in the query.
+  test("excludes venueless stubs at the SQL boundary", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findManyByShowIds(["show-1", "show-2"]);
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.venueId).toEqual({ not: null });
   });
 });
 

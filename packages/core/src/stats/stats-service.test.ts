@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { CacheService } from "../_shared/cache";
-import { StatsService, songStatsChanged } from "./stats-service";
+import type { RecurrenceTrackForWalk } from "../_shared/track-gap";
+import { computeRecurrenceForSong, StatsService, songStatsChanged } from "./stats-service";
 
 const baseFresh = {
   timesPlayed: 3,
@@ -101,6 +102,95 @@ describe("songStatsChanged", () => {
   test("returns true when current yearlyPlayData is null and fresh has data", () => {
     const current = { ...baseFresh, yearlyPlayData: null as unknown };
     expect(songStatsChanged(current, baseFresh)).toBe(true);
+  });
+});
+
+describe("computeRecurrenceForSong", () => {
+  const statsShows = ["2003-01-01", "2003-01-05", "2003-01-10", "2003-01-20", "2003-02-01"];
+
+  function recurrenceTrack(
+    opts: Partial<RecurrenceTrackForWalk> & Pick<RecurrenceTrackForWalk, "trackId" | "showId" | "showDate">,
+  ): RecurrenceTrackForWalk {
+    return {
+      dayOrder: null,
+      showCountForStats: true,
+      set: "S1",
+      position: 1,
+      segue: null,
+      seguedIn: false,
+      flags: [],
+      ...opts,
+    };
+  }
+
+  // One dyslexic occurrence ⇒ a flag-recurrence row keyed by (track, flag) with
+  // null gap/prev. No segue rows for kinds the track never qualifies for... but
+  // every standalone track qualifies for STANDALONE, so that row exists too.
+  test("a single dyslexic standalone track yields first-time flag + segue rows", () => {
+    const tracks = [recurrenceTrack({ trackId: "a", showId: "A", showDate: "2003-01-01", flags: ["DYSLEXIC"] })];
+    const { flagRecurrences, segueRecurrences } = computeRecurrenceForSong(tracks, statsShows);
+
+    expect(flagRecurrences).toEqual([
+      { trackId: "a", flag: "DYSLEXIC", gap: null, versionGap: 0, previousShowId: null },
+    ]);
+    // A lone standalone track is first-of-each segue kind it qualifies for.
+    expect(segueRecurrences).toEqual([
+      { trackId: "a", kind: "STANDALONE", gap: null, versionGap: 0, previousShowId: null },
+      { trackId: "a", kind: "NOT_SEGUED_IN", gap: null, versionGap: 0, previousShowId: null },
+      { trackId: "a", kind: "NOT_SEGUED_OUT", gap: null, versionGap: 0, previousShowId: null },
+    ]);
+  });
+
+  // Two dyslexic performances ⇒ the later carries the gap + prev show.
+  test("two dyslexic performances: later track records gap and previous show", () => {
+    const tracks = [
+      recurrenceTrack({ trackId: "a", showId: "A", showDate: "2003-01-01", flags: ["DYSLEXIC"] }),
+      recurrenceTrack({ trackId: "b", showId: "B", showDate: "2003-01-20", flags: ["DYSLEXIC"] }),
+    ];
+    const { flagRecurrences } = computeRecurrenceForSong(tracks, statsShows);
+    expect(flagRecurrences).toContainEqual({
+      trackId: "a",
+      flag: "DYSLEXIC",
+      gap: null,
+      versionGap: 0,
+      previousShowId: null,
+    });
+    // Strictly between 01-01 and 01-20: 01-05, 01-10 → 2 shows. Versions: a and b
+    // are consecutive dyslexic versions with nothing between → versionGap 0.
+    expect(flagRecurrences).toContainEqual({
+      trackId: "b",
+      flag: "DYSLEXIC",
+      gap: 2,
+      versionGap: 0,
+      previousShowId: "A",
+    });
+  });
+
+  // A track that segues out qualifies only for NOT_SEGUED_IN (not standalone /
+  // not-segued-out), so only that kind's row is emitted for it.
+  test("a segued-out track only qualifies for NOT_SEGUED_IN", () => {
+    const tracks = [recurrenceTrack({ trackId: "a", showId: "A", showDate: "2003-01-01", segue: ">" })];
+    const { segueRecurrences } = computeRecurrenceForSong(tracks, statsShows);
+    expect(segueRecurrences).toEqual([
+      { trackId: "a", kind: "NOT_SEGUED_IN", gap: null, versionGap: 0, previousShowId: null },
+    ]);
+  });
+
+  // A segued-into track qualifies only for NOT_SEGUED_OUT (not standalone, not
+  // not-segued-in), so only that kind's row is emitted for it.
+  test("a segued-into track only qualifies for NOT_SEGUED_OUT", () => {
+    const tracks = [recurrenceTrack({ trackId: "a", showId: "A", showDate: "2003-01-01", seguedIn: true })];
+    const { segueRecurrences } = computeRecurrenceForSong(tracks, statsShows);
+    expect(segueRecurrences).toEqual([
+      { trackId: "a", kind: "NOT_SEGUED_OUT", gap: null, versionGap: 0, previousShowId: null },
+    ]);
+  });
+
+  // A song with no flags emits no flag-recurrence rows.
+  test("a song with no flags emits no flag-recurrence rows", () => {
+    const tracks = [recurrenceTrack({ trackId: "a", showId: "A", showDate: "2003-01-01" })];
+    const { flagRecurrences } = computeRecurrenceForSong(tracks, statsShows);
+    expect(flagRecurrences).toEqual([]);
   });
 });
 

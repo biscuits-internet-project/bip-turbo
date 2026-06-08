@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { describe, expect, type Mock, test, vi } from "vitest";
 import type { CacheInvalidationService } from "../_shared/cache";
 import type { StatsService } from "../stats/stats-service";
@@ -152,6 +153,48 @@ describe("ShowService.getShowDatesWithFlags", () => {
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where).toEqual({ venueId: { not: null } });
+  });
+});
+
+describe("ShowService.findAdjacentShows", () => {
+  // Prod has orphan placeholder shows (bare YYYY-MM-DD slug, no venue) sitting
+  // beside the real show on the same date — e.g. `2025-10-31` next to
+  // `2025-10-31-suwannee-music-park-live-oak-fl`. If adjacency links to one,
+  // clicking the prev/next button 404s because findByShowSlug returns null for
+  // a venueless show. Both adjacency queries must exclude these.
+  test("excludes venueless stub shows from both prev and next queries", async () => {
+    const db = makeMockDb();
+    db.show.findUnique.mockResolvedValue({ id: "current-id", dayOrder: null });
+    const captured: Array<{ strings: ReadonlyArray<string>; values: unknown[] }> = [];
+    db.$queryRaw = vi.fn((strings: ReadonlyArray<string>, ...values: unknown[]) => {
+      captured.push({ strings, values });
+      return Promise.resolve([]);
+    });
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.findAdjacentShows("2025-10-31", "2025-10-31-suwannee-music-park-live-oak-fl");
+
+    expect(captured).toHaveLength(2);
+    for (const { strings, values } of captured) {
+      const composed = Prisma.sql(strings, ...values);
+      expect(composed.sql).toContain("venue_id IS NOT NULL");
+    }
+  });
+});
+
+describe("ShowService.search", () => {
+  // Full-text search fetches shows by the ids returned from pg_search_documents.
+  // Guard the fetch with the stub filter so an indexed venueless placeholder can
+  // never surface as a clickable search hit that 404s.
+  test("excludes venueless stub shows from the id fetch", async () => {
+    const db = makeMockDb();
+    db.$queryRaw = vi.fn().mockResolvedValue([]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    await service.search("suwannee");
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.venueId).toEqual({ not: null });
   });
 });
 

@@ -1,13 +1,20 @@
+import type { SegueRecurrenceKind } from "@bip/domain";
 import { CacheKeys, countSortedAfter } from "@bip/domain";
 import type { CacheService } from "../_shared/cache/cache-service";
 import type { DbClient } from "../_shared/database/models";
 import { nonStubShowsSql, STATS_SHOWS_WHERE, statsShowsSql, TRACK_BY_SHOW_ORDER_ASC } from "../_shared/show-ordering";
 import {
+  computeRecurrence,
   computeSongStats,
   computeTrackGaps,
+  flagPredicate,
   type GapResult,
+  notSeguedInPredicate,
+  notSeguedOutPredicate,
+  type RecurrencePredicate,
+  type RecurrenceTrackForWalk,
   sortTracksForGapWalk,
-  type TrackForGapWalk,
+  standalonePredicate,
 } from "../_shared/track-gap";
 
 const ONE_DAY_SECONDS = 86400;
@@ -224,7 +231,7 @@ export class StatsService {
     if (affected.length === 0) return;
     const affectedSongIds = affected.map((a) => a.songId);
 
-    const [statsShows, allTracks, currentSongs] = await Promise.all([
+    const [statsShows, allTracks, currentSongs, seguedInTrackIds] = await Promise.all([
       this.db.show.findMany({
         where: STATS_SHOWS_WHERE,
         select: { date: true },
@@ -234,6 +241,7 @@ export class StatsService {
         where: { songId: { in: affectedSongIds } },
         include: {
           show: { select: { id: true, date: true, dayOrder: true, countForStats: true } },
+          trackFlags: { select: { flag: true } },
         },
         orderBy: TRACK_BY_SHOW_ORDER_ASC,
       }),
@@ -247,6 +255,7 @@ export class StatsService {
           yearlyPlayData: true,
         },
       }),
+      this.seguedInTrackIds(affectedSongIds),
     ]);
     const statsShowDates = statsShows.map((s) => s.date);
     const currentSongById = new Map(currentSongs.map((s) => [s.id, s]));
@@ -260,9 +269,11 @@ export class StatsService {
 
     const changedGapResults: GapResult[] = [];
     const changedSongUpdates: Array<{ songId: string; stats: ReturnType<typeof computeSongStats> }> = [];
+    const flagRecurrences: FlagRecurrenceResult[] = [];
+    const segueRecurrences: SegueRecurrenceResult[] = [];
 
     for (const [songId, songTracks] of tracksBySong) {
-      const walkInput: TrackForGapWalk[] = songTracks.flatMap((t) => {
+      const recurrenceInput: RecurrenceTrackForWalk[] = songTracks.flatMap((t) => {
         if (!t.show) return [];
         return [
           {
@@ -271,12 +282,20 @@ export class StatsService {
             showDate: t.show.date,
             dayOrder: t.show.dayOrder,
             showCountForStats: t.show.countForStats,
+            set: t.set,
             position: t.position,
+            segue: t.segue,
+            seguedIn: seguedInTrackIds.has(t.id),
+            flags: t.trackFlags.map((f) => f.flag),
           },
         ];
       });
-      const sortedTracks = sortTracksForGapWalk(walkInput);
+      const sortedTracks = sortTracksForGapWalk(recurrenceInput);
       const gapResults = computeTrackGaps(sortedTracks, statsShowDates);
+
+      const songRecurrence = computeRecurrenceForSong(recurrenceInput, statsShowDates);
+      flagRecurrences.push(...songRecurrence.flagRecurrences);
+      segueRecurrences.push(...songRecurrence.segueRecurrences);
 
       // Diff each computed (gap, prevId) against the current row. Tracks
       // before sinceDate can't change, but they're cheap to check and the
@@ -291,7 +310,7 @@ export class StatsService {
       }
 
       const songStats = computeSongStats(
-        walkInput.filter((t) => t.showCountForStats).map((t) => ({ showId: t.showId, showDate: t.showDate })),
+        recurrenceInput.filter((t) => t.showCountForStats).map((t) => ({ showId: t.showId, showDate: t.showDate })),
       );
       const current = currentSongById.get(songId);
       if (!current || songStatsChanged(current, songStats)) {
@@ -299,7 +318,123 @@ export class StatsService {
       }
     }
 
-    await Promise.all([this.bulkUpdateTrackGaps(changedGapResults), this.bulkUpdateSongStats(changedSongUpdates)]);
+    const affectedTrackIds = allTracks.map((t) => t.id);
+    await Promise.all([
+      this.bulkUpdateTrackGaps(changedGapResults),
+      this.bulkUpdateSongStats(changedSongUpdates),
+      this.replaceFlagRecurrence(affectedTrackIds, flagRecurrences),
+      this.replaceSegueRecurrence(affectedTrackIds, segueRecurrences),
+    ]);
+  }
+
+  /**
+   * Full-catalog rebuild entrypoint: recompute recurrence (and gaps / song
+   * stats) for every track by walking from the earliest show forward. A manual
+   * convenience for local/one-off backfills; prod's initial population runs via
+   * the recompute queue (a migration enqueues the earliest date, the deploy-time
+   * recompute-pending then rebuilds the whole catalog through the same path).
+   */
+  async rebuildAllRecurrence(): Promise<void> {
+    const earliest = await this.db.show.findFirst({
+      orderBy: { date: "asc" },
+      select: { date: true },
+    });
+    if (!earliest) return;
+    await this.rebuildGapsAndSongStatsSince(earliest.date);
+  }
+
+  /**
+   * Set the `flag_gap` / `flag_previous_show_id` columns on the recurrence-
+   * bearing track_flags rows, and clear them on every other flag row for the
+   * affected tracks (a track that no longer qualifies for a flag's recurrence
+   * — e.g. the flag was removed — must lose its stale recurrence). Two
+   * UNNEST-driven statements, mirroring `bulkUpdateTrackGaps`.
+   */
+  private async replaceFlagRecurrence(affectedTrackIds: string[], recurrences: FlagRecurrenceResult[]): Promise<void> {
+    if (affectedTrackIds.length === 0) return;
+    // Clear first so rows that dropped out of a recurrence series reset to null.
+    await this.db.$executeRaw`
+      UPDATE track_flags
+         SET flag_gap = NULL, flag_version_gap = NULL, flag_previous_show_id = NULL, updated_at = NOW()
+       WHERE track_id = ANY(${affectedTrackIds}::uuid[])
+         AND (flag_gap IS NOT NULL OR flag_version_gap IS NOT NULL OR flag_previous_show_id IS NOT NULL)
+    `;
+    if (recurrences.length === 0) return;
+    const trackIds = recurrences.map((r) => r.trackId);
+    const flags = recurrences.map((r) => r.flag);
+    const gaps = recurrences.map((r) => r.gap);
+    const versionGaps = recurrences.map((r) => r.versionGap);
+    const previousShowIds = recurrences.map((r) => r.previousShowId);
+    await this.db.$executeRaw`
+      UPDATE track_flags tf
+         SET flag_gap = u.gap,
+             flag_version_gap = u.version_gap,
+             flag_previous_show_id = u.previous_show_id,
+             updated_at = NOW()
+        FROM (
+          SELECT
+            UNNEST(${trackIds}::uuid[])        AS track_id,
+            UNNEST(${flags}::track_flag[])     AS flag,
+            UNNEST(${gaps}::int[])             AS gap,
+            UNNEST(${versionGaps}::int[])      AS version_gap,
+            UNNEST(${previousShowIds}::uuid[]) AS previous_show_id
+        ) AS u
+       WHERE tf.track_id = u.track_id AND tf.flag = u.flag
+    `;
+  }
+
+  /**
+   * Replace the track_segue_recurrence rows for the affected tracks: delete
+   * them all, then re-insert the freshly-computed set. A delete+insert (rather
+   * than upsert+prune) because the qualifying set per track changes wholesale
+   * when a segue is added or removed, and the affected-track scope is bounded.
+   */
+  private async replaceSegueRecurrence(
+    affectedTrackIds: string[],
+    recurrences: SegueRecurrenceResult[],
+  ): Promise<void> {
+    if (affectedTrackIds.length === 0) return;
+    await this.db.$executeRaw`
+      DELETE FROM track_segue_recurrence WHERE track_id = ANY(${affectedTrackIds}::uuid[])
+    `;
+    if (recurrences.length === 0) return;
+    const trackIds = recurrences.map((r) => r.trackId);
+    const kinds = recurrences.map((r) => r.kind);
+    const gaps = recurrences.map((r) => r.gap);
+    const versionGaps = recurrences.map((r) => r.versionGap);
+    const previousShowIds = recurrences.map((r) => r.previousShowId);
+    await this.db.$executeRaw`
+      INSERT INTO track_segue_recurrence (track_id, kind, gap, version_gap, previous_show_id, updated_at)
+      SELECT
+        UNNEST(${trackIds}::uuid[]),
+        UNNEST(${kinds}::segue_recurrence_kind[]),
+        UNNEST(${gaps}::int[]),
+        UNNEST(${versionGaps}::int[]),
+        UNNEST(${previousShowIds}::uuid[]),
+        NOW()
+    `;
+  }
+
+  /**
+   * The ids of the affected-song tracks that are segued INTO — i.e. the track
+   * at position-1 in the same show+set segued out. The set neighbor usually
+   * belongs to a DIFFERENT song than the one being rebuilt, so this can't be
+   * derived from the per-song track list; a self-join resolves it in one query.
+   */
+  private async seguedInTrackIds(songIds: string[]): Promise<Set<string>> {
+    if (songIds.length === 0) return new Set();
+    const rows = await this.db.$queryRaw<Array<{ id: string }>>`
+      SELECT t.id
+      FROM tracks t
+      JOIN tracks prev
+        ON prev.show_id = t.show_id
+       AND prev.set = t.set
+       AND prev.position = t.position - 1
+      WHERE t.song_id = ANY(${songIds}::uuid[])
+        AND prev.segue IS NOT NULL
+        AND prev.segue != ''
+    `;
+    return new Set(rows.map((r) => r.id));
   }
 
   /**
@@ -360,6 +495,67 @@ export class StatsService {
        WHERE t.id = u.track_id
     `;
   }
+}
+
+/** One computed flag-recurrence row: the recurrence of `flag` at `trackId`. */
+export type FlagRecurrenceResult = {
+  trackId: string;
+  flag: string;
+  gap: number | null;
+  versionGap: number | null;
+  previousShowId: string | null;
+};
+
+/** One computed segue-recurrence row: the recurrence of `kind` at `trackId`. */
+export type SegueRecurrenceResult = {
+  trackId: string;
+  kind: SegueRecurrenceKind;
+  gap: number | null;
+  versionGap: number | null;
+  previousShowId: string | null;
+};
+
+// The three segue kinds and their qualifying predicates, walked for every song.
+const SEGUE_RECURRENCE_PREDICATES: ReadonlyArray<{ kind: SegueRecurrenceKind; predicate: RecurrencePredicate }> = [
+  { kind: "STANDALONE", predicate: standalonePredicate },
+  { kind: "NOT_SEGUED_IN", predicate: notSeguedInPredicate },
+  { kind: "NOT_SEGUED_OUT", predicate: notSeguedOutPredicate },
+];
+
+/**
+ * Compute every flag-recurrence and segue-recurrence row for one song's
+ * tracks. Runs the generic recurrence walk once per distinct flag present on
+ * the song and once per segue kind. Pure — the rebuild fetches the tracks and
+ * writes the diffed results. Input need not be pre-sorted.
+ */
+export function computeRecurrenceForSong(
+  tracks: RecurrenceTrackForWalk[],
+  statsShowDates: string[],
+): { flagRecurrences: FlagRecurrenceResult[]; segueRecurrences: SegueRecurrenceResult[] } {
+  const sorted = sortTracksForGapWalk(tracks);
+
+  const distinctFlags = [...new Set(sorted.flatMap((t) => t.flags))];
+  const flagRecurrences = distinctFlags.flatMap((flag) =>
+    computeRecurrence(sorted, flagPredicate(flag), statsShowDates).map((r) => ({
+      trackId: r.trackId,
+      flag,
+      gap: r.gap,
+      versionGap: r.versionGap,
+      previousShowId: r.previousShowId,
+    })),
+  );
+
+  const segueRecurrences = SEGUE_RECURRENCE_PREDICATES.flatMap(({ kind, predicate }) =>
+    computeRecurrence(sorted, predicate, statsShowDates).map((r) => ({
+      trackId: r.trackId,
+      kind,
+      gap: r.gap,
+      versionGap: r.versionGap,
+      previousShowId: r.previousShowId,
+    })),
+  );
+
+  return { flagRecurrences, segueRecurrences };
 }
 
 /**

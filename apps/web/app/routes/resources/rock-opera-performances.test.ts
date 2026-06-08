@@ -52,6 +52,8 @@ function makeSetlist(showId: string, date: string): Setlist {
     medianSongGap: null,
     debutCount: 0,
     rockOperaPerformances: [], // composer default; loader overlays real data
+    lineup: [],
+    trackMusicianDeltas: [],
   };
 }
 

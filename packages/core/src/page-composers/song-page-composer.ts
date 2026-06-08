@@ -4,8 +4,11 @@ import {
   countSortedAfter,
   countSortedBetween,
   countSortedOnOrAfter,
+  narrowSongKind,
+  type SongKind,
   type SongPagePerformance,
   type SongPageView,
+  type TrackFlag,
 } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
@@ -31,7 +34,7 @@ export interface FilteredSongRarity {
 export interface PerformanceFilterOptions {
   startDate?: Date;
   endDate?: Date;
-  cover?: boolean;
+  kind?: SongKind;
   authorId?: string;
   attendedUserId?: string;
   encore?: boolean;
@@ -42,6 +45,7 @@ export interface PerformanceFilterOptions {
   standalone?: boolean;
   inverted?: boolean;
   dyslexic?: boolean;
+  unfinished?: boolean;
   /** Narrow to tracks carrying a curated jam-chart note (non-empty). */
   jamChart?: boolean;
   allTimer?: boolean;
@@ -161,7 +165,7 @@ export class SongPageComposer {
 
     const performances = result.map((row) => ({
       ...this.transformToSongPagePerformanceView(row),
-      cover: song.cover ?? undefined,
+      kind: song.kind ?? undefined,
       authorId: song.authorId ?? null,
       // Single-song rows skip the song join; fill in title/slug from the
       // page's song context so cross-song renderers (e.g. the
@@ -293,7 +297,7 @@ export class SongPageComposer {
 
     const performances = result.map((row) => ({
       ...this.transformToSongPagePerformanceView(row),
-      cover: song.cover ?? undefined,
+      kind: song.kind ?? undefined,
       authorId: song.authorId ?? null,
       // The per-song composer queries without a song join (the song is
       // already known), so the raw rows don't carry song_title/song_slug.
@@ -468,7 +472,7 @@ export class SongPageComposer {
       o.startDate ? { condition: Prisma.sql`shows.date >= ${o.startDate.toISOString().slice(0, 10)}` } : null,
     endDate: (o) =>
       o.endDate ? { condition: Prisma.sql`shows.date <= ${o.endDate.toISOString().slice(0, 10)}` } : null,
-    cover: (o) => (o.cover !== undefined ? { condition: Prisma.sql`songs.cover = ${o.cover}` } : null),
+    kind: (o) => (o.kind ? { condition: Prisma.sql`songs.kind = ${o.kind}` } : null),
     authorId: (o) => (o.authorId ? { condition: Prisma.sql`songs.author_id = ${o.authorId}::uuid` } : null),
     attendedUserId: (o) =>
       o.attendedUserId
@@ -504,13 +508,19 @@ export class SongPageComposer {
     inverted: (o) =>
       o.inverted
         ? {
-            condition: Prisma.sql`EXISTS (SELECT 1 FROM annotations WHERE annotations.track_id = tracks.id AND LOWER(annotations.desc) LIKE '%inverted%')`,
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'INVERTED'::track_flag)`,
           }
         : null,
     dyslexic: (o) =>
       o.dyslexic
         ? {
-            condition: Prisma.sql`EXISTS (SELECT 1 FROM annotations WHERE annotations.track_id = tracks.id AND LOWER(annotations.desc) LIKE '%dyslexic%')`,
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'DYSLEXIC'::track_flag)`,
+          }
+        : null,
+    unfinished: (o) =>
+      o.unfinished
+        ? {
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'UNFINISHED'::track_flag)`,
           }
         : null,
   };
@@ -540,7 +550,7 @@ export class SongPageComposer {
     extraJoins?: Prisma.Sql[];
   }): Promise<PerformanceDto[]> {
     const songColumns = options.includeSongInfo
-      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug, songs.cover as song_cover, songs.author_id as song_author_id`
+      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug, songs.kind as song_kind, songs.author_id as song_author_id`
       : Prisma.empty;
     const songJoin = options.includeSongInfo ? Prisma.sql`JOIN songs ON tracks.song_id = songs.id` : Prisma.empty;
     const extraJoinsSql =
@@ -619,8 +629,20 @@ export class SongPageComposer {
       annotationsByTrackId.set(annotation.trackId, trackAnnotations);
     }
 
+    const flagRows = await this.db.trackFlagAssignment.findMany({
+      where: { trackId: { in: trackIds } },
+      select: { trackId: true, flag: true },
+    });
+    const flagsByTrackId = new Map<string, TrackFlag[]>();
+    for (const row of flagRows) {
+      const trackFlags = flagsByTrackId.get(row.trackId) || [];
+      trackFlags.push(row.flag);
+      flagsByTrackId.set(row.trackId, trackFlags);
+    }
+
     for (const performance of performances) {
       performance.annotations = annotationsByTrackId.get(performance.trackId) || [];
+      performance.flags = flagsByTrackId.get(performance.trackId) || [];
     }
 
     await this.computePerformanceTags(performances);
@@ -704,6 +726,7 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.standalone ||
       options.inverted ||
       options.dyslexic ||
+      options.unfinished ||
       options.jamChart ||
       options.allTimer ||
       options.monthDay,
@@ -732,6 +755,7 @@ export function assignFilteredGaps(performances: SongPagePerformance[], matching
     // The filtered set is the universe, so each row advances the "last
     // performance" cursor — no count_for_stats sub-distinction here.
     showCountForStats: true,
+    set: performance.set ?? "",
     position: performance.position ?? 0,
   }));
 
@@ -750,8 +774,8 @@ export function assignFilteredGaps(performances: SongPagePerformance[], matching
 
 /**
  * Compute the performance tags (encore, opener/closer, segues, standalone,
- * inverted, dyslexic) for a single performance. Pure function — no DB,
- * no side effects.
+ * inverted, dyslexic, unfinished) for a single performance. Pure function: no
+ * DB, no side effects. Reads the structured `flags` populated by enrichment.
  */
 export function computeTagsForPerformance(
   performance: SongPagePerformance,
@@ -783,12 +807,11 @@ export function computeTagsForPerformance(
   // Standalone (no segue in or out)
   tags.standalone = !hasSegueIn && !hasSegueOut;
 
-  // Inverted/Dyslexic from annotations
-  if (performance.annotations) {
-    const annotationText = performance.annotations.map((a) => a.desc?.toLowerCase() || "").join(" ");
-    tags.inverted = annotationText.includes("inverted");
-    tags.dyslexic = annotationText.includes("dyslexic");
-  }
+  // Inverted/Dyslexic/Unfinished from structured track flags.
+  const flags = performance.flags ?? [];
+  tags.inverted = flags.includes("INVERTED");
+  tags.dyslexic = flags.includes("DYSLEXIC");
+  tags.unfinished = flags.includes("UNFINISHED");
 
   return tags;
 }
@@ -845,7 +868,7 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     segue: row.segue,
     set: row.set,
     position: row.position,
-    cover: row.song_cover ?? undefined,
+    kind: narrowSongKind(row.song_kind),
     authorId: row.song_author_id ?? null,
     duration: row.duration ?? null,
     durationSource: row.duration_source ?? null,
@@ -950,13 +973,13 @@ export type PerformanceDto = {
   prev_song_slug: string | null;
 
   // Song fields (present when songs table is joined)
-  song_cover?: boolean | null;
+  song_kind?: string | null;
   song_author_id?: string | null;
 };
 
 type AllTimerPerformanceDto = PerformanceDto & {
   song_title: string;
   song_slug: string;
-  song_cover: boolean | null;
+  song_kind: string | null;
   song_author_id: string | null;
 };

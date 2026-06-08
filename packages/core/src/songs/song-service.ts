@@ -1,4 +1,4 @@
-import type { Logger, Song, TrendingSong } from "@bip/domain";
+import { type Logger, narrowSongKind, type Song, type SongKind, type TrendingSong } from "@bip/domain";
 import type { DbClient, DbSong } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -12,7 +12,7 @@ export interface SongFilter {
   startDate?: Date;
   endDate?: Date;
   authorId?: string;
-  cover?: boolean;
+  kind?: SongKind;
   attendedUserId?: string;
 }
 
@@ -21,7 +21,7 @@ export interface CreateSongInput {
   lyrics?: string | null;
   tabs?: string | null;
   notes?: string | null;
-  cover?: boolean | null;
+  kind?: SongKind | null;
   history?: string | null;
   featuredLyric?: string | null;
   guitarTabsUrl?: string | null;
@@ -58,6 +58,7 @@ function mapSongToDomainEntity(dbSong: DbSong): Song {
     yearlyPlayData: yearlyPlayData as Record<string, unknown>,
     longestGapsData: longestGapsData as Record<string, unknown>,
     cover: cover ?? false,
+    kind: narrowSongKind(dbSong.kind),
   };
 }
 
@@ -388,6 +389,7 @@ export class SongService {
           showDate: t.show.date,
           dayOrder: t.show.dayOrder,
           showCountForStats: t.show.countForStats,
+          set: t.set,
           position: t.position,
         },
       ];

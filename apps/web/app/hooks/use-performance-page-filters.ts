@@ -37,7 +37,7 @@ export function usePerformancePageFilters<T>({
   const [searchParams, setSearchParams] = useSearchParams();
 
   const selectedTimeRange = getTimeRangeParam(searchParams) || "all";
-  const coverFilter = (searchParams.get("cover") as "all" | "cover" | "original") || "all";
+  const kindFilter = (searchParams.get("kind") as "all" | "original" | "cover" | "mashup" | "improvisation") || "all";
   const selectedAuthor = searchParams.get("author") || null;
   const filtersParam = searchParams.get("filters") || "";
   const attendedParam = searchParams.get("attended") || "";
@@ -56,7 +56,7 @@ export function usePerformancePageFilters<T>({
 
   const hasFilters =
     selectedTimeRange !== "all" ||
-    coverFilter !== "all" ||
+    kindFilter !== "all" ||
     !!selectedAuthor ||
     filtersParam !== "" ||
     attendedParam !== "" ||
@@ -85,7 +85,7 @@ export function usePerformancePageFilters<T>({
 
     const params = new URLSearchParams();
     if (selectedTimeRange !== "all") params.set("timeRange", selectedTimeRange);
-    if (coverFilter !== "all") params.set("cover", coverFilter);
+    if (kindFilter !== "all") params.set("kind", kindFilter);
     if (selectedAuthor) params.set("author", selectedAuthor);
     if (filtersParam) params.set("filters", filtersParam);
     if (attendedParam) params.set("attended", attendedParam);
@@ -129,7 +129,7 @@ export function usePerformancePageFilters<T>({
     };
   }, [
     selectedTimeRange,
-    coverFilter,
+    kindFilter,
     selectedAuthor,
     filtersParam,
     attendedParam,
@@ -195,7 +195,7 @@ export function usePerformancePageFilters<T>({
       timeRange: null,
       year: null,
       era: null,
-      cover: null,
+      kind: null,
       author: null,
       filters: null,
       attended: null,
@@ -209,7 +209,7 @@ export function usePerformancePageFilters<T>({
     filteredData,
     isLoading,
     selectedTimeRange,
-    coverFilter,
+    kindFilter,
     selectedAuthor,
     playedFilter: playedParam || "all",
     activeToggleSet,

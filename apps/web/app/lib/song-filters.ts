@@ -84,6 +84,7 @@ export const TOGGLE_FILTER_DEFINITIONS = [
   { key: "standalone", label: "Standalone" },
   { key: "inverted", label: "Inverted" },
   { key: "dyslexic", label: "Dyslexic" },
+  { key: "unfinished", label: "Unfinished" },
   { key: "jamChart", label: "Jam Chart" },
   { key: "allTimer", label: "All-Timer" },
   { key: "attended", label: "Attended" },

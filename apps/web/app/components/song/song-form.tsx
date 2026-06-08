@@ -5,8 +5,8 @@ import { useNavigate, useSubmit } from "react-router-dom";
 import { z } from "zod";
 import { AuthorSearch } from "~/components/author/author-search";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
+import { GlassSelect } from "~/components/ui/glass-select";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { formInputClass } from "~/lib/form-styles";
@@ -19,7 +19,7 @@ export const songFormSchema = z.object({
   lyrics: z.string().nullable(),
   tabs: z.string().nullable(),
   notes: z.string().nullable(),
-  cover: z.boolean().nullable(),
+  kind: z.enum(["original", "cover", "mashup", "improvisation"]).nullable(),
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   guitarTabsUrl: z.string().nullable(),
@@ -45,7 +45,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
       lyrics: null,
       tabs: null,
       notes: null,
-      cover: false,
+      kind: "original",
       history: null,
       featuredLyric: null,
       guitarTabsUrl: null,
@@ -56,11 +56,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
     const formData = new FormData();
     for (const [key, value] of Object.entries(data)) {
       if (value !== null) {
-        if (key === "cover") {
-          formData.append(key, value ? "on" : "off");
-        } else {
-          formData.append(key, value.toString());
-        }
+        formData.append(key, value.toString());
       }
     }
     submit(formData, { method: "post" });
@@ -225,17 +221,23 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
 
         <FormField
           control={form.control}
-          name="cover"
-          render={({ field }: { field: ControllerRenderProps<SongFormValues, "cover"> }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+          name="kind"
+          render={({ field }: { field: ControllerRenderProps<SongFormValues, "kind"> }) => (
+            <FormItem>
+              <FormLabel className="text-content-text-secondary">Type</FormLabel>
               <FormControl>
-                <Checkbox
-                  checked={field.value || false}
-                  onCheckedChange={field.onChange}
-                  className="bg-content-bg-secondary border-content-bg-secondary"
+                <GlassSelect
+                  value={field.value || "original"}
+                  onValueChange={field.onChange}
+                  options={[
+                    { value: "original", label: "Original" },
+                    { value: "cover", label: "Cover" },
+                    { value: "mashup", label: "Mashup" },
+                    { value: "improvisation", label: "Improvisation" },
+                  ]}
+                  className="w-[200px]"
                 />
               </FormControl>
-              <FormLabel className="text-content-text-secondary">Cover Song</FormLabel>
               <FormMessage />
             </FormItem>
           )}

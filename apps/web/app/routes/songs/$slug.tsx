@@ -13,14 +13,15 @@ import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
 import { isNoteworthy } from "~/components/track/noteworthy-marker";
 import { Button } from "~/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { StatBox } from "~/components/ui/stat-box";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { formatVenueLocation } from "~/lib/format-venue";
 import { pickGapTier } from "~/lib/gap-tier";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
-import { formatVenueLocation } from "~/lib/format-venue";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -51,40 +52,6 @@ export const loader = publicLoader(async ({ params, context }: LoaderFunctionArg
 
   return { ...view, dehydratedState: dehydrate(queryClient) };
 });
-
-interface StatBoxProps {
-  label: string;
-  value: ReactNode;
-  sublabel?: ReactNode;
-  sublabel2?: string;
-}
-
-function StatBox({ label, value, sublabel, sublabel2 }: StatBoxProps) {
-  // On phone-landscape viewports the stat cards eat too much vertical
-  // space: 8 cards in a 4x2 grid push the rest of the page below the
-  // fold. Shrink padding, value font, and inter-element spacing so the
-  // grid stays legible at half its usual height.
-  return (
-    <div className="glass-content p-2 sm:p-3 short:!py-1 short:!px-2.5 rounded-lg h-full">
-      <dt className="text-sm short:!text-[11px] short:!leading-tight font-medium text-content-text-secondary">
-        {label}
-      </dt>
-      <dd className="mt-2 short:!mt-0.5">
-        <span className="text-xl sm:text-3xl short:!text-base short:!leading-tight font-bold text-content-text-primary">
-          {value}
-        </span>
-        {sublabel && (
-          <div className="mt-1 text-sm short:!text-[11px] short:!leading-tight short:!mt-0.5 text-content-text-tertiary">
-            {sublabel}
-          </div>
-        )}
-        {sublabel2 && (
-          <div className="mt-3 text-sm text-content-text-tertiary hidden sm:block short:hidden">{sublabel2}</div>
-        )}
-      </dd>
-    </div>
-  );
-}
 
 function ReviewNote({ notes }: { notes: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -290,6 +257,7 @@ export default function SongPage() {
               by <span className="text-brand-primary">{song.authorName}</span>
             </span>
           )}
+          {song.kind === "mashup" && <span className="text-content-text-tertiary text-lg">mashup</span>}
         </div>
         <div className="flex items-center gap-3">
           <Link

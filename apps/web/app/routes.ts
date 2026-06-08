@@ -25,6 +25,11 @@ export default [
     ]),
   ]),
 
+  // Musicians routes with layout
+  layout("routes/musicians/_layout.tsx", [
+    ...prefix("musicians", [index("routes/musicians/index.tsx"), route(":slug", "routes/musicians/$slug.tsx")]),
+  ]),
+
   // Resources routes with layout
   layout("routes/resources/_layout.tsx", [
     ...prefix("resources", [

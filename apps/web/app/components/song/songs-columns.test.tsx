@@ -57,6 +57,7 @@ function makeSong(overrides: Partial<SongWithShows> = {}): SongWithShows {
     tabs: null,
     notes: null,
     cover: false,
+    kind: "original",
     authorId: null,
     history: null,
     featuredLyric: null,

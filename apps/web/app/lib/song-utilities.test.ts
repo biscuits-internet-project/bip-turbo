@@ -109,14 +109,14 @@ describe("fetchFilteredSongs", () => {
     expect(result.every((s) => s.filteredTimesPlayed === undefined)).toBe(true);
   });
 
-  // Cover and author are non-narrowing — they restrict which songs appear
+  // Kind and author are non-narrowing — they restrict which songs appear
   // but every matching song still surfaces its full play history. So the
-  // canonical fetch carries the cover/author filter and no scope counting
+  // canonical fetch carries the kind/author filter and no scope counting
   // happens. filteredTimesPlayed stays undefined.
-  test("cover only: includes cover in baseFilter, no scope counts attached", async () => {
-    await fetchFilteredSongs(new URL("http://test/songs?cover=cover"), ctx);
+  test("kind only: includes kind in baseFilter, no scope counts attached", async () => {
+    await fetchFilteredSongs(new URL("http://test/songs?kind=cover"), ctx);
 
-    expect(mockFindMany).toHaveBeenCalledWith({ cover: true });
+    expect(mockFindMany).toHaveBeenCalledWith({ kind: "cover" });
     expect(mockFindManyInDateRange).not.toHaveBeenCalled();
     expect(mockBuildSongPerformanceCounts).not.toHaveBeenCalled();
   });

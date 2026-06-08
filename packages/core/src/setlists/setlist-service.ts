@@ -1,15 +1,36 @@
 import {
   type Annotation,
   average,
+  type FlagRecurrence,
+  type Instrument,
+  type MusicianRef,
   median,
+  narrowSongKind,
+  RECURRENCE_THRESHOLDS,
+  type RecurrenceKind,
+  type RecurrenceThreshold,
+  type SegueRecurrence,
+  type SegueRecurrenceKind,
   type Setlist,
   type SetlistLight,
   type Show,
+  type ShowLineupMember,
   type Track,
+  type TrackFlag,
   type TrackLight,
+  type TrackMusicianDelta,
   type Venue,
 } from "@bip/domain";
-import type { DbAnnotation, DbClient, DbShow, DbSong, DbTrack, DbVenue } from "../_shared/database/models";
+import type {
+  DbAnnotation,
+  DbClient,
+  DbInstrument,
+  DbMusician,
+  DbShow,
+  DbSong,
+  DbTrack,
+  DbVenue,
+} from "../_shared/database/models";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
 import {
   NON_STUB_SHOWS_WHERE,
@@ -60,7 +81,32 @@ type DbTrackLight = {
   duration: number | null;
   durationSource: string | null;
   previousPerformanceShow: { date: string; slug: string | null } | null;
-  song: { id: string; title: string; slug: string } | null;
+  trackFlags?: {
+    flag: TrackFlag;
+    flagVersionGap?: number | null;
+    flagGap?: number | null;
+    flagPreviousShow?: { date: string; slug: string | null } | null;
+  }[];
+  segueRecurrences?: {
+    kind: SegueRecurrenceKind;
+    versionGap: number | null;
+    gap: number | null;
+    previousShow: { date: string; slug: string | null } | null;
+  }[];
+  completionsAsLater?: {
+    earlierTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
+  }[];
+  completionAsEarlier?: {
+    laterTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
+  } | null;
+  trackMusicians?: DbTrackMusicianWithRelations[];
+  song: {
+    id: string;
+    title: string;
+    slug: string;
+    kind: string | null;
+    author: { name: string | null } | null;
+  } | null;
   annotations: DbAnnotation[];
 };
 
@@ -144,19 +190,189 @@ function mapAnnotationToDomainEntity(dbAnnotation: DbAnnotation): Annotation {
   };
 }
 
+// Collect the linkable shows from a set of completion rows, dropping any whose
+// show lacks a slug (can't be linked). Ordered by show date so multi-version
+// footnotes read chronologically. `otherSongTitle` is set only when the linked
+// version is a differently-named song than `currentSongTitle`, so the footnote
+// reads "… version of <name>".
+function completionShowsFromDb(
+  currentSongTitle: string | null | undefined,
+  rows: Array<{ show: { date: string; slug: string | null }; songTitle: string | null }> | null | undefined,
+): Array<{ date: string; slug: string; otherSongTitle?: string }> {
+  return (rows ?? [])
+    .filter((row): row is { show: { date: string; slug: string }; songTitle: string | null } => Boolean(row.show.slug))
+    .map((row) => {
+      const differs = Boolean(row.songTitle) && row.songTitle !== currentSongTitle;
+      return {
+        date: String(row.show.date),
+        slug: row.show.slug,
+        ...(differs ? { otherSongTitle: row.songTitle as string } : {}),
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Whether a recurrence of `kind` should ship to the client. A kind absent from
+ * the threshold map is display-disabled and never shows. A first-ever recurrence
+ * (null gaps) shows EXCEPT on the song's debut (where "1st <anything>" is noise —
+ * the debut footnote covers it). Otherwise the per-kind compound rule applies:
+ * fire when `versionGap >= version` OR `(versionGap > minVersions AND showGap >
+ * minShows)` — a big version gap always notes; a moderate one only if it's also
+ * a long calendar absence. A versionGap of 0 (prior version was already the same
+ * shape — no shape change) never shows. The lean-payload gate.
+ */
+function recurrenceQualifies(
+  kind: RecurrenceKind,
+  versionGap: number | null,
+  showGap: number | null,
+  isFirstTime: boolean,
+  isDebut: boolean,
+  thresholds: Partial<Record<RecurrenceKind, RecurrenceThreshold>>,
+): boolean {
+  const threshold = thresholds[kind];
+  if (threshold === undefined) return false;
+  if (isFirstTime) return !isDebut;
+  if (versionGap === null) return false;
+  if (versionGap >= threshold.version) return true;
+  return versionGap > threshold.minVersions && showGap !== null && showGap > threshold.minShows;
+}
+
+/**
+ * The versionGap to PROJECT for a first-ever recurrence: the count of versions
+ * before it (so the footnote can read "1st <…> (after X versions)") — but only
+ * when that count clears the kind's `version` threshold, marking a notably late
+ * first appearance. Below threshold (or kind disabled) → null, so the footnote
+ * stays a plain "1st time" / "1st <noun>".
+ */
+function firstEverVersionsBefore(
+  kind: RecurrenceKind,
+  versionsBefore: number | null,
+  thresholds: Partial<Record<RecurrenceKind, RecurrenceThreshold>>,
+): number | null {
+  const threshold = thresholds[kind];
+  if (threshold === undefined || versionsBefore === null) return null;
+  return versionsBefore >= threshold.version ? versionsBefore : null;
+}
+
+/** Project the displayable flag recurrences from a track's raw track_flags rows.
+ *  `isDebut` is true when the track is the song's first-ever performance. */
+export function gateFlagRecurrences(
+  rows: Array<{
+    flag: TrackFlag;
+    flagVersionGap: number | null;
+    flagGap: number | null;
+    flagPreviousShow: { date: string; slug: string | null } | null;
+  }>,
+  isDebut: boolean,
+  thresholds: Partial<Record<RecurrenceKind, RecurrenceThreshold>> = RECURRENCE_THRESHOLDS,
+): FlagRecurrence[] {
+  const out: FlagRecurrence[] = [];
+  for (const row of rows) {
+    const lastPlayed = previousPerformanceShowFromDb(row.flagPreviousShow);
+    if (!recurrenceQualifies(row.flag, row.flagVersionGap, row.flagGap, lastPlayed === null, isDebut, thresholds))
+      continue;
+    const versionGap =
+      lastPlayed === null ? firstEverVersionsBefore(row.flag, row.flagVersionGap, thresholds) : row.flagVersionGap;
+    out.push({ flag: row.flag, versionGap, gap: row.flagGap, lastPlayed });
+  }
+  return out;
+}
+
+/** Project the displayable segue recurrences from a track's raw rows. */
+export function gateSegueRecurrences(
+  rows: Array<{
+    kind: SegueRecurrenceKind;
+    versionGap: number | null;
+    gap: number | null;
+    previousShow: { date: string; slug: string | null } | null;
+  }>,
+  isDebut: boolean,
+  thresholds: Partial<Record<RecurrenceKind, RecurrenceThreshold>> = RECURRENCE_THRESHOLDS,
+): SegueRecurrence[] {
+  const out: SegueRecurrence[] = [];
+  for (const row of rows) {
+    const lastPlayed = previousPerformanceShowFromDb(row.previousShow);
+    if (!recurrenceQualifies(row.kind, row.versionGap, row.gap, lastPlayed === null, isDebut, thresholds)) continue;
+    const versionGap =
+      lastPlayed === null ? firstEverVersionsBefore(row.kind, row.versionGap, thresholds) : row.versionGap;
+    out.push({ kind: row.kind, versionGap, gap: row.gap, lastPlayed });
+  }
+  // "1st standalone version" already implies not-segued-in AND not-segued-out,
+  // so when standalone is shown its narrower siblings are redundant — drop them.
+  if (out.some((r) => r.kind === "STANDALONE")) {
+    return out.filter((r) => r.kind === "STANDALONE");
+  }
+  return out;
+}
+
 function mapTrackToDomainEntity(
   dbTrack: DbTrack & {
-    song: DbSong | null;
+    song: (DbSong & { author?: { name: string | null } | null }) | null;
     previousPerformanceShow?: { date: string; slug: string | null } | null;
+    trackFlags?: {
+      flag: TrackFlag;
+      flagVersionGap?: number | null;
+      flagGap?: number | null;
+      flagPreviousShow?: { date: string; slug: string | null } | null;
+    }[];
+    segueRecurrences?: {
+      kind: SegueRecurrenceKind;
+      versionGap: number | null;
+      gap: number | null;
+      previousShow: { date: string; slug: string | null } | null;
+    }[];
+    completionsAsLater?: {
+      earlierTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
+    }[];
+    completionAsEarlier?: {
+      laterTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
+    } | null;
   },
 ): Track {
-  const { createdAt, updatedAt, slug, previousPerformanceShow, ...rest } = dbTrack;
+  const {
+    createdAt,
+    updatedAt,
+    slug,
+    previousPerformanceShow,
+    trackFlags,
+    segueRecurrences,
+    completionsAsLater,
+    completionAsEarlier,
+    ...rest
+  } = dbTrack;
   return {
     ...rest,
     slug: slug ?? "",
     createdAt: new Date(createdAt),
     updatedAt: new Date(updatedAt),
     previousPerformanceShow: previousPerformanceShowFromDb(previousPerformanceShow ?? null),
+    flags: (trackFlags ?? []).map((row) => row.flag),
+    // A null song-level gap marks the song's debut — recurrence "1st" notes are
+    // noise there, so the gate suppresses them.
+    flagRecurrences: gateFlagRecurrences(
+      (trackFlags ?? []).map((row) => ({
+        flag: row.flag,
+        flagVersionGap: row.flagVersionGap ?? null,
+        flagGap: row.flagGap ?? null,
+        flagPreviousShow: row.flagPreviousShow ?? null,
+      })),
+      dbTrack.gap === null,
+    ),
+    segueRecurrences: gateSegueRecurrences(segueRecurrences ?? [], dbTrack.gap === null),
+    completes: completionShowsFromDb(
+      dbTrack.song?.title,
+      completionsAsLater?.map((row) => ({
+        show: row.earlierTrack.show,
+        songTitle: row.earlierTrack.song?.title ?? null,
+      })),
+    ),
+    completedBy: completionShowsFromDb(
+      dbTrack.song?.title,
+      completionAsEarlier
+        ? [{ show: completionAsEarlier.laterTrack.show, songTitle: completionAsEarlier.laterTrack.song?.title ?? null }]
+        : [],
+    ),
     song: dbTrack.song
       ? {
           id: dbTrack.song.id,
@@ -166,6 +382,7 @@ function mapTrackToDomainEntity(
           tabs: dbTrack.song.tabs,
           notes: dbTrack.song.notes,
           cover: dbTrack.song.cover ?? false,
+          kind: narrowSongKind(dbTrack.song.kind),
           history: dbTrack.song.history,
           featuredLyric: dbTrack.song.featuredLyric,
           timesPlayed: dbTrack.song.timesPlayed,
@@ -193,9 +410,58 @@ function mapTrackToDomainEntity(
           createdAt: new Date(dbTrack.song.createdAt),
           updatedAt: new Date(dbTrack.song.updatedAt),
           authorId: dbTrack.song.authorId,
-          authorName: null,
+          authorName: dbTrack.song.author?.name ?? null,
         }
       : undefined,
+  };
+}
+
+function mapInstrumentRowToDomainEntity(db: DbInstrument): Instrument {
+  return {
+    id: db.id,
+    name: db.name,
+    slug: db.slug,
+    createdAt: new Date(db.createdAt),
+    updatedAt: new Date(db.updatedAt),
+  };
+}
+
+function mapMusicianRefToDomainEntity(db: DbMusician & { defaultInstrument: DbInstrument | null }): MusicianRef {
+  return {
+    id: db.id,
+    name: db.name,
+    slug: db.slug,
+    knownFrom: db.knownFrom ?? null,
+    defaultInstrument: db.defaultInstrument ? mapInstrumentRowToDomainEntity(db.defaultInstrument) : null,
+  };
+}
+
+// Performer relations carry the musician (with its default instrument) plus the
+// many-to-many instruments the musician played on that show or track.
+type DbShowMusicianWithRelations = {
+  musician: DbMusician & { defaultInstrument: DbInstrument | null };
+  instruments: { instrument: DbInstrument }[];
+};
+
+type DbTrackMusicianWithRelations = {
+  present: boolean;
+  musician: DbMusician & { defaultInstrument: DbInstrument | null };
+  instruments: { instrument: DbInstrument }[];
+};
+
+function mapShowMusicianToLineupMember(db: DbShowMusicianWithRelations): ShowLineupMember {
+  return {
+    musician: mapMusicianRefToDomainEntity(db.musician),
+    instruments: db.instruments.map((row) => mapInstrumentRowToDomainEntity(row.instrument)),
+  };
+}
+
+function mapTrackMusicianToDelta(db: DbTrackMusicianWithRelations, trackId: string): TrackMusicianDelta {
+  return {
+    trackId,
+    musician: mapMusicianRefToDomainEntity(db.musician),
+    present: db.present,
+    instruments: db.instruments.map((row) => mapInstrumentRowToDomainEntity(row.instrument)),
   };
 }
 
@@ -225,8 +491,10 @@ function mapSetlistToDomainEntity(
       song: DbSong | null;
       annotations: DbAnnotation[];
       previousPerformanceShow?: { date: string; slug: string | null } | null;
+      trackMusicians?: DbTrackMusicianWithRelations[];
     })[];
     venue: DbVenue;
+    showMusicians?: DbShowMusicianWithRelations[];
   },
 ): Setlist {
   const tracks = show.tracks ?? [];
@@ -269,6 +537,10 @@ function mapSetlistToDomainEntity(
     medianSongGap: median(eligible),
     debutCount: computeDebutCount(tracks),
     rockOperaPerformances: [],
+    lineup: (show.showMusicians ?? []).map(mapShowMusicianToLineupMember),
+    trackMusicianDeltas: tracks.flatMap((track) =>
+      (track.trackMusicians ?? []).map((tm) => mapTrackMusicianToDelta(tm, track.id)),
+    ),
   };
 }
 
@@ -290,7 +562,46 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
     duration: track.duration,
     durationSource: track.durationSource,
     previousPerformanceShow: previousPerformanceShowFromDb(track.previousPerformanceShow),
-    song: track.song ?? undefined,
+    flags: (track.trackFlags ?? []).map((row) => row.flag),
+    // A null song-level gap marks the song's debut — recurrence "1st" notes are
+    // noise there, so the gate suppresses them (mirrors the heavy mapper).
+    flagRecurrences: gateFlagRecurrences(
+      (track.trackFlags ?? []).map((row) => ({
+        flag: row.flag,
+        flagVersionGap: row.flagVersionGap ?? null,
+        flagGap: row.flagGap ?? null,
+        flagPreviousShow: row.flagPreviousShow ?? null,
+      })),
+      track.gap === null,
+    ),
+    segueRecurrences: gateSegueRecurrences(track.segueRecurrences ?? [], track.gap === null),
+    completes: completionShowsFromDb(
+      track.song?.title,
+      track.completionsAsLater?.map((row) => ({
+        show: row.earlierTrack.show,
+        songTitle: row.earlierTrack.song?.title ?? null,
+      })),
+    ),
+    completedBy: completionShowsFromDb(
+      track.song?.title,
+      track.completionAsEarlier
+        ? [
+            {
+              show: track.completionAsEarlier.laterTrack.show,
+              songTitle: track.completionAsEarlier.laterTrack.song?.title ?? null,
+            },
+          ]
+        : [],
+    ),
+    song: track.song
+      ? {
+          id: track.song.id,
+          title: track.song.title,
+          slug: track.song.slug,
+          kind: narrowSongKind(track.song.kind),
+          authorName: track.song.author?.name ?? null,
+        }
+      : undefined,
   };
 }
 
@@ -298,6 +609,7 @@ function mapSetlistLightToDomainEntity(
   show: DbShow & {
     tracks: DbTrackLight[];
     venue: DbVenue;
+    showMusicians?: DbShowMusicianWithRelations[];
   },
 ): SetlistLight {
   const tracks = show.tracks ?? [];
@@ -335,8 +647,62 @@ function mapSetlistLightToDomainEntity(
     medianSongGap: median(eligible),
     debutCount: computeDebutCount(tracks),
     rockOperaPerformances: [],
+    lineup: (show.showMusicians ?? []).map(mapShowMusicianToLineupMember),
+    trackMusicianDeltas: tracks.flatMap((track) =>
+      (track.trackMusicians ?? []).map((tm) => mapTrackMusicianToDelta(tm, track.id)),
+    ),
   };
 }
+
+// Performer relations: the show's lineup and each track's sit-in / sat-out
+// deltas, both resolving the musician's default instrument and the many-to-many
+// instruments played. Loaded on list queries too (not just single-show fetches)
+// so the synthesized "with <guest> on <instrument>" footnotes render in setlist
+// listings, matching the free-text annotations they replaced.
+const SINGLE_SHOW_PERFORMER_INCLUDE = {
+  showMusicians: {
+    include: {
+      musician: { include: { defaultInstrument: true } },
+      instruments: { include: { instrument: true } },
+    },
+  },
+} as const;
+
+const TRACK_PERFORMER_INCLUDE = {
+  trackMusicians: {
+    include: {
+      musician: { include: { defaultInstrument: true } },
+      instruments: { include: { instrument: true } },
+    },
+  },
+} as const;
+
+// Structured flags plus both ends of the cross-show completion link. A track
+// that is the *later* one completing an earlier version owns a `completionsAsLater`
+// row; the *earlier* (unfinished) track owns the `completionAsEarlier` row.
+const TRACK_FLAGS_AND_COMPLETIONS_INCLUDE = {
+  trackFlags: {
+    select: {
+      flag: true,
+      flagVersionGap: true,
+      flagGap: true,
+      flagPreviousShow: { select: { date: true, slug: true } },
+    },
+  },
+  segueRecurrences: {
+    select: { kind: true, versionGap: true, gap: true, previousShow: { select: { date: true, slug: true } } },
+  },
+  completionsAsLater: {
+    select: {
+      earlierTrack: { select: { show: { select: { date: true, slug: true } }, song: { select: { title: true } } } },
+    },
+  },
+  completionAsEarlier: {
+    select: {
+      laterTrack: { select: { show: { select: { date: true, slug: true } }, song: { select: { title: true } } } },
+    },
+  },
+} as const;
 
 export class SetlistService {
   constructor(
@@ -372,9 +738,12 @@ export class SetlistService {
             song: true,
             annotations: true,
             previousPerformanceShow: { select: { date: true, slug: true } },
+            ...TRACK_PERFORMER_INCLUDE,
+            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
           },
         },
         venue: true,
+        ...SINGLE_SHOW_PERFORMER_INCLUDE,
       },
     });
 
@@ -395,12 +764,15 @@ export class SetlistService {
       include: {
         tracks: {
           include: {
-            song: true,
+            song: { include: { author: { select: { name: true } } } },
             annotations: true,
             previousPerformanceShow: { select: { date: true, slug: true } },
+            ...TRACK_PERFORMER_INCLUDE,
+            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
           },
         },
         venue: true,
+        ...SINGLE_SHOW_PERFORMER_INCLUDE,
       },
     });
 
@@ -441,6 +813,9 @@ export class SetlistService {
         id: {
           in: showIds,
         },
+        // Drop orphan placeholder shows with no venue so they never reach a
+        // listing (and so pagination counts stay exact).
+        venueId: NON_STUB_SHOWS_WHERE.venueId,
       },
       orderBy,
       skip,
@@ -452,12 +827,15 @@ export class SetlistService {
       include: {
         tracks: {
           include: {
-            song: true,
+            song: { include: { author: { select: { name: true } } } },
             annotations: true,
             previousPerformanceShow: { select: { date: true, slug: true } },
+            ...TRACK_PERFORMER_INCLUDE,
+            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
           },
         },
         venue: true,
+        ...SINGLE_SHOW_PERFORMER_INCLUDE,
       },
     });
 
@@ -496,7 +874,9 @@ export class SetlistService {
 
     const results = await this.db.show.findMany({
       where: {
-        venueId,
+        // Explicit caller venueId (the venue-detail page) wins; otherwise apply
+        // the stub filter to drop orphan placeholder shows that have no venue.
+        venueId: venueId !== undefined ? venueId : NON_STUB_SHOWS_WHERE.venueId,
         date: monthDay
           ? { endsWith: `-${monthDay}` }
           : year
@@ -601,17 +981,22 @@ export class SetlistService {
             duration: true,
             durationSource: true,
             previousPerformanceShow: { select: { date: true, slug: true } },
+            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
+            ...TRACK_PERFORMER_INCLUDE,
             song: {
               select: {
                 id: true,
                 title: true,
                 slug: true,
+                kind: true,
+                author: { select: { name: true } },
               },
             },
             annotations: true,
           },
         },
         venue: true,
+        ...SINGLE_SHOW_PERFORMER_INCLUDE,
       },
     });
 

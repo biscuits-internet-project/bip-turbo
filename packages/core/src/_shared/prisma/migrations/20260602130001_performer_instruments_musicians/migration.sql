@@ -23,6 +23,17 @@ INSERT INTO "instruments" ("name", "slug", "updated_at") VALUES
   ('trombone', 'trombone', now())
 ON CONFLICT ("slug") DO NOTHING;
 
+-- Lowercase the core instrument display names seeded capitalized by
+-- add_musicians_performers (and the "Keyboards" rename from
+-- performer_instruments_and_known_from). Those migrations are deployed and
+-- immutable, so the casing is fixed forward here. Slugs are unchanged.
+UPDATE "instruments" SET "name" = 'drums', "updated_at" = now() WHERE "slug" = 'drums';
+UPDATE "instruments" SET "name" = 'bass', "updated_at" = now() WHERE "slug" = 'bass';
+UPDATE "instruments" SET "name" = 'guitar', "updated_at" = now() WHERE "slug" = 'guitar';
+UPDATE "instruments" SET "name" = 'keyboards', "updated_at" = now() WHERE "slug" = 'keys';
+UPDATE "instruments" SET "name" = 'vocals', "updated_at" = now() WHERE "slug" = 'vocals';
+UPDATE "instruments" SET "name" = 'percussion', "updated_at" = now() WHERE "slug" = 'percussion';
+
 -- New musicians (default instrument resolved by slug; known_from is free text).
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Elliot Levin', 'elliot-levin', 'Sun Ra Arkestra', (SELECT "id" FROM "instruments" WHERE "slug" = 'saxophone'), now()
@@ -31,13 +42,13 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Tony', 'tony', 'Fathead', (SELECT "id" FROM "instruments" WHERE "slug" = 'congas'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Mike Greenfield', 'mike-greenfield', 'The Ally', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
+SELECT 'Mike Greenfield', 'mike-greenfield', 'Lotus, Electron, The Ally', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Vernon Reid', 'vernon-reid', 'Living Colour', (SELECT "id" FROM "instruments" WHERE "slug" = 'guitar'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Joe Russo', 'joe-russo', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
+SELECT 'Joe Russo', 'joe-russo', 'Joe Russo''s Almost Dead, Benevento/Russo Duo', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Jack', 'jack', 'Planet 22', (SELECT "id" FROM "instruments" WHERE "slug" = 'saxophone'), now()
@@ -67,7 +78,7 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Meredith Motley', 'meredith-motley', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'vocals'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Anthony Rogers-Wright', 'anthony-rogers-wright', 'the Arthur Dent Foundation', (SELECT "id" FROM "instruments" WHERE "slug" = 'bass'), now()
+SELECT 'Anthony Rogers-Wright', 'anthony-rogers-wright', 'The Arthur Dent Foundation', (SELECT "id" FROM "instruments" WHERE "slug" = 'bass'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Jordan Crisman', 'jordan-crisman', 'Cantus', (SELECT "id" FROM "instruments" WHERE "slug" = 'bass'), now()
@@ -100,13 +111,13 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Travis Tritt', 'travis-tritt', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'guitar'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Jamie Shields', 'jamie-shields', 'The New Deal, the New Deal', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
+SELECT 'Jamie Shields', 'jamie-shields', 'The New Deal', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'John Whooley', 'john-whooley', 'Estradasphere', (SELECT "id" FROM "instruments" WHERE "slug" = 'saxophone'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Mike Dillon', 'mike-dillon', 'Les Claypool''s Flying Frog Brigade', (SELECT "id" FROM "instruments" WHERE "slug" = 'percussion'), now()
+SELECT 'Mike Dillon', 'mike-dillon', 'Garage A Trois, Critters Buggin, Les Claypool', (SELECT "id" FROM "instruments" WHERE "slug" = 'percussion'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Stanton Moore', 'stanton-moore', 'Galactic', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
@@ -115,7 +126,7 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Joe Stapleton', 'joe-stapleton', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'guitar'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Jay Lane', 'jay-lane', 'Les Claypool''s Flying Frog Brigade', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
+SELECT 'Jay Lane', 'jay-lane', 'RatDog, Primus, Charlie Hunter, Further', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Darren Pujalet', 'darren-pujalet', 'Particle', (SELECT "id" FROM "instruments" WHERE "slug" = 'percussion'), now()
@@ -208,7 +219,7 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Brendan Bayliss', 'brendan-bayliss', 'Umphrey''s McGee', (SELECT "id" FROM "instruments" WHERE "slug" = 'guitar'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Holly Bowling', 'holly-bowling', 'as Leora', (SELECT "id" FROM "instruments" WHERE "slug" = 'piano'), now()
+SELECT 'Holly Bowling', 'holly-bowling', 'Ghost Light', (SELECT "id" FROM "instruments" WHERE "slug" = 'piano'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Simon Green', 'simon-green', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'bass'), now()
@@ -271,10 +282,10 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Steve Molitz', 'steve-molitz', 'Particle', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Marco Benevento', 'marco-benevento', 'The Duo', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
+SELECT 'Marco Benevento', 'marco-benevento', 'Joe Russo''s Almost Dead, Benevento/Russo Duo', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'John Medeski', 'john-medeski', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
+SELECT 'John Medeski', 'john-medeski', 'Medeski Martin & Wood', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Scotty Zwang', 'scotty-zwang', 'Dopapod', (SELECT "id" FROM "instruments" WHERE "slug" = 'drums'), now()
@@ -295,13 +306,13 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Pauly Herron', 'pauly-herron', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'percussion'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Govinda Meyer', 'govinda-meyer', 'aka Flute Girl', (SELECT "id" FROM "instruments" WHERE "slug" = 'flute'), now()
+SELECT 'Govinda Meyer', 'govinda-meyer', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'flute'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Vic Vucheck', 'vic-vucheck', NULL, (SELECT "id" FROM "instruments" WHERE "slug" = 'flute'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Oteil Burbridge', 'oteil-burbridge', 'Allman Brothers Band', (SELECT "id" FROM "instruments" WHERE "slug" = 'bass'), now()
+SELECT 'Oteil Burbridge', 'oteil-burbridge', 'Dead & Company, Allman Brothers Band, Vida Blue, Aquarium Rescue Unit', (SELECT "id" FROM "instruments" WHERE "slug" = 'bass'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Benny Bloom', 'benny-bloom', 'Lettuce', (SELECT "id" FROM "instruments" WHERE "slug" = 'trumpet'), now()
@@ -325,10 +336,10 @@ INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", 
 SELECT 'Antibalas Horns', 'antibalas-horns', 'Antibalas Afrobeat Orchestra', (SELECT "id" FROM "instruments" WHERE "slug" = 'horns'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Gabe Mervine', 'gabe-mervine', 'The Motet', (SELECT "id" FROM "instruments" WHERE "slug" = 'horns'), now()
+SELECT 'Gabe Mervine', 'gabe-mervine', 'The Motet', (SELECT "id" FROM "instruments" WHERE "slug" = 'trumpet'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
-SELECT 'Drew Sayers', 'drew-sayers', 'The Motet', (SELECT "id" FROM "instruments" WHERE "slug" = 'horns'), now()
+SELECT 'Drew Sayers', 'drew-sayers', 'The Motet', (SELECT "id" FROM "instruments" WHERE "slug" = 'saxophone'), now()
 ON CONFLICT ("slug") DO NOTHING;
 INSERT INTO "musicians" ("name", "slug", "known_from", "default_instrument_id", "updated_at")
 SELECT 'Trevor Garrod', 'trevor-garrod', 'Tea Leaf Green', (SELECT "id" FROM "instruments" WHERE "slug" = 'keys'), now()

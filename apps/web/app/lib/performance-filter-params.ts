@@ -15,6 +15,7 @@ const VALID_FILTER_KEYS = new Set([
   "standalone",
   "inverted",
   "dyslexic",
+  "unfinished",
   "jamChart",
   "allTimer",
 ]);
@@ -62,7 +63,7 @@ export async function resolveLast10ShowsDateRange(): Promise<{ startDate: Date }
 
 export async function parsePerformanceFilters(url: URL, context: PublicContext): Promise<PerformanceFilterOptions> {
   const timeRangeParam = getTimeRangeParam(url.searchParams);
-  const coverParam = url.searchParams.get("cover");
+  const kindParam = url.searchParams.get("kind");
   const authorParam = url.searchParams.get("author");
   const filtersParam = url.searchParams.get("filters");
   const attendedParam = url.searchParams.get("attended");
@@ -78,8 +79,9 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
     if (dateRange.startDate) filters.startDate = dateRange.startDate;
     if (dateRange.endDate) filters.endDate = dateRange.endDate;
   }
-  if (coverParam === "cover") filters.cover = true;
-  else if (coverParam === "original") filters.cover = false;
+  if (kindParam === "original" || kindParam === "cover" || kindParam === "mashup" || kindParam === "improvisation") {
+    filters.kind = kindParam;
+  }
   if (authorParam && UUID_REGEX.test(authorParam)) filters.authorId = authorParam;
   if (monthDayParam) filters.monthDay = monthDayParam;
 
@@ -102,7 +104,7 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
  */
 export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: string): string {
   const timeRange = getTimeRangeParam(url.searchParams);
-  const coverParam = url.searchParams.get("cover");
+  const kindParam = url.searchParams.get("kind");
   const authorParam = url.searchParams.get("author");
   const filtersParam = url.searchParams.get("filters");
   const monthDay = url.searchParams.get("monthDay");
@@ -110,7 +112,7 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
   return CacheKeys.songs.filtered({
     scope,
     timeRange: timeRange || null,
-    cover: coverParam || null,
+    kind: kindParam || null,
     author: authorParam || null,
     filters: filtersParam || null,
     attended: attendedUserId || null,
