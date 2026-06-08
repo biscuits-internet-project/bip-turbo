@@ -1,7 +1,7 @@
 import type { Annotation } from "../models/annotation";
 import type { ShowMinimal } from "../models/show";
-import type { Song } from "../models/song";
-import type { TrackMinimal } from "../models/track";
+import type { Song, SongKind } from "../models/song";
+import type { TrackFlag, TrackMinimal } from "../models/track";
 import type { VenueMinimal } from "../models/venue";
 
 export type SongPageView = {
@@ -22,11 +22,13 @@ export type SongPagePerformance = {
   allTimer?: boolean;
   segue?: string | null;
   annotations?: Annotation[];
+  // Structured performance markers backing the inverted/dyslexic/unfinished tags.
+  flags?: TrackFlag[];
   set?: string;
   position?: number;
   songTitle?: string;
   songSlug?: string;
-  cover?: boolean;
+  kind?: SongKind | null;
   authorId?: string | null;
   duration?: number | null;
   durationSource?: string | null;
@@ -43,6 +45,7 @@ export type SongPagePerformance = {
     encore?: boolean;
     inverted?: boolean;
     dyslexic?: boolean;
+    unfinished?: boolean;
     standalone?: boolean;
     segueIn?: boolean;
     segueOut?: boolean;

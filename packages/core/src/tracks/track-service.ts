@@ -10,7 +10,8 @@ export interface TrackMusicianDelta {
   musicianId: string;
   /** true → sat in (also played); false → sat out. */
   present: boolean;
-  instrumentId?: string | null;
+  /** Instruments the musician played on this track (a sit-in can be on several, e.g. guitar + vocals). Empty for a sat-out. */
+  instrumentIds?: string[];
 }
 
 // Database query result that includes song and annotations
@@ -33,6 +34,11 @@ function mapTrackToDomainEntity(
     previousPerformanceShow: previousPerformanceShow?.slug
       ? { date: String(previousPerformanceShow.date), slug: previousPerformanceShow.slug }
       : null,
+    flags: [],
+    flagRecurrences: [],
+    segueRecurrences: [],
+    completes: [],
+    completedBy: [],
   };
 }
 
@@ -366,9 +372,15 @@ export class TrackService {
             trackId,
             musicianId: delta.musicianId,
             present: delta.present,
-            instrumentId: delta.instrumentId ?? null,
             createdAt: new Date(),
             updatedAt: new Date(),
+            instruments: {
+              create: (delta.instrumentIds ?? []).map((instrumentId) => ({
+                instrumentId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })),
+            },
           },
         }),
       ),

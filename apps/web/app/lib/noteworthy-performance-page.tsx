@@ -31,7 +31,7 @@ export function NoteworthyPerformancePage({
     filteredData: filteredPerformances,
     isLoading,
     selectedTimeRange,
-    coverFilter,
+    kindFilter,
     selectedAuthor,
     activeToggleSet,
     hasActiveFilters,
@@ -62,7 +62,7 @@ export function NoteworthyPerformancePage({
             updateFilter={updateFilter}
             toggleFilter={toggleFilter}
             clearFilters={clearFilters}
-            coverFilter={coverFilter}
+            kindFilter={kindFilter}
             selectedAuthor={selectedAuthor}
             showAllTimerToggle={!hideAllTimerToggle}
             showJamChartToggle={!hideJamChartToggle}

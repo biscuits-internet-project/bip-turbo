@@ -39,6 +39,12 @@ export const SHOW_ORDER_DESC: Prisma.ShowOrderByWithRelationInput[] = [
  * Track ordering when joined to show — adds in-show position after the
  * show ordering and uses show.id as the final tiebreaker. Used by
  * `SongService.updateSongStatistics` to walk a song's tracks chronologically.
+ *
+ * NOTE: this cannot encode set play-order (Prisma orderBy can't express the
+ * `setSortKey` CASE, and alphabetical set order wrongly puts encores first), so
+ * it's only a pre-sort. The authoritative in-show ordering — including set rank
+ * so encores fall after the regular sets — is applied in-memory by
+ * `sortTracksForGapWalk`, which every gap/recurrence walk runs.
  */
 export const TRACK_BY_SHOW_ORDER_ASC: Prisma.TrackOrderByWithRelationInput[] = [
   { show: { date: "asc" } },
@@ -80,7 +86,8 @@ const UNKNOWN_SET_RANK = 999;
  * into play order ("E1" would precede "S1"), so callers ordering tracks by set
  * must rank through this rather than comparing labels directly.
  */
-export function setSortKey(label: string): number {
+export function setSortKey(label: string | null | undefined): number {
+  if (!label) return UNKNOWN_SET_RANK;
   return SET_SORT_ORDER[label.toLowerCase()] ?? UNKNOWN_SET_RANK;
 }
 

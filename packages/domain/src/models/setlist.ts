@@ -1,4 +1,5 @@
 import type { Annotation } from "./annotation";
+import type { ShowLineupMember, TrackMusicianDelta } from "./musician";
 import type { RockOperaPerformanceAnnotation } from "./rock-opera";
 import type { Show } from "./show";
 import type { Track, TrackLight } from "./track";
@@ -29,6 +30,16 @@ export type Setlist = {
    * this empty so list pages pay no lookup cost.
    */
   rockOperaPerformances: RockOperaPerformanceAnnotation[];
+  /**
+   * The show's default performer lineup. Populated only by single-show fetches
+   * (services.setlists.findByShowSlug); list-page composers leave this empty.
+   */
+  lineup: ShowLineupMember[];
+  /**
+   * Per-track sit-in / sat-out deviations from the lineup, used to synthesize
+   * performer footnotes. Populated only by single-show fetches.
+   */
+  trackMusicianDeltas: TrackMusicianDelta[];
 };
 
 export type SetLight = {
@@ -56,4 +67,14 @@ export type SetlistLight = {
    * this empty so list pages pay no lookup cost.
    */
   rockOperaPerformances: RockOperaPerformanceAnnotation[];
+  /**
+   * The show's default performer lineup. Populated only by single-show fetches;
+   * list-page composers leave this empty.
+   */
+  lineup: ShowLineupMember[];
+  /**
+   * Per-track sit-in / sat-out deviations from the lineup. Populated only by
+   * single-show fetches.
+   */
+  trackMusicianDeltas: TrackMusicianDelta[];
 };

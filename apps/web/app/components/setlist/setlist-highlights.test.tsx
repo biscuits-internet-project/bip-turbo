@@ -16,6 +16,8 @@ function makeSetlist(sets: Array<{ label: string; tracks: Partial<Track>[] }>): 
     medianSongGap: null,
     debutCount: 0,
     rockOperaPerformances: [],
+    lineup: [],
+    trackMusicianDeltas: [],
     sets: sets.map((set, sortIdx) => ({
       label: set.label,
       sort: sortIdx,

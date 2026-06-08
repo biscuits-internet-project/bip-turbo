@@ -9,6 +9,69 @@ const previousPerformanceShowSchema = z
   })
   .nullable();
 
+export const trackFlagSchema = z.enum([
+  "DYSLEXIC",
+  "INVERTED",
+  "UNFINISHED",
+  "ENDING_ONLY",
+  "MIDDLE_ONLY",
+  "BEGINNING_ONLY",
+]);
+
+export type TrackFlag = z.infer<typeof trackFlagSchema>;
+
+/**
+ * The three segue-shape recurrence series a track can belong to, derived from
+ * `Track.segue` and the prior track's segue:
+ *   * STANDALONE      — neither segued into nor out of.
+ *   * NOT_SEGUED_IN   — not segued into (the prior track did not segue out).
+ *   * NOT_SEGUED_OUT  — does not segue out (own segue is empty).
+ */
+export const segueRecurrenceKindSchema = z.enum(["STANDALONE", "NOT_SEGUED_IN", "NOT_SEGUED_OUT"]);
+
+export type SegueRecurrenceKind = z.infer<typeof segueRecurrenceKindSchema>;
+
+// The prior performance in a recurrence series, or null on a first-ever one.
+const recurrenceLastPlayedSchema = z.object({ date: z.string(), slug: z.string() }).nullable();
+
+/** A flag's recurrence since the song last carried this flag (null gaps ⇒ first
+ *  time): `versionGap` = the song's own performances between, `gap` = shows
+ *  between. Both displayed. Pre-gated by the mapper to displayable entries only. */
+export const flagRecurrenceSchema = z.object({
+  flag: trackFlagSchema,
+  versionGap: z.number().nullable(),
+  gap: z.number().nullable(),
+  lastPlayed: recurrenceLastPlayedSchema,
+});
+
+export type FlagRecurrence = z.infer<typeof flagRecurrenceSchema>;
+
+/** A segue-shape recurrence (standalone / not-segued-in / not-segued-out) since
+ *  the prior same-shape version: `versionGap` = the song's own performances
+ *  between, `gap` = shows between. Both displayed. */
+export const segueRecurrenceSchema = z.object({
+  kind: segueRecurrenceKindSchema,
+  versionGap: z.number().nullable(),
+  gap: z.number().nullable(),
+  lastPlayed: recurrenceLastPlayedSchema,
+});
+
+export type SegueRecurrence = z.infer<typeof segueRecurrenceSchema>;
+
+// The shows on the other end of cross-show completions, carried for the
+// "completes <date(s)>" / "completed by <date(s)>" footnotes. An array because
+// one ending can finish several earlier versions. `otherSongTitle` is set only
+// when the linked version is a differently-named song ("… version of <name>").
+const completionShowsSchema = z
+  .array(
+    z.object({
+      date: z.string(),
+      slug: z.string(),
+      otherSongTitle: z.string().optional(),
+    }),
+  )
+  .default([]);
+
 export const trackSchema = z.object({
   id: z.string().uuid(),
   showId: z.string().uuid(),
@@ -31,6 +94,11 @@ export const trackSchema = z.object({
   duration: z.number().nullable(),
   durationSource: z.string().nullable(),
   previousPerformanceShow: previousPerformanceShowSchema,
+  flags: z.array(trackFlagSchema).default([]),
+  flagRecurrences: z.array(flagRecurrenceSchema).default([]),
+  segueRecurrences: z.array(segueRecurrenceSchema).default([]),
+  completes: completionShowsSchema,
+  completedBy: completionShowsSchema,
   song: songSchema.optional(),
   annotations: z.array(annotationSchema).optional(),
 });
@@ -51,6 +119,10 @@ export const songLightSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   slug: z.string(),
+  // Carried for the auto debut footnote: kind decides the text, authorName
+  // names the origin for covers/mashups.
+  kind: z.enum(["original", "cover", "mashup", "improvisation"]).nullable().optional(),
+  authorName: z.string().nullable().optional(),
 });
 
 export type SongLight = z.infer<typeof songLightSchema>;
@@ -72,6 +144,11 @@ export const trackLightSchema = z.object({
   duration: z.number().nullable(),
   durationSource: z.string().nullable(),
   previousPerformanceShow: previousPerformanceShowSchema,
+  flags: z.array(trackFlagSchema).default([]),
+  flagRecurrences: z.array(flagRecurrenceSchema).default([]),
+  segueRecurrences: z.array(segueRecurrenceSchema).default([]),
+  completes: completionShowsSchema,
+  completedBy: completionShowsSchema,
   song: songLightSchema.optional(),
 });
 

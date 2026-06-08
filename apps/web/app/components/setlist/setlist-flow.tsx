@@ -2,7 +2,22 @@ import type { Setlist, SetlistLight } from "@bip/domain";
 import { formatDuration } from "@bip/domain";
 import { Link } from "react-router-dom";
 import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
+import {
+  debutFootnoteSuppressed,
+  gapFootnoteSuppressed,
+  LAST_TIME_PLAYED_GAP_THRESHOLD,
+} from "~/lib/footnote-constants";
+import { deriveShowLineupNotes, elevatedGuestIds } from "~/lib/lineup-notes";
 import { cn } from "~/lib/utils";
+import {
+  annotationFootnoteSources,
+  dataDrivenFootnoteSources,
+  debutFootnoteSources,
+  deriveFootnotes,
+  guestExclusionFootnotes,
+  lastTimePlayedFootnoteSources,
+  synthesizePerformerFootnotes,
+} from "./footnotes";
 import { countSetlistEncores } from "./set-label";
 import { formatSetHeading, summarizeDurations } from "./setlist-duration";
 import { TrackRatingOverlay } from "./track-rating-overlay";
@@ -15,26 +30,38 @@ import { TrackRatingOverlay } from "./track-rating-overlay";
  * view-toggle machinery around it.
  */
 export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
-  // Number annotations in track order: each distinct description gets the next
-  // index, and each track maps to the indices it carries, so the inline `sup`
-  // markers and the footnote list agree.
-  const uniqueAnnotations = new Map<string, { index: number; desc: string }>();
-  const trackAnnotationMap = new Map<string, number[]>();
-  let annotationIndex = 1;
   const allTracks = setlist.sets.flatMap((set) => set.tracks);
-  for (const track of allTracks) {
-    const trackIndices: number[] = [];
-    for (const annotation of setlist.annotations.filter((a) => a.trackId === track.id)) {
-      if (!annotation.desc) continue;
-      if (!uniqueAnnotations.has(annotation.desc)) {
-        uniqueAnnotations.set(annotation.desc, { index: annotationIndex++, desc: annotation.desc });
-      }
-      const index = uniqueAnnotations.get(annotation.desc)?.index;
-      if (index) trackIndices.push(index);
-    }
-    if (trackIndices.length > 0) trackAnnotationMap.set(track.id, trackIndices);
-  }
-  const orderedAnnotations = Array.from(uniqueAnnotations.values()).sort((a, b) => a.index - b.index);
+  // DB annotations are numbered before synthesized performer footnotes on any
+  // given track, so the existing annotation indices stay stable.
+  //
+  // Whole-show guests are surfaced in the show-level lineup note, so their
+  // per-track "with" footnotes are suppressed; for guests below 100% coverage
+  // the tracks they sat out are footnoted ("except where noted").
+  const lineupNotes = deriveShowLineupNotes(
+    setlist.show.date,
+    setlist.lineup,
+    setlist.trackMusicianDeltas,
+    allTracks.map((track) => track.id),
+  );
+  // The early setlists are too scattered to trust a song's gap or first
+  // appearance. Debuts firm up sooner than gaps, so they have separate start
+  // dates: before each, that category is suppressed. Flags, completions,
+  // annotations, and performer notes still render — observed facts, not stats.
+  const suppressDebuts = debutFootnoteSuppressed(setlist.show.date);
+  const suppressGaps = gapFootnoteSuppressed(setlist.show.date);
+  const footnoteSources = [
+    ...annotationFootnoteSources(setlist.annotations),
+    // All of a track's structured flags + completion links read on one line,
+    // right after annotations so the setlist reads like its annotation era.
+    ...dataDrivenFootnoteSources(allTracks, { suppressRecurrences: suppressGaps }),
+    ...synthesizePerformerFootnotes(setlist.trackMusicianDeltas, elevatedGuestIds(lineupNotes)),
+    ...guestExclusionFootnotes(lineupNotes.guests, setlist.trackMusicianDeltas),
+    // Auto last-time-played / debut footnotes append after the above so the
+    // existing annotation and performer footnote numbers stay stable.
+    ...(!suppressGaps ? lastTimePlayedFootnoteSources(allTracks, LAST_TIME_PLAYED_GAP_THRESHOLD) : []),
+    ...(!suppressDebuts ? debutFootnoteSources(allTracks) : []),
+  ];
+  const { trackFootnoteIndices, orderedFootnotes } = deriveFootnotes(allTracks, footnoteSources);
 
   const encoresInSet = countSetlistEncores(setlist.sets);
   const showDuration = summarizeDurations(allTracks);
@@ -85,9 +112,9 @@ export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
                           iconClassName="h-3 w-3 md:h-4 md:w-4 inline-block mr-1 transform -translate-y-0.5"
                         />
                         <Link to={`/songs/${track.song?.slug}`}>{track.song?.title}</Link>
-                        {trackAnnotationMap.has(track.id) && (
+                        {trackFootnoteIndices.has(track.id) && (
                           <sup className="text-brand-secondary ml-0.5 font-medium text-xs">
-                            {trackAnnotationMap.get(track.id)?.map((index, markerPosition) => (
+                            {trackFootnoteIndices.get(track.id)?.map((index, markerPosition) => (
                               <span key={index} className={markerPosition > 0 ? "ml-1" : ""}>
                                 {index}
                               </span>
@@ -124,11 +151,11 @@ export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
         </div>
       )}
 
-      {orderedAnnotations.length > 0 && (
+      {orderedFootnotes.length > 0 && (
         <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
-          {orderedAnnotations.map((annotation) => (
-            <div key={`annotation-${annotation.index}`} className="text-sm text-content-text-secondary">
-              <sup className="text-brand-secondary">{annotation.index}</sup> {annotation.desc}
+          {orderedFootnotes.map((footnote) => (
+            <div key={`footnote-${footnote.index}`} className="text-sm text-content-text-secondary">
+              <sup className="text-brand-secondary">{footnote.index}</sup> {footnote.content}
             </div>
           ))}
         </div>

@@ -79,6 +79,11 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
             duration: null,
             durationSource: null,
             previousPerformanceShow: null,
+            flags: [],
+            flagRecurrences: [],
+            segueRecurrences: [],
+            completes: [],
+            completedBy: [],
             song: { id: "song-1", title, slug: title.toLowerCase().replace(/\s+/g, "-") },
           },
         ],
@@ -89,6 +94,8 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
     medianSongGap: null,
     debutCount: 0,
     rockOperaPerformances: [],
+    lineup: [],
+    trackMusicianDeltas: [],
   };
 }
 

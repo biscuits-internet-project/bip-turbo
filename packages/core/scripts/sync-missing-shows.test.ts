@@ -879,7 +879,7 @@ describe("buildSongCreateInput", () => {
       timesPlayed: 412,
       dateFirstPlayed: new Date("1998-07-04"),
       dateLastPlayed: new Date("2026-02-06"),
-      cover: null,
+      kind: null,
       legacyAuthor: null,
       featuredLyric: null,
       tabs: null,
@@ -907,7 +907,7 @@ describe("buildSongCreateInput", () => {
         timesPlayed: 188,
         dateFirstPlayed: "2002-12-31",
         dateLastPlayed: "2025-07-04",
-        cover: false,
+        kind: "original",
         legacyAuthor: "Disco Biscuits",
         featuredLyric: "And the sky lights up",
         tabs: "https://example/tabs",
@@ -918,7 +918,7 @@ describe("buildSongCreateInput", () => {
       now,
     );
     expect(input).toMatchObject({
-      cover: false,
+      kind: "original",
       legacyAuthor: "Disco Biscuits",
       featuredLyric: "And the sky lights up",
       tabs: "https://example/tabs",
@@ -1687,7 +1687,7 @@ describe("buildSongDriftUpdate", () => {
   const localBase = {
     title: "Crystal Ball",
     lyrics: "And the sky lights up...",
-    cover: false,
+    kind: "original",
     legacyAuthor: "Disco Biscuits",
     featuredLyric: "And the sky lights up",
     tabs: null,
@@ -1708,7 +1708,7 @@ describe("buildSongDriftUpdate", () => {
         timesPlayed: 188,
         dateFirstPlayed: null,
         dateLastPlayed: null,
-        cover: false,
+        kind: "original",
         legacyAuthor: "Disco Biscuits",
         featuredLyric: "And the sky lights up",
       }),
@@ -1730,7 +1730,7 @@ describe("buildSongDriftUpdate", () => {
     expect(patch).toEqual({ lyrics: "And the sky lights up (extended)" });
   });
 
-  // Multi-field drift: title rename + new featuredLyric + cover flag flip
+  // Multi-field drift: title rename + new featuredLyric + kind change
   // bundle into one patch — one UPDATE round-trip instead of three.
   test("combines multiple drifted fields into one patch", () => {
     const patch = buildSongDriftUpdate(localBase, {
@@ -1741,18 +1741,18 @@ describe("buildSongDriftUpdate", () => {
       timesPlayed: 188,
       dateFirstPlayed: null,
       dateLastPlayed: null,
-      cover: true,
+      kind: "cover",
       featuredLyric: "Glow stick crescendo",
     });
     expect(patch).toEqual({
       title: "Crystal Ball (Reprise)",
-      cover: true,
+      kind: "cover",
       featuredLyric: "Glow stick crescendo",
     });
   });
 
   // Pre-deploy MCP omits the new curated fields. Sparse remote payload must
-  // never claim drift on `cover` / `legacyAuthor` / `featuredLyric` / `tabs`
+  // never claim drift on `kind` / `legacyAuthor` / `featuredLyric` / `tabs`
   // / `notes` / `history` / `guitarTabsUrl` — otherwise every existing song
   // would have those fields clobbered to null on the next sync.
   test("ignores curated fields when remote omits them", () => {

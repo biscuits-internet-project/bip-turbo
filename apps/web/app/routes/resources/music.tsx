@@ -28,7 +28,9 @@ export default function Music() {
         </div>
 
         <div className="glass-content rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Inverted</h2>
+          <h2 id="inverted" className="text-2xl font-semibold text-brand-secondary mb-4 scroll-mt-24">
+            Inverted
+          </h2>
           <p className="text-content-text-secondary mb-4">
             Inverted songs are played with the sections in reverse order. For example, if a song normally has an A-B-C
             structure, the inverted version would be played C-B-A. This technique creates a fresh take on familiar
@@ -74,7 +76,9 @@ export default function Music() {
         </div>
 
         <div className="glass-content rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Dyslexic</h2>
+          <h2 id="dyslexic" className="text-2xl font-semibold text-brand-secondary mb-4 scroll-mt-24">
+            Dyslexic
+          </h2>
           <p className="text-content-text-secondary mb-4">
             Dyslexic versions involve playing the song's sections in a scrambled order, rather than simply reversing
             them as in inverted versions. This creates an even more unpredictable and challenging arrangement that tests

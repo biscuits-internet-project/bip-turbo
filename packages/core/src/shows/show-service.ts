@@ -7,6 +7,7 @@ import type { FilterCondition, QueryOptions } from "../_shared/database/types";
 import {
   DAY_ORDER_NULL_SENTINEL,
   NON_STUB_SHOWS_WHERE,
+  nonStubShowsSql,
   resolveShowOrderBy,
   SHOW_ORDER_ASC,
   SHOW_ORDER_DESC,
@@ -49,7 +50,8 @@ export type ShowCreateInput = Prisma.ShowCreateInput;
 
 export interface LineupEntry {
   musicianId: string;
-  instrumentId?: string | null;
+  /** Instruments this musician played in the show's lineup (e.g. guitar + vocals). */
+  instrumentIds?: string[];
 }
 
 // Mapper functions
@@ -238,6 +240,7 @@ export class ShowService {
         FROM shows s
         LEFT JOIN venues v ON s.venue_id = v.id
         WHERE s.slug IS NOT NULL
+          AND ${nonStubShowsSql("s")}
           AND ${showOrderTuple("s")} < ${hereTuple}
         ORDER BY ${showOrderBySql("s", "DESC")}
         LIMIT 1
@@ -247,6 +250,7 @@ export class ShowService {
         FROM shows s
         LEFT JOIN venues v ON s.venue_id = v.id
         WHERE s.slug IS NOT NULL
+          AND ${nonStubShowsSql("s")}
           AND ${showOrderTuple("s")} > ${hereTuple}
         ORDER BY ${showOrderBySql("s", "ASC")}
         LIMIT 1
@@ -323,6 +327,8 @@ export class ShowService {
         id: {
           in: showIds,
         },
+        // Never surface orphan placeholder shows (no venue) as search hits.
+        venueId: NON_STUB_SHOWS_WHERE.venueId,
       },
       orderBy: resolveShowOrderBy(options?.sort, SHOW_ORDER_DESC),
       skip:
@@ -406,7 +412,7 @@ export class ShowService {
 
     const entries: LineupEntry[] = musicians.map((musician) => ({
       musicianId: musician.id,
-      instrumentId: musician.defaultInstrumentId ?? null,
+      instrumentIds: musician.defaultInstrumentId ? [musician.defaultInstrumentId] : [],
     }));
 
     // No cache invalidation here: the caller (create) is about to run its own
@@ -424,9 +430,15 @@ export class ShowService {
           data: {
             showId,
             musicianId: entry.musicianId,
-            instrumentId: entry.instrumentId ?? null,
             createdAt: new Date(),
             updatedAt: new Date(),
+            instruments: {
+              create: (entry.instrumentIds ?? []).map((instrumentId) => ({
+                instrumentId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })),
+            },
           },
         }),
       ),

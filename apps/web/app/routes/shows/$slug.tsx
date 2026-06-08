@@ -13,6 +13,7 @@ import type { ShowExternalSources } from "~/components/setlist/show-external-bad
 import { ArchiveRecordingsCard } from "~/components/show/archive-recordings-card";
 import { DebutYearChart } from "~/components/show/debut-year-chart";
 import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-link-card";
+import { ShowLineupSection } from "~/components/show/show-lineup-section";
 import { ShowPhotos } from "~/components/show/show-photos";
 import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
@@ -316,6 +317,7 @@ export default function Show() {
             defaultView={setlistView}
             onViewChange={setSetlistView}
           />
+          <ShowLineupSection lineup={setlist.lineup} />
           {/* Note when count_for_stats=false (soundchecks, radio sessions,
               cancelled stubs, late-night Tractorbeam sets). Yellow accent on
               the left edge for attention, no full background so it doesn't

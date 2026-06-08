@@ -138,7 +138,7 @@ export default function OnThisDay() {
     filteredData: filteredPerformances,
     isLoading,
     selectedTimeRange,
-    coverFilter,
+    kindFilter,
     selectedAuthor,
     activeToggleSet,
     hasActiveFilters,
@@ -214,7 +214,7 @@ export default function OnThisDay() {
                     updateFilter={updateFilter}
                     toggleFilter={toggleFilter}
                     clearFilters={clearFilters}
-                    coverFilter={coverFilter}
+                    kindFilter={kindFilter}
                     selectedAuthor={selectedAuthor}
                     showAllTimerToggle={false}
                     searchValue={searchText}

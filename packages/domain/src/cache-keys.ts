@@ -12,7 +12,7 @@ export const CacheKeys = {
    */
   show: {
     /** Complete show + setlist data for show page */
-    data: (slug: string) => `show:${slug}:data:v6`,
+    data: (slug: string) => `show:${slug}:data:v12`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
@@ -31,7 +31,7 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      return `shows:list:${filterHash}:v6`;
+      return `shows:list:${filterHash}:v12`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -46,7 +46,7 @@ export const CacheKeys = {
    */
   setlist: {
     /** Complete setlist data with tracks and annotations */
-    data: (slug: string) => `setlist:${slug}:data:v6`,
+    data: (slug: string) => `setlist:${slug}:data:v12`,
   },
 
   /**
@@ -81,25 +81,25 @@ export const CacheKeys = {
    */
   songs: {
     /** Full songs index page data */
-    index: () => "songs:index:full:v3",
+    index: () => "songs:index:full:v4",
     /** All-timers page data */
-    allTimers: () => "songs:all-timers:v3",
+    allTimers: () => "songs:all-timers:v5",
     /** Jam Charts page data (tracks that are all-timers OR carry a curated note) */
-    jamCharts: () => "songs:jam-charts:v4",
+    jamCharts: () => "songs:jam-charts:v6",
     /** Songs with history content */
-    histories: () => "songs:histories:v3",
+    histories: () => "songs:histories:v4",
     /** All-timers for a specific calendar day (On This Day page) */
-    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v3`,
+    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v5`,
     /** Every On-This-Day all-timer cache across all calendar days (for pattern deletion). */
     allTimersOnThisDayAll: () => "songs:all-timers:on-this-day:*",
-    /** Filtered song results by era/author/cover/tags/attended */
+    /** Filtered song results by era/author/kind/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
       const attendedUserId = filters.attended;
       if (attendedUserId) {
-        return `songs:filtered:user:${attendedUserId}:${filterHash}:v3`;
+        return `songs:filtered:user:${attendedUserId}:${filterHash}:v5`;
       }
-      return `songs:filtered:${filterHash}:v3`;
+      return `songs:filtered:${filterHash}:v5`;
     },
     /** All filtered song caches (for pattern deletion) */
     allFiltered: () => "songs:filtered:*",
@@ -117,7 +117,7 @@ export const CacheKeys = {
      * have 400+ attended shows and the un-paginated payload is large enough
      * to be slow to deserialize/transport even from Redis.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v7`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v11`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -142,7 +142,7 @@ export const CacheKeys = {
    */
   rockOperas: {
     /** Resource-page list payload: setlists + external sources for one rock opera. */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v5`,
+    performances: (slug: string) => `rock-operas:performances:${slug}:v9`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },
@@ -152,7 +152,7 @@ export const CacheKeys = {
    */
   home: {
     /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v6`,
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v10`,
   },
 
   /**

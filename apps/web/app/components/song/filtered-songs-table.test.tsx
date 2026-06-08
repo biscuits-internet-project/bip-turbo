@@ -26,7 +26,7 @@ import { FilteredSongsTable } from "./filtered-songs-table";
 
 interface HookReturnOverrides {
   selectedTimeRange?: string;
-  coverFilter?: "all" | "cover" | "original";
+  kindFilter?: "all" | "original" | "cover" | "mashup" | "improvisation";
   selectedAuthor?: string | null;
   activeToggleSet?: Set<string>;
   playedFilter?: string;
@@ -35,17 +35,17 @@ interface HookReturnOverrides {
 
 function setHookReturn(overrides: HookReturnOverrides = {}) {
   const selectedTimeRange = overrides.selectedTimeRange ?? "all";
-  const coverFilter = overrides.coverFilter ?? "all";
+  const kindFilter = overrides.kindFilter ?? "all";
   const selectedAuthor = overrides.selectedAuthor ?? null;
   const activeToggleSet = overrides.activeToggleSet ?? new Set<string>();
   const hasFilters =
     overrides.hasFilters ??
-    (selectedTimeRange !== "all" || coverFilter !== "all" || selectedAuthor !== null || activeToggleSet.size > 0);
+    (selectedTimeRange !== "all" || kindFilter !== "all" || selectedAuthor !== null || activeToggleSet.size > 0);
   usePerformancePageFiltersMock.mockReturnValue({
     filteredData: [],
     isLoading: false,
     selectedTimeRange,
-    coverFilter,
+    kindFilter,
     selectedAuthor,
     playedFilter: overrides.playedFilter ?? "all",
     activeToggleSet,
@@ -154,7 +154,7 @@ describe("FilteredSongsTable", () => {
   // filteredTimesPlayed would just equal timesPlayed. Hide to avoid a
   // duplicate column. Same rule the "not played" filter control uses.
   test("showFilteredPlays=false when only cover filter is active", () => {
-    setHookReturn({ coverFilter: "cover" });
+    setHookReturn({ kindFilter: "cover" });
     renderComponent();
 
     const table = screen.getByTestId("SongsTable");
@@ -174,7 +174,7 @@ describe("FilteredSongsTable", () => {
 
   // Cover + author combined are still non-narrowing — same rule applies.
   test("showFilteredPlays=false when only cover+author are active", () => {
-    setHookReturn({ coverFilter: "original", selectedAuthor: "00000000-0000-0000-0000-000000000000" });
+    setHookReturn({ kindFilter: "original", selectedAuthor: "00000000-0000-0000-0000-000000000000" });
     renderComponent();
 
     const table = screen.getByTestId("SongsTable");
@@ -184,7 +184,7 @@ describe("FilteredSongsTable", () => {
   // Cover alongside a narrowing filter: the narrowing one decides. Cover
   // doesn't erase the need for the column when a time range is also set.
   test("showFilteredPlays=true when cover and a time range are both active", () => {
-    setHookReturn({ coverFilter: "cover", selectedTimeRange: "1999" });
+    setHookReturn({ kindFilter: "cover", selectedTimeRange: "1999" });
     renderComponent();
 
     const table = screen.getByTestId("SongsTable");

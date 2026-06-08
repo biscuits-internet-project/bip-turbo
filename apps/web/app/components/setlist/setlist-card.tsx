@@ -3,12 +3,14 @@ import { Check } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
+import { ShowLineupNote } from "~/components/show/show-lineup-note";
 import { ShowDate } from "~/components/show-date";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { formatVenueLocation } from "~/lib/format-venue";
+import { deriveShowLineupNotes } from "~/lib/lineup-notes";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { RockOperaAnnotations } from "./rock-opera-annotations";
@@ -273,6 +275,14 @@ function SetlistCardComponent({
         <div className={cn(collapsible && "overflow-hidden")}>
           <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
             <RockOperaAnnotations performances={setlist.rockOperaPerformances} />
+            <ShowLineupNote
+              notes={deriveShowLineupNotes(
+                setlist.show.date,
+                setlist.lineup,
+                setlist.trackMusicianDeltas,
+                setlist.sets.flatMap((set) => set.tracks).map((track) => track.id),
+              )}
+            />
             {setlist.show.notes && (
               <div
                 className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"

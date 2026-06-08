@@ -61,6 +61,11 @@ function makeTrack(overrides: Partial<TrackLight> & { id: string; songId: string
     duration: overrides.duration ?? null,
     durationSource: overrides.durationSource ?? null,
     previousPerformanceShow: null,
+    flags: overrides.flags ?? [],
+    flagRecurrences: overrides.flagRecurrences ?? [],
+    segueRecurrences: overrides.segueRecurrences ?? [],
+    completes: overrides.completes ?? [],
+    completedBy: overrides.completedBy ?? [],
     song: overrides.song ?? { id: overrides.songId, title: "Tractorbeam", slug: "tractorbeam" },
   };
 }

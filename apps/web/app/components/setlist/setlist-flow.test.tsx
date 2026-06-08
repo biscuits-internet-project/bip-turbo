@@ -15,7 +15,26 @@ vi.mock("~/components/track/noteworthy-marker", () => ({
 
 import { SetlistFlow } from "./setlist-flow";
 
-function durTrack(id: string, title: string, duration: number | null, set: string, position: number) {
+function durTrack(
+  id: string,
+  title: string,
+  duration: number | null,
+  set: string,
+  position: number,
+  overrides: {
+    gap?: number | null;
+    previousPerformanceShow?: { date: string; slug: string } | null;
+    completes?: { date: string; slug: string }[];
+    completedBy?: { date: string; slug: string }[];
+    flags?: Array<"DYSLEXIC" | "INVERTED" | "UNFINISHED" | "ENDING_ONLY" | "MIDDLE_ONLY" | "BEGINNING_ONLY">;
+    song?: {
+      id: string;
+      title: string;
+      slug: string;
+      kind?: "original" | "cover" | "mashup" | "improvisation" | null;
+    };
+  } = {},
+) {
   return {
     id,
     showId: "show-1",
@@ -28,23 +47,27 @@ function durTrack(id: string, title: string, duration: number | null, set: strin
     allTimer: false,
     averageRating: null,
     ratingsCount: 0,
-    gap: null,
+    gap: null as number | null,
     previousPerformanceShowId: null,
     duration,
     durationSource: duration === null ? null : "nugs",
-    previousPerformanceShow: null,
+    previousPerformanceShow: null as { date: string; slug: string } | null,
     song: { id, title, slug: title.toLowerCase().replace(/\s+/g, "-") },
+    ...overrides,
   };
 }
 
 function flowSetlist(
   sets: Array<{ label: string; tracks: ReturnType<typeof durTrack>[] }>,
   annotations: Array<{ trackId: string; desc: string }> = [],
+  showDate?: string,
 ): SetlistLight {
   return {
-    show: { id: "show-1" },
+    show: { id: "show-1", date: showDate },
     sets: sets.map((s, i) => ({ label: s.label, sort: i + 1, tracks: s.tracks })),
     annotations,
+    trackMusicianDeltas: [],
+    lineup: [],
   } as unknown as SetlistLight;
 }
 
@@ -180,5 +203,86 @@ describe("SetlistFlow", () => {
     expect(screen.getByText("Glow-stick war peak")).toBeInTheDocument();
     // The inline superscript marker "1" and the footnote index "1" both render.
     expect(screen.getAllByText("1").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // A debut composition and a long-gap return both auto-footnote, alongside the
+  // hand annotation (no suppression).
+  test("auto-footnotes debuts and long-gap returns next to hand annotations", async () => {
+    const debut = durTrack("a", "Aquatic Ape", 522, "S1", 1, { gap: null });
+    const returning = durTrack("b", "Spaga", 410, "S1", 2, {
+      gap: 241,
+      previousPerformanceShow: { date: "2007-02-15", slug: "2007-02-15-foo" },
+    });
+    await setupWithRouter(
+      <SetlistFlow
+        setlist={flowSetlist([{ label: "S1", tracks: [debut, returning] }], [{ trackId: "a", desc: "Tela tease" }])}
+      />,
+    );
+
+    expect(screen.getByText("debut (original - unknown author)")).toBeInTheDocument();
+    expect(screen.getByText(/last played/)).toHaveTextContent("241 shows");
+    // The hand annotation still renders unchanged.
+    expect(screen.getByText("Tela tease")).toBeInTheDocument();
+  });
+
+  // Helper: a show with a debut track and a long-gap return, to probe which
+  // auto footnotes the show's date allows.
+  function debutAndReturnSetlist(showDate: string) {
+    const debut = durTrack("a", "Aquatic Ape", 522, "S1", 1, { gap: null, flags: ["INVERTED"] });
+    const returning = durTrack("b", "Spaga", 410, "S1", 2, {
+      gap: 241,
+      previousPerformanceShow: { date: "1995-04-21", slug: "1995-04-21-foo" },
+    });
+    return flowSetlist([{ label: "S1", tracks: [debut, returning] }], [{ trackId: "a", desc: "Tela tease" }], showDate);
+  }
+
+  // Before the debut start date, neither debut nor gap footnotes render, but the
+  // hand annotation and structured flag still do.
+  test("a show before the debut start date shows no debut or last-played footnote", async () => {
+    await setupWithRouter(<SetlistFlow setlist={debutAndReturnSetlist("1997-07-10")} />);
+
+    expect(screen.queryByText("debut (original - unknown author)")).not.toBeInTheDocument();
+    expect(screen.queryByText(/last played/)).not.toBeInTheDocument();
+    // Observed facts still render: the annotation and the structured flag.
+    expect(screen.getByText("Tela tease")).toBeInTheDocument();
+    expect(screen.getByText("inverted")).toBeInTheDocument();
+  });
+
+  // Debuts firm up before gaps: a show between the two start dates shows the
+  // debut but still suppresses the gap-derived last-played footnote.
+  test("a show between the two start dates shows the debut but not the last-played", async () => {
+    await setupWithRouter(<SetlistFlow setlist={debutAndReturnSetlist("1998-05-01")} />);
+
+    expect(screen.getByText("debut (original - unknown author)")).toBeInTheDocument();
+    expect(screen.queryByText(/last played/)).not.toBeInTheDocument();
+  });
+
+  // On the gap start date both categories are trustworthy.
+  test("a show on the gap start date shows both the debut and the last-played", async () => {
+    await setupWithRouter(<SetlistFlow setlist={debutAndReturnSetlist("1998-08-28")} />);
+
+    expect(screen.getByText("debut (original - unknown author)")).toBeInTheDocument();
+    expect(screen.getByText(/last played/)).toHaveTextContent("241 shows");
+  });
+
+  // A track that completes an earlier unfinished version footnotes the link to
+  // that earlier show.
+  test("footnotes a cross-show completion linking to the earlier version", async () => {
+    const completing = durTrack("a", "Basis for a Day", 600, "S1", 1, {
+      completes: [{ date: "2025-11-14", slug: "2025-11-14-earlier" }],
+    });
+    await setupWithRouter(<SetlistFlow setlist={flowSetlist([{ label: "S1", tracks: [completing] }])} />);
+
+    expect(screen.getByText(/completes/)).toHaveTextContent("completes 11/14/2025 version");
+    expect(screen.getByRole("link", { name: "11/14/2025" })).toHaveAttribute("href", "/shows/2025-11-14-earlier");
+  });
+
+  // Structured flags render as footnotes, mirroring the annotation text they
+  // replace so the setlist reads the same after the backfill.
+  test("renders a footnote for a structured track flag", async () => {
+    const inverted = durTrack("a", "Abraxas", 600, "S1", 1, { flags: ["INVERTED"] });
+    await setupWithRouter(<SetlistFlow setlist={flowSetlist([{ label: "S1", tracks: [inverted] }])} />);
+
+    expect(screen.getByText("inverted")).toBeInTheDocument();
   });
 });

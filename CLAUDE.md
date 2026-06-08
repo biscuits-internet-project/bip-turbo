@@ -70,6 +70,15 @@ make db-execute FILE=file.sql        # Execute SQL file against local database
 make db-query SQL="SELECT * FROM t"  # Execute SQL query against local database
 ```
 
+## CRITICAL: Schema and data changes go through migrations ONLY
+
+**Never alter the database schema or insert/update/delete data outside a Prisma migration** — not via `db-query`/`db-execute`, not via a script, not by hand in Studio. This applies to local AND prod. The only exception is repairing a broken/failed migration (e.g. `migrate resolve`).
+
+- **Never edit a migration that has run in production.** Migrations are immutable once deployed; the recorded checksum means an edit silently never re-runs in prod and desyncs history. To change something an applied migration created (drop a column, alter a table, fix seeded data), write a NEW forward migration. Only an unmerged, never-deployed migration may be edited in place.
+- Schema change (column, table, index, constraint): edit `schema.prisma`, create a new migration, apply it. If `migrate dev` reports drift and wants to reset the dev DB (which would wipe restored prod data), hand-author the `migration.sql` under `packages/core/src/_shared/prisma/migrations/<timestamp>_<name>/` and apply with `bun run prisma:migrate:deploy` (deploy skips the drift check).
+- Seed/reference/backfill data: ship it as idempotent `INSERT ... ON CONFLICT DO NOTHING` SQL inside a migration (precedent: the musicians/instruments seed), NOT a runtime script. Prod has no arbitrary-script lever; a migration is the only thing that runs there.
+- `db-query`/`db-execute` are for READ-ONLY inspection. Do not use them to mutate.
+
 ## Project Architecture
 
 This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime:

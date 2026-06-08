@@ -116,8 +116,8 @@ describe("PerformanceFilterControls", () => {
     expect(screen.getByText("Played")).toBeInTheDocument();
   });
 
-  test("hides played filter when only cover filter is set", async () => {
-    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" coverFilter="cover" />);
+  test("hides played filter when only kind filter is set", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} playedFilter="all" kindFilter="cover" />);
 
     expect(screen.queryByText("Played")).not.toBeInTheDocument();
   });

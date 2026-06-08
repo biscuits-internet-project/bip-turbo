@@ -413,6 +413,7 @@ export class PostgresSearchService {
         FROM shows s
         LEFT JOIN venues v ON s.venue_id = v.id
         WHERE search_date_match(s.date, $1)
+          AND s.venue_id IS NOT NULL
       )
       SELECT 
         entity_type,

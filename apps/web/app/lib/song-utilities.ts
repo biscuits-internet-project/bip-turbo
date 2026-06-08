@@ -1,5 +1,5 @@
 import { computeRarityStats } from "@bip/core";
-import type { Show, Song } from "@bip/domain";
+import type { Show, Song, SongKind } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import type { PublicContext } from "~/lib/base-loaders";
 import { dateToISOStringSansTime } from "~/lib/date";
@@ -16,7 +16,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 interface BaseFilter {
   authorId?: string;
-  cover?: boolean;
+  kind?: SongKind;
 }
 
 /**
@@ -37,11 +37,14 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
   const timeRangeParam = getTimeRangeParam(params);
   const playedParam = params.get("played");
   const authorParam = params.get("author");
-  const coverParam = params.get("cover");
+  const kindParam = params.get("kind");
   const attendedParam = params.get("attended");
   const filtersParam = params.get("filters");
 
-  const coverFilter = coverParam === "cover" ? true : coverParam === "original" ? false : undefined;
+  const kindFilter =
+    kindParam === "original" || kindParam === "cover" || kindParam === "mashup" || kindParam === "improvisation"
+      ? kindParam
+      : undefined;
   const authorId = authorParam && UUID_REGEX.test(authorParam) ? authorParam : undefined;
   const attendedUserId = await resolveAttendedUserId(attendedParam, context);
 
@@ -57,13 +60,13 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
 
   const baseFilter: BaseFilter = {};
   if (authorId) baseFilter.authorId = authorId;
-  if (coverFilter !== undefined) baseFilter.cover = coverFilter;
+  if (kindFilter !== undefined) baseFilter.kind = kindFilter;
 
   const cacheKey = CacheKeys.songs.filtered({
     timeRange: timeRangeParam || null,
     played: playedParam || null,
     author: authorId || null,
-    cover: coverParam || null,
+    kind: kindParam || null,
     attended: attendedUserId || null,
     filters: filtersParam || null,
   });

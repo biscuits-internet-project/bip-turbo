@@ -1,4 +1,13 @@
-import type { Instrument, Logger, Musician } from "@bip/domain";
+import type {
+  Instrument,
+  Logger,
+  Musician,
+  MusicianAppearanceShow,
+  MusicianAppearances,
+  MusicianPerformance,
+  MusicianSongPlay,
+  MusicianWithStats,
+} from "@bip/domain";
 import type { DbClient, DbInstrument, DbMusician } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -10,6 +19,7 @@ export interface CreateInstrumentInput {
 
 export interface CreateMusicianInput {
   name: string;
+  knownFrom?: string | null;
   defaultInstrumentId?: string | null;
 }
 
@@ -28,6 +38,7 @@ function mapMusicianToDomainEntity(db: DbMusician): Musician {
     id: db.id,
     name: db.name,
     slug: db.slug,
+    knownFrom: db.knownFrom ?? null,
     defaultInstrumentId: db.defaultInstrumentId ?? null,
     createdAt: new Date(db.createdAt),
     updatedAt: new Date(db.updatedAt),
@@ -139,6 +150,282 @@ export class MusicianService {
     return sorted.slice(0, limit);
   }
 
+  /**
+   * Shows and track count a musician appears on, for their profile page.
+   * Appearances combine lineup membership (every track of a show they were in
+   * the lineup for, minus their per-track sat-outs) with sit-ins (present=true
+   * deltas on shows they were not in the lineup for).
+   *
+   * Known simplification for this preview: a show where the musician is in the
+   * lineup but sat out every track still counts as an appearance. Full
+   * lineup-minus-satouts-plus-sitins show filtering is deferred to the Phase 8
+   * filter work.
+   */
+  async findAppearances(musicianId: string): Promise<MusicianAppearances> {
+    const [lineupRows, presentDeltas, absentDeltaCount, lineupTrackCount] = await Promise.all([
+      this.db.showMusician.findMany({ where: { musicianId }, select: { showId: true } }),
+      this.db.trackMusician.findMany({
+        where: { musicianId, present: true },
+        select: { track: { select: { showId: true } } },
+      }),
+      this.db.trackMusician.count({ where: { musicianId, present: false } }),
+      this.db.track.count({ where: { show: { showMusicians: { some: { musicianId } } } } }),
+    ]);
+
+    const lineupShowIds = lineupRows.map((row) => row.showId);
+    const lineupShowIdSet = new Set(lineupShowIds);
+    const sitInShowIds = presentDeltas.map((delta) => delta.track.showId);
+    const showIds = Array.from(new Set([...lineupShowIds, ...sitInShowIds]));
+
+    // Tracks of their lineup shows, minus their sat-outs, plus sit-ins on shows
+    // they were not in the lineup for (a sit-in on a lineup show is already
+    // counted by lineupTrackCount).
+    const sitInOnNonLineupCount = presentDeltas.filter((delta) => !lineupShowIdSet.has(delta.track.showId)).length;
+    const trackCount = lineupTrackCount - absentDeltaCount + sitInOnNonLineupCount;
+
+    const [firstShow, lastShow] = showIds.length
+      ? await Promise.all([this.findAppearanceShow(showIds, "asc"), this.findAppearanceShow(showIds, "desc")])
+      : [null, null];
+
+    return { showIds, trackCount, firstShow, lastShow };
+  }
+
+  /** Earliest/latest appearance show (with venue) for the first/last cards. */
+  private async findAppearanceShow(
+    showIds: string[],
+    direction: "asc" | "desc",
+  ): Promise<MusicianAppearanceShow | null> {
+    const show = await this.db.show.findFirst({
+      where: { id: { in: showIds } },
+      orderBy: { date: direction },
+      select: { date: true, slug: true, venue: { select: { name: true, city: true, state: true } } },
+    });
+    if (!show) return null;
+    return {
+      date: show.date,
+      slug: show.slug,
+      venue: show.venue ? { name: show.venue.name, city: show.venue.city, state: show.venue.state } : null,
+    };
+  }
+
+  /**
+   * Every musician with their appearance aggregates in one query, for the
+   * /musicians index table. A musician "plays" a track when they are in that
+   * show's lineup and have no sat-out delta for the track, OR they have a
+   * present=true sit-in delta for it. Track count, distinct show count, and
+   * first/last show dates all derive from that single per-track predicate, so
+   * they agree with each other and with the per-musician findAppearances math.
+   */
+  async findAllWithStats(): Promise<MusicianWithStats[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        slug: string;
+        known_from: string | null;
+        default_instrument_id: string | null;
+        default_instrument_name: string | null;
+        track_count: bigint;
+        show_count: bigint;
+        first_show_date: string | null;
+        last_show_date: string | null;
+      }>
+    >`
+      WITH appearances AS (
+        SELECT t.id AS track_id, t.show_id, sm.musician_id
+        FROM show_musicians sm
+        JOIN tracks t ON t.show_id = sm.show_id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM track_musicians tm
+          WHERE tm.track_id = t.id AND tm.musician_id = sm.musician_id AND tm.present = false
+        )
+        UNION
+        SELECT tm.track_id, t.show_id, tm.musician_id
+        FROM track_musicians tm
+        JOIN tracks t ON t.id = tm.track_id
+        WHERE tm.present = true
+      ),
+      stats AS (
+        SELECT
+          a.musician_id,
+          COUNT(*) AS track_count,
+          COUNT(DISTINCT a.show_id) AS show_count,
+          to_char(MIN(s.date::date), 'YYYY-MM-DD') AS first_show_date,
+          to_char(MAX(s.date::date), 'YYYY-MM-DD') AS last_show_date
+        FROM appearances a
+        JOIN shows s ON s.id = a.show_id
+        GROUP BY a.musician_id
+      )
+      SELECT
+        m.id,
+        m.name,
+        m.slug,
+        m.known_from,
+        m.default_instrument_id,
+        i.name AS default_instrument_name,
+        COALESCE(stats.track_count, 0) AS track_count,
+        COALESCE(stats.show_count, 0) AS show_count,
+        stats.first_show_date,
+        stats.last_show_date
+      FROM musicians m
+      LEFT JOIN instruments i ON i.id = m.default_instrument_id
+      LEFT JOIN stats ON stats.musician_id = m.id
+      ORDER BY m.name ASC
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      knownFrom: row.known_from ?? null,
+      defaultInstrumentName: row.default_instrument_name ?? null,
+      trackCount: Number(row.track_count),
+      showCount: Number(row.show_count),
+      firstShowDate: row.first_show_date,
+      lastShowDate: row.last_show_date,
+    }));
+  }
+
+  /**
+   * Songs a musician has played, with their per-song play count and first/last
+   * date, for the songs table on a profile page. Uses the same "plays this
+   * track" predicate as findAllWithStats: a lineup track with no sat-out, or a
+   * present=true sit-in.
+   */
+  async findSongsPlayed(musicianId: string): Promise<MusicianSongPlay[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{
+        song_id: string;
+        title: string;
+        slug: string;
+        play_count: bigint;
+        first_show_date: string;
+        first_show_slug: string | null;
+        first_venue_name: string | null;
+        first_venue_city: string | null;
+        first_venue_state: string | null;
+        last_show_date: string;
+        last_show_slug: string | null;
+        last_venue_name: string | null;
+        last_venue_city: string | null;
+        last_venue_state: string | null;
+      }>
+    >`
+      WITH appearances AS (
+        SELECT t.show_id, t.song_id
+        FROM show_musicians sm
+        JOIN tracks t ON t.show_id = sm.show_id
+        WHERE sm.musician_id = ${musicianId}::uuid
+          AND NOT EXISTS (
+            SELECT 1 FROM track_musicians tm
+            WHERE tm.track_id = t.id AND tm.musician_id = sm.musician_id AND tm.present = false
+          )
+        UNION
+        SELECT t.show_id, t.song_id
+        FROM track_musicians tm
+        JOIN tracks t ON t.id = tm.track_id
+        WHERE tm.musician_id = ${musicianId}::uuid AND tm.present = true
+      )
+      SELECT
+        a.song_id,
+        songs.title,
+        songs.slug,
+        COUNT(*) AS play_count,
+        to_char(MIN(s.date::date), 'YYYY-MM-DD') AS first_show_date,
+        (array_agg(s.slug ORDER BY s.date ASC))[1] AS first_show_slug,
+        (array_agg(v.name ORDER BY s.date ASC))[1] AS first_venue_name,
+        (array_agg(v.city ORDER BY s.date ASC))[1] AS first_venue_city,
+        (array_agg(v.state ORDER BY s.date ASC))[1] AS first_venue_state,
+        to_char(MAX(s.date::date), 'YYYY-MM-DD') AS last_show_date,
+        (array_agg(s.slug ORDER BY s.date DESC))[1] AS last_show_slug,
+        (array_agg(v.name ORDER BY s.date DESC))[1] AS last_venue_name,
+        (array_agg(v.city ORDER BY s.date DESC))[1] AS last_venue_city,
+        (array_agg(v.state ORDER BY s.date DESC))[1] AS last_venue_state
+      FROM appearances a
+      JOIN shows s ON s.id = a.show_id
+      JOIN songs ON songs.id = a.song_id
+      LEFT JOIN venues v ON v.id = s.venue_id
+      GROUP BY a.song_id, songs.title, songs.slug
+      ORDER BY songs.title ASC
+    `;
+
+    return rows.map((row) => ({
+      songId: row.song_id,
+      title: row.title,
+      slug: row.slug,
+      playCount: Number(row.play_count),
+      firstShow: {
+        date: row.first_show_date,
+        slug: row.first_show_slug,
+        venue: { name: row.first_venue_name, city: row.first_venue_city, state: row.first_venue_state },
+      },
+      lastShow: {
+        date: row.last_show_date,
+        slug: row.last_show_slug,
+        venue: { name: row.last_venue_name, city: row.last_venue_city, state: row.last_venue_state },
+      },
+    }));
+  }
+
+  /**
+   * Every individual performance (one row per show+song) a musician played, for
+   * the "All Performances" list on a profile. Same "plays this track" predicate
+   * as findSongsPlayed, but un-aggregated.
+   */
+  async findPerformances(musicianId: string): Promise<MusicianPerformance[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{
+        track_id: string;
+        date: string;
+        show_slug: string | null;
+        song_title: string;
+        song_slug: string;
+        venue_name: string | null;
+        venue_city: string | null;
+        venue_state: string | null;
+      }>
+    >`
+      WITH appearances AS (
+        SELECT t.id AS track_id
+        FROM show_musicians sm
+        JOIN tracks t ON t.show_id = sm.show_id
+        WHERE sm.musician_id = ${musicianId}::uuid
+          AND NOT EXISTS (
+            SELECT 1 FROM track_musicians tm
+            WHERE tm.track_id = t.id AND tm.musician_id = sm.musician_id AND tm.present = false
+          )
+        UNION
+        SELECT tm.track_id
+        FROM track_musicians tm
+        WHERE tm.musician_id = ${musicianId}::uuid AND tm.present = true
+      )
+      SELECT
+        t.id AS track_id,
+        to_char(s.date::date, 'YYYY-MM-DD') AS date,
+        s.slug AS show_slug,
+        songs.title AS song_title,
+        songs.slug AS song_slug,
+        v.name AS venue_name,
+        v.city AS venue_city,
+        v.state AS venue_state
+      FROM appearances a
+      JOIN tracks t ON t.id = a.track_id
+      JOIN shows s ON s.id = t.show_id
+      JOIN songs ON songs.id = t.song_id
+      LEFT JOIN venues v ON v.id = s.venue_id
+      ORDER BY s.date DESC, t.position ASC
+    `;
+
+    return rows.map((row) => ({
+      trackId: row.track_id,
+      date: row.date,
+      showSlug: row.show_slug,
+      songTitle: row.song_title,
+      songSlug: row.song_slug,
+      venue: { name: row.venue_name, city: row.venue_city, state: row.venue_state },
+    }));
+  }
+
   async create(data: CreateMusicianInput): Promise<Musician> {
     const name = data.name?.trim();
     if (!name) {
@@ -155,6 +442,7 @@ export class MusicianService {
       data: {
         name,
         slug,
+        knownFrom: data.knownFrom ?? null,
         defaultInstrumentId: data.defaultInstrumentId ?? null,
         createdAt: new Date(),
         updatedAt: new Date(),

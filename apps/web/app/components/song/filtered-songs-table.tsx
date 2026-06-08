@@ -17,7 +17,7 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
     filteredData: filteredSongs,
     isLoading,
     selectedTimeRange,
-    coverFilter,
+    kindFilter,
     selectedAuthor,
     playedFilter,
     activeToggleSet,
@@ -57,7 +57,7 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
       updateFilter={updateFilter}
       toggleFilter={toggleFilter}
       clearFilters={clearFilters}
-      coverFilter={coverFilter}
+      kindFilter={kindFilter}
       selectedAuthor={selectedAuthor}
       playedFilter={playedFilter}
       searchValue={searchText}

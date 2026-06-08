@@ -26,7 +26,7 @@ vi.mock("~/hooks/use-performance-page-filters", () => ({
     filteredData: [],
     isLoading: false,
     selectedTimeRange: "all",
-    coverFilter: "all",
+    kindFilter: "all",
     selectedAuthor: null,
     activeToggleSet: new Set(),
     hasActiveFilters: false,

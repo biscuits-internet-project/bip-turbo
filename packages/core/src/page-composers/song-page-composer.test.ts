@@ -1,4 +1,4 @@
-import type { Annotation, SongPagePerformance } from "@bip/domain";
+import type { SongPagePerformance } from "@bip/domain";
 import { CacheKeys } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import { describe, expect, test, vi } from "vitest";
@@ -43,16 +43,6 @@ function makeSetPositionData(
     map.set(buildSetPositionKey(showId, set), { min, max });
   }
   return map;
-}
-
-function makeAnnotation(desc: string): Annotation {
-  return {
-    id: "ann-1",
-    trackId: "track-1",
-    desc,
-    createdAt: new Date("2024-01-01"),
-    updatedAt: new Date("2024-01-01"),
-  };
 }
 
 function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
@@ -205,31 +195,24 @@ describe("computeTagsForPerformance", () => {
     expect(noneTags.standalone).toBe(true);
   });
 
-  // Inverted/dyslexic tags come from annotation text (case-insensitive
-  // substring match on `annotation.desc`). Current impl uses
-  // `annotationText.includes("inverted")`, so substrings like "not inverted"
-  // would also match — noted for a future scoped discussion, but the current
-  // behavior is what we're pinning.
-  test("inverted and dyslexic tags match annotation desc case-insensitively", () => {
+  // Inverted/dyslexic/unfinished tags come from the structured `flags` set
+  // (populated by enrichment), not annotation text.
+  test("inverted, dyslexic, and unfinished tags reflect the track's flags", () => {
     const setData = makeSetPositionData([["show-1", "S1", 1, 8]]);
 
-    const invertedTags = computeTagsForPerformance(
-      makePerformance({ annotations: [makeAnnotation("Inverted version")] }),
-      setData,
-    );
-    expect(invertedTags.inverted).toBe(true);
-    expect(invertedTags.dyslexic).toBe(false);
+    const tags = computeTagsForPerformance(makePerformance({ flags: ["INVERTED", "UNFINISHED"] }), setData);
+    expect(tags.inverted).toBe(true);
+    expect(tags.unfinished).toBe(true);
+    expect(tags.dyslexic).toBe(false);
 
-    const dyslexicTags = computeTagsForPerformance(
-      makePerformance({ annotations: [makeAnnotation("DYSLEXIC Cassidy")] }),
-      setData,
-    );
+    const dyslexicTags = computeTagsForPerformance(makePerformance({ flags: ["DYSLEXIC"] }), setData);
     expect(dyslexicTags.dyslexic).toBe(true);
     expect(dyslexicTags.inverted).toBe(false);
 
-    const noAnnotationsTags = computeTagsForPerformance(makePerformance({ annotations: [] }), setData);
-    expect(noAnnotationsTags.inverted).toBe(false);
-    expect(noAnnotationsTags.dyslexic).toBe(false);
+    const noFlagsTags = computeTagsForPerformance(makePerformance({ flags: [] }), setData);
+    expect(noFlagsTags.inverted).toBe(false);
+    expect(noFlagsTags.dyslexic).toBe(false);
+    expect(noFlagsTags.unfinished).toBe(false);
   });
 });
 
@@ -296,18 +279,18 @@ describe("transformToSongPagePerformanceView", () => {
   });
 
   // When the DTO includes song-level fields (from the songs table join in
-  // buildAllTimers), cover and authorId are mapped to the view.
-  test("maps song_cover and song_author_id to cover and authorId", () => {
-    const view = transformToSongPagePerformanceView(makeDto({ song_cover: true, song_author_id: "author-1" }));
-    expect(view.cover).toBe(true);
+  // buildAllTimers), kind and authorId are mapped to the view.
+  test("maps song_kind and song_author_id to kind and authorId", () => {
+    const view = transformToSongPagePerformanceView(makeDto({ song_kind: "cover", song_author_id: "author-1" }));
+    expect(view.kind).toBe("cover");
     expect(view.authorId).toBe("author-1");
   });
 
   // When song-level fields are absent (build() path where songs isn't
-  // joined), cover and authorId default to undefined/null.
-  test("cover is undefined and authorId is null when song fields are absent", () => {
+  // joined), kind and authorId default to null.
+  test("kind is null and authorId is null when song fields are absent", () => {
     const view = transformToSongPagePerformanceView(makeDto());
-    expect(view.cover).toBeUndefined();
+    expect(view.kind).toBeNull();
     expect(view.authorId).toBeNull();
   });
 
@@ -381,6 +364,20 @@ describe("buildFilterQuery", () => {
     // The encore condition should reference tracks.set LIKE 'E%'
     const sql = conditions[0].strings.join("");
     expect(sql).toContain("tracks.set LIKE");
+  });
+
+  // The inverted/dyslexic/unfinished filters query the structured track_flags
+  // table by enum value, not free-text annotations.
+  test.each([
+    ["inverted", { inverted: true }, "INVERTED"],
+    ["dyslexic", { dyslexic: true }, "DYSLEXIC"],
+    ["unfinished", { unfinished: true }, "UNFINISHED"],
+  ] as const)("%s filters on the track_flags enum", (_label, options, flag) => {
+    const { conditions } = SongPageComposer.buildFilterQuery([], options);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toContain("track_flags");
+    expect(sql).toContain(`'${flag}'::track_flag`);
+    expect(sql).not.toContain("annotations");
   });
 
   // The attended filter is special: it produces a JOIN (on the attendances
@@ -512,10 +509,11 @@ describe("buildJamCharts", () => {
   function createComposer(rows: Array<Partial<PerformanceDto>>) {
     const mockDb = {
       $queryRaw: vi.fn().mockResolvedValue(rows.map((r) => makeDto(r as Partial<PerformanceDto>))),
-      // enrichPerformances looks up annotations + previous-show data per
-      // returned track. Stub both to empty so the test focuses on the
+      // enrichPerformances looks up annotations, track flags, and previous-show
+      // data per returned track. Stub them to empty so the test focuses on the
       // base WHERE composition and the result shape.
       annotation: { findMany: vi.fn().mockResolvedValue([]) },
+      trackFlagAssignment: { findMany: vi.fn().mockResolvedValue([]) },
     };
     const mockSongService = {} as never;
     return { composer: new SongPageComposer(mockDb as never, mockSongService), mockDb };
@@ -576,13 +574,14 @@ describe("buildSongPerformances populates songTitle/songSlug", () => {
     const mockDb = {
       $queryRaw: vi.fn().mockResolvedValue([makeDto({ track_id: "t-1" }), makeDto({ track_id: "t-2" })]),
       annotation: { findMany: vi.fn().mockResolvedValue([]) },
+      trackFlagAssignment: { findMany: vi.fn().mockResolvedValue([]) },
     };
     const mockSongService = {
       findBySlug: vi.fn().mockResolvedValue({
         id: "song-1",
         title: "King of the World",
         slug: "king-of-the-world",
-        cover: false,
+        kind: "original",
         authorId: null,
       }),
     };
@@ -602,7 +601,7 @@ describe("CacheKeys.songs.jamCharts", () => {
   // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
   // bumped together with the rest of the songs cache family.
   test("returns a stable, versioned key string", () => {
-    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v4");
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v6");
   });
 });
 
@@ -625,8 +624,8 @@ describe("isNarrowingFilter", () => {
   // Cover/author filters pick which songs appear on /songs but don't narrow
   // which performances of a given song count — every performance of a cover
   // song is still a cover. They must NOT trigger filteredGap.
-  test("returns false when only cover or author is set", () => {
-    expect(isNarrowingFilter({ cover: true })).toBe(false);
+  test("returns false when only kind or author is set", () => {
+    expect(isNarrowingFilter({ kind: "cover" })).toBe(false);
     expect(isNarrowingFilter({ authorId: "author-1" })).toBe(false);
   });
 
@@ -644,6 +643,7 @@ describe("isNarrowingFilter", () => {
     ["standalone", { standalone: true }],
     ["inverted", { inverted: true }],
     ["dyslexic", { dyslexic: true }],
+    ["unfinished", { unfinished: true }],
     ["allTimer", { allTimer: true }],
     ["monthDay", { monthDay: "07-26" }],
   ])("returns true when %s is set", (_label, options) => {
@@ -969,7 +969,7 @@ describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v3");
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v5");
   });
 
   // The on-this-day counts cache key is used by the home page to cache

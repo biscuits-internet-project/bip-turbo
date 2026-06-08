@@ -126,8 +126,8 @@ describe("usePerformancePageFilters", () => {
     expect(result.current.hasFilters).toBe(true);
   });
 
-  test("hasFilters is true when cover filter is set", () => {
-    mockSearchParams = new URLSearchParams("cover=cover");
+  test("hasFilters is true when kind filter is set", () => {
+    mockSearchParams = new URLSearchParams("kind=cover");
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
 
@@ -245,12 +245,12 @@ describe("usePerformancePageFilters", () => {
   });
 
   // Verifies that the setSearchParams updater clears all URL param keys
-  // (timeRange, cover, author, filters, attended, played). We call the updater
+  // (timeRange, kind, author, filters, attended, played). We call the updater
   // manually because the mock doesn't trigger React state updates — we just
   // need to confirm the function produces the right params.
   test("clearFilters resets all params", () => {
     mockSearchParams = new URLSearchParams(
-      "timeRange=2024&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
+      "timeRange=2024&kind=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
     );
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
@@ -263,11 +263,11 @@ describe("usePerformancePageFilters", () => {
 
     const updaterFn = mockSetSearchParams.mock.calls[0][0];
     const nextParams = updaterFn(
-      new URLSearchParams("timeRange=2024&cover=cover&author=Trey&filters=encore&attended=attended&played=notPlayed"),
+      new URLSearchParams("timeRange=2024&kind=cover&author=Trey&filters=encore&attended=attended&played=notPlayed"),
     );
 
     expect(nextParams.get("timeRange")).toBeNull();
-    expect(nextParams.get("cover")).toBeNull();
+    expect(nextParams.get("kind")).toBeNull();
     expect(nextParams.get("author")).toBeNull();
     expect(nextParams.get("filters")).toBeNull();
     expect(nextParams.get("attended")).toBeNull();

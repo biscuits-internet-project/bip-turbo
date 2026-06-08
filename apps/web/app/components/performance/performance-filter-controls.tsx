@@ -29,7 +29,7 @@ interface PerformanceFilterControlsProps {
    */
   showJamChartToggle?: boolean;
   hideTimeRange?: boolean;
-  coverFilter?: string;
+  kindFilter?: string;
   selectedAuthor?: string | null;
   playedFilter?: string;
   searchValue?: string;
@@ -47,7 +47,7 @@ export function PerformanceFilterControls({
   showAllTimerToggle = true,
   showJamChartToggle = true,
   hideTimeRange = false,
-  coverFilter,
+  kindFilter,
   selectedAuthor,
   playedFilter,
   searchValue,
@@ -75,7 +75,7 @@ export function PerformanceFilterControls({
   const activeFilterCount =
     (searchValue && searchValue.length > 0 ? 1 : 0) +
     (!hideTimeRange && selectedTimeRange !== "all" ? 1 : 0) +
-    (coverFilter && coverFilter !== "all" ? 1 : 0) +
+    (kindFilter && kindFilter !== "all" ? 1 : 0) +
     (selectedAuthor ? 1 : 0) +
     (playedFilter && playedFilter !== "all" ? 1 : 0) +
     activeToggleSet.size;
@@ -135,19 +135,21 @@ export function PerformanceFilterControls({
               width="w-[200px]"
             />
           )}
-          {coverFilter !== undefined && (
+          {kindFilter !== undefined && (
             <SelectFilter
-              id="cover-filter"
-              label="Original / Cover"
-              value={coverFilter}
-              onValueChange={(value) => updateFilter({ cover: value })}
+              id="kind-filter"
+              label="Type"
+              value={kindFilter}
+              onValueChange={(value) => updateFilter({ kind: value })}
               options={[
                 { value: "all", label: "All" },
                 { value: "original", label: "Original" },
                 { value: "cover", label: "Cover" },
+                { value: "mashup", label: "Mashup" },
+                { value: "improvisation", label: "Improvisation" },
               ]}
               placeholder="Type"
-              width="w-[120px]"
+              width="w-[150px]"
             />
           )}
           {selectedAuthor !== undefined && (

@@ -183,10 +183,19 @@ describe("TrackService.setTrackMusicianDeltas", () => {
     const cache = makeCacheInvalidationStub();
     const service = new TrackService(db as never, logger, cache);
 
-    await service.setTrackMusicianDeltas("track-id", [{ musicianId: "m-sam", present: true, instrumentId: "i-drums" }]);
+    await service.setTrackMusicianDeltas("track-id", [
+      { musicianId: "m-sam", present: true, instrumentIds: ["i-drums", "i-vocals"] },
+    ]);
 
     expect(db.trackMusician.deleteMany).toHaveBeenCalledWith({ where: { trackId: "track-id" } });
     expect(db.trackMusician.create).toHaveBeenCalledTimes(1);
+    // A sit-in on several instruments writes one TrackMusician row with a
+    // nested instrument per instrumentId (no single instrumentId column).
+    const created = db.trackMusician.create.mock.calls[0][0].data;
+    expect(created.instruments.create.map((i: { instrumentId: string }) => i.instrumentId)).toEqual([
+      "i-drums",
+      "i-vocals",
+    ]);
     expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "2018-07-12-red-rocks", [2018]);
   });
 

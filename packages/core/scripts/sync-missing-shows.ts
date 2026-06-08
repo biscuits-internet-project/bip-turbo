@@ -127,7 +127,7 @@ export interface McpSong {
   // parse, and treated as "no opinion" in drift detection — see
   // buildSongDriftUpdate. `null` is distinct from `undefined` here: explicit
   // null means "prod has cleared the value" and DOES drift.
-  cover?: boolean | null;
+  kind?: string | null;
   legacyAuthor?: string | null;
   featuredLyric?: string | null;
   tabs?: string | null;
@@ -464,7 +464,7 @@ export function buildSongCreateInput(song: McpSong, now: Date): Prisma.SongUnche
     // Optional curated fields — `?? null` collapses `undefined` (older MCP)
     // to a stable explicit value, matching the existing buildShowCreateInput
     // pattern.
-    cover: song.cover ?? null,
+    kind: song.kind ?? null,
     legacyAuthor: song.legacyAuthor ?? null,
     featuredLyric: song.featuredLyric ?? null,
     tabs: song.tabs ?? null,
@@ -482,7 +482,7 @@ export function buildSongCreateInput(song: McpSong, now: Date): Prisma.SongUnche
 export interface LocalSongCurated {
   title: string;
   lyrics: string | null;
-  cover: boolean | null;
+  kind: string | null;
   legacyAuthor: string | null;
   featuredLyric: string | null;
   tabs: string | null;
@@ -494,7 +494,7 @@ export interface LocalSongCurated {
 export interface SongDriftUpdate {
   title?: string;
   lyrics?: string | null;
-  cover?: boolean | null;
+  kind?: string | null;
   legacyAuthor?: string | null;
   featuredLyric?: string | null;
   tabs?: string | null;
@@ -510,14 +510,14 @@ export interface SongDriftUpdate {
  * `rebuildGapsAndSongStatsSince` and intentionally never appear in the patch.
  *
  * Fields whose remote value is `undefined` are treated as "no opinion" — a
- * pre-deploy MCP that doesn't return `cover` shouldn't clobber a locally set
+ * pre-deploy MCP that doesn't return `kind` shouldn't clobber a locally set
  * value. Explicit `null` from MCP IS drift (prod cleared the field).
  */
 export function buildSongDriftUpdate(local: LocalSongCurated, remote: McpSong): SongDriftUpdate | null {
   const patch: SongDriftUpdate = {};
   if (local.title !== remote.title) patch.title = remote.title;
   if (local.lyrics !== remote.lyrics) patch.lyrics = remote.lyrics;
-  if (remote.cover !== undefined && local.cover !== remote.cover) patch.cover = remote.cover;
+  if (remote.kind !== undefined && local.kind !== remote.kind) patch.kind = remote.kind;
   if (remote.legacyAuthor !== undefined && local.legacyAuthor !== remote.legacyAuthor) {
     patch.legacyAuthor = remote.legacyAuthor;
   }
@@ -2003,7 +2003,7 @@ async function syncMissingShows(): Promise<void> {
     // can consume. Songs already in the DB reuse their existing id; new songs
     // get created via get_songs fetch. We fetch the full MCP shape for EVERY
     // in-scope song (not just missing ones) so the same call doubles as the
-    // source for buildSongDriftUpdate — admin edits to lyrics / cover /
+    // source for buildSongDriftUpdate — admin edits to lyrics / kind /
     // featuredLyric on prod mirror locally without a second round-trip.
     const allSongSlugs = collectSongSlugs(setlists);
     const localSongRows = await db.song.findMany({
@@ -2013,7 +2013,7 @@ async function syncMissingShows(): Promise<void> {
         id: true,
         title: true,
         lyrics: true,
-        cover: true,
+        kind: true,
         legacyAuthor: true,
         featuredLyric: true,
         tabs: true,

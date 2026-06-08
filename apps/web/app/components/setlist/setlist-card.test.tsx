@@ -94,6 +94,11 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
             duration: null,
             durationSource: null,
             previousPerformanceShow: null,
+            flags: [],
+            flagRecurrences: [],
+            segueRecurrences: [],
+            completes: [],
+            completedBy: [],
             song: { id: "song-1", title: "Basis for a Day", slug: "basis-for-a-day" },
           },
         ],
@@ -104,6 +109,8 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
     medianSongGap: null,
     debutCount: 0,
     rockOperaPerformances: [],
+    lineup: [],
+    trackMusicianDeltas: [],
   };
 }
 
