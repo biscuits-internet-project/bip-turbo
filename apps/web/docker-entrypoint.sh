@@ -4,20 +4,19 @@ set -e
 echo "Running Prisma migrations..."
 cd /app/packages/core
 
-# One-time recovery for the failed deploy of PR #158: the
-# 20260602130030_retire_migrated_annotations migration referenced track_completions
-# before that table existed (its timestamp sorted before the migration that creates
-# it), so it failed mid-apply on prod and rolled back. Prisma records that failure and
-# then blocks every later migration with P3009. The migration has since been renumbered
-# to run after its dependencies, so the stale failed row must be cleared before deploy.
-# Idempotent: matches only a still-failed (finished_at IS NULL) row, so it is a no-op on
-# every healthy deploy. Safe to delete this block once prod has migrated past it.
+# Recovery for the partially-failed PR #158 backfill deploy. Two bugs each left a
+# migration marked failed in prod, which then blocks every later migration with
+# P3009: a mis-ordered migration that referenced a not-yet-created table (fixed by
+# renumbering), and a recompute-enqueue that inserted a NULL since_date (fixed by a
+# HAVING guard). A failed Prisma migration is always a fully rolled-back transaction
+# (no partial data), so clearing the failed row simply lets the corrected migration
+# re-apply on the next deploy. Clears ANY still-failed (finished_at IS NULL) row so
+# the cascade resolves without manual `migrate resolve` against prod.
+# Idempotent: a no-op on every healthy deploy. Remove this block once prod is healthy.
 bun prisma db execute \
   --config=src/_shared/prisma/prisma.config.ts \
   --stdin <<'SQL' || echo "Stale-migration cleanup skipped (no failed row, or already recovered)"
-DELETE FROM "_prisma_migrations"
-WHERE "migration_name" = '20260602130030_retire_migrated_annotations'
-  AND "finished_at" IS NULL;
+DELETE FROM "_prisma_migrations" WHERE "finished_at" IS NULL;
 SQL
 
 bun prisma migrate deploy \
