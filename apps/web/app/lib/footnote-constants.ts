@@ -4,25 +4,11 @@
 // bundle (see server-import-leak.test.ts).
 
 /**
- * Master gate for the auto-composed last-time-played and debut footnotes. Kept
- * separate from MUSICIANS_FEATURE_ENABLED so the two can be validated and
- * shipped independently.
- */
-export const AUTO_FOOTNOTES_ENABLED = true;
-
-/**
  * A returning song earns a "last time played" footnote only once its gap (shows
  * since it last appeared) reaches this many shows. Below the threshold the
  * return isn't notable enough to annotate. Tuned by eye against real setlists.
  */
 export const LAST_TIME_PLAYED_GAP_THRESHOLD = 40;
-
-/**
- * Gate for the cross-show "completes" / "completed by" footnotes. Separate from
- * the other auto-footnote gates so the completion links can be validated and
- * shipped on their own.
- */
-export const COMPLETIONS_FOOTNOTES_ENABLED = true;
 
 /**
  * The first show whose debut footnotes are trustworthy. Earlier setlists are

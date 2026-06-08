@@ -5,8 +5,6 @@ import { DataTable } from "~/components/ui/data-table";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { notFound } from "~/lib/errors";
-import { MUSICIANS_FEATURE_ENABLED } from "~/lib/musicians-constants";
 import { formatDateShort } from "~/lib/utils";
 import { services } from "~/server/services";
 
@@ -15,7 +13,6 @@ interface LoaderData {
 }
 
 export const loader = publicLoader(async (): Promise<LoaderData> => {
-  if (!MUSICIANS_FEATURE_ENABLED) throw notFound();
   return { musicians: await services.musicians.findAllWithStats() };
 });
 

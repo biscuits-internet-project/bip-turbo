@@ -11,7 +11,6 @@ import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { deriveShowLineupNotes } from "~/lib/lineup-notes";
-import { MUSICIANS_FEATURE_ENABLED } from "~/lib/musicians-constants";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { RockOperaAnnotations } from "./rock-opera-annotations";
@@ -276,16 +275,14 @@ function SetlistCardComponent({
         <div className={cn(collapsible && "overflow-hidden")}>
           <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
             <RockOperaAnnotations performances={setlist.rockOperaPerformances} />
-            {MUSICIANS_FEATURE_ENABLED && (
-              <ShowLineupNote
-                notes={deriveShowLineupNotes(
-                  setlist.show.date,
-                  setlist.lineup,
-                  setlist.trackMusicianDeltas,
-                  setlist.sets.flatMap((set) => set.tracks).map((track) => track.id),
-                )}
-              />
-            )}
+            <ShowLineupNote
+              notes={deriveShowLineupNotes(
+                setlist.show.date,
+                setlist.lineup,
+                setlist.trackMusicianDeltas,
+                setlist.sets.flatMap((set) => set.tracks).map((track) => track.id),
+              )}
+            />
             {setlist.show.notes && (
               <div
                 className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"

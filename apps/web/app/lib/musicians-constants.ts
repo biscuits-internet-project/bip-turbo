@@ -1,5 +1,5 @@
-// Client-safe constants for the musicians/performers GUI preview. Imports
-// nothing — in particular nothing from @bip/core — so route components can
+// Client-safe constants for the musicians/performers GUI. Imports nothing — in
+// particular nothing from @bip/core — so route components can
 // reference these values without the server-import-leak guardrail dragging
 // core into the client bundle.
 
@@ -9,14 +9,6 @@ import type { ShowLineupMember } from "@bip/domain";
 // as a literal here rather than imported so this module stays free of any
 // @bip/core import (see server-import-leak.test.ts).
 const MARLON_LINEUP_SLUGS = ["jon-gutwillig", "marc-brownstein", "aron-magner", "marlon-lewis"];
-
-/**
- * Master gate for the in-progress musicians/performers GUI (show-page lineup
- * section, auto-composed performer footnotes, and the /musicians pages). The
- * feature spans unbuilt admin/sync phases, so it stays off in every deployed
- * environment and is flipped to true locally to validate the backfilled data.
- */
-export const MUSICIANS_FEATURE_ENABLED = true;
 
 /**
  * Drummer-era windows keyed by the drummer's musician slug. A drummer's

@@ -11,13 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
-import {
-  classifyMusician,
-  DRUMMER_ERAS,
-  isOutsideEra,
-  MUSICIANS_FEATURE_ENABLED,
-  type MusicianTier,
-} from "~/lib/musicians-constants";
+import { classifyMusician, DRUMMER_ERAS, isOutsideEra, type MusicianTier } from "~/lib/musicians-constants";
 import { services } from "~/server/services";
 
 export const routeParam = "slug";
@@ -51,8 +45,6 @@ interface LoaderData {
 }
 
 export const loader = publicLoader(async ({ params }): Promise<LoaderData> => {
-  if (!MUSICIANS_FEATURE_ENABLED) throw notFound();
-
   const slug = params.slug;
   if (!slug) throw notFound();
 

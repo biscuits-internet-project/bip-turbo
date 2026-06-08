@@ -25,7 +25,6 @@ import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { logger } from "~/lib/logger";
-import { MUSICIANS_FEATURE_ENABLED } from "~/lib/musicians-constants";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
@@ -318,7 +317,7 @@ export default function Show() {
             defaultView={setlistView}
             onViewChange={setSetlistView}
           />
-          {MUSICIANS_FEATURE_ENABLED && <ShowLineupSection lineup={setlist.lineup} />}
+          <ShowLineupSection lineup={setlist.lineup} />
           {/* Note when count_for_stats=false (soundchecks, radio sessions,
               cancelled stubs, late-night Tractorbeam sets). Yellow accent on
               the left edge for attention, no full background so it doesn't
