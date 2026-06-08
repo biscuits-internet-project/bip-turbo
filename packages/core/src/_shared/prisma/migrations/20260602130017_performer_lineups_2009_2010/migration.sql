@@ -4,6 +4,17 @@
 -- after a data resync is safe. Split across several migrations so each file is
 -- editable; they apply in timestamp order.
 
+-- Correction: 2010-03-21 Brooklyn Bowl was played without Jon Gutwillig, so
+-- remove his lineup row (and instrument links) here.
+DELETE FROM "show_musician_instruments" smi
+USING "show_musicians" sm, "shows" s, "musicians" mu
+WHERE smi."show_musician_id" = sm."id" AND sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2010-03-21-brooklyn-bowl-brooklyn-ny' AND mu."slug" = 'jon-gutwillig';
+DELETE FROM "show_musicians" sm
+USING "shows" s, "musicians" mu
+WHERE sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2010-03-21-brooklyn-bowl-brooklyn-ny' AND mu."slug" = 'jon-gutwillig';
+
 -- Per-show lineups, shows dated 2009..2010.
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
@@ -4289,24 +4300,6 @@ SELECT sm."id", i."id", now() FROM "show_musicians" sm
   JOIN "musicians" mu ON mu."id" = sm."musician_id"
   JOIN "instruments" i ON i."slug" = 'guitar'
 WHERE s."slug" = '2010-03-19-house-of-blues-boston-ma' AND mu."slug" = 'chris-michetti'
-ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
-INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
-SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
-WHERE s."slug" = '2010-03-21-brooklyn-bowl-brooklyn-ny' AND mu."slug" = 'jon-gutwillig'
-ON CONFLICT ("show_id", "musician_id") DO NOTHING;
-INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
-SELECT sm."id", i."id", now() FROM "show_musicians" sm
-  JOIN "shows" s ON s."id" = sm."show_id"
-  JOIN "musicians" mu ON mu."id" = sm."musician_id"
-  JOIN "instruments" i ON i."slug" = 'guitar'
-WHERE s."slug" = '2010-03-21-brooklyn-bowl-brooklyn-ny' AND mu."slug" = 'jon-gutwillig'
-ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
-INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
-SELECT sm."id", i."id", now() FROM "show_musicians" sm
-  JOIN "shows" s ON s."id" = sm."show_id"
-  JOIN "musicians" mu ON mu."id" = sm."musician_id"
-  JOIN "instruments" i ON i."slug" = 'vocals'
-WHERE s."slug" = '2010-03-21-brooklyn-bowl-brooklyn-ny' AND mu."slug" = 'jon-gutwillig'
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu

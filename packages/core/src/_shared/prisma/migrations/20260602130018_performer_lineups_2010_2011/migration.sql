@@ -4,6 +4,18 @@
 -- after a data resync is safe. Split across several migrations so each file is
 -- editable; they apply in timestamp order.
 
+-- Correction: 2010-12-31 Tower Theater — Sam Altman is listed explicitly on the
+-- S2/S3/encore tracks (track_musicians) instead of the whole-show lineup, so
+-- remove his show_musicians lineup row (and its instrument link) here.
+DELETE FROM "show_musician_instruments" smi
+USING "show_musicians" sm, "shows" s, "musicians" mu
+WHERE smi."show_musician_id" = sm."id" AND sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2010-12-31-tower-theater-upper-darby-pa' AND mu."slug" = 'sam-altman';
+DELETE FROM "show_musicians" sm
+USING "shows" s, "musicians" mu
+WHERE sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2010-12-31-tower-theater-upper-darby-pa' AND mu."slug" = 'sam-altman';
+
 -- Per-show lineups, shows dated 2010..2011.
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
@@ -3390,17 +3402,6 @@ WHERE s."slug" = '2010-12-31-tower-theater-upper-darby-pa' AND mu."slug" = 'marc
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
-WHERE s."slug" = '2010-12-31-tower-theater-upper-darby-pa' AND mu."slug" = 'sam-altman'
-ON CONFLICT ("show_id", "musician_id") DO NOTHING;
-INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
-SELECT sm."id", i."id", now() FROM "show_musicians" sm
-  JOIN "shows" s ON s."id" = sm."show_id"
-  JOIN "musicians" mu ON mu."id" = sm."musician_id"
-  JOIN "instruments" i ON i."slug" = 'drums'
-WHERE s."slug" = '2010-12-31-tower-theater-upper-darby-pa' AND mu."slug" = 'sam-altman'
-ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
-INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
-SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
 WHERE s."slug" = '2011-01-13-boulder-theater-boulder-co' AND mu."slug" = 'jon-gutwillig'
 ON CONFLICT ("show_id", "musician_id") DO NOTHING;
 INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
@@ -4995,4 +4996,28 @@ SELECT sm."id", i."id", now() FROM "show_musicians" sm
   JOIN "musicians" mu ON mu."id" = sm."musician_id"
   JOIN "instruments" i ON i."slug" = 'drums'
 WHERE s."slug" = '2011-08-16-verizon-wireless-amphitheatre-charlotte-nc' AND mu."slug" = 'allen-aucoin'
+ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
+
+-- 2010-05-07 Paper Mill Island — Tom Hamilton + Chris Michetti play guitar the whole show (sit out 2 tracks, see deltas)
+INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
+SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
+WHERE s."slug" = '2010-05-07-paper-mill-island-amphitheater-baldwinsville-ny' AND mu."slug" = 'tom-hamilton'
+ON CONFLICT ("show_id", "musician_id") DO NOTHING;
+INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
+SELECT sm."id", i."id", now() FROM "show_musicians" sm
+  JOIN "shows" s ON s."id" = sm."show_id"
+  JOIN "musicians" mu ON mu."id" = sm."musician_id"
+  JOIN "instruments" i ON i."slug" = 'guitar'
+WHERE s."slug" = '2010-05-07-paper-mill-island-amphitheater-baldwinsville-ny' AND mu."slug" = 'tom-hamilton'
+ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
+INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
+SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
+WHERE s."slug" = '2010-05-07-paper-mill-island-amphitheater-baldwinsville-ny' AND mu."slug" = 'chris-michetti'
+ON CONFLICT ("show_id", "musician_id") DO NOTHING;
+INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
+SELECT sm."id", i."id", now() FROM "show_musicians" sm
+  JOIN "shows" s ON s."id" = sm."show_id"
+  JOIN "musicians" mu ON mu."id" = sm."musician_id"
+  JOIN "instruments" i ON i."slug" = 'guitar'
+WHERE s."slug" = '2010-05-07-paper-mill-island-amphitheater-baldwinsville-ny' AND mu."slug" = 'chris-michetti'
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;

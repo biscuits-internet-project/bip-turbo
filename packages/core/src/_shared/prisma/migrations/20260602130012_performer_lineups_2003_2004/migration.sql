@@ -4,6 +4,18 @@
 -- after a data resync is safe. Split across several migrations so each file is
 -- editable; they apply in timestamp order.
 
+-- Correction: 2004-05-09 Starland Ballroom — Sam Altman is the show drummer
+-- (above); Mike Greenfield only guested on percussion for 4 Set-2 tracks (deltas),
+-- so remove his stale whole-show lineup row + instrument link.
+DELETE FROM "show_musician_instruments" smi
+USING "show_musicians" sm, "shows" s, "musicians" mu
+WHERE smi."show_musician_id" = sm."id" AND sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'mike-greenfield';
+DELETE FROM "show_musicians" sm
+USING "shows" s, "musicians" mu
+WHERE sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'mike-greenfield';
+
 -- Per-show lineups, shows dated 2003..2004.
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
@@ -4622,14 +4634,14 @@ WHERE s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'm
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
-WHERE s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'mike-greenfield'
+WHERE s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'sam-altman'
 ON CONFLICT ("show_id", "musician_id") DO NOTHING;
 INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
 SELECT sm."id", i."id", now() FROM "show_musicians" sm
   JOIN "shows" s ON s."id" = sm."show_id"
   JOIN "musicians" mu ON mu."id" = sm."musician_id"
   JOIN "instruments" i ON i."slug" = 'drums'
-WHERE s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'mike-greenfield'
+WHERE s."slug" = '2004-05-09-starland-ballroom-sayreville-nj' AND mu."slug" = 'sam-altman'
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
@@ -4955,4 +4967,47 @@ SELECT sm."id", i."id", now() FROM "show_musicians" sm
   JOIN "musicians" mu ON mu."id" = sm."musician_id"
   JOIN "instruments" i ON i."slug" = 'drums'
 WHERE s."slug" = '2004-09-04-snow-ridge-ski-area-turin-ny' AND mu."slug" = 'sam-altman'
+ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
+
+-- Correction: 2004-01-17 Culture Room — Sam Altman (the era drummer) added to the
+-- lineup alongside Mike Greenfield so the derived "without Sam Altman" note stops
+-- (Mike confirmed; Sam's absence could not be confirmed).
+INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
+SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
+WHERE s."slug" = '2004-01-17-culture-room-fort-lauderdale-fl' AND mu."slug" = 'sam-altman'
+ON CONFLICT ("show_id", "musician_id") DO NOTHING;
+INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
+SELECT sm."id", i."id", now() FROM "show_musicians" sm
+  JOIN "shows" s ON s."id" = sm."show_id"
+  JOIN "musicians" mu ON mu."id" = sm."musician_id"
+  JOIN "instruments" i ON i."slug" = 'drums'
+WHERE s."slug" = '2004-01-17-culture-room-fort-lauderdale-fl' AND mu."slug" = 'sam-altman'
+ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
+
+-- Correction: 2004-01-16 Culture Room — Sam Altman added to lineup alongside Mike
+-- Greenfield so the derived "without Sam Altman" note stops (Sam's absence unconfirmed).
+INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
+SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
+WHERE s."slug" = '2004-01-16-culture-room-fort-lauderdale-fl' AND mu."slug" = 'sam-altman'
+ON CONFLICT ("show_id", "musician_id") DO NOTHING;
+INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
+SELECT sm."id", i."id", now() FROM "show_musicians" sm
+  JOIN "shows" s ON s."id" = sm."show_id"
+  JOIN "musicians" mu ON mu."id" = sm."musician_id"
+  JOIN "instruments" i ON i."slug" = 'drums'
+WHERE s."slug" = '2004-01-16-culture-room-fort-lauderdale-fl' AND mu."slug" = 'sam-altman'
+ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
+
+-- Correction: 2004-01-15 Twilight Tampa — Sam Altman added to lineup alongside Mike
+-- Greenfield so the derived "without Sam Altman" note stops (Sam's absence unconfirmed).
+INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
+SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
+WHERE s."slug" = '2004-01-15-twilight-tampa-fl' AND mu."slug" = 'sam-altman'
+ON CONFLICT ("show_id", "musician_id") DO NOTHING;
+INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
+SELECT sm."id", i."id", now() FROM "show_musicians" sm
+  JOIN "shows" s ON s."id" = sm."show_id"
+  JOIN "musicians" mu ON mu."id" = sm."musician_id"
+  JOIN "instruments" i ON i."slug" = 'drums'
+WHERE s."slug" = '2004-01-15-twilight-tampa-fl' AND mu."slug" = 'sam-altman'
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;

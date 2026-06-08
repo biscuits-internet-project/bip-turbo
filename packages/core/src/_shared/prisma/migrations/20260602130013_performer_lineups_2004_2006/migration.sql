@@ -4,6 +4,18 @@
 -- after a data resync is safe. Split across several migrations so each file is
 -- editable; they apply in timestamp order.
 
+-- Correction: 2005-04-26 Theater at MSG — this whole show was WITHOUT Sam Altman
+-- and WITH David Northrup (Travis Tritt Band) on drums (lineup above), so remove
+-- Sam Altman's stale lineup row + instrument link.
+DELETE FROM "show_musician_instruments" smi
+USING "show_musicians" sm, "shows" s, "musicians" mu
+WHERE smi."show_musician_id" = sm."id" AND sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2005-04-26-the-theater-at-msg-new-york-ny' AND mu."slug" = 'sam-altman';
+DELETE FROM "show_musicians" sm
+USING "shows" s, "musicians" mu
+WHERE sm."show_id" = s."id" AND sm."musician_id" = mu."id"
+  AND s."slug" = '2005-04-26-the-theater-at-msg-new-york-ny' AND mu."slug" = 'sam-altman';
+
 -- Per-show lineups, shows dated 2004..2006.
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
@@ -1033,17 +1045,6 @@ SELECT sm."id", i."id", now() FROM "show_musicians" sm
   JOIN "musicians" mu ON mu."id" = sm."musician_id"
   JOIN "instruments" i ON i."slug" = 'vocals'
 WHERE s."slug" = '2005-04-26-the-theater-at-msg-new-york-ny' AND mu."slug" = 'marc-brownstein'
-ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
-INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
-SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
-WHERE s."slug" = '2005-04-26-the-theater-at-msg-new-york-ny' AND mu."slug" = 'sam-altman'
-ON CONFLICT ("show_id", "musician_id") DO NOTHING;
-INSERT INTO "show_musician_instruments" ("show_musician_id", "instrument_id", "updated_at")
-SELECT sm."id", i."id", now() FROM "show_musicians" sm
-  JOIN "shows" s ON s."id" = sm."show_id"
-  JOIN "musicians" mu ON mu."id" = sm."musician_id"
-  JOIN "instruments" i ON i."slug" = 'drums'
-WHERE s."slug" = '2005-04-26-the-theater-at-msg-new-york-ny' AND mu."slug" = 'sam-altman'
 ON CONFLICT ("show_musician_id", "instrument_id") DO NOTHING;
 INSERT INTO "show_musicians" ("show_id", "musician_id", "updated_at")
 SELECT s."id", mu."id", now() FROM "shows" s, "musicians" mu
