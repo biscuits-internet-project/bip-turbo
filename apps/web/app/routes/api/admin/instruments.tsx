@@ -4,9 +4,9 @@ import { services } from "~/server/services";
 
 export const action = adminAction(async ({ request }) =>
   handleAdminCrud(request, {
-    label: "author",
-    create: (name) => services.authors.create({ name }),
-    update: (slug, name) => services.authors.update(slug, { name }),
-    remove: (id) => services.authors.delete(id),
+    label: "instrument",
+    create: (name) => services.instruments.create({ name }),
+    update: (slug, name) => services.instruments.update(slug, { name }),
+    remove: (id) => services.instruments.delete(id),
   }),
 );

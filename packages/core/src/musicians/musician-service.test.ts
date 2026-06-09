@@ -87,6 +87,117 @@ describe("InstrumentService.create — dedupe by slug", () => {
   });
 });
 
+type InstrumentRow = { id: string; name: string; slug: string };
+
+function makeInstrumentEditDb(bySlug: Record<string, InstrumentRow>) {
+  return {
+    instrument: {
+      findFirst: vi.fn(({ where }: { where: { slug?: string; id?: { not?: string } } }) => {
+        const match = where.slug ? bySlug[where.slug] : null;
+        if (!match) return Promise.resolve(null);
+        // generateInstrumentSlug excludes the current row when checking collisions.
+        if (where.id?.not && match.id === where.id.not) return Promise.resolve(null);
+        return Promise.resolve(match);
+      }),
+      update: vi.fn(({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
+        Promise.resolve({
+          id: where.id,
+          name: "",
+          slug: "",
+          createdAt: new Date("2020-01-01"),
+          updatedAt: new Date("2020-01-01"),
+          ...data,
+        }),
+      ),
+    },
+  };
+}
+
+describe("InstrumentService.update — resolves by slug", () => {
+  test("looks the instrument up by slug and regenerates the slug on rename", async () => {
+    const db = makeInstrumentEditDb({ guitar: { id: "g1", name: "Guitar", slug: "guitar" } });
+    const service = new InstrumentService(db as never, logger);
+
+    const result = await service.update("guitar", { name: "Electric Guitar" });
+
+    expect(db.instrument.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "g1" } }));
+    expect(result.slug).toBe("electric-guitar");
+  });
+
+  test("appends a suffix when the renamed slug collides with another instrument", async () => {
+    const db = makeInstrumentEditDb({
+      keys: { id: "k1", name: "Keys", slug: "keys" },
+      piano: { id: "p1", name: "Piano", slug: "piano" },
+    });
+    const service = new InstrumentService(db as never, logger);
+
+    const result = await service.update("keys", { name: "Piano" });
+
+    expect(result.slug).toBe("piano-2");
+  });
+
+  test("throws when no instrument matches the slug", async () => {
+    const service = new InstrumentService(makeInstrumentEditDb({}) as never, logger);
+
+    await expect(service.update("kazoo", { name: "Kazoo" })).rejects.toThrow('Instrument with slug "kazoo" not found');
+  });
+});
+
+describe("InstrumentService.delete — guards referenced rows", () => {
+  function makeDeleteDb(counts: { show: number; track: number; musician: number }) {
+    return {
+      showMusicianInstrument: { count: vi.fn(() => Promise.resolve(counts.show)) },
+      trackMusicianInstrument: { count: vi.fn(() => Promise.resolve(counts.track)) },
+      musician: { count: vi.fn(() => Promise.resolve(counts.musician)) },
+      instrument: { delete: vi.fn(() => Promise.resolve({})) },
+    };
+  }
+
+  test("refuses to delete an instrument referenced by any join or musician default", async () => {
+    const db = makeDeleteDb({ show: 0, track: 2, musician: 1 });
+    const service = new InstrumentService(db as never, logger);
+
+    await expect(service.delete("g1")).rejects.toThrow("Cannot delete instrument with 3 reference(s)");
+    expect(db.instrument.delete).not.toHaveBeenCalled();
+  });
+
+  test("deletes an unreferenced instrument", async () => {
+    const db = makeDeleteDb({ show: 0, track: 0, musician: 0 });
+    const service = new InstrumentService(db as never, logger);
+
+    const result = await service.delete("g1");
+
+    expect(result).toBe(true);
+    expect(db.instrument.delete).toHaveBeenCalledWith({ where: { id: "g1" } });
+  });
+});
+
+describe("InstrumentService.findManyWithUsageCount", () => {
+  test("sums show, track, and musician-default counts per instrument", async () => {
+    const db = {
+      instrument: {
+        findMany: vi.fn(() =>
+          Promise.resolve([
+            {
+              id: "g1",
+              name: "Guitar",
+              slug: "guitar",
+              createdAt: new Date("2020-01-01"),
+              updatedAt: new Date("2020-01-01"),
+              _count: { showMusicianInstruments: 4, trackMusicianInstruments: 5, musicians: 2 },
+            },
+          ]),
+        ),
+      },
+    };
+    const service = new InstrumentService(db as never, logger);
+
+    const [result] = await service.findManyWithUsageCount();
+
+    expect(result.usageCount).toBe(11);
+  });
+});
+
 describe("MusicianService.findAppearances", () => {
   function makeAppearancesDb(args: {
     lineupShowIds: string[];

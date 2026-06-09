@@ -17,6 +17,8 @@ export interface CreateInstrumentInput {
   name: string;
 }
 
+export type UpdateInstrumentInput = Partial<CreateInstrumentInput>;
+
 export interface CreateMusicianInput {
   name: string;
   knownFrom?: string | null;
@@ -90,6 +92,113 @@ export class InstrumentService {
       data: { name, slug, createdAt: new Date(), updatedAt: new Date() },
     });
     return mapInstrumentToDomainEntity(result);
+  }
+
+  // A rename can collide with another instrument's slug, so append a suffix
+  // (mirrors AuthorService). create() still dedupes on slug — see the class doc.
+  private async generateInstrumentSlug(name: string, excludeId?: string): Promise<string> {
+    const baseSlug = slugify(name);
+    let slug = baseSlug;
+    let counter = 2;
+
+    while (true) {
+      const existing = await this.db.instrument.findFirst({
+        where: { slug, ...(excludeId && { id: { not: excludeId } }) },
+      });
+      if (!existing) {
+        return slug;
+      }
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+  }
+
+  async update(slug: string, data: UpdateInstrumentInput): Promise<Instrument> {
+    // Resolve by slug — that's what the admin edit route and API pass in.
+    const current = await this.db.instrument.findFirst({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!current) {
+      throw new Error(`Instrument with slug "${slug}" not found`);
+    }
+
+    const name = data.name?.trim();
+    if (data.name !== undefined && !name) {
+      throw new Error("Instrument name is required");
+    }
+
+    const updateData: { name?: string; slug?: string; updatedAt: Date } = {
+      updatedAt: new Date(),
+    };
+    if (name) {
+      updateData.name = name;
+      updateData.slug = await this.generateInstrumentSlug(name, current.id);
+    }
+
+    const result = await this.db.instrument.update({
+      where: { id: current.id },
+      data: updateData,
+    });
+    return mapInstrumentToDomainEntity(result);
+  }
+
+  // Total references to an instrument across show lineups, track deltas, and
+  // musician defaults — drives both the delete guard and the UI's decision to
+  // hide the delete affordance.
+  async countReferences(id: string): Promise<number> {
+    const [showUses, trackUses, defaultFor] = await Promise.all([
+      this.db.showMusicianInstrument.count({ where: { instrumentId: id } }),
+      this.db.trackMusicianInstrument.count({ where: { instrumentId: id } }),
+      this.db.musician.count({ where: { defaultInstrumentId: id } }),
+    ]);
+    return showUses + trackUses + defaultFor;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    // The schema would cascade the join rows and null out musician defaults, so
+    // guard against deleting an instrument that's still referenced anywhere.
+    const references = await this.countReferences(id);
+    if (references > 0) {
+      throw new Error(`Cannot delete instrument with ${references} reference(s)`);
+    }
+
+    try {
+      await this.db.instrument.delete({ where: { id } });
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  async findManyWithUsageCount(): Promise<Array<Instrument & { usageCount: number }>> {
+    const results = await this.db.instrument.findMany({
+      include: {
+        _count: {
+          select: {
+            showMusicianInstruments: true,
+            trackMusicianInstruments: true,
+            musicians: true,
+          },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return results.map((result) => ({
+      ...mapInstrumentToDomainEntity(result),
+      usageCount:
+        result._count.showMusicianInstruments + result._count.trackMusicianInstruments + result._count.musicians,
+    }));
+  }
+
+  async search(query: string, limit = 10): Promise<Instrument[]> {
+    const results = await this.db.instrument.findMany({
+      where: { name: { contains: query, mode: "insensitive" } },
+      orderBy: { name: "asc" },
+      take: limit,
+    });
+    return results.map(mapInstrumentToDomainEntity);
   }
 }
 

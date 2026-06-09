@@ -123,6 +123,8 @@ export default [
     route("show-youtubes", "routes/api/show-youtubes.tsx"),
     route("authors", "routes/api/authors.tsx"),
     route("authors/:id", "routes/api/authors/$id.tsx"),
+    route("instruments", "routes/api/instruments.tsx"),
+    route("instruments/:id", "routes/api/instruments/$id.tsx"),
     route("venues", "routes/api/venues.tsx"),
     route("venues/:id", "routes/api/venues/$id.tsx"),
     route("all-timers", "routes/api/all-timers.tsx"),
@@ -144,6 +146,7 @@ export default [
     route("images/upload", "routes/api/images/upload.tsx"),
     route("admin/cache", "routes/api/admin/cache.tsx"),
     route("admin/authors", "routes/api/admin/authors.tsx"),
+    route("admin/instruments", "routes/api/admin/instruments.tsx"),
   ]),
 
   // Admin routes
@@ -153,6 +156,11 @@ export default [
       index("routes/admin/authors/index.tsx"),
       route("new", "routes/admin/authors/new.tsx"),
       route(":slug/edit", "routes/admin/authors/$slug.edit.tsx"),
+    ]),
+    ...prefix("instruments", [
+      index("routes/admin/instruments/index.tsx"),
+      route("new", "routes/admin/instruments/new.tsx"),
+      route(":slug/edit", "routes/admin/instruments/$slug.edit.tsx"),
     ]),
   ]),
 

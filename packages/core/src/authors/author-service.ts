@@ -172,15 +172,15 @@ export class AuthorService {
     return mapAuthorToDomainEntity(result);
   }
 
-  async update(id: string, data: UpdateAuthorInput): Promise<Author> {
-    // Get current author for validation
-    const current = await this.db.author.findUnique({
-      where: { id },
-      select: { name: true },
+  async update(slug: string, data: UpdateAuthorInput): Promise<Author> {
+    // Resolve by slug — that's what the admin edit route and API pass in.
+    const current = await this.db.author.findFirst({
+      where: { slug },
+      select: { id: true },
     });
 
     if (!current) {
-      throw new Error(`Author with id "${id}" not found`);
+      throw new Error(`Author with slug "${slug}" not found`);
     }
 
     // Validate required fields
@@ -201,21 +201,24 @@ export class AuthorService {
 
     // Regenerate slug if name changes
     if (data.name) {
-      updateData.slug = await this.generateAuthorSlug(cleanData.name || "", id);
+      updateData.slug = await this.generateAuthorSlug(cleanData.name || "", current.id);
     }
 
     const result = await this.db.author.update({
-      where: { id },
+      where: { id: current.id },
       data: updateData,
     });
     return mapAuthorToDomainEntity(result);
   }
 
+  // Number of songs attributed to an author — drives the delete guard and the
+  // UI's decision to hide the delete affordance.
+  async countSongs(id: string): Promise<number> {
+    return this.db.song.count({ where: { authorId: id } });
+  }
+
   async delete(id: string): Promise<boolean> {
-    // Check if author has any songs
-    const songsCount = await this.db.song.count({
-      where: { authorId: id },
-    });
+    const songsCount = await this.countSongs(id);
 
     if (songsCount > 0) {
       throw new Error(`Cannot delete author with ${songsCount} associated song(s)`);

@@ -1,4 +1,4 @@
-import { BookUser, RefreshCw, Trash2 } from "lucide-react";
+import { BookUser, Guitar, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -84,6 +84,12 @@ export default function AdminIndex() {
             description="Manage song authors and composers"
             href="/admin/authors"
             icon={<BookUser className="h-5 w-5" />}
+          />
+          <AdminCard
+            title="Instruments"
+            description="Manage instruments for lineups and performers"
+            href="/admin/instruments"
+            icon={<Guitar className="h-5 w-5" />}
           />
         </div>
 

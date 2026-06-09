@@ -55,6 +55,20 @@ export function formatDateShort(date: string | Date): string {
 }
 
 /**
+ * Medium date with an abbreviated month (`Jan 1, 2025`), UTC-anchored. Used by
+ * admin index tables for "Created" columns. Accepts an ISO-like string or a
+ * Date.
+ */
+export function formatDateMedium(date: string | Date): string {
+  return new Date(date).toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
  * Compact mobile-only short date (`M/D/YY`). Used by `<ShowDate>` to render
  * the same date in less horizontal space on phone-width tables.
  */

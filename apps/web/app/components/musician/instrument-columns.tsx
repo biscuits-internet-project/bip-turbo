@@ -1,4 +1,4 @@
-import type { Author } from "@bip/domain";
+import type { Instrument } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Link } from "react-router-dom";
 import { DeleteEntityButton } from "~/components/admin/delete-entity-button";
@@ -6,32 +6,32 @@ import { NumberCell } from "~/components/ui/number-cell";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { formatDateMedium } from "~/lib/utils";
 
-type AuthorWithSongCount = Author & { songCount?: number };
+type InstrumentWithUsageCount = Instrument & { usageCount?: number };
 
 // A factory rather than a const so the index page can thread its revalidate
 // callback into the per-row delete button.
-export function getAuthorColumns(onDeleted: () => void): ColumnDef<AuthorWithSongCount>[] {
+export function getInstrumentColumns(onDeleted: () => void): ColumnDef<InstrumentWithUsageCount>[] {
   return [
     {
       accessorKey: "name",
       header: ({ column }) => <SortableHeader column={column} label="Name" />,
       cell: ({ row }) => {
-        const author = row.original;
+        const instrument = row.original;
         return (
           <Link
-            to={`/admin/authors/${author.slug}/edit`}
+            to={`/admin/instruments/${instrument.slug}/edit`}
             className="text-brand-primary hover:text-brand-secondary font-medium"
           >
-            {author.name}
+            {instrument.name}
           </Link>
         );
       },
     },
     {
-      accessorKey: "songCount",
-      header: ({ column }) => <SortableHeader column={column} label="Songs" />,
+      accessorKey: "usageCount",
+      header: ({ column }) => <SortableHeader column={column} label="Usage" />,
       cell: ({ row }) => {
-        const count = row.original.songCount ?? 0;
+        const count = row.original.usageCount ?? 0;
         return (
           <NumberCell width="4ch" className="text-content-text-primary font-semibold">
             {count}
@@ -57,17 +57,17 @@ export function getAuthorColumns(onDeleted: () => void): ColumnDef<AuthorWithSon
       id: "actions",
       header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => {
-        const author = row.original;
-        // Authors with songs can't be deleted (the service guard rejects it), so
+        const instrument = row.original;
+        // In-use instruments can't be deleted (the service guard rejects it), so
         // don't offer the affordance at all.
-        if ((author.songCount ?? 0) > 0) return null;
+        if ((instrument.usageCount ?? 0) > 0) return null;
         return (
           <div className="flex justify-end">
             <DeleteEntityButton
-              entityId={author.id}
-              entityName={author.name}
-              entityLabel="author"
-              endpoint="/api/admin/authors"
+              entityId={instrument.id}
+              entityName={instrument.name}
+              entityLabel="instrument"
+              endpoint="/api/admin/instruments"
               onDeleted={onDeleted}
               variant="icon"
             />
