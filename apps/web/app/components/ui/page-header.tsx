@@ -20,7 +20,7 @@ export function PageHeader({ title, backLink, actions }: PageHeaderProps) {
   return (
     <div>
       {(backLink || actions) && (
-        <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="mb-2 md:mb-0 flex items-center justify-between gap-3">
           {backLink ? <BackLink to={backLink.to}>{backLink.label}</BackLink> : <span />}
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>

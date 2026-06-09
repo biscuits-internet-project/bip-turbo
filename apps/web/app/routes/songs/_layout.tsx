@@ -30,7 +30,7 @@ export default function SongsLayout() {
   const showTabs = TABBED_PATHS.has(pathname);
 
   return (
-    <div className="py-2 sm:py-3">
+    <div className="py-1">
       {showTabs && (
         <>
           <PageHeader
