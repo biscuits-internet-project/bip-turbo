@@ -3,6 +3,7 @@ import { formatDuration } from "@bip/domain";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Edit2, GripVertical, Trash } from "lucide-react";
+import type { ReactNode } from "react";
 import { TrackIcon } from "~/components/track/track-icon";
 import { Button } from "~/components/ui/button";
 import { listRowClass } from "~/lib/form-styles";
@@ -13,9 +14,13 @@ interface SortableTrackItemProps {
   onEdit: (track: Track) => void;
   onDelete: (id: string) => void;
   isDeleting?: boolean;
+  /** This track's read-only footnotes (annotations, flags, performers,
+   *  completions), pre-derived by the show-level footnote engine so the wording
+   *  matches the public setlist exactly. */
+  footnotes?: ReactNode[];
 }
 
-export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: SortableTrackItemProps) {
+export function SortableTrackItem({ track, onEdit, onDelete, isDeleting, footnotes }: SortableTrackItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: track.id });
 
   const style = {
@@ -85,20 +90,19 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
         {/* Note (full-width, below title) */}
         {track.note && <p className="text-content-text-secondary text-sm italic pl-8 md:pl-12">{track.note}</p>}
 
-        {/* Annotations (full-width, below note) */}
-        {track.annotations && track.annotations.length > 0 && (
+        {/* Read-only footnotes (full-width, below note) — one row each, mirroring
+            the public setlist wording. */}
+        {footnotes && footnotes.length > 0 && (
           <div className="space-y-1 pl-8 md:pl-12">
-            {track.annotations.map(
-              (annotation, index) =>
-                annotation.desc && (
-                  <div
-                    key={annotation.id || index}
-                    className="text-content-text-accent text-sm pl-2 border-l-2 border-content-bg-secondary"
-                  >
-                    {annotation.desc}
-                  </div>
-                ),
-            )}
+            {footnotes.map((footnote, index) => (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: footnotes are positional and stable per render
+                key={index}
+                className="text-content-text-accent text-sm pl-2 border-l-2 border-content-bg-secondary"
+              >
+                {footnote}
+              </div>
+            ))}
           </div>
         )}
       </div>

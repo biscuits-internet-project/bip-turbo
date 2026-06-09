@@ -12,6 +12,7 @@ const capturedRowProps: Array<{
   onEdit: (track: Track) => void;
   onDelete: (id: string) => void;
   isDeleting?: boolean;
+  footnotes?: React.ReactNode[];
 }> = [];
 vi.mock("./sortable-track-item", () => ({
   SortableTrackItem: (props: {
@@ -19,6 +20,7 @@ vi.mock("./sortable-track-item", () => ({
     onEdit: (track: Track) => void;
     onDelete: (id: string) => void;
     isDeleting?: boolean;
+    footnotes?: React.ReactNode[];
   }) => {
     capturedRowProps.push(props);
     return (
@@ -124,6 +126,41 @@ describe("TrackManager", () => {
       const urls = fetchMock.mock.calls.map((c) => c[0]);
       expect(urls).toContain("/api/tracks?showId=show-1");
     });
+  });
+
+  // The footnoteSetlist runs through the same engine as the public setlist and
+  // is sliced per track: a flagged track gets its footnote content, an
+  // unrelated track gets none.
+  test("derives per-track footnotes from footnoteSetlist and hands them to each row", async () => {
+    const footnoteSetlist = {
+      show: { id: "show-1", date: "2025-11-15" },
+      sets: [
+        {
+          label: "S1",
+          sort: 1,
+          tracks: [
+            { id: "t-1", songId: "song-1", gap: 5, previousPerformanceShow: null, flags: ["DYSLEXIC"] },
+            { id: "t-2", songId: "song-2", gap: 5, previousPerformanceShow: null, flags: [] },
+          ],
+        },
+      ],
+      annotations: [],
+      lineup: [],
+      trackMusicianDeltas: [],
+    };
+
+    await setup(
+      <TrackManager
+        showId="show-1"
+        initialTracks={[makeTrack({ id: "t-1" }), makeTrack({ id: "t-2", position: 2 })]}
+        footnoteSetlist={footnoteSetlist as never}
+      />,
+    );
+
+    const flaggedRow = capturedRowProps.find((p) => p.track.id === "t-1");
+    const plainRow = capturedRowProps.find((p) => p.track.id === "t-2");
+    expect(flaggedRow?.footnotes).toHaveLength(1);
+    expect(plainRow?.footnotes ?? []).toHaveLength(0);
   });
 
   // Initial tracks render grouped by set with section headers, in the

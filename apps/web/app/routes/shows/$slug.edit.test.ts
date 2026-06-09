@@ -13,6 +13,7 @@ const findBySlug = vi.fn();
 const findByDate = vi.fn();
 const findVenues = vi.fn();
 const findTracksByShowId = vi.fn();
+const findSetlistByShowSlug = vi.fn();
 const updateShow = vi.fn();
 
 const findAllRockOperas = vi.fn().mockResolvedValue([]);
@@ -24,6 +25,7 @@ vi.mock("~/server/services", () => ({
     shows: { findBySlug, findByDate, update: updateShow, getLineup },
     venues: { findMany: findVenues },
     tracks: { findByShowId: findTracksByShowId },
+    setlists: { findByShowSlug: findSetlistByShowSlug },
     rockOperas: {
       findAll: findAllRockOperas,
       findPerformancesForShow: findRockOperaPerformancesForShow,
@@ -62,6 +64,24 @@ describe("shows/$slug.edit loader", () => {
     findByDate.mockReset();
     findVenues.mockReset().mockResolvedValue([]);
     findTracksByShowId.mockReset().mockResolvedValue([]);
+    findSetlistByShowSlug.mockReset().mockResolvedValue(null);
+  });
+
+  // The read-only track footnotes on the edit page run through the same engine
+  // as the public setlist, so the loader fetches the full setlist (by slug) and
+  // returns it for TrackManager to derive per-track footnotes from.
+  test("returns the setlist from findByShowSlug(slug) as footnoteSetlist", async () => {
+    const setlist = { show: showEarly, sets: [] };
+    findBySlug.mockResolvedValue(showEarly);
+    findByDate.mockResolvedValue([showEarly]);
+    findSetlistByShowSlug.mockResolvedValue(setlist);
+
+    const result = (await loader({
+      params: { slug: showEarly.slug },
+    } as unknown as LoaderFunctionArgs)) as { footnoteSetlist: unknown };
+
+    expect(findSetlistByShowSlug).toHaveBeenCalledWith(showEarly.slug);
+    expect(result.footnoteSetlist).toBe(setlist);
   });
 
   // The loader's main new responsibility is seeding the same-date reorder

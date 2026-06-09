@@ -1,4 +1,4 @@
-import type { Track } from "@bip/domain";
+import type { Setlist, Track } from "@bip/domain";
 import { formatDuration, parseDuration } from "@bip/domain";
 import {
   closestCenter,
@@ -12,8 +12,9 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { buildShowFootnotes, footnotesByTrack } from "~/components/setlist/footnotes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,10 @@ import { type TrackFormData, useTrackApi } from "./use-track-api";
 interface TrackManagerProps {
   showId: string;
   initialTracks?: Track[];
+  /** The show's setlist, used only to derive each track's read-only footnotes
+   *  (flags, performers, completions, recurrence) through the same engine as
+   *  the public setlist. Absent when the parent has no setlist to pass. */
+  footnoteSetlist?: Setlist;
 }
 
 const INITIAL_FORM: TrackFormData = {
@@ -55,8 +60,15 @@ const INITIAL_FORM: TrackFormData = {
  * drop reorder is handled inline because it needs access to the live
  * tracks list to compute optimistic position updates.
  */
-export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) {
+export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: TrackManagerProps) {
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
+  // Derive the show's footnotes once, then slice per track id. Keyed by id so
+  // reordering or editing a row keeps each track's footnotes attached.
+  const footnotesByTrackId = useMemo(
+    () =>
+      footnoteSetlist ? footnotesByTrack(buildShowFootnotes(footnoteSetlist)) : new Map<string, React.ReactNode[]>(),
+    [footnoteSetlist],
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [deleteTrackId, setDeleteTrackId] = useState<string | null>(null);
@@ -258,6 +270,7 @@ export function TrackManager({ showId, initialTracks = [] }: TrackManagerProps) 
                             <SortableTrackItem
                               key={track.id}
                               track={track}
+                              footnotes={footnotesByTrackId.get(track.id)}
                               onEdit={startEditing}
                               onDelete={handleDelete}
                               isDeleting={api.isDeleting}

@@ -131,70 +131,32 @@ describe("SortableTrackItem", () => {
     expect(screen.getByText(">")).toBeInTheDocument();
   });
 
-  // Annotations render below the note in their own section. Each annotation
-  // is its own row so multi-line annotations don't collapse together.
-  test("renders each annotation as its own row when annotations exist", async () => {
-    await setup(
+  // Read-only footnotes (annotations, flags, performers, completions) come
+  // pre-derived from the show-level engine and render below the note, each on
+  // its own row so multi-line footnotes don't collapse together.
+  test("renders each footnote as its own row when footnotes are passed", async () => {
+    const { container } = await setup(
       <SortableTrackItem
-        track={makeTrack({
-          annotations: [
-            {
-              id: "ann-1",
-              trackId: "track-1",
-              desc: "inverted",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            {
-              id: "ann-2",
-              trackId: "track-1",
-              desc: "with 'Floes' tease",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        })}
+        track={makeTrack()}
+        footnotes={["inverted", "with Mike Greenfield on guitar"]}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
       />,
     );
 
     expect(screen.getByText("inverted")).toBeInTheDocument();
-    expect(screen.getByText("with 'Floes' tease")).toBeInTheDocument();
+    expect(screen.getByText("with Mike Greenfield on guitar")).toBeInTheDocument();
+    expect(container.querySelectorAll("div.border-l-2").length).toBe(2);
   });
 
-  // Annotations with empty desc are skipped — they'd render as visual noise
-  // (an empty bordered row). This is a defensive check against bad data.
-  test("skips annotations whose desc is null or empty", async () => {
+  // No footnotes (empty or omitted) renders no footnote rows — keeps rows for
+  // tracks with no structured data compact.
+  test("renders no footnote rows when footnotes is empty or omitted", async () => {
     const { container } = await setup(
-      <SortableTrackItem
-        track={makeTrack({
-          annotations: [
-            {
-              id: "ann-1",
-              trackId: "track-1",
-              desc: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            {
-              id: "ann-2",
-              trackId: "track-1",
-              desc: "real annotation",
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        })}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />,
+      <SortableTrackItem track={makeTrack()} footnotes={[]} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    expect(screen.getByText("real annotation")).toBeInTheDocument();
-    // Only one annotation row (the real one) renders.
-    const annotationRows = container.querySelectorAll("div.border-l-2");
-    expect(annotationRows.length).toBe(1);
+    expect(container.querySelector("div.border-l-2")).toBeNull();
   });
 
   // Edit button fires onEdit with the full track so the parent can hydrate

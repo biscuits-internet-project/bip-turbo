@@ -1,15 +1,17 @@
-import type { Annotation, Instrument, TrackMusicianDelta } from "@bip/domain";
+import type { Annotation, Instrument, Setlist, TrackMusicianDelta } from "@bip/domain";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test } from "vitest";
 import {
   annotationFootnoteSources,
   buildDebutText,
+  buildShowFootnotes,
   dataDrivenFootnoteSources,
   debutFootnoteSources,
   deriveFootnotes,
   type FootnoteSource,
   type FootnoteTrack,
+  footnotesByTrack,
   guestExclusionFootnotes,
   lastTimePlayedFootnoteSources,
   synthesizePerformerFootnotes,
@@ -328,7 +330,9 @@ describe("buildDebutText", () => {
   });
 
   test("an original with no known author reads 'debut (original - unknown author)'", () => {
-    expect(buildDebutText({ slug: "story", kind: "original", authorName: null })).toBe("debut (original - unknown author)");
+    expect(buildDebutText({ slug: "story", kind: "original", authorName: null })).toBe(
+      "debut (original - unknown author)",
+    );
   });
 
   test("an original with a known author names it: 'debut (original - X)'", () => {
@@ -348,9 +352,7 @@ describe("buildDebutText", () => {
   });
 
   test("a cover with no author flags the missing attribution", () => {
-    expect(buildDebutText({ slug: "shimmy", kind: "cover", authorName: null })).toBe(
-      "debut (cover - unknown author)",
-    );
+    expect(buildDebutText({ slug: "shimmy", kind: "cover", authorName: null })).toBe("debut (cover - unknown author)");
   });
 
   test("a mashup with known artists names them", () => {
@@ -793,5 +795,96 @@ describe("dataDrivenFootnoteSources", () => {
     expect(container).toHaveTextContent(
       "dyslexic, ending only, completes 11/14/2025 version, completed by 11/16/2025 version",
     );
+  });
+});
+
+// A minimal Setlist carrying only the fields buildShowFootnotes reads (sets,
+// show.date, lineup, trackMusicianDeltas, annotations). A recent date keeps
+// flags/performers out of the early-era suppression window.
+function makeSetlist(overrides: {
+  tracks: Array<Partial<FootnoteTrack> & { id: string }>;
+  deltas?: TrackMusicianDelta[];
+  annotations?: Annotation[];
+}): Setlist {
+  return {
+    show: { id: "show-1", date: "2025-11-15" },
+    // A small non-null gap keeps each track out of the debut (gap === null) and
+    // last-time-played (gap >= threshold) auto-footnotes, isolating the flag /
+    // performer footnotes under test.
+    sets: [{ label: "S1", sort: 1, tracks: overrides.tracks.map((track) => makeTrack({ gap: 5, ...track })) }],
+    annotations: overrides.annotations ?? [],
+    lineup: [],
+    trackMusicianDeltas: overrides.deltas ?? [],
+  } as unknown as Setlist;
+}
+
+describe("buildShowFootnotes", () => {
+  test("derives flag and performer footnotes for a setlist through the same engine", () => {
+    const setlist = makeSetlist({
+      tracks: [{ id: "t1", flags: ["DYSLEXIC"] }, { id: "t2" }],
+      deltas: [makeDelta({ trackId: "t2", present: true, instruments: [makeInstrument("guitar")] })],
+    });
+
+    const { trackFootnoteIndices, orderedFootnotes } = buildShowFootnotes(setlist);
+
+    expect(trackFootnoteIndices.get("t1")).toEqual([1]);
+    expect(trackFootnoteIndices.get("t2")).toEqual([2]);
+    const flagContent = renderContent(orderedFootnotes[0].content);
+    expect(flagContent.container).toHaveTextContent("dyslexic");
+    const performerContent = renderContent(orderedFootnotes[1].content);
+    expect(performerContent.container).toHaveTextContent("with Mike Greenfield on guitar");
+  });
+
+  // The early-era show date predates both the debut and gap trustworthy-data
+  // start dates, so debut + last-time-played + recurrence footnotes are
+  // suppressed — but observed facts (flags) still render. This is the whole
+  // reason buildShowFootnotes wraps deriveFootnotes: it applies that gating.
+  test("suppresses debut/last-time-played/recurrence footnotes before the era start dates, but keeps flags", () => {
+    const setlist = makeSetlist({
+      tracks: [
+        // A flagged track that, recently, would also read ", 1st time" from its
+        // flag recurrence — the flag survives the early era, the recurrence clause does not.
+        {
+          id: "t1",
+          gap: 5,
+          flags: ["DYSLEXIC"],
+          flagRecurrences: [{ flag: "DYSLEXIC", versionGap: null, gap: null, lastPlayed: null }],
+        },
+        // gap === null would be a debut; suppressed pre-1998-02-19.
+        { id: "t2", gap: null },
+        // gap past the LTP threshold would be "last played …"; suppressed pre-1998-08-28.
+        { id: "t3", gap: 50, previousPerformanceShow: { date: "1996-01-01", slug: "1996-01-01-show" } },
+      ],
+    });
+    setlist.show.date = "1997-01-01";
+
+    const { trackFootnoteIndices, orderedFootnotes } = buildShowFootnotes(setlist);
+
+    // Only the flag footnote survives — no debut (t2) or last-time-played (t3).
+    expect(orderedFootnotes).toHaveLength(1);
+    expect(trackFootnoteIndices.get("t1")).toEqual([1]);
+    expect(trackFootnoteIndices.has("t2")).toBe(false);
+    expect(trackFootnoteIndices.has("t3")).toBe(false);
+    // The flag renders, but its gap-derived ", 1st time" recurrence clause is gated off.
+    const { container } = renderContent(orderedFootnotes[0].content);
+    expect(container).toHaveTextContent("dyslexic");
+    expect(container).not.toHaveTextContent("1st time");
+  });
+});
+
+describe("footnotesByTrack", () => {
+  test("maps each track id to its footnote contents in ascending index order", () => {
+    const setlist = makeSetlist({
+      tracks: [{ id: "t1", flags: ["DYSLEXIC"] }, { id: "t2" }],
+      deltas: [makeDelta({ trackId: "t2", present: true, instruments: [makeInstrument("guitar")] })],
+    });
+
+    const byTrack = footnotesByTrack(buildShowFootnotes(setlist));
+
+    expect(byTrack.get("t1")).toHaveLength(1);
+    expect(renderContent(byTrack.get("t1")?.[0]).container).toHaveTextContent("dyslexic");
+    expect(byTrack.get("t2")).toHaveLength(1);
+    expect(renderContent(byTrack.get("t2")?.[0]).container).toHaveTextContent("with Mike Greenfield on guitar");
+    expect(byTrack.has("t3")).toBe(false);
   });
 });

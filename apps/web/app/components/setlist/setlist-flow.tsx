@@ -2,22 +2,8 @@ import type { Setlist, SetlistLight } from "@bip/domain";
 import { formatDuration } from "@bip/domain";
 import { Link } from "react-router-dom";
 import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
-import {
-  debutFootnoteSuppressed,
-  gapFootnoteSuppressed,
-  LAST_TIME_PLAYED_GAP_THRESHOLD,
-} from "~/lib/footnote-constants";
-import { deriveShowLineupNotes, elevatedGuestIds } from "~/lib/lineup-notes";
 import { cn } from "~/lib/utils";
-import {
-  annotationFootnoteSources,
-  dataDrivenFootnoteSources,
-  debutFootnoteSources,
-  deriveFootnotes,
-  guestExclusionFootnotes,
-  lastTimePlayedFootnoteSources,
-  synthesizePerformerFootnotes,
-} from "./footnotes";
+import { buildShowFootnotes } from "./footnotes";
 import { countSetlistEncores } from "./set-label";
 import { formatSetHeading, summarizeDurations } from "./setlist-duration";
 import { TrackRatingOverlay } from "./track-rating-overlay";
@@ -31,37 +17,7 @@ import { TrackRatingOverlay } from "./track-rating-overlay";
  */
 export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
   const allTracks = setlist.sets.flatMap((set) => set.tracks);
-  // DB annotations are numbered before synthesized performer footnotes on any
-  // given track, so the existing annotation indices stay stable.
-  //
-  // Whole-show guests are surfaced in the show-level lineup note, so their
-  // per-track "with" footnotes are suppressed; for guests below 100% coverage
-  // the tracks they sat out are footnoted ("except where noted").
-  const lineupNotes = deriveShowLineupNotes(
-    setlist.show.date,
-    setlist.lineup,
-    setlist.trackMusicianDeltas,
-    allTracks.map((track) => track.id),
-  );
-  // The early setlists are too scattered to trust a song's gap or first
-  // appearance. Debuts firm up sooner than gaps, so they have separate start
-  // dates: before each, that category is suppressed. Flags, completions,
-  // annotations, and performer notes still render — observed facts, not stats.
-  const suppressDebuts = debutFootnoteSuppressed(setlist.show.date);
-  const suppressGaps = gapFootnoteSuppressed(setlist.show.date);
-  const footnoteSources = [
-    ...annotationFootnoteSources(setlist.annotations),
-    // All of a track's structured flags + completion links read on one line,
-    // right after annotations so the setlist reads like its annotation era.
-    ...dataDrivenFootnoteSources(allTracks, { suppressRecurrences: suppressGaps }),
-    ...synthesizePerformerFootnotes(setlist.trackMusicianDeltas, elevatedGuestIds(lineupNotes)),
-    ...guestExclusionFootnotes(lineupNotes.guests, setlist.trackMusicianDeltas),
-    // Auto last-time-played / debut footnotes append after the above so the
-    // existing annotation and performer footnote numbers stay stable.
-    ...(!suppressGaps ? lastTimePlayedFootnoteSources(allTracks, LAST_TIME_PLAYED_GAP_THRESHOLD) : []),
-    ...(!suppressDebuts ? debutFootnoteSources(allTracks) : []),
-  ];
-  const { trackFootnoteIndices, orderedFootnotes } = deriveFootnotes(allTracks, footnoteSources);
+  const { trackFootnoteIndices, orderedFootnotes } = buildShowFootnotes(setlist);
 
   const encoresInSet = countSetlistEncores(setlist.sets);
   const showDuration = summarizeDurations(allTracks);
