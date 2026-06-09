@@ -770,6 +770,27 @@ describe("SetlistService.findMany stub filtering", () => {
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.venueId).toBe("venue-1");
   });
+
+  // The homepage and venue pages build setlists via findMany and render them
+  // with the heavy mapper, so the query must join every relation that mapper
+  // reads — the song author (debut-footnote text), structured flags / segue
+  // recurrences / completions, and the track + show performer lineups — or those
+  // footnotes silently vanish (the mapper defaults each absent relation to []).
+  test("joins every relation the heavy setlist mapper renders", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findMany({ filters: { year: 2024 } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    const trackInclude = call.include.tracks.include;
+    expect(trackInclude.song).toEqual({ include: { author: { select: { name: true } } } });
+    expect(trackInclude.trackFlags).toBeDefined();
+    expect(trackInclude.segueRecurrences).toBeDefined();
+    expect(trackInclude.completionsAsLater).toBeDefined();
+    expect(trackInclude.trackMusicians).toBeDefined();
+    expect(call.include.showMusicians).toBeDefined();
+  });
 });
 
 describe("SetlistService.findManyByShowIds stub filtering", () => {

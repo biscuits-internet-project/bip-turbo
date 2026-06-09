@@ -704,6 +704,26 @@ const TRACK_FLAGS_AND_COMPLETIONS_INCLUDE = {
   },
 } as const;
 
+// Every show + track relation the heavy mapper (mapSetlistToDomainEntity) reads:
+// the song author for debut-footnote text, the structured flags / segue
+// recurrences / completion links, and the per-track plus whole-show performer
+// lineups. Shared by every query that returns a heavy Setlist so the joins stay
+// in lockstep — a query missing one silently blanks that footnote category,
+// since the mapper defaults each absent relation to an empty array.
+const HEAVY_SETLIST_INCLUDE = {
+  tracks: {
+    include: {
+      song: { include: { author: { select: { name: true } } } },
+      annotations: true,
+      previousPerformanceShow: { select: { date: true, slug: true } },
+      ...TRACK_PERFORMER_INCLUDE,
+      ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
+    },
+  },
+  venue: true,
+  ...SINGLE_SHOW_PERFORMER_INCLUDE,
+} as const;
+
 export class SetlistService {
   constructor(
     private readonly db: DbClient,
@@ -732,19 +752,7 @@ export class SetlistService {
     const show = await this.db.show.findUnique({
       where: { id },
       relationLoadStrategy: "join",
-      include: {
-        tracks: {
-          include: {
-            song: true,
-            annotations: true,
-            previousPerformanceShow: { select: { date: true, slug: true } },
-            ...TRACK_PERFORMER_INCLUDE,
-            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
-          },
-        },
-        venue: true,
-        ...SINGLE_SHOW_PERFORMER_INCLUDE,
-      },
+      include: HEAVY_SETLIST_INCLUDE,
     });
 
     if (!show || !show.venue) return null;
@@ -761,19 +769,7 @@ export class SetlistService {
     const result = await this.db.show.findUnique({
       where: { slug },
       relationLoadStrategy: "join",
-      include: {
-        tracks: {
-          include: {
-            song: { include: { author: { select: { name: true } } } },
-            annotations: true,
-            previousPerformanceShow: { select: { date: true, slug: true } },
-            ...TRACK_PERFORMER_INCLUDE,
-            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
-          },
-        },
-        venue: true,
-        ...SINGLE_SHOW_PERFORMER_INCLUDE,
-      },
+      include: HEAVY_SETLIST_INCLUDE,
     });
 
     if (!result || !result.venue) return null;
@@ -824,19 +820,7 @@ export class SetlistService {
       // 100 shows × ~25 tracks each + relations, the per-roundtrip latency
       // dominates the page load on un-cached routes (top-rated etc).
       relationLoadStrategy: "join",
-      include: {
-        tracks: {
-          include: {
-            song: { include: { author: { select: { name: true } } } },
-            annotations: true,
-            previousPerformanceShow: { select: { date: true, slug: true } },
-            ...TRACK_PERFORMER_INCLUDE,
-            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
-          },
-        },
-        venue: true,
-        ...SINGLE_SHOW_PERFORMER_INCLUDE,
-      },
+      include: HEAVY_SETLIST_INCLUDE,
     });
 
     const setlists = results
@@ -892,16 +876,7 @@ export class SetlistService {
       skip,
       take,
       relationLoadStrategy: "join",
-      include: {
-        tracks: {
-          include: {
-            song: true,
-            annotations: true,
-            previousPerformanceShow: { select: { date: true, slug: true } },
-          },
-        },
-        venue: true,
-      },
+      include: HEAVY_SETLIST_INCLUDE,
     });
 
     const setlists = results

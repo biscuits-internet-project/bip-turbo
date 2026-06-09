@@ -152,7 +152,7 @@ export const CacheKeys = {
    */
   home: {
     /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v10`,
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v11`,
   },
 
   /**
