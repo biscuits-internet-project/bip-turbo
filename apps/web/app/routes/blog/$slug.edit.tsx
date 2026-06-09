@@ -1,12 +1,11 @@
 import type { BlogPost, BlogPostState } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs } from "react-router";
-import { Link, redirect } from "react-router-dom";
+import { redirect } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { BlogPostForm, type BlogPostFormValues } from "~/components/blog/blog-form";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
@@ -138,14 +137,8 @@ export default function EditBlogPost() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Edit Blog Post</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={`/blog/${blogPost.slug}`} className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Post</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Edit Blog Post" backLink={{ to: `/blog/${blogPost.slug}`, label: "Back to Post" }} />
       </div>
 
       <AdminOnly>

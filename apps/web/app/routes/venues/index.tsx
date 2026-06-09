@@ -7,6 +7,8 @@ import { AdminOnly } from "~/components/admin/admin-only";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getVenuesMeta } from "~/lib/seo";
@@ -392,19 +394,16 @@ export default function VenuesPage() {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <div className="relative">
-        <h1 className="page-heading">VENUES</h1>
-        <div className="absolute top-0 right-0">
+      <PageHeader
+        title="VENUES"
+        actions={
           <AdminOnly>
-            <Button asChild size="sm" className="btn-primary">
-              <Link to="/venues/new" className="flex items-center gap-1">
-                <Plus className="h-4 w-4" />
-                <span>Create Venue</span>
-              </Link>
-            </Button>
+            <LinkButton to="/venues/new" icon={Plus} iconOnlyOnMobile>
+              Create Venue
+            </LinkButton>
           </AdminOnly>
-        </div>
-      </div>
+        }
+      />
       {/* Stats Grid */}
       <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatBox icon={<MapPin className="h-4 w-4" />} label="Total Venues" value={stats.totalVenues} />

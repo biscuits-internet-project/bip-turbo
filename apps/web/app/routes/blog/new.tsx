@@ -1,11 +1,10 @@
 import type { BlogPostState } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import type { ActionFunctionArgs } from "react-router";
-import { Link, redirect } from "react-router-dom";
+import { redirect } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { BlogPostForm } from "~/components/blog/blog-form";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
@@ -66,14 +65,8 @@ export const action = adminAction(async ({ request, context }: ActionFunctionArg
 export default function NewBlogPost() {
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Create Blog Post</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/blog" className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Blog</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Create Blog Post" backLink={{ to: "/blog", label: "Back to Blog" }} />
       </div>
 
       <AdminOnly>

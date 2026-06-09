@@ -1,11 +1,10 @@
 import { narrowSongKind } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import type { ActionFunctionArgs } from "react-router";
-import { Link, redirect } from "react-router-dom";
+import { redirect } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SongForm } from "~/components/song/song-form";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
@@ -43,14 +42,8 @@ export const action = adminAction(async ({ request }: ActionFunctionArgs) => {
 export default function NewSong() {
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Create Song</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/songs" className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Songs</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Create Song" backLink={{ to: "/songs", label: "Back to Songs" }} />
       </div>
 
       <AdminOnly>

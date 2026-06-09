@@ -125,6 +125,8 @@ export default [
     route("authors/:id", "routes/api/authors/$id.tsx"),
     route("instruments", "routes/api/instruments.tsx"),
     route("instruments/:id", "routes/api/instruments/$id.tsx"),
+    route("musicians", "routes/api/musicians.tsx"),
+    route("musicians/:id", "routes/api/musicians/$id.tsx"),
     route("venues", "routes/api/venues.tsx"),
     route("venues/:id", "routes/api/venues/$id.tsx"),
     route("all-timers", "routes/api/all-timers.tsx"),
@@ -147,6 +149,7 @@ export default [
     route("admin/cache", "routes/api/admin/cache.tsx"),
     route("admin/authors", "routes/api/admin/authors.tsx"),
     route("admin/instruments", "routes/api/admin/instruments.tsx"),
+    route("admin/musicians", "routes/api/admin/musicians.tsx"),
   ]),
 
   // Admin routes
@@ -161,6 +164,10 @@ export default [
       index("routes/admin/instruments/index.tsx"),
       route("new", "routes/admin/instruments/new.tsx"),
       route(":slug/edit", "routes/admin/instruments/$slug.edit.tsx"),
+    ]),
+    ...prefix("musicians", [
+      route("new", "routes/admin/musicians/new.tsx"),
+      route(":slug/edit", "routes/admin/musicians/$slug.edit.tsx"),
     ]),
   ]),
 

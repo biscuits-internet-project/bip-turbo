@@ -87,12 +87,12 @@ describe("SongsLayout", () => {
     expect(screen.getByText("SONGS")).toBeInTheDocument();
   });
 
-  // The heading should also appear on non-tabbed pages (slug, new, edit)
-  // since the layout wraps all songs routes.
-  test("renders SONGS heading on song detail pages", () => {
+  // On non-tabbed pages (detail, new, edit) the layout's SONGS header is
+  // hidden so it doesn't stack a second heading above the page's own title.
+  test("does not render the SONGS layout heading on song detail pages", () => {
     renderAtPath("/songs/basis-for-a-day");
 
-    expect(screen.getByText("SONGS")).toBeInTheDocument();
+    expect(screen.queryByText("SONGS")).not.toBeInTheDocument();
   });
 
   // The Outlet should always render regardless of path, since child routes
@@ -139,5 +139,13 @@ describe("SongsLayout", () => {
     // The active tab in the desktop strip should now reflect the new path.
     const allTimersLink = screen.getByRole("link", { name: /all-timers/i });
     expect(allTimersLink.className).toContain("border-brand-primary");
+  });
+
+  // Admins get a shortcut to the authors admin from the songs header (AdminOnly
+  // is mocked to passthrough here; its gating is covered by its own test).
+  test("renders a Manage authors admin link in the header", () => {
+    renderAtPath("/songs");
+
+    expect(screen.getByRole("link", { name: /manage authors/i })).toHaveAttribute("href", "/admin/authors");
   });
 });

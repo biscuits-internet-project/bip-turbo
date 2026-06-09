@@ -13,6 +13,9 @@ build:
 tc:
 	bun run typecheck:all
 
+typegen:
+	cd apps/web && bun react-router typegen && bun run gen-root
+
 lint:
 	bun run lint
 

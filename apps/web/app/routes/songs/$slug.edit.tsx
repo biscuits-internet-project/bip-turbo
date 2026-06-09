@@ -1,12 +1,11 @@
 import { narrowSongKind, type Song } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs } from "react-router";
-import { Link, redirect } from "react-router-dom";
+import { redirect } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SongForm, type SongFormValues } from "~/components/song/song-form";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
@@ -84,14 +83,8 @@ export default function EditSong() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Edit Song</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={`/songs/${song.slug}`} className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Song</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Edit Song" backLink={{ to: `/songs/${song.slug}`, label: "Back to Song" }} />
       </div>
 
       <AdminOnly>

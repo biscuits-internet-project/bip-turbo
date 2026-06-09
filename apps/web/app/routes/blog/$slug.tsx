@@ -1,12 +1,12 @@
 import type { BlogPost } from "@bip/domain";
-import { ArrowLeft, CalendarDays, Pencil } from "lucide-react";
+import { CalendarDays, Pencil } from "lucide-react";
 import Markdown from "react-markdown";
-import { Link } from "react-router-dom";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
@@ -69,33 +69,22 @@ export default function BlogPostPage() {
         }}
       />
 
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap items-baseline gap-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">{blogPost.title}</h1>
-          <div className="flex items-center gap-2 text-content-text-secondary">
-            <CalendarDays className="h-4 w-4" />
-            <span className="text-lg">{formatDate(blogPost.publishedAt)}</span>
-          </div>
+      <div className="space-y-2">
+        <PageHeader
+          title={blogPost.title}
+          backLink={{ to: "/blog", label: "All Posts" }}
+          actions={
+            <AdminOnly>
+              <LinkButton to={`/blog/${blogPost.slug}/edit`} icon={Pencil} intent="secondary" iconOnlyOnMobile>
+                Edit Post
+              </LinkButton>
+            </AdminOnly>
+          }
+        />
+        <div className="flex items-center justify-center gap-2 text-content-text-secondary">
+          <CalendarDays className="h-4 w-4" />
+          <span className="text-lg">{formatDate(blogPost.publishedAt)}</span>
         </div>
-        <AdminOnly>
-          <Button asChild variant="outline" className="btn-secondary">
-            <Link to={`/blog/${blogPost.slug}/edit`} className="flex items-center gap-2">
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Link>
-          </Button>
-        </AdminOnly>
-      </div>
-
-      {/* Subtle back link */}
-      <div className="flex justify-start">
-        <Link
-          to="/blog"
-          className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-        >
-          <ArrowLeft className="h-3 w-3" />
-          <span>Back to blog</span>
-        </Link>
       </div>
 
       <Card className="relative overflow-hidden border-content-bg-secondary">

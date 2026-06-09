@@ -1,8 +1,7 @@
-import { ArrowLeft } from "lucide-react";
-import { Link, redirect, useSubmit } from "react-router-dom";
+import { redirect, useSubmit } from "react-router-dom";
 import { ShowForm, type ShowFormValues } from "~/components/show/show-form";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
 
@@ -46,14 +45,8 @@ export default function NewShow() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Create Show</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/shows" className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Shows</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Create Show" backLink={{ to: "/shows", label: "Back to Shows" }} />
       </div>
 
       <Card className="card-premium">

@@ -1,7 +1,7 @@
-import { Link } from "react-router-dom";
 import { ContactDialog } from "~/components/contact/contact-dialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { LinkButton } from "~/components/ui/link-button";
 
 export function meta() {
   return [
@@ -81,9 +81,7 @@ export default function About() {
               or helping to improve our data, every contribution makes the community stronger.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button asChild className="btn-primary">
-                <Link to="/auth/register">Join the Community</Link>
-              </Button>
+              <LinkButton to="/auth/register">Join the Community</LinkButton>
               <ContactDialog>
                 <Button className="btn-secondary">Get Involved</Button>
               </ContactDialog>

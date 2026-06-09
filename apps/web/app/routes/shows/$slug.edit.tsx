@@ -1,13 +1,12 @@
 import type { Band, RockOpera, Show, Track, Venue } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ShowDayOrderManager, type ShowDayOrderRow } from "~/components/show/show-day-order-manager";
 import { ShowForm, type ShowFormValues } from "~/components/show/show-form";
 import { TrackManager } from "~/components/track/track-manager";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
@@ -149,14 +148,8 @@ export default function EditShow() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Edit Show</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={`/shows/${show.slug}`} className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Show</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Edit Show" backLink={{ to: `/shows/${show.slug}`, label: "Back to Show" }} />
       </div>
 
       <div className="space-y-6">

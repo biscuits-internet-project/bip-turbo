@@ -1,6 +1,6 @@
 import { compareByShowDate, type SongPageView } from "@bip/domain";
 import { type DehydratedState, dehydrate } from "@tanstack/react-query";
-import { ArrowLeft, BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
+import { BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -11,7 +11,8 @@ import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
 import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
 import { isNoteworthy } from "~/components/track/noteworthy-marker";
-import { Button } from "~/components/ui/button";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { StatBox } from "~/components/ui/stat-box";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -249,33 +250,28 @@ export default function SongPage() {
         }}
       />
 
-      <div className="flex items-center justify-between">
-        <div className="flex flex-wrap items-baseline gap-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">{song.title}</h1>
-          {song.authorName && (
-            <span className="text-content-text-secondary text-lg">
-              by <span className="text-brand-primary">{song.authorName}</span>
-            </span>
-          )}
-          {song.kind === "mashup" && <span className="text-content-text-tertiary text-lg">mashup</span>}
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/songs"
-            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3" />
-            <span>Back to songs</span>
-          </Link>
-          <AdminOnly>
-            <Button asChild variant="outline" className="btn-secondary">
-              <Link to={`/songs/${song.slug}/edit`} className="flex items-center gap-2">
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-            </Button>
-          </AdminOnly>
-        </div>
+      <div className="space-y-2">
+        <PageHeader
+          title={song.title}
+          backLink={{ to: "/songs", label: "All Songs" }}
+          actions={
+            <AdminOnly>
+              <LinkButton to={`/songs/${song.slug}/edit`} icon={Pencil} intent="secondary" iconOnlyOnMobile>
+                Edit Song
+              </LinkButton>
+            </AdminOnly>
+          }
+        />
+        {(song.authorName || song.kind === "mashup") && (
+          <div className="flex flex-wrap items-baseline justify-center gap-x-3 text-content-text-secondary text-lg">
+            {song.authorName && (
+              <span>
+                by <span className="text-brand-primary">{song.authorName}</span>
+              </span>
+            )}
+            {song.kind === "mashup" && <span className="text-content-text-tertiary">mashup</span>}
+          </div>
+        )}
       </div>
 
       {/* Stats Grid */}

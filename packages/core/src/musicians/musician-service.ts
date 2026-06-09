@@ -25,6 +25,8 @@ export interface CreateMusicianInput {
   defaultInstrumentId?: string | null;
 }
 
+export type UpdateMusicianInput = Partial<CreateMusicianInput>;
+
 function mapInstrumentToDomainEntity(db: DbInstrument): Instrument {
   return {
     id: db.id,
@@ -558,5 +560,91 @@ export class MusicianService {
       },
     });
     return mapMusicianToDomainEntity(result);
+  }
+
+  // A rename can collide with another musician's slug, so append a suffix
+  // (mirrors InstrumentService). create() still dedupes on slug; see its doc.
+  private async generateMusicianSlug(name: string, excludeId?: string): Promise<string> {
+    const baseSlug = slugify(name);
+    let slug = baseSlug;
+    let counter = 2;
+
+    while (true) {
+      const existing = await this.db.musician.findFirst({
+        where: { slug, ...(excludeId && { id: { not: excludeId } }) },
+      });
+      if (!existing) {
+        return slug;
+      }
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+  }
+
+  async update(slug: string, data: UpdateMusicianInput): Promise<Musician> {
+    // Resolve by slug, which is what the admin edit route and API pass in.
+    const current = await this.db.musician.findFirst({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!current) {
+      throw new Error(`Musician with slug "${slug}" not found`);
+    }
+
+    const updateData: {
+      name?: string;
+      slug?: string;
+      knownFrom?: string | null;
+      defaultInstrumentId?: string | null;
+      updatedAt: Date;
+    } = { updatedAt: new Date() };
+
+    if (data.name !== undefined) {
+      const name = data.name?.trim();
+      if (!name) {
+        throw new Error("Musician name is required");
+      }
+      updateData.name = name;
+      updateData.slug = await this.generateMusicianSlug(name, current.id);
+    }
+    // `!== undefined` (not truthiness) so the form can clear these to null.
+    if (data.knownFrom !== undefined) {
+      updateData.knownFrom = data.knownFrom ?? null;
+    }
+    if (data.defaultInstrumentId !== undefined) {
+      updateData.defaultInstrumentId = data.defaultInstrumentId ?? null;
+    }
+
+    const result = await this.db.musician.update({
+      where: { id: current.id },
+      data: updateData,
+    });
+    return mapMusicianToDomainEntity(result);
+  }
+
+  // Total references to a musician across show lineups and per-track deltas;
+  // drives both the delete guard and the UI's decision to hide the affordance.
+  async countReferences(id: string): Promise<number> {
+    const [showUses, trackUses] = await Promise.all([
+      this.db.showMusician.count({ where: { musicianId: id } }),
+      this.db.trackMusician.count({ where: { musicianId: id } }),
+    ]);
+    return showUses + trackUses;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    // The schema would cascade lineup and delta rows, so guard against deleting
+    // a musician who still appears anywhere.
+    const references = await this.countReferences(id);
+    if (references > 0) {
+      throw new Error(`Cannot delete musician with ${references} reference(s)`);
+    }
+
+    try {
+      await this.db.musician.delete({ where: { id } });
+      return true;
+    } catch (_error) {
+      return false;
+    }
   }
 }

@@ -1,8 +1,9 @@
 import type { LucideIcon } from "lucide-react";
-import { Calendar, Clock, Flame, History, ListMusic, Plus } from "lucide-react";
+import { BookUser, Calendar, Clock, Flame, History, ListMusic, Plus } from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { Button } from "~/components/ui/button";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { cn } from "~/lib/utils";
 
 interface Tab {
@@ -30,22 +31,21 @@ export default function SongsLayout() {
 
   return (
     <div className="py-2 sm:py-3">
-      <div className="relative">
-        <h1 className="page-heading">SONGS</h1>
-        <div className="absolute top-0 right-0 flex items-center gap-3">
-          <AdminOnly>
-            <Button asChild className="btn-primary">
-              <Link to="/songs/new" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                New Song
-              </Link>
-            </Button>
-          </AdminOnly>
-        </div>
-      </div>
-
       {showTabs && (
         <>
+          <PageHeader
+            title="SONGS"
+            actions={
+              <AdminOnly>
+                <LinkButton to="/admin/authors" icon={BookUser} intent="secondary" iconOnlyOnMobile>
+                  Manage authors
+                </LinkButton>
+                <LinkButton to="/songs/new" icon={Plus} iconOnlyOnMobile>
+                  Create Song
+                </LinkButton>
+              </AdminOnly>
+            }
+          />
           <div className="w-full hidden sm:flex justify-start border-b border-glass-border/30 mb-6">
             {TABS.map((tab) => {
               const isActive = pathname === tab.path;
