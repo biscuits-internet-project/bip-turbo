@@ -1,13 +1,13 @@
 import type { Setlist, Venue } from "@bip/domain";
 import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
-import { Link } from "react-router-dom";
+import { CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey } from "~/lib/query-keys";
@@ -112,35 +112,21 @@ export default function VenuePage() {
         }}
       />
 
-      <div className="space-y-4 mb-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-content-text-primary">{venue.name}</h1>
-            <div className="flex items-center text-content-text-secondary mt-1">
-              <MapPin className="h-4 w-4 mr-1" />
-              <span>{[venue.city, venue.state, venue.country].filter(Boolean).join(", ")}</span>
-            </div>
-          </div>
-
-          <AdminOnly>
-            <Button asChild size="sm" className="btn-secondary">
-              <Link to={`/venues/${venue.slug}/edit`} className="flex items-center gap-1">
-                <Edit className="h-4 w-4" />
-                <span>Edit Venue</span>
-              </Link>
-            </Button>
-          </AdminOnly>
-        </div>
-
-        {/* Subtle back link */}
-        <div className="flex justify-start">
-          <Link
-            to="/venues"
-            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3" />
-            <span>Back to venues</span>
-          </Link>
+      <div className="space-y-2 mb-6">
+        <PageHeader
+          title={venue.name}
+          backLink={{ to: "/venues", label: "All Venues" }}
+          actions={
+            <AdminOnly>
+              <LinkButton to={`/venues/${venue.slug}/edit`} icon={Edit} intent="secondary" iconOnlyOnMobile>
+                Edit Venue
+              </LinkButton>
+            </AdminOnly>
+          }
+        />
+        <div className="flex items-center justify-center text-content-text-secondary">
+          <MapPin className="h-4 w-4 mr-1" />
+          <span>{[venue.city, venue.state, venue.country].filter(Boolean).join(", ")}</span>
         </div>
       </div>
 

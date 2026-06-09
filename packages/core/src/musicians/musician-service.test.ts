@@ -198,6 +198,154 @@ describe("InstrumentService.findManyWithUsageCount", () => {
   });
 });
 
+type MusicianRow = {
+  id: string;
+  name: string;
+  slug: string;
+  knownFrom: string | null;
+  defaultInstrumentId: string | null;
+};
+
+function makeMusicianEditDb(bySlug: Record<string, MusicianRow>) {
+  return {
+    musician: {
+      findFirst: vi.fn(({ where }: { where: { slug?: string; id?: { not?: string } } }) => {
+        const match = where.slug ? bySlug[where.slug] : null;
+        if (!match) return Promise.resolve(null);
+        // generateMusicianSlug excludes the current row when checking collisions.
+        if (where.id?.not && match.id === where.id.not) return Promise.resolve(null);
+        return Promise.resolve(match);
+      }),
+      update: vi.fn(({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
+        Promise.resolve({
+          id: where.id,
+          name: "",
+          slug: "",
+          knownFrom: null,
+          defaultInstrumentId: null,
+          createdAt: new Date("2020-01-01"),
+          updatedAt: new Date("2020-01-01"),
+          ...data,
+        }),
+      ),
+    },
+  };
+}
+
+describe("MusicianService.update resolves by slug", () => {
+  test("looks the musician up by slug and regenerates the slug on rename", async () => {
+    const db = makeMusicianEditDb({
+      "jon-gutwillig": {
+        id: "jg",
+        name: "Jon Gutwillig",
+        slug: "jon-gutwillig",
+        knownFrom: null,
+        defaultInstrumentId: null,
+      },
+    });
+    const service = new MusicianService(db as never, logger);
+
+    const result = await service.update("jon-gutwillig", { name: "Jon Gutwillik" });
+
+    expect(db.musician.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "jg" } }));
+    expect(result.slug).toBe("jon-gutwillik");
+  });
+
+  test("appends a suffix when the renamed slug collides with another musician", async () => {
+    const db = makeMusicianEditDb({
+      "marc-brownstein": {
+        id: "mb",
+        name: "Marc Brownstein",
+        slug: "marc-brownstein",
+        knownFrom: null,
+        defaultInstrumentId: null,
+      },
+      "aron-magner": { id: "am", name: "Aron Magner", slug: "aron-magner", knownFrom: null, defaultInstrumentId: null },
+    });
+    const service = new MusicianService(db as never, logger);
+
+    const result = await service.update("marc-brownstein", { name: "Aron Magner" });
+
+    expect(result.slug).toBe("aron-magner-2");
+  });
+
+  test("updates knownFrom and the default instrument", async () => {
+    const db = makeMusicianEditDb({
+      "aron-magner": { id: "am", name: "Aron Magner", slug: "aron-magner", knownFrom: null, defaultInstrumentId: null },
+    });
+    const service = new MusicianService(db as never, logger);
+
+    const result = await service.update("aron-magner", { knownFrom: "Conspirator", defaultInstrumentId: "keys-id" });
+
+    expect(result.knownFrom).toBe("Conspirator");
+    expect(result.defaultInstrumentId).toBe("keys-id");
+  });
+
+  test("clears knownFrom and the default instrument when set to null", async () => {
+    const db = makeMusicianEditDb({
+      "allen-aucoin": {
+        id: "aa",
+        name: "Allen Aucoin",
+        slug: "allen-aucoin",
+        knownFrom: "DJ Spaceman",
+        defaultInstrumentId: "drums-id",
+      },
+    });
+    const service = new MusicianService(db as never, logger);
+
+    const result = await service.update("allen-aucoin", { knownFrom: null, defaultInstrumentId: null });
+
+    expect(db.musician.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ knownFrom: null, defaultInstrumentId: null }) }),
+    );
+    expect(result.knownFrom).toBeNull();
+    expect(result.defaultInstrumentId).toBeNull();
+  });
+
+  test("throws when no musician matches the slug", async () => {
+    const service = new MusicianService(makeMusicianEditDb({}) as never, logger);
+
+    await expect(service.update("nobody", { name: "Someone" })).rejects.toThrow(
+      'Musician with slug "nobody" not found',
+    );
+  });
+});
+
+describe("MusicianService.delete guards referenced rows", () => {
+  function makeDeleteDb(counts: { show: number; track: number }) {
+    return {
+      showMusician: { count: vi.fn(() => Promise.resolve(counts.show)) },
+      trackMusician: { count: vi.fn(() => Promise.resolve(counts.track)) },
+      musician: { delete: vi.fn(() => Promise.resolve({})) },
+    };
+  }
+
+  test("counts lineup and per-track references", async () => {
+    const db = makeDeleteDb({ show: 4, track: 6 });
+    const service = new MusicianService(db as never, logger);
+
+    expect(await service.countReferences("am")).toBe(10);
+  });
+
+  test("refuses to delete a musician with appearances", async () => {
+    const db = makeDeleteDb({ show: 1, track: 2 });
+    const service = new MusicianService(db as never, logger);
+
+    await expect(service.delete("am")).rejects.toThrow("Cannot delete musician with 3 reference(s)");
+    expect(db.musician.delete).not.toHaveBeenCalled();
+  });
+
+  test("deletes an unreferenced musician", async () => {
+    const db = makeDeleteDb({ show: 0, track: 0 });
+    const service = new MusicianService(db as never, logger);
+
+    const result = await service.delete("am");
+
+    expect(result).toBe(true);
+    expect(db.musician.delete).toHaveBeenCalledWith({ where: { id: "am" } });
+  });
+});
+
 describe("MusicianService.findAppearances", () => {
   function makeAppearancesDb(args: {
     lineupShowIds: string[];

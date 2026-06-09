@@ -1,9 +1,8 @@
 import type { Venue } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "~/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { VenueForm, type VenueFormValues } from "~/components/venue/venue-form";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
@@ -86,14 +85,8 @@ export default function EditVenue() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Edit Venue</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={`/venues/${venue.slug}`} className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Venue</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Edit Venue" backLink={{ to: `/venues/${venue.slug}`, label: "Back to Venue" }} />
       </div>
 
       <Card className="card-premium">

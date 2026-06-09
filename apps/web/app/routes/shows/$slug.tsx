@@ -1,7 +1,7 @@
 import type { ShowNavItem } from "@bip/core";
 import { type ArchiveDotOrgRecording, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import { type DehydratedState, dehydrate } from "@tanstack/react-query";
-import { ArrowLeft, ChevronLeft, ChevronRight, Edit } from "lucide-react";
+import { ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -16,7 +16,8 @@ import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-
 import { ShowLineupSection } from "~/components/show/show-lineup-section";
 import { ShowPhotos } from "~/components/show/show-photos";
 import { ShowDate } from "~/components/show-date";
-import { Button } from "~/components/ui/button";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useSession } from "~/hooks/use-session";
 import { useSetlistView } from "~/hooks/use-setlist-view";
@@ -227,31 +228,23 @@ export default function Show() {
         }}
       />
 
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl md:text-4xl font-bold text-content-text-primary">
-          {formatDateLong(setlist.show.date)}
-        </h1>
-        <AdminOnly>
-          <Button variant="outline" size="sm" asChild className="btn-secondary">
-            <Link to={`/shows/${setlist.show.slug}/edit`} className="flex items-center gap-1">
-              <Edit className="h-4 w-4" />
-              <span>Edit Show</span>
-            </Link>
-          </Button>
-        </AdminOnly>
-      </div>
+      <PageHeader
+        title={formatDateLong(setlist.show.date)}
+        backLink={{
+          to: `/shows/year/${setlist.show.date.slice(0, 4)}`,
+          label: `To ${setlist.show.date.slice(0, 4)} shows`,
+        }}
+        actions={
+          <AdminOnly>
+            <LinkButton to={`/shows/${setlist.show.slug}/edit`} icon={Edit} intent="secondary" iconOnlyOnMobile>
+              Edit Show
+            </LinkButton>
+          </AdminOnly>
+        }
+      />
 
       {/* Navigation */}
       <div className="space-y-2">
-        <div className="flex justify-start">
-          <Link
-            to={`/shows/year/${setlist.show.date.slice(0, 4)}`}
-            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3" />
-            <span>Back to {setlist.show.date.slice(0, 4)} shows</span>
-          </Link>
-        </div>
         <div className="flex justify-between items-center gap-2">
           {adjacentShows.previous ? (
             <Link

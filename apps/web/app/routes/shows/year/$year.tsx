@@ -3,12 +3,13 @@ import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ShowFiltersNav } from "~/components/show-filters-nav";
 import { Button } from "~/components/ui/button";
+import { LinkButton } from "~/components/ui/link-button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -229,12 +230,9 @@ export default function ShowsByYear() {
               </div>
             )}
             <AdminOnly>
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/shows/new" className="flex items-center gap-1">
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">New Show</span>
-                </Link>
-              </Button>
+              <LinkButton to="/shows/new" icon={Plus} iconOnlyOnMobile>
+                Create Show
+              </LinkButton>
             </AdminOnly>
           </div>
           <div className="flex flex-wrap items-baseline justify-center gap-4 -mt-4">

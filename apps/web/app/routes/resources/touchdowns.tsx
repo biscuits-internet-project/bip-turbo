@@ -1,6 +1,5 @@
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { BackLink } from "~/components/ui/back-link";
 import { publicLoader } from "~/lib/base-loaders";
 
 export const loader = publicLoader<void>(async () => {});
@@ -59,13 +58,7 @@ export default function Touchdowns() {
 
         {/* Subtle back link */}
         <div className="flex justify-start">
-          <Link
-            to="/resources"
-            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3" />
-            <span>Back to resources</span>
-          </Link>
+          <BackLink to="/resources">All Resources</BackLink>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

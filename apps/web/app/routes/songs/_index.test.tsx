@@ -46,11 +46,11 @@ describe("Songs index page", () => {
     expect(screen.queryByRole("link", { name: /all-timers/i })).not.toBeInTheDocument();
   });
 
-  // The layout renders the admin "New Song" button.
-  test("does not render a New Song button", () => {
+  // The "Create Song" button lives in the layout, not this index route.
+  test("does not render a Create Song button", () => {
     renderSongsIndex();
 
-    expect(screen.queryByRole("link", { name: /new song/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /create song/i })).not.toBeInTheDocument();
   });
 
   // The FilteredSongsTable renders the songs table with filter controls.

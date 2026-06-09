@@ -1,7 +1,6 @@
-import { ArrowLeft } from "lucide-react";
-import { Link, redirect, useSubmit } from "react-router-dom";
-import { Button } from "~/components/ui/button";
+import { redirect, useSubmit } from "react-router-dom";
 import { Card, CardContent } from "~/components/ui/card";
+import { PageHeader } from "~/components/ui/page-header";
 import { VenueForm, type VenueFormValues } from "~/components/venue/venue-form";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { services } from "~/server/services";
@@ -43,14 +42,8 @@ export default function NewVenue() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-content-text-primary">Create Venue</h1>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/venues" className="flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to Venues</span>
-          </Link>
-        </Button>
+      <div className="mb-6">
+        <PageHeader title="Create Venue" backLink={{ to: "/venues", label: "Back to Venues" }} />
       </div>
 
       <Card className="card-premium">

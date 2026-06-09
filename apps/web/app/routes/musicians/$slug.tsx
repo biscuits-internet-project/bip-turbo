@@ -1,10 +1,13 @@
 import type { Instrument, Musician, MusicianAppearanceShow, MusicianPerformance, MusicianSongPlay } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowLeft } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AdminOnly } from "~/components/admin/admin-only";
 import { DateVenueCell } from "~/components/performance/date-venue-cell";
 import { ShowDate } from "~/components/show-date";
 import { DataTable } from "~/components/ui/data-table";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { StatBox } from "~/components/ui/stat-box";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -258,23 +261,26 @@ export default function MusicianPage() {
 
   return (
     <div>
-      <div className="space-y-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-content-text-primary">{musician.name}</h1>
-          <div className="flex flex-wrap items-center gap-x-3 text-content-text-secondary mt-1">
-            {musician.defaultInstrument && <span className="lowercase">{musician.defaultInstrument.name}</span>}
-            {musician.knownFrom && <span className="text-content-text-tertiary">Known from {musician.knownFrom}</span>}
-          </div>
-        </div>
-
-        <div className="flex justify-start">
-          <Link
-            to="/musicians"
-            className="flex items-center gap-1 text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3" />
-            <span>Back to musicians</span>
-          </Link>
+      <div className="space-y-2 mb-6">
+        <PageHeader
+          title={musician.name}
+          backLink={{ to: "/musicians", label: "All Musicians" }}
+          actions={
+            <AdminOnly>
+              <LinkButton
+                to={`/admin/musicians/${musician.slug}/edit`}
+                icon={Pencil}
+                intent="secondary"
+                iconOnlyOnMobile
+              >
+                Edit Musician
+              </LinkButton>
+            </AdminOnly>
+          }
+        />
+        <div className="flex flex-wrap items-center justify-center gap-x-3 text-content-text-secondary">
+          {musician.defaultInstrument && <span className="lowercase">{musician.defaultInstrument.name}</span>}
+          {musician.knownFrom && <span className="text-content-text-tertiary">Known from {musician.knownFrom}</span>}
         </div>
       </div>
 

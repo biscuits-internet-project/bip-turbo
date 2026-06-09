@@ -35,6 +35,7 @@ Before writing markup, grep the className you're about to type. If it's already 
 - **2+ duplications → className constant** in [form-styles.ts](app/lib/form-styles.ts) (form chrome) or a domain module. See `formInputClass`, `formLabelClass`.
 - **2+ Button (or Badge / Card / …) className overrides → add a `variant`** to the existing CVA. See `variant="brand"`. Don't create `<MyButton>`.
 - **No thin wrappers to hide a className.** `<PremiumCard>` for `<Card className="card-premium">` is indirection, not abstraction. Use a constant or variant.
+- **DO extract a shared component for a repeated multi-element affordance.** A composite that's *more than a className* — e.g. a `Button asChild` + `Link` + icon nav button repeated across pages — belongs in one component so its styling AND verbiage stay consistent app-wide and change in one place. Use [LinkButton](app/components/ui/link-button.tsx) for prominent action/nav buttons ("Create X", "Back to X") and [BackLink](app/components/ui/back-link.tsx) for the subtle content-page back link ("All X"). The "no `<MyButton>`" rule above targets pure single-className hiding, not multi-element composites. Navigation should look identical across pages; settle on one pattern unless there's a real reason for two (e.g. prominent form/list actions vs. low-emphasis content-page nav). Verbiage convention: create buttons say **"Create X"** (not "New X").
 - **Don't bake project styling into shadcn defaults.** Auth/search/etc. use the upstream primitive. Project looks → constant or variant.
 
 ## Package-Specific Commands

@@ -1,13 +1,10 @@
 import type { Author } from "@bip/domain";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs } from "react-router";
-import { Link, redirect, useNavigate } from "react-router-dom";
-import { AdminOnly } from "~/components/admin/admin-only";
+import { redirect, useNavigate } from "react-router-dom";
+import { AdminFormPage } from "~/components/admin/admin-form-page";
 import { DeleteEntityButton } from "~/components/admin/delete-entity-button";
-import { AuthorForm, type AuthorFormValues } from "~/components/author/author-form";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
+import { EntityNameForm, type NameFormValues } from "~/components/admin/entity-name-form";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
@@ -44,15 +41,12 @@ export const action = adminAction(async ({ request, params }: ActionFunctionArgs
 export default function EditAuthor() {
   const { author, songCount } = useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
-  const [defaultValues, setDefaultValues] = useState<AuthorFormValues | undefined>(undefined);
+  const [defaultValues, setDefaultValues] = useState<NameFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Set form values when author data is loaded
   useEffect(() => {
     if (author) {
-      setDefaultValues({
-        name: author.name,
-      });
+      setDefaultValues({ name: author.name });
       setIsLoading(false);
     }
   }, [author]);
@@ -62,40 +56,33 @@ export default function EditAuthor() {
   }
 
   return (
-    <AdminOnly>
-      <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-content-text-primary">Edit Author</h1>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/admin/authors" className="flex items-center gap-1">
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Authors</span>
-            </Link>
-          </Button>
-        </div>
-
-        <Card className="card-premium">
-          <CardContent className="p-6 space-y-6">
-            <AuthorForm defaultValues={defaultValues} submitLabel="Save Changes" cancelHref="/admin/authors" />
-            <div className="border-t border-glass-border pt-6">
-              {songCount > 0 ? (
-                <p className="text-sm text-content-text-secondary">
-                  In use by {songCount} song(s) — reassign those songs before this author can be deleted.
-                </p>
-              ) : (
-                <DeleteEntityButton
-                  entityId={author.id}
-                  entityName={author.name}
-                  entityLabel="author"
-                  endpoint="/api/admin/authors"
-                  onDeleted={() => navigate("/admin/authors")}
-                  variant="button"
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </AdminOnly>
+    <AdminFormPage
+      title="Edit Author"
+      backHref="/admin/authors"
+      backLabel="Back to Authors"
+      footer={
+        songCount > 0 ? (
+          <p className="text-sm text-content-text-secondary">
+            In use by {songCount} song(s); reassign those songs before this author can be deleted.
+          </p>
+        ) : (
+          <DeleteEntityButton
+            entityId={author.id}
+            entityName={author.name}
+            entityLabel="author"
+            endpoint="/api/admin/authors"
+            onDeleted={() => navigate("/admin/authors")}
+            variant="button"
+          />
+        )
+      }
+    >
+      <EntityNameForm
+        noun="author"
+        defaultValues={defaultValues}
+        submitLabel="Save Changes"
+        cancelHref="/admin/authors"
+      />
+    </AdminFormPage>
   );
 }

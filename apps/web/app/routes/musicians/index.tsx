@@ -1,7 +1,11 @@
 import type { MusicianWithStats } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
+import { Guitar, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AdminOnly } from "~/components/admin/admin-only";
 import { DataTable } from "~/components/ui/data-table";
+import { LinkButton } from "~/components/ui/link-button";
+import { PageHeader } from "~/components/ui/page-header";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -84,7 +88,19 @@ export default function MusiciansPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="page-heading">MUSICIANS</h1>
+      <PageHeader
+        title="MUSICIANS"
+        actions={
+          <AdminOnly>
+            <LinkButton to="/admin/instruments" icon={Guitar} intent="secondary" iconOnlyOnMobile>
+              Manage instruments
+            </LinkButton>
+            <LinkButton to="/admin/musicians/new" icon={Plus} iconOnlyOnMobile>
+              Create Musician
+            </LinkButton>
+          </AdminOnly>
+        }
+      />
       <DataTable
         columns={columns}
         data={musicians}

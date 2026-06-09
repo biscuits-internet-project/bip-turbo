@@ -11,16 +11,16 @@ import { formatSetLabel } from "~/components/setlist/set-label";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { LinkButton } from "~/components/ui/link-button";
 import { PaginationControls } from "~/components/ui/pagination-controls";
 import { SegmentButton } from "~/components/ui/segment-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { UrlSortableHeader } from "~/components/ui/url-sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
-import { showUserDataQueryKey } from "~/lib/query-keys";
 import { formatVenueLocation } from "~/lib/format-venue";
+import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
 import { formatDateLong, formatDateShort, formatDateShortMobile } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -381,12 +381,9 @@ export default function UserProfile() {
 
               {/* Edit Profile Button */}
               {isOwnProfile && (
-                <Button asChild className="btn-secondary">
-                  <Link to="/profile/edit">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </Link>
-                </Button>
+                <LinkButton to="/profile/edit" icon={Edit} intent="secondary">
+                  Edit Profile
+                </LinkButton>
               )}
             </div>
           </div>
@@ -516,9 +513,7 @@ export default function UserProfile() {
                       <div className="flex items-center gap-2 text-sm text-content-text-secondary mt-1">
                         <CalendarDays className="w-4 h-4" />
                         <span>{formatDateLong(review.show.date)}</span>
-                        {review.show.venue.city && (
-                          <span>• {formatVenueLocation(review.show.venue)}</span>
-                        )}
+                        {review.show.venue.city && <span>• {formatVenueLocation(review.show.venue)}</span>}
                       </div>
                     )}
                   </CardHeader>
