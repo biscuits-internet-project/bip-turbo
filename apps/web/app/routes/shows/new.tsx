@@ -51,7 +51,7 @@ export default function NewShow() {
 
       <Card className="card-premium">
         <CardContent className="p-6">
-          <ShowForm onSubmit={handleSubmit} submitLabel="Create Show" cancelHref="/shows" />
+          <ShowForm onSubmit={handleSubmit} submitLabel="Create Show" cancelHref="/shows" requireVenue />
         </CardContent>
       </Card>
     </div>

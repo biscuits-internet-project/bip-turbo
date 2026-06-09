@@ -1,9 +1,11 @@
-import type { Band, RockOpera, Show, Track, Venue } from "@bip/domain";
+import type { Band, RockOpera, Show, ShowLineupMember, Track, Venue } from "@bip/domain";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { DeleteEntityButton } from "~/components/admin/delete-entity-button";
 import { ShowDayOrderManager, type ShowDayOrderRow } from "~/components/show/show-day-order-manager";
 import { ShowForm, type ShowFormValues } from "~/components/show/show-form";
+import { ShowLineupManager } from "~/components/show/show-lineup-manager";
 import { TrackManager } from "~/components/track/track-manager";
 import { Card, CardContent } from "~/components/ui/card";
 import { PageHeader } from "~/components/ui/page-header";
@@ -20,6 +22,7 @@ interface LoaderData {
   sameDateShows: ShowDayOrderRow[];
   rockOperas: RockOpera[];
   currentRockOperaIds: string[];
+  initialLineup: ShowLineupMember[];
 }
 
 export const loader = adminLoader(async ({ params }) => {
@@ -61,7 +64,10 @@ export const loader = adminLoader(async ({ params }) => {
     .map((annotation) => slugToId.get(annotation.rockOpera.slug))
     .filter((id): id is string => id !== undefined);
 
-  return { show, bands, venues, tracks, sameDateShows, rockOperas, currentRockOperaIds };
+  // Seed the lineup editor from the show's current ShowMusician rows.
+  const initialLineup = await services.shows.getLineup(show.id);
+
+  return { show, bands, venues, tracks, sameDateShows, rockOperas, currentRockOperaIds, initialLineup };
 });
 
 export const action = adminAction(async ({ request, params }) => {
@@ -90,7 +96,8 @@ export const action = adminAction(async ({ request, params }) => {
 });
 
 export default function EditShow() {
-  const { show, bands, tracks, sameDateShows, rockOperas, currentRockOperaIds } = useSerializedLoaderData<LoaderData>();
+  const { show, bands, tracks, sameDateShows, rockOperas, currentRockOperaIds, initialLineup } =
+    useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<ShowFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,7 +156,20 @@ export default function EditShow() {
   return (
     <div>
       <div className="mb-6">
-        <PageHeader title="Edit Show" backLink={{ to: `/shows/${show.slug}`, label: "Back to Show" }} />
+        <PageHeader
+          title="Edit Show"
+          backLink={{ to: `/shows/${show.slug}`, label: "Back to Show" }}
+          actions={
+            <DeleteEntityButton
+              entityId={show.id}
+              entityName={show.date}
+              entityLabel="show"
+              endpoint={`/api/shows/${show.id}`}
+              variant="button"
+              onDeleted={() => navigate("/shows")}
+            />
+          }
+        />
       </div>
 
       <div className="space-y-6">
@@ -166,6 +186,8 @@ export default function EditShow() {
             />
           </CardContent>
         </Card>
+
+        <ShowLineupManager showId={show.id} initialLineup={initialLineup} />
 
         {sameDateShows.length >= 2 && (
           <ShowDayOrderManager currentShowId={show.id} date={show.date} initialShows={sameDateShows} />
