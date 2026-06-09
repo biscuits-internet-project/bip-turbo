@@ -72,10 +72,10 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting }: Sorta
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant="destructiveOutline"
               onClick={() => onDelete(track.id)}
               disabled={isDeleting}
-              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3 border-red-600 text-red-400 hover:bg-red-900/20"
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
             >
               <Trash className="h-3 w-3" />
             </Button>

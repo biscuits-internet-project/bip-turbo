@@ -20,6 +20,9 @@ const buttonVariants = cva(
         cancel:
           "border border-content-bg-secondary bg-transparent text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Outlined red delete affordance — shared by the track delete row and
+        // the show/entity delete buttons so every "delete" reads the same.
+        destructiveOutline: "border border-red-600 bg-transparent text-red-400 hover:bg-red-900/20",
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",

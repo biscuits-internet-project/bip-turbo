@@ -1,5 +1,6 @@
 import type { Band, RockOpera } from "@bip/domain";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMemo } from "react";
 import type { ControllerRenderProps } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -40,6 +41,11 @@ interface ShowFormProps {
    * rock operas seeded yet).
    */
   rockOperas?: RockOpera[];
+  /**
+   * Require a venue selection (the create flow). Without it, "No venue" would
+   * produce a hidden orphan-stub show that's filtered from listings/search.
+   */
+  requireVenue?: boolean;
 }
 
 export function ShowForm({
@@ -49,9 +55,20 @@ export function ShowForm({
   cancelHref,
   showId,
   rockOperas = [],
+  requireVenue = false,
 }: ShowFormProps) {
+  const schema = useMemo(
+    () =>
+      requireVenue
+        ? showFormSchema.refine((values) => values.venueId !== "none" && values.venueId !== "", {
+            path: ["venueId"],
+            message: "Venue is required",
+          })
+        : showFormSchema,
+    [requireVenue],
+  );
   const form = useForm<ShowFormValues>({
-    resolver: zodResolver(showFormSchema),
+    resolver: zodResolver(schema),
     defaultValues: defaultValues || {
       date: "",
       venueId: "none",

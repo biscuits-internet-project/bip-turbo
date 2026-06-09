@@ -449,7 +449,7 @@ type DbTrackMusicianWithRelations = {
   instruments: { instrument: DbInstrument }[];
 };
 
-function mapShowMusicianToLineupMember(db: DbShowMusicianWithRelations): ShowLineupMember {
+export function mapShowMusicianToLineupMember(db: DbShowMusicianWithRelations): ShowLineupMember {
   return {
     musician: mapMusicianRefToDomainEntity(db.musician),
     instruments: db.instruments.map((row) => mapInstrumentRowToDomainEntity(row.instrument)),
@@ -659,12 +659,18 @@ function mapSetlistLightToDomainEntity(
 // instruments played. Loaded on list queries too (not just single-show fetches)
 // so the synthesized "with <guest> on <instrument>" footnotes render in setlist
 // listings, matching the free-text annotations they replaced.
+// The musician (with default instrument) + played instruments for one lineup
+// row. Shared so ShowService.getLineup loads exactly what
+// mapShowMusicianToLineupMember reads, keeping the edit page's read-only
+// lineup identical to the show page's.
+export const LINEUP_MEMBER_INCLUDE = {
+  musician: { include: { defaultInstrument: true } },
+  instruments: { include: { instrument: true } },
+} as const;
+
 const SINGLE_SHOW_PERFORMER_INCLUDE = {
   showMusicians: {
-    include: {
-      musician: { include: { defaultInstrument: true } },
-      instruments: { include: { instrument: true } },
-    },
+    include: LINEUP_MEMBER_INCLUDE,
   },
 } as const;
 

@@ -74,7 +74,7 @@ export function DeleteEntityButton({
           <Trash2 className="h-4 w-4" />
         </Button>
       ) : (
-        <Button variant="destructive" onClick={() => setIsOpen(true)} className="gap-2">
+        <Button variant="destructiveOutline" onClick={() => setIsOpen(true)} className="gap-2">
           <Trash2 className="h-4 w-4" />
           Delete {titleLabel}
         </Button>

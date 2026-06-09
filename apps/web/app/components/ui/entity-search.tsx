@@ -8,6 +8,8 @@ export interface EntityPickerProps {
   placeholder?: string;
   className?: string;
   allowCreate?: boolean;
+  /** Start open with the search input focused — for a freshly added picker row. */
+  autoOpen?: boolean;
 }
 
 interface EntitySearchProps<T extends { id: string }> extends EntityPickerProps {
@@ -16,6 +18,8 @@ interface EntitySearchProps<T extends { id: string }> extends EntityPickerProps 
   /** Label for the clear-selection row, e.g. "No Musician" or "All Authors". */
   noneLabel: string;
   itemLabel: (item: T) => ReactNode;
+  /** Fires with the full resolved record on selection — for callers that need fields beyond the id. */
+  onItemChange?: (item: T | null) => void;
 }
 
 /**
@@ -28,9 +32,11 @@ interface EntitySearchProps<T extends { id: string }> extends EntityPickerProps 
 export function EntitySearch<T extends { id: string }>({
   value,
   onValueChange,
+  onItemChange,
   placeholder,
   className,
   allowCreate = false,
+  autoOpen,
   resource,
   noneLabel,
   itemLabel,
@@ -40,6 +46,8 @@ export function EntitySearch<T extends { id: string }>({
     <SearchPicker<T>
       value={value ?? null}
       onValueChange={onValueChange}
+      onItemChange={onItemChange}
+      autoOpen={autoOpen}
       className={className}
       placeholder={searchPlaceholder}
       searchPlaceholder={searchPlaceholder}

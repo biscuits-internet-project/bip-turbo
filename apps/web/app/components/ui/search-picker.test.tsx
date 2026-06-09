@@ -218,6 +218,37 @@ describe("SearchPicker", () => {
     expect(screen.queryByText(/Create "/)).not.toBeInTheDocument();
   });
 
+  // `onItemChange` surfaces the full selected record (not just its id) so a
+  // parent can react to the picked item's fields — e.g. the lineup editor
+  // pre-filling a musician's default instrument. Fires on explicit selection.
+  test("clicking a result fires onItemChange with the full item", async () => {
+    const onItemChange = vi.fn();
+    const fetchResults = vi.fn().mockResolvedValue(ITEMS);
+
+    const { user } = await setup(<SearchPicker<Item> {...baseProps({ onItemChange, fetchResults })} />);
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByText("Banana"));
+
+    expect(onItemChange).toHaveBeenCalledWith({ id: "2", name: "Banana" });
+  });
+
+  // Clearing the selection via the none row reports null through onItemChange
+  // too, so the parent can reset any derived state.
+  test("selecting the clear row fires onItemChange with null", async () => {
+    const onItemChange = vi.fn();
+    const fetchResults = vi.fn().mockResolvedValue(ITEMS);
+
+    const { user } = await setup(
+      <SearchPicker<Item> {...baseProps({ value: "1", onItemChange, fetchResults, noneLabel: "Clear" })} />,
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByText("Clear"));
+
+    expect(onItemChange).toHaveBeenCalledWith(null);
+  });
+
   // fetchResults rejecting (e.g. server 500) is handled gracefully: items
   // clear and the configured emptyMessage shows. Prevents a transient
   // network error from corrupting the local items list.

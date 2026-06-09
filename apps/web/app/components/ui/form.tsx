@@ -1,5 +1,6 @@
 import type * as LabelPrimitive from "@radix-ui/react-label";
 import { Slot } from "@radix-ui/react-slot";
+import { AlertCircle } from "lucide-react";
 import * as React from "react";
 import {
   Controller,
@@ -122,6 +123,23 @@ const FormMessage = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<
 
     if (!body) {
       return null;
+    }
+
+    // Validation errors render as a boxed, icon-led red alert so they read as
+    // an alert across every form; non-error children stay as plain text.
+    if (error) {
+      return (
+        <div
+          id={formMessageId}
+          className={cn(
+            "mt-1 flex items-center gap-2 rounded-md border border-red-500/40 bg-red-500/15 px-3 py-2 text-sm text-red-300",
+            className,
+          )}
+        >
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+          <span>{body}</span>
+        </div>
+      );
     }
 
     return (

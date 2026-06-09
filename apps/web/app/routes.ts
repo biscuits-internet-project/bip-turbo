@@ -120,6 +120,8 @@ export default [
     route("attendances", "routes/api/attendances.tsx"),
     route("shows/user-data", "routes/api/shows/user-data.tsx"),
     route("shows/reorder", "routes/api/shows/reorder.tsx"),
+    route("shows/:showId/lineup", "routes/api/shows/$showId.lineup.tsx"),
+    route("shows/:showId", "routes/api/shows/$showId.tsx"),
     route("show-youtubes", "routes/api/show-youtubes.tsx"),
     route("authors", "routes/api/authors.tsx"),
     route("authors/:id", "routes/api/authors/$id.tsx"),

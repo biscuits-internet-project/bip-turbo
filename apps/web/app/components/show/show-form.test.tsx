@@ -41,3 +41,46 @@ describe("ShowForm countForStats", () => {
     expect(screen.getByRole("switch", { name: /count for stats/i })).toBeChecked();
   });
 });
+
+describe("ShowForm requireVenue", () => {
+  // Create flow opts in to requireVenue so a show can't be saved without a
+  // venue (which would otherwise become a hidden orphan stub).
+  test("blocks submit and shows an error when no venue is selected", async () => {
+    const onSubmit = vi.fn();
+    const { user } = await setup(
+      <ShowForm defaultValues={baseValues} onSubmit={onSubmit} submitLabel="Create Show" requireVenue />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /create show/i }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(await screen.findByText(/venue is required/i)).toBeInTheDocument();
+  });
+
+  // With a venue chosen, the same form submits normally.
+  test("submits when a venue is selected", async () => {
+    const onSubmit = vi.fn();
+    const { user } = await setup(
+      <ShowForm
+        defaultValues={{ ...baseValues, venueId: "venue-1" }}
+        onSubmit={onSubmit}
+        submitLabel="Create Show"
+        requireVenue
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /create show/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  // Edit flow (default) leaves venue optional, so existing flows are unchanged.
+  test("allows an empty venue when requireVenue is not set", async () => {
+    const onSubmit = vi.fn();
+    const { user } = await setup(<ShowForm defaultValues={baseValues} onSubmit={onSubmit} submitLabel="Update Show" />);
+
+    await user.click(screen.getByRole("button", { name: /update show/i }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+});

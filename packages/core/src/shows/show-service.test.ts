@@ -83,6 +83,7 @@ function makeMockDb() {
       findMany: vi.fn().mockResolvedValue([]),
     },
     showMusician: {
+      findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       create: vi.fn().mockResolvedValue({}),
     },
@@ -696,6 +697,59 @@ describe("ShowService — default lineup on create", () => {
 
     expect(db.showMusician.create).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
+  });
+
+  // The edit page renders the lineup with the same ShowLineupSection component
+  // as the public show page, so getLineup resolves musician + instrument names
+  // (ShowLineupMember[]), not just ids.
+  test("getLineup returns resolved ShowLineupMember entries", async () => {
+    const db = makeMockDb();
+    const now = new Date();
+    db.showMusician.findMany.mockResolvedValue([
+      {
+        musician: {
+          id: "m-marc",
+          name: "Marc Brownstein",
+          slug: "marc-brownstein",
+          knownFrom: null,
+          defaultInstrument: null,
+        },
+        instruments: [
+          { instrument: { id: "i-bass", name: "Bass", slug: "bass", createdAt: now, updatedAt: now } },
+          { instrument: { id: "i-vocals", name: "Vocals", slug: "vocals", createdAt: now, updatedAt: now } },
+        ],
+      },
+    ]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    const lineup = await service.getLineup("show-id");
+
+    expect(db.showMusician.findMany.mock.calls[0][0]).toMatchObject({ where: { showId: "show-id" } });
+    expect(lineup).toEqual([
+      {
+        musician: {
+          id: "m-marc",
+          name: "Marc Brownstein",
+          slug: "marc-brownstein",
+          knownFrom: null,
+          defaultInstrument: null,
+        },
+        instruments: [
+          { id: "i-bass", name: "Bass", slug: "bass", createdAt: now, updatedAt: now },
+          { id: "i-vocals", name: "Vocals", slug: "vocals", createdAt: now, updatedAt: now },
+        ],
+      },
+    ]);
+  });
+
+  // A show with no lineup rows yields an empty list (not null), so the editor
+  // renders an empty form rather than crashing.
+  test("getLineup returns an empty array when the show has no lineup", async () => {
+    const db = makeMockDb();
+    db.showMusician.findMany.mockResolvedValue([]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    expect(await service.getLineup("show-id")).toEqual([]);
   });
 
   // setLineup is a full-set replace: existing rows are deleted, then the new

@@ -17,10 +17,11 @@ const updateShow = vi.fn();
 
 const findAllRockOperas = vi.fn().mockResolvedValue([]);
 const findRockOperaPerformancesForShow = vi.fn().mockResolvedValue([]);
+const getLineup = vi.fn().mockResolvedValue([]);
 
 vi.mock("~/server/services", () => ({
   services: {
-    shows: { findBySlug, findByDate, update: updateShow },
+    shows: { findBySlug, findByDate, update: updateShow, getLineup },
     venues: { findMany: findVenues },
     tracks: { findByShowId: findTracksByShowId },
     rockOperas: {

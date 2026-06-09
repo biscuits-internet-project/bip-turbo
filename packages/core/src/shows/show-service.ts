@@ -1,4 +1,4 @@
-import type { Logger, Show, Venue } from "@bip/domain";
+import type { Logger, Show, ShowLineupMember, Venue } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cache";
 import type { DbClient, DbShow, DbVenue } from "../_shared/database/models";
@@ -16,6 +16,7 @@ import {
 } from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
 import { MARLON_LINEUP_SLUGS } from "../musicians/musician-constants";
+import { LINEUP_MEMBER_INCLUDE, mapShowMusicianToLineupMember } from "../setlists/setlist-service";
 import type { StatsService } from "../stats/stats-service";
 
 export interface ShowFilter {
@@ -443,6 +444,22 @@ export class ShowService {
         }),
       ),
     ]);
+  }
+
+  /**
+   * Current lineup for a show as resolved ShowLineupMember[] (the same shape the
+   * show page renders), so the admin edit page can show a read-only lineup with
+   * the identical component and seed its editor from the same data. findBySlug
+   * doesn't carry the lineup; only the heavier setlist query does, so this
+   * focused reader is the cheap path.
+   */
+  async getLineup(showId: string): Promise<ShowLineupMember[]> {
+    const rows = await this.db.showMusician.findMany({
+      where: { showId },
+      include: LINEUP_MEMBER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(mapShowMusicianToLineupMember);
   }
 
   /**

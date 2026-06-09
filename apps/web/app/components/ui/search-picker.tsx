@@ -22,6 +22,10 @@ interface SearchPickerProps<T> {
   // The selected item's id, or null when nothing is selected.
   value: string | null;
   onValueChange: (value: string | null) => void;
+  // Optional: fires alongside onValueChange with the full resolved record on
+  // an explicit selection (item click, clear row, or create), so a parent can
+  // react to the picked item's fields. Not fired by the fetchById seed effect.
+  onItemChange?: (item: T | null) => void;
 
   // Returns items matching the current query. Wrappers decide what "empty
   // query" means — return [] to suppress the list, or return top-N items.
@@ -49,6 +53,11 @@ interface SearchPickerProps<T> {
   // when the wrapper wants to seed a top-N list before the user types.
   loadOnOpen?: boolean;
 
+  // If true, the popover starts open on mount with its search input focused —
+  // used when a caller adds a fresh picker (e.g. a new lineup row) and wants
+  // the user typing the name immediately.
+  autoOpen?: boolean;
+
   placeholder?: string;
   searchPlaceholder?: string;
   // Static message OR function of the current query. The function form
@@ -71,6 +80,7 @@ interface SearchPickerProps<T> {
 export function SearchPicker<T>({
   value,
   onValueChange,
+  onItemChange,
   fetchResults,
   fetchById,
   initialItem,
@@ -79,13 +89,14 @@ export function SearchPicker<T>({
   noneLabel,
   allowCreate,
   loadOnOpen = false,
+  autoOpen = false,
   placeholder = "Search…",
   searchPlaceholder = "Search…",
   emptyMessage = "No results found.",
   loadingMessage = "Searching…",
   className,
 }: SearchPickerProps<T>) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -176,6 +187,7 @@ export function SearchPicker<T>({
       if (created) {
         setItems((prev) => [created, ...prev]);
         onValueChange(itemId(created));
+        onItemChange?.(created);
         setCurrentItem(created);
         setSearchQuery("");
         setOpen(false);
@@ -223,6 +235,7 @@ export function SearchPicker<T>({
                   value="__none__"
                   onSelect={() => {
                     onValueChange(null);
+                    onItemChange?.(null);
                     setOpen(false);
                   }}
                   className="text-content-text-primary hover:bg-hover-glass"
@@ -251,6 +264,7 @@ export function SearchPicker<T>({
                     value={id}
                     onSelect={() => {
                       onValueChange(id);
+                      onItemChange?.(item);
                       setCurrentItem(item);
                       setOpen(false);
                     }}
