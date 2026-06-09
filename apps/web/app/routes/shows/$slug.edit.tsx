@@ -1,4 +1,4 @@
-import type { Band, RockOpera, Show, ShowLineupMember, Track, Venue } from "@bip/domain";
+import type { Band, RockOpera, Setlist, Show, ShowLineupMember, Track, Venue } from "@bip/domain";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ interface LoaderData {
   bands: Band[];
   venues: Venue[];
   tracks: Track[];
+  footnoteSetlist: Setlist | null;
   sameDateShows: ShowDayOrderRow[];
   rockOperas: RockOpera[];
   currentRockOperaIds: string[];
@@ -39,8 +40,14 @@ export const loader = adminLoader(async ({ params }) => {
   // Get venues for the venue selector
   const venues = await services.venues.findMany({});
 
-  // Get tracks for this show
+  // Get tracks for this show. The edit forms use this lighter shape; the
+  // read-only footnotes derive from the heavier setlist below.
   const tracks = await services.tracks.findByShowId(show.id);
+
+  // The full setlist carries flags/performers/completions/recurrence per track,
+  // which TrackManager runs through the same footnote engine as the public
+  // setlist so admins see the current derived state before editing.
+  const footnoteSetlist = await services.setlists.findByShowSlug(slug as string);
 
   // Same-date show group — drives the reorder widget visibility/seed.
   const sameDateRaw = await services.shows.findByDate(show.date);
@@ -67,7 +74,17 @@ export const loader = adminLoader(async ({ params }) => {
   // Seed the lineup editor from the show's current ShowMusician rows.
   const initialLineup = await services.shows.getLineup(show.id);
 
-  return { show, bands, venues, tracks, sameDateShows, rockOperas, currentRockOperaIds, initialLineup };
+  return {
+    show,
+    bands,
+    venues,
+    tracks,
+    footnoteSetlist,
+    sameDateShows,
+    rockOperas,
+    currentRockOperaIds,
+    initialLineup,
+  };
 });
 
 export const action = adminAction(async ({ request, params }) => {
@@ -96,7 +113,7 @@ export const action = adminAction(async ({ request, params }) => {
 });
 
 export default function EditShow() {
-  const { show, bands, tracks, sameDateShows, rockOperas, currentRockOperaIds, initialLineup } =
+  const { show, bands, tracks, footnoteSetlist, sameDateShows, rockOperas, currentRockOperaIds, initialLineup } =
     useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<ShowFormValues | undefined>(undefined);
@@ -194,7 +211,7 @@ export default function EditShow() {
         )}
 
         <div className="mt-6">
-          <TrackManager showId={show.id} initialTracks={tracks} />
+          <TrackManager showId={show.id} initialTracks={tracks} footnoteSetlist={footnoteSetlist ?? undefined} />
         </div>
       </div>
     </div>

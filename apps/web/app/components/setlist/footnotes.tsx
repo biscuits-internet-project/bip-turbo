@@ -1,6 +1,12 @@
-import type { Annotation, SegueRecurrenceKind, TrackMusicianDelta } from "@bip/domain";
+import type { Annotation, SegueRecurrenceKind, Setlist, SetlistLight, TrackMusicianDelta } from "@bip/domain";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import {
+  debutFootnoteSuppressed,
+  gapFootnoteSuppressed,
+  LAST_TIME_PLAYED_GAP_THRESHOLD,
+} from "~/lib/footnote-constants";
+import { deriveShowLineupNotes, elevatedGuestIds } from "~/lib/lineup-notes";
 import { formatDateShort } from "~/lib/utils";
 
 /**
@@ -688,4 +694,63 @@ export function dataDrivenFootnoteSources(
     });
   }
   return sources;
+}
+
+/**
+ * The single source of truth for a show's footnotes: collects every footnote
+ * source (annotations, flags/completions, performer deltas, guest exclusions,
+ * last-time-played, debuts) in precedence order, applies the era-based gaps/
+ * debut suppression, and numbers them. Both the public setlist view and the
+ * admin show-edit view derive through this so their wording can never diverge.
+ */
+export function buildShowFootnotes(setlist: Setlist | SetlistLight): DerivedFootnotes {
+  const allTracks = setlist.sets.flatMap((set) => set.tracks);
+  // Whole-show guests are surfaced in the show-level lineup note, so their
+  // per-track "with" footnotes are suppressed; for guests below 100% coverage
+  // the tracks they sat out are footnoted ("except where noted").
+  const lineupNotes = deriveShowLineupNotes(
+    setlist.show.date,
+    setlist.lineup,
+    setlist.trackMusicianDeltas,
+    allTracks.map((track) => track.id),
+  );
+  // The early setlists are too scattered to trust a song's gap or first
+  // appearance. Debuts firm up sooner than gaps, so they have separate start
+  // dates: before each, that category is suppressed. Flags, completions,
+  // annotations, and performer notes still render — observed facts, not stats.
+  const suppressDebuts = debutFootnoteSuppressed(setlist.show.date);
+  const suppressGaps = gapFootnoteSuppressed(setlist.show.date);
+  const footnoteSources = [
+    // DB annotations are numbered before synthesized performer footnotes on any
+    // given track, so the existing annotation indices stay stable.
+    ...annotationFootnoteSources(setlist.annotations),
+    // All of a track's structured flags + completion links read on one line,
+    // right after annotations so the setlist reads like its annotation era.
+    ...dataDrivenFootnoteSources(allTracks, { suppressRecurrences: suppressGaps }),
+    ...synthesizePerformerFootnotes(setlist.trackMusicianDeltas, elevatedGuestIds(lineupNotes)),
+    ...guestExclusionFootnotes(lineupNotes.guests, setlist.trackMusicianDeltas),
+    // Auto last-time-played / debut footnotes append after the above so the
+    // existing annotation and performer footnote numbers stay stable.
+    ...(!suppressGaps ? lastTimePlayedFootnoteSources(allTracks, LAST_TIME_PLAYED_GAP_THRESHOLD) : []),
+    ...(!suppressDebuts ? debutFootnoteSources(allTracks) : []),
+  ];
+  return deriveFootnotes(allTracks, footnoteSources);
+}
+
+/**
+ * Slice the show-level derivation into per-track footnote contents, so a view
+ * that renders each track's footnotes in isolation (the admin show-edit rows)
+ * can list them without the central numbered list. Keyed by track id; the
+ * contents stay in the same ascending order as the track's `sup` markers.
+ */
+export function footnotesByTrack(derived: DerivedFootnotes): Map<string, ReactNode[]> {
+  const contentByIndex = new Map(derived.orderedFootnotes.map((footnote) => [footnote.index, footnote.content]));
+  const byTrack = new Map<string, ReactNode[]>();
+  for (const [trackId, indices] of derived.trackFootnoteIndices) {
+    byTrack.set(
+      trackId,
+      indices.map((index) => contentByIndex.get(index)),
+    );
+  }
+  return byTrack;
 }
