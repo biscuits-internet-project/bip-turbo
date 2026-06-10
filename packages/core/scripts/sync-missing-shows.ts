@@ -16,10 +16,11 @@
  * We therefore write directly via Prisma with the prod-supplied slugs.
  */
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type TrackFlag } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
+import { InstrumentService, MusicianService } from "../src/musicians/musician-service";
 import { RatingService } from "../src/ratings/rating-service";
 import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
@@ -100,6 +101,59 @@ export interface McpSetlistTrack {
   // "no opinion" (pre-deploy MCP); an explicit empty array means "prod has
   // zero". Replace-not-merge semantics on sync — see diffTrackAnnotations.
   annotations?: string[];
+  // Per-track musician deltas (sit-ins / sat-outs). Each carries the
+  // musician + the instruments played, keyed by slug (the stable cross-env
+  // id). `undefined` = no opinion (pre-deploy MCP); explicit empty = "prod
+  // has zero deltas on this track". See diffTrackMusicians.
+  trackMusicians?: McpTrackMusician[];
+  // Structured track flags (DYSLEXIC / INVERTED / UNFINISHED / *_ONLY).
+  // Wire shape is the enum name strings. `undefined` = no opinion; explicit
+  // empty = "prod cleared this track's flags". The recurrence columns
+  // (flag_gap / flag_version_gap / flag_previous_show_id) are DERIVED locally
+  // by the end-of-batch stats rebuild and never travel on the wire.
+  flags?: string[];
+  // Completion links where THIS track is the later (completing) one. Each
+  // entry is the natural key of the earlier (unfinished) track it completes.
+  // `undefined` = no opinion; explicit empty = "prod cleared this track's
+  // completions". See resolveCompletionLinks / diffCompletions.
+  completes?: McpTrackCompletion[];
+}
+
+// An instrument carried by slug (the stable cross-env id) plus its name, so
+// the sync can idempotently create the row when the local DB lacks it.
+export interface McpInstrumentRef {
+  slug: string;
+  name: string;
+}
+
+// One lineup member (whole-show performer) on the wire. Name + knownFrom +
+// default instrument are carried so the sync can seed a missing Musician row.
+export interface McpLineupMember {
+  musicianSlug: string;
+  musicianName: string;
+  knownFrom: string | null;
+  defaultInstrument: McpInstrumentRef | null;
+  instruments: McpInstrumentRef[];
+}
+
+// One per-track musician delta on the wire. `present` distinguishes a sit-in
+// (true) from a sat-out (false).
+export interface McpTrackMusician {
+  musicianSlug: string;
+  musicianName: string;
+  present: boolean;
+  defaultInstrument: McpInstrumentRef | null;
+  instruments: McpInstrumentRef[];
+}
+
+// The earlier (unfinished) track a completion points at, by natural key.
+// Tracks are matched cross-environment by (show slug, set, position) — the
+// same key buildSetlistReconciliation uses — not by id, so a completion
+// resolves even when the earlier track's local id drifted from prod.
+export interface McpTrackCompletion {
+  showSlug: string;
+  set: string;
+  position: number;
 }
 
 export interface McpSetlistSet {
@@ -112,6 +166,10 @@ export interface McpSetlist {
   showDate: string;
   venue: { name: string | null; city: string | null; state: string | null };
   sets: McpSetlistSet[];
+  // Whole-show performer lineup. Same optional + replace-not-merge semantics
+  // as the per-track fields: `undefined` = pre-deploy MCP (no opinion),
+  // explicit empty = "prod has no lineup for this show". See diffShowMusicians.
+  lineup?: McpLineupMember[];
 }
 
 export interface McpSong {
@@ -875,6 +933,183 @@ export function diffTrackAnnotations(
   return { toCreateDescs, toDeleteIds };
 }
 
+// --- Performer / flag / completion diffs ---
+//
+// All four share the diffTrackAnnotations contract: identity is by a stable
+// slug / enum / natural key (never a per-env row id), `undefined` remote means
+// "no opinion" (pre-deploy MCP) and yields empty deltas, and an explicit array
+// (including empty) is authoritative replace-not-merge. The performer diffs add
+// a second level — the many-to-many instruments a musician played — which is
+// diffed per retained musician rather than cascade-replaced, so a re-run with
+// unchanged instruments produces zero writes and doesn't churn row ids.
+
+export interface LocalShowMusician {
+  showMusicianId: string;
+  musicianSlug: string;
+  instrumentSlugs: string[];
+}
+
+export interface RemoteShowMusician {
+  musicianSlug: string;
+  instrumentSlugs: string[];
+}
+
+export interface ShowMusicianDiff {
+  toCreate: Array<{ musicianSlug: string; instrumentSlugs: string[] }>;
+  toDeleteShowMusicianIds: string[];
+  toUpdateInstruments: Array<{ showMusicianId: string; addInstrumentSlugs: string[]; removeInstrumentSlugs: string[] }>;
+}
+
+export function diffShowMusicians(
+  local: LocalShowMusician[],
+  remote: RemoteShowMusician[] | undefined,
+): ShowMusicianDiff {
+  if (remote === undefined) return { toCreate: [], toDeleteShowMusicianIds: [], toUpdateInstruments: [] };
+  const localBySlug = new Map(local.map((m) => [m.musicianSlug, m]));
+  const remoteBySlug = new Map(remote.map((m) => [m.musicianSlug, m]));
+  const toCreate = remote
+    .filter((m) => !localBySlug.has(m.musicianSlug))
+    .map((m) => ({ musicianSlug: m.musicianSlug, instrumentSlugs: m.instrumentSlugs }));
+  const toDeleteShowMusicianIds = local.filter((m) => !remoteBySlug.has(m.musicianSlug)).map((m) => m.showMusicianId);
+  const toUpdateInstruments: ShowMusicianDiff["toUpdateInstruments"] = [];
+  for (const m of local) {
+    const r = remoteBySlug.get(m.musicianSlug);
+    if (!r) continue;
+    const { add, remove } = diffSlugSets(m.instrumentSlugs, r.instrumentSlugs);
+    if (add.length > 0 || remove.length > 0) {
+      toUpdateInstruments.push({ showMusicianId: m.showMusicianId, addInstrumentSlugs: add, removeInstrumentSlugs: remove });
+    }
+  }
+  return { toCreate, toDeleteShowMusicianIds, toUpdateInstruments };
+}
+
+export interface LocalTrackMusician {
+  trackMusicianId: string;
+  musicianSlug: string;
+  present: boolean;
+  instrumentSlugs: string[];
+}
+
+export interface RemoteTrackMusician {
+  musicianSlug: string;
+  present: boolean;
+  instrumentSlugs: string[];
+}
+
+export interface TrackMusicianDiff {
+  toCreate: Array<{ musicianSlug: string; present: boolean; instrumentSlugs: string[] }>;
+  toDeleteTrackMusicianIds: string[];
+  toUpdate: Array<{
+    trackMusicianId: string;
+    present?: boolean;
+    addInstrumentSlugs: string[];
+    removeInstrumentSlugs: string[];
+  }>;
+}
+
+export function diffTrackMusicians(
+  local: LocalTrackMusician[],
+  remote: RemoteTrackMusician[] | undefined,
+): TrackMusicianDiff {
+  if (remote === undefined) return { toCreate: [], toDeleteTrackMusicianIds: [], toUpdate: [] };
+  const localBySlug = new Map(local.map((m) => [m.musicianSlug, m]));
+  const remoteBySlug = new Map(remote.map((m) => [m.musicianSlug, m]));
+  const toCreate = remote
+    .filter((m) => !localBySlug.has(m.musicianSlug))
+    .map((m) => ({ musicianSlug: m.musicianSlug, present: m.present, instrumentSlugs: m.instrumentSlugs }));
+  const toDeleteTrackMusicianIds = local.filter((m) => !remoteBySlug.has(m.musicianSlug)).map((m) => m.trackMusicianId);
+  const toUpdate: TrackMusicianDiff["toUpdate"] = [];
+  for (const m of local) {
+    const r = remoteBySlug.get(m.musicianSlug);
+    if (!r) continue;
+    const { add, remove } = diffSlugSets(m.instrumentSlugs, r.instrumentSlugs);
+    const presentChanged = m.present !== r.present;
+    if (presentChanged || add.length > 0 || remove.length > 0) {
+      toUpdate.push({
+        trackMusicianId: m.trackMusicianId,
+        ...(presentChanged ? { present: r.present } : {}),
+        addInstrumentSlugs: add,
+        removeInstrumentSlugs: remove,
+      });
+    }
+  }
+  return { toCreate, toDeleteTrackMusicianIds, toUpdate };
+}
+
+// Set add/remove over slug arrays — the shared instrument-sub-bridge diff for
+// both performer helpers, so a musician kept across runs only churns the
+// instrument rows that actually changed.
+function diffSlugSets(local: string[], remote: string[]): { add: string[]; remove: string[] } {
+  const localSet = new Set(local);
+  const remoteSet = new Set(remote);
+  return { add: remote.filter((s) => !localSet.has(s)), remove: local.filter((s) => !remoteSet.has(s)) };
+}
+
+// Track flags mirror diffTrackAnnotations exactly: identity by the flag enum
+// string, replace-not-merge, `undefined` = no opinion. The derived recurrence
+// columns are never part of this diff (see McpSetlistTrack.flags).
+export function diffTrackFlags(local: string[], remote: string[] | undefined): { toAdd: string[]; toRemove: string[] } {
+  if (remote === undefined) return { toAdd: [], toRemove: [] };
+  const localSet = new Set(local);
+  const remoteSet = new Set(remote);
+  return { toAdd: remote.filter((f) => !localSet.has(f)), toRemove: local.filter((f) => !remoteSet.has(f)) };
+}
+
+export interface CompletionKey {
+  showSlug: string;
+  set: string;
+  position: number;
+}
+
+export interface RemoteCompletionLink {
+  // The later (completing) track — the one carrying the `completes` entry.
+  later: CompletionKey;
+  // The earlier (unfinished) track it completes.
+  earlier: CompletionKey;
+}
+
+const completionKeyOf = (k: CompletionKey): string => `${k.showSlug}|${k.set}|${k.position}`;
+
+/**
+ * Resolve each completion link's two natural-key endpoints to local track ids.
+ * A link whose earlier OR later track isn't local (e.g. a narrow --years window
+ * synced one show of a cross-show completion) lands in `skipped`, not resolved —
+ * the caller logs it and moves on rather than inserting a dangling FK.
+ */
+export function resolveCompletionLinks(
+  links: RemoteCompletionLink[],
+  trackKeyToLocalId: Map<string, string>,
+): { resolved: Array<{ earlierTrackId: string; laterTrackId: string }>; skipped: RemoteCompletionLink[] } {
+  const resolved: Array<{ earlierTrackId: string; laterTrackId: string }> = [];
+  const skipped: RemoteCompletionLink[] = [];
+  for (const link of links) {
+    const earlierTrackId = trackKeyToLocalId.get(completionKeyOf(link.earlier));
+    const laterTrackId = trackKeyToLocalId.get(completionKeyOf(link.later));
+    if (earlierTrackId && laterTrackId) resolved.push({ earlierTrackId, laterTrackId });
+    else skipped.push(link);
+  }
+  return { resolved, skipped };
+}
+
+/**
+ * Diff local completion rows against the desired (already-resolved) set, keyed
+ * by `earlierTrackId` — the UNIQUE column, so one earlier track has at most one
+ * completer. A re-pointed completion (same earlier, new later) is an upsert, not
+ * an insert, so it overwrites cleanly instead of hitting the unique constraint.
+ * `local` MUST be scoped to completions whose earlier track is in the sync's
+ * scope, or out-of-scope links would be spuriously deleted.
+ */
+export function diffCompletions(
+  local: Array<{ earlierTrackId: string; laterTrackId: string }>,
+  desired: Array<{ earlierTrackId: string; laterTrackId: string }>,
+): { toUpsert: Array<{ earlierTrackId: string; laterTrackId: string }>; toDeleteEarlierTrackIds: string[] } {
+  const localByEarlier = new Map(local.map((c) => [c.earlierTrackId, c.laterTrackId]));
+  const desiredByEarlier = new Map(desired.map((c) => [c.earlierTrackId, c.laterTrackId]));
+  const toUpsert = desired.filter((c) => localByEarlier.get(c.earlierTrackId) !== c.laterTrackId);
+  const toDeleteEarlierTrackIds = local.filter((c) => !desiredByEarlier.has(c.earlierTrackId)).map((c) => c.earlierTrackId);
+  return { toUpsert, toDeleteEarlierTrackIds };
+}
+
 // --- JSON-RPC transport ---
 
 // Bun's default fetch timeout has been observed to abort the bigger sync
@@ -1005,6 +1240,13 @@ interface SyncUserActivityOptions {
   cacheInvalidation: CacheInvalidationService | null;
   changedSlugs: Set<string>;
   now: Date;
+  // prod show/track id → local id, for rows whose local id drifted from prod
+  // (seeded by an old dump under a different id, then matched by slug/natural
+  // key in the show/track passes). Rating + attendance references resolve
+  // through these before the FK check + upsert so an id-drifted show/track
+  // doesn't orphan its user activity. Absent entry = ids already match.
+  prodShowIdToLocalId?: Map<string, string>;
+  prodTrackIdToLocalId?: Map<string, string>;
   // Injected to keep the function unit-testable without mocking globals.
   // Defaults to the real mcpCall in the production wiring below.
   mcp?: <T>(toolName: string, args: Record<string, unknown>) => Promise<T>;
@@ -1036,6 +1278,8 @@ export async function syncUserActivity(
 ): Promise<UserActivityStats> {
   const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, now, changedSlugs } = options;
   const mcp = options.mcp ?? mcpCall;
+  const prodShowIdToLocalId = options.prodShowIdToLocalId ?? new Map<string, string>();
+  const prodTrackIdToLocalId = options.prodTrackIdToLocalId ?? new Map<string, string>();
   const stats: UserActivityStats = {
     usersCreated: 0,
     usersUpdated: 0,
@@ -1200,16 +1444,25 @@ export async function syncUserActivity(
     const resolvedRatings = ratings.map((r) => ({
       ...r,
       localUserId: prodIdToLocalId.get(r.userId) ?? r.userId,
+      // Resolve the rateable through the show/track drift maps so a rating that
+      // references prod's show/track id lands on the local row even when that
+      // row was seeded under a different id. No-drift case = the same id back.
+      localRateableId:
+        r.rateableType === "Show"
+          ? prodShowIdToLocalId.get(r.rateableId) ?? r.rateableId
+          : r.rateableType === "Track"
+            ? prodTrackIdToLocalId.get(r.rateableId) ?? r.rateableId
+            : r.rateableId,
     }));
     // Batched FK existence check per page. The realistic miss is show/track:
     // a dev DB synced for a narrow --years window legitimately lacks older
     // shows that older ratings reference.
     const ratingUserIds = Array.from(new Set(resolvedRatings.map((r) => r.localUserId)));
     const ratingShowIds = Array.from(
-      new Set(resolvedRatings.filter((r) => r.rateableType === "Show").map((r) => r.rateableId)),
+      new Set(resolvedRatings.filter((r) => r.rateableType === "Show").map((r) => r.localRateableId)),
     );
     const ratingTrackIds = Array.from(
-      new Set(resolvedRatings.filter((r) => r.rateableType === "Track").map((r) => r.rateableId)),
+      new Set(resolvedRatings.filter((r) => r.rateableType === "Track").map((r) => r.localRateableId)),
     );
     const [existingRatingUsers, existingRatingShows, existingRatingTracks] = await Promise.all([
       ratingUserIds.length > 0
@@ -1232,19 +1485,19 @@ export async function syncUserActivity(
         console.warn(`  ⚠️  rating ${r.id}: skipping — user ${r.localUserId} not local`);
         continue;
       }
-      if (r.rateableType === "Show" && !localRatingShowSet.has(r.rateableId)) {
+      if (r.rateableType === "Show" && !localRatingShowSet.has(r.localRateableId)) {
         stats.ratingsFkSkipped++;
-        console.warn(`  ⚠️  rating ${r.id}: skipping — show ${r.rateableId} not local`);
+        console.warn(`  ⚠️  rating ${r.id}: skipping — show ${r.localRateableId} not local`);
         continue;
       }
-      if (r.rateableType === "Track" && !localRatingTrackSet.has(r.rateableId)) {
+      if (r.rateableType === "Track" && !localRatingTrackSet.has(r.localRateableId)) {
         stats.ratingsFkSkipped++;
-        console.warn(`  ⚠️  rating ${r.id}: skipping — track ${r.rateableId} not local`);
+        console.warn(`  ⚠️  rating ${r.id}: skipping — track ${r.localRateableId} not local`);
         continue;
       }
       if (isDryRun) {
         stats.ratingsUpserted++;
-        touchedRateables.set(`${r.rateableType}|${r.rateableId}`, { rateableId: r.rateableId, rateableType: r.rateableType });
+        touchedRateables.set(`${r.rateableType}|${r.localRateableId}`, { rateableId: r.localRateableId, rateableType: r.rateableType });
         continue;
       }
       try {
@@ -1261,7 +1514,7 @@ export async function syncUserActivity(
           where: {
             userId_rateableId_rateableType: {
               userId: r.localUserId,
-              rateableId: r.rateableId,
+              rateableId: r.localRateableId,
               rateableType: r.rateableType,
             },
           },
@@ -1274,14 +1527,14 @@ export async function syncUserActivity(
             userId: r.localUserId,
             value: r.value,
             rateableType: r.rateableType,
-            rateableId: r.rateableId,
+            rateableId: r.localRateableId,
             createdAt: new Date(r.createdAt),
             updatedAt: new Date(r.updatedAt),
           },
         });
         stats.ratingsUpserted++;
-        touchedRateables.set(`${r.rateableType}|${r.rateableId}`, {
-          rateableId: r.rateableId,
+        touchedRateables.set(`${r.rateableType}|${r.localRateableId}`, {
+          rateableId: r.localRateableId,
           rateableType: r.rateableType,
         });
       } catch (err) {
@@ -1307,9 +1560,11 @@ export async function syncUserActivity(
     const resolvedAttendances = attendances.map((a) => ({
       ...a,
       localUserId: prodIdToLocalId.get(a.userId) ?? a.userId,
+      // Same show-id drift remap as the rating loop.
+      localShowId: prodShowIdToLocalId.get(a.showId) ?? a.showId,
     }));
     const attUserIds = Array.from(new Set(resolvedAttendances.map((a) => a.localUserId)));
-    const attShowIds = Array.from(new Set(resolvedAttendances.map((a) => a.showId)));
+    const attShowIds = Array.from(new Set(resolvedAttendances.map((a) => a.localShowId)));
     const [existingAttUsers, existingAttShows] = await Promise.all([
       attUserIds.length > 0
         ? db.user.findMany({ where: { id: { in: attUserIds } }, select: { id: true } })
@@ -1327,12 +1582,12 @@ export async function syncUserActivity(
         console.warn(`  ⚠️  attendance ${a.id}: skipping — user ${a.localUserId} not local`);
         continue;
       }
-      if (!localAttShowBySlug.has(a.showId)) {
+      if (!localAttShowBySlug.has(a.localShowId)) {
         stats.attendancesFkSkipped++;
-        console.warn(`  ⚠️  attendance ${a.id}: skipping — show ${a.showId} not local`);
+        console.warn(`  ⚠️  attendance ${a.id}: skipping — show ${a.localShowId} not local`);
         continue;
       }
-      const showSlug = localAttShowBySlug.get(a.showId) ?? null;
+      const showSlug = localAttShowBySlug.get(a.localShowId) ?? null;
       if (isDryRun) {
         stats.attendancesUpserted++;
         if (showSlug) changedSlugs.add(showSlug);
@@ -1345,12 +1600,12 @@ export async function syncUserActivity(
         // on an id-keyed insert. --full-users converges the local id back
         // to prod's over two runs.
         await db.attendance.upsert({
-          where: { userId_showId: { userId: a.localUserId, showId: a.showId } },
+          where: { userId_showId: { userId: a.localUserId, showId: a.localShowId } },
           update: { updatedAt: new Date(a.updatedAt) },
           create: {
             id: a.id,
             userId: a.localUserId,
-            showId: a.showId,
+            showId: a.localShowId,
             createdAt: new Date(a.createdAt),
             updatedAt: new Date(a.updatedAt),
           },
@@ -1512,6 +1767,17 @@ interface SyncStats {
   rockOperasUpserted: number;
   rockOperaAssignmentsAdded: number;
   rockOperaAssignmentsRemoved: number;
+  musiciansCreated: number;
+  instrumentsCreated: number;
+  showMusiciansUpserted: number;
+  showMusiciansDeleted: number;
+  trackMusiciansUpserted: number;
+  trackMusiciansDeleted: number;
+  trackFlagsAdded: number;
+  trackFlagsRemoved: number;
+  completionsUpserted: number;
+  completionsDeleted: number;
+  completionsSkipped: number;
   userActivity: UserActivityStats | null;
   errors: number;
 }
@@ -1644,6 +1910,10 @@ async function syncMissingShows(): Promise<void> {
   // setlist reconcile inserts or deletes a track, those arrays go stale; we
   // call generateSegueRunsForShow per structurally-changed show to rebuild.
   const segueRunService = new SegueRunGeneratorService(prisma, logger);
+  // Both dedupe-by-slug on create (return the existing row), so the performer
+  // mirroring pass can resolve-or-seed musicians/instruments idempotently.
+  const instrumentService = new InstrumentService(prisma, logger);
+  const musicianService = new MusicianService(prisma, logger);
   if (redis) await redis.connect();
 
   // Track every show whose row materially changed this run — used at the end
@@ -1655,6 +1925,13 @@ async function syncMissingShows(): Promise<void> {
   // the same as chronologically, so `<` works directly.
   let earliestInsertedDate: string | null = null;
   let songsChanged = false;
+  // prod row id → local row id, for shows/tracks whose local id drifted from
+  // prod (seeded under a different id by an old dump, then matched by slug).
+  // The user-activity pass falls back through these so a rating/attendance that
+  // references prod's show/track id still lands on the local row — mirroring the
+  // existing prodIdToLocalId remap for users. Empty entry = ids already match.
+  const prodShowIdToLocalId = new Map<string, string>();
+  const prodTrackIdToLocalId = new Map<string, string>();
 
   const stats: SyncStats = {
     yearsSynced: years,
@@ -1685,6 +1962,17 @@ async function syncMissingShows(): Promise<void> {
     rockOperasUpserted: 0,
     rockOperaAssignmentsAdded: 0,
     rockOperaAssignmentsRemoved: 0,
+    musiciansCreated: 0,
+    instrumentsCreated: 0,
+    showMusiciansUpserted: 0,
+    showMusiciansDeleted: 0,
+    trackMusiciansUpserted: 0,
+    trackMusiciansDeleted: 0,
+    trackFlagsAdded: 0,
+    trackFlagsRemoved: 0,
+    completionsUpserted: 0,
+    completionsDeleted: 0,
+    completionsSkipped: 0,
     userActivity: null,
     errors: 0,
   };
@@ -2428,6 +2716,438 @@ async function syncMissingShows(): Promise<void> {
       }
     }
 
+    // Build prodShowIdToLocalId for any show whose local id drifted from prod's
+    // (matched by slug above, kept its old local id). The user-activity pass
+    // remaps rating/attendance show references through this so they don't FK-skip.
+    {
+      const remoteIdBySlug = new Map(remoteFullShows.map((s) => [s.slug, s.id]));
+      for (const [slug, local] of existingBySlug) {
+        if (String(local.id).startsWith("dry-run-show-")) continue;
+        const prodId = remoteIdBySlug.get(slug);
+        if (prodId && prodId !== local.id) prodShowIdToLocalId.set(prodId, local.id);
+      }
+    }
+
+    // Step 8c: mirror performer data (whole-show lineup + per-track sit-ins /
+    // sat-outs), track flags, and completion links for every in-scope show.
+    // Runs after the setlist reconcile so every track exists locally under its
+    // prod id. The diffs key musicians by slug and tracks by (slug, set,
+    // position) — never a per-env row id — so they survive id drift. Each
+    // per-entity diff treats `undefined` remote as "no opinion" (pre-deploy
+    // MCP), so this whole step is a no-op until the MCP route change deploys.
+    const performerShowIds = Array.from(existingBySlug.values())
+      .filter((s) => !String(s.id).startsWith("dry-run-show-"))
+      .map((s) => s.id);
+    if (performerShowIds.length > 0 || isDryRun) {
+      // 8c.1 — resolve every musician + instrument referenced across the
+      // in-scope setlists to a local id, seeding missing rows idempotently by
+      // slug. Instruments first so a musician's defaultInstrument FK resolves.
+      const instrumentNameBySlug = new Map<string, string>();
+      const musicianRefBySlug = new Map<string, { name: string; knownFrom: string | null; defaultInstrumentSlug: string | null }>();
+      const noteInstrument = (i: { slug: string; name: string } | null | undefined): void => {
+        if (i) instrumentNameBySlug.set(i.slug, i.name);
+      };
+      for (const setlist of setlistBySlug.values()) {
+        for (const member of setlist.lineup ?? []) {
+          noteInstrument(member.defaultInstrument);
+          for (const i of member.instruments) noteInstrument(i);
+          if (!musicianRefBySlug.has(member.musicianSlug)) {
+            musicianRefBySlug.set(member.musicianSlug, {
+              name: member.musicianName,
+              knownFrom: member.knownFrom,
+              defaultInstrumentSlug: member.defaultInstrument?.slug ?? null,
+            });
+          }
+        }
+        for (const set of setlist.sets) {
+          for (const track of set.tracks) {
+            for (const tm of track.trackMusicians ?? []) {
+              noteInstrument(tm.defaultInstrument);
+              for (const i of tm.instruments) noteInstrument(i);
+              if (!musicianRefBySlug.has(tm.musicianSlug)) {
+                musicianRefBySlug.set(tm.musicianSlug, {
+                  name: tm.musicianName,
+                  knownFrom: null,
+                  defaultInstrumentSlug: tm.defaultInstrument?.slug ?? null,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const instrumentSlugToId = new Map<string, string>();
+      const musicianSlugToId = new Map<string, string>();
+      if (instrumentNameBySlug.size > 0) {
+        const existing = await db.instrument.findMany({
+          where: { slug: { in: Array.from(instrumentNameBySlug.keys()) } },
+          select: { id: true, slug: true },
+        });
+        for (const row of existing) instrumentSlugToId.set(row.slug, row.id);
+        for (const [slug, name] of instrumentNameBySlug) {
+          if (instrumentSlugToId.has(slug)) continue;
+          if (isDryRun) {
+            instrumentSlugToId.set(slug, `dry-run-instrument-${slug}`);
+          } else {
+            const created = await instrumentService.create({ name });
+            instrumentSlugToId.set(created.slug, created.id);
+          }
+          stats.instrumentsCreated++;
+        }
+      }
+      if (musicianRefBySlug.size > 0) {
+        const existing = await db.musician.findMany({
+          where: { slug: { in: Array.from(musicianRefBySlug.keys()) } },
+          select: { id: true, slug: true },
+        });
+        for (const row of existing) musicianSlugToId.set(row.slug, row.id);
+        for (const [slug, ref] of musicianRefBySlug) {
+          if (musicianSlugToId.has(slug)) continue;
+          if (isDryRun) {
+            musicianSlugToId.set(slug, `dry-run-musician-${slug}`);
+          } else {
+            const created = await musicianService.create({
+              name: ref.name,
+              knownFrom: ref.knownFrom,
+              defaultInstrumentId: ref.defaultInstrumentSlug ? instrumentSlugToId.get(ref.defaultInstrumentSlug) ?? null : null,
+            });
+            musicianSlugToId.set(created.slug, created.id);
+          }
+          stats.musiciansCreated++;
+        }
+      }
+      const instrumentIdsFor = (slugs: string[]): string[] =>
+        slugs.map((s) => instrumentSlugToId.get(s)).filter((id): id is string => id !== undefined);
+
+      // 8c.2 — re-load local tracks (fresh, post-reconcile) and build the
+      // (slug, set, position) → local track id map plus prodTrackIdToLocalId.
+      const showIdToSlug = new Map<string, string>();
+      for (const [slug, local] of existingBySlug) {
+        if (!String(local.id).startsWith("dry-run-show-")) showIdToSlug.set(local.id, slug);
+      }
+      const localTrackRows = performerShowIds.length === 0
+        ? []
+        : await db.track.findMany({
+            where: { showId: { in: performerShowIds } },
+            select: { id: true, showId: true, set: true, position: true },
+          });
+      const trackKeyToLocalId = new Map<string, string>();
+      const allTrackIds: string[] = [];
+      for (const row of localTrackRows) {
+        const slug = showIdToSlug.get(row.showId);
+        if (!slug) continue;
+        trackKeyToLocalId.set(`${slug}|${row.set}|${row.position}`, row.id);
+        allTrackIds.push(row.id);
+      }
+      // prodTrackIdToLocalId: where a remote track's prod id differs from the
+      // local id at the same (slug, set, position) — residual drift the step-8
+      // id-rebuild didn't converge (e.g. a track only ever ratings-referenced).
+      for (const [slug, setlist] of setlistBySlug) {
+        for (const set of setlist.sets) {
+          for (const track of set.tracks) {
+            if (!track.id) continue;
+            const localId = trackKeyToLocalId.get(`${slug}|${set.label}|${track.position}`);
+            if (localId && localId !== track.id) prodTrackIdToLocalId.set(track.id, localId);
+          }
+        }
+      }
+
+      // 8c.3 — load local performer + flag rows for the in-scope shows/tracks.
+      const localShowMusicianRows = performerShowIds.length === 0
+        ? []
+        : await db.showMusician.findMany({
+            where: { showId: { in: performerShowIds } },
+            select: {
+              id: true,
+              showId: true,
+              musician: { select: { slug: true } },
+              instruments: { select: { instrument: { select: { slug: true } } } },
+            },
+          });
+      const localShowMusiciansByShowId = new Map<string, LocalShowMusician[]>();
+      for (const row of localShowMusicianRows) {
+        const entry: LocalShowMusician = {
+          showMusicianId: row.id,
+          musicianSlug: row.musician.slug,
+          instrumentSlugs: row.instruments.map((r) => r.instrument.slug),
+        };
+        const arr = localShowMusiciansByShowId.get(row.showId);
+        if (arr) arr.push(entry);
+        else localShowMusiciansByShowId.set(row.showId, [entry]);
+      }
+
+      const localTrackMusicianRows = allTrackIds.length === 0
+        ? []
+        : await db.trackMusician.findMany({
+            where: { trackId: { in: allTrackIds } },
+            select: {
+              id: true,
+              trackId: true,
+              present: true,
+              musician: { select: { slug: true } },
+              instruments: { select: { instrument: { select: { slug: true } } } },
+            },
+          });
+      const localTrackMusiciansByTrackId = new Map<string, LocalTrackMusician[]>();
+      for (const row of localTrackMusicianRows) {
+        const entry: LocalTrackMusician = {
+          trackMusicianId: row.id,
+          musicianSlug: row.musician.slug,
+          present: row.present,
+          instrumentSlugs: row.instruments.map((r) => r.instrument.slug),
+        };
+        const arr = localTrackMusiciansByTrackId.get(row.trackId);
+        if (arr) arr.push(entry);
+        else localTrackMusiciansByTrackId.set(row.trackId, [entry]);
+      }
+
+      const localFlagRows = allTrackIds.length === 0
+        ? []
+        : await db.trackFlagAssignment.findMany({ where: { trackId: { in: allTrackIds } }, select: { trackId: true, flag: true } });
+      const localFlagsByTrackId = new Map<string, string[]>();
+      for (const row of localFlagRows) {
+        const arr = localFlagsByTrackId.get(row.trackId);
+        if (arr) arr.push(row.flag);
+        else localFlagsByTrackId.set(row.trackId, [row.flag]);
+      }
+
+      // 8c.4 — per show: apply the lineup diff, then per track the musician +
+      // flag diffs. A flag change also widens the stats-rebuild window so the
+      // derived recurrence columns recompute (the structural-only gate in step 8
+      // would otherwise miss a flag-only edit on an already-local show).
+      for (const [slug, local] of existingBySlug) {
+        const setlist = setlistBySlug.get(slug);
+        if (!setlist) continue;
+        const isDryRunShow = String(local.id).startsWith("dry-run-show-");
+
+        const localSM = localShowMusiciansByShowId.get(local.id) ?? [];
+        const remoteSM = setlist.lineup?.map((m) => ({ musicianSlug: m.musicianSlug, instrumentSlugs: m.instruments.map((i) => i.slug) }));
+        const smDiff = diffShowMusicians(localSM, remoteSM);
+
+        type TrackPerformerWork = {
+          trackId: string;
+          tmDiff: TrackMusicianDiff;
+          flagDiff: { toAdd: string[]; toRemove: string[] };
+        };
+        const trackWork: TrackPerformerWork[] = [];
+        for (const set of setlist.sets) {
+          for (const track of set.tracks) {
+            const trackId = trackKeyToLocalId.get(`${slug}|${set.label}|${track.position}`);
+            if (!trackId) continue;
+            const localTM = localTrackMusiciansByTrackId.get(trackId) ?? [];
+            const remoteTM = track.trackMusicians?.map((tm) => ({
+              musicianSlug: tm.musicianSlug,
+              present: tm.present,
+              instrumentSlugs: tm.instruments.map((i) => i.slug),
+            }));
+            const tmDiff = diffTrackMusicians(localTM, remoteTM);
+            const flagDiff = diffTrackFlags(localFlagsByTrackId.get(trackId) ?? [], track.flags);
+            if (
+              tmDiff.toCreate.length > 0 ||
+              tmDiff.toDeleteTrackMusicianIds.length > 0 ||
+              tmDiff.toUpdate.length > 0 ||
+              flagDiff.toAdd.length > 0 ||
+              flagDiff.toRemove.length > 0
+            ) {
+              trackWork.push({ trackId, tmDiff, flagDiff });
+            }
+          }
+        }
+
+        const lineupChanged =
+          smDiff.toCreate.length > 0 || smDiff.toDeleteShowMusicianIds.length > 0 || smDiff.toUpdateInstruments.length > 0;
+        if (!lineupChanged && trackWork.length === 0) continue;
+
+        const flagChanged = trackWork.some((w) => w.flagDiff.toAdd.length > 0 || w.flagDiff.toRemove.length > 0);
+        // Tally before the write so dry runs report the same numbers.
+        stats.showMusiciansUpserted += smDiff.toCreate.length + smDiff.toUpdateInstruments.length;
+        stats.showMusiciansDeleted += smDiff.toDeleteShowMusicianIds.length;
+        for (const w of trackWork) {
+          stats.trackMusiciansUpserted += w.tmDiff.toCreate.length + w.tmDiff.toUpdate.length;
+          stats.trackMusiciansDeleted += w.tmDiff.toDeleteTrackMusicianIds.length;
+          stats.trackFlagsAdded += w.flagDiff.toAdd.length;
+          stats.trackFlagsRemoved += w.flagDiff.toRemove.length;
+        }
+
+        if (isDryRun || isDryRunShow) {
+          console.log(`  🎙️  ${slug}: lineup ±${smDiff.toCreate.length + smDiff.toDeleteShowMusicianIds.length}, ${trackWork.length} track delta(s) (dry run)`);
+          changedSlugs.add(slug);
+          continue;
+        }
+
+        try {
+          await db.$transaction(async (tx) => {
+            if (smDiff.toDeleteShowMusicianIds.length > 0) {
+              await tx.showMusician.deleteMany({ where: { id: { in: smDiff.toDeleteShowMusicianIds } } });
+            }
+            for (const c of smDiff.toCreate) {
+              const musicianId = musicianSlugToId.get(c.musicianSlug);
+              if (!musicianId) continue;
+              const instrumentIds = instrumentIdsFor(c.instrumentSlugs);
+              await tx.showMusician.create({
+                data: {
+                  showId: local.id,
+                  musicianId,
+                  createdAt: now,
+                  updatedAt: now,
+                  instruments:
+                    instrumentIds.length > 0 ? { create: instrumentIds.map((instrumentId) => ({ instrumentId })) } : undefined,
+                },
+              });
+            }
+            for (const u of smDiff.toUpdateInstruments) {
+              const removeIds = instrumentIdsFor(u.removeInstrumentSlugs);
+              const addIds = instrumentIdsFor(u.addInstrumentSlugs);
+              if (removeIds.length > 0) {
+                await tx.showMusicianInstrument.deleteMany({
+                  where: { showMusicianId: u.showMusicianId, instrumentId: { in: removeIds } },
+                });
+              }
+              if (addIds.length > 0) {
+                await tx.showMusicianInstrument.createMany({
+                  data: addIds.map((instrumentId) => ({ showMusicianId: u.showMusicianId, instrumentId })),
+                });
+              }
+            }
+            for (const w of trackWork) {
+              if (w.tmDiff.toDeleteTrackMusicianIds.length > 0) {
+                await tx.trackMusician.deleteMany({ where: { id: { in: w.tmDiff.toDeleteTrackMusicianIds } } });
+              }
+              for (const c of w.tmDiff.toCreate) {
+                const musicianId = musicianSlugToId.get(c.musicianSlug);
+                if (!musicianId) continue;
+                const instrumentIds = instrumentIdsFor(c.instrumentSlugs);
+                await tx.trackMusician.create({
+                  data: {
+                    trackId: w.trackId,
+                    musicianId,
+                    present: c.present,
+                    createdAt: now,
+                    updatedAt: now,
+                    instruments:
+                      instrumentIds.length > 0 ? { create: instrumentIds.map((instrumentId) => ({ instrumentId })) } : undefined,
+                  },
+                });
+              }
+              for (const u of w.tmDiff.toUpdate) {
+                if (u.present !== undefined) {
+                  await tx.trackMusician.update({ where: { id: u.trackMusicianId }, data: { present: u.present, updatedAt: now } });
+                }
+                const removeIds = instrumentIdsFor(u.removeInstrumentSlugs);
+                const addIds = instrumentIdsFor(u.addInstrumentSlugs);
+                if (removeIds.length > 0) {
+                  await tx.trackMusicianInstrument.deleteMany({
+                    where: { trackMusicianId: u.trackMusicianId, instrumentId: { in: removeIds } },
+                  });
+                }
+                if (addIds.length > 0) {
+                  await tx.trackMusicianInstrument.createMany({
+                    data: addIds.map((instrumentId) => ({ trackMusicianId: u.trackMusicianId, instrumentId })),
+                  });
+                }
+              }
+              if (w.flagDiff.toRemove.length > 0) {
+                await tx.trackFlagAssignment.deleteMany({
+                  where: { trackId: w.trackId, flag: { in: w.flagDiff.toRemove as TrackFlag[] } },
+                });
+              }
+              if (w.flagDiff.toAdd.length > 0) {
+                await tx.trackFlagAssignment.createMany({
+                  data: w.flagDiff.toAdd.map((flag) => ({ trackId: w.trackId, flag: flag as TrackFlag, createdAt: now, updatedAt: now })),
+                });
+              }
+            }
+          });
+          changedSlugs.add(slug);
+          // A flag add/remove shifts the derived recurrence columns; widen the
+          // rebuild window to this show's date so the end-of-batch recompute
+          // picks it up (step 8 only widens on structural setlist changes).
+          if (flagChanged) {
+            const showDate = String(local.date);
+            if (earliestInsertedDate === null || showDate < earliestInsertedDate) earliestInsertedDate = showDate;
+          }
+          console.log(`  🎙️  ${slug}: lineup ±${smDiff.toCreate.length + smDiff.toDeleteShowMusicianIds.length}, ${trackWork.length} track delta(s)`);
+        } catch (err) {
+          console.error(`  ❌ failed to mirror performers for ${slug}:`, err);
+          stats.errors++;
+        }
+      }
+
+      // Step 8d: completion links. Cross-show, so resolved after all tracks
+      // exist, keyed by the UNIQUE earlier track. Gated on prod having served
+      // completion data for at least one in-scope track — pre-deploy MCP omits
+      // `completes` entirely (no opinion), and without the gate the empty
+      // desired set would wrongly delete every local completion.
+      const completionLinks: RemoteCompletionLink[] = [];
+      let completionsServed = false;
+      for (const [slug, setlist] of setlistBySlug) {
+        for (const set of setlist.sets) {
+          for (const track of set.tracks) {
+            if (track.completes === undefined) continue;
+            completionsServed = true;
+            for (const c of track.completes) {
+              completionLinks.push({
+                later: { showSlug: slug, set: set.label, position: track.position },
+                earlier: { showSlug: c.showSlug, set: c.set, position: c.position },
+              });
+            }
+          }
+        }
+      }
+      if (completionsServed && allTrackIds.length > 0) {
+        const { resolved, skipped } = resolveCompletionLinks(completionLinks, trackKeyToLocalId);
+        stats.completionsSkipped += skipped.length;
+        // Only completions with BOTH ends in scope are authoritatively managed
+        // here. A completion whose later track is in an un-synced show would
+        // otherwise be absent from `resolved` (its link rides the later track's
+        // payload, which we never fetched) and get wrongly deleted.
+        const localCompletionRows = await db.trackCompletion.findMany({
+          where: { earlierTrackId: { in: allTrackIds }, laterTrackId: { in: allTrackIds } },
+          select: { earlierTrackId: true, laterTrackId: true },
+        });
+        const compDiff = diffCompletions(localCompletionRows, resolved);
+        stats.completionsUpserted += compDiff.toUpsert.length;
+        stats.completionsDeleted += compDiff.toDeleteEarlierTrackIds.length;
+        if (!isDryRun && (compDiff.toUpsert.length > 0 || compDiff.toDeleteEarlierTrackIds.length > 0)) {
+          try {
+            await db.$transaction(async (tx) => {
+              if (compDiff.toDeleteEarlierTrackIds.length > 0) {
+                await tx.trackCompletion.deleteMany({ where: { earlierTrackId: { in: compDiff.toDeleteEarlierTrackIds } } });
+              }
+              for (const link of compDiff.toUpsert) {
+                await tx.trackCompletion.upsert({
+                  where: { earlierTrackId: link.earlierTrackId },
+                  update: { laterTrackId: link.laterTrackId, updatedAt: now },
+                  create: { earlierTrackId: link.earlierTrackId, laterTrackId: link.laterTrackId, createdAt: now, updatedAt: now },
+                });
+              }
+            });
+            // Invalidate the show on each end of every touched link (both
+            // upserts and deletes — the deleted link's later track lives in the
+            // localCompletionRows snapshot).
+            const showIdByTrackId = new Map(localTrackRows.map((t) => [t.id, t.showId]));
+            const deletedSet = new Set(compDiff.toDeleteEarlierTrackIds);
+            const touchedTrackIds = [
+              ...compDiff.toUpsert.flatMap((l) => [l.earlierTrackId, l.laterTrackId]),
+              ...localCompletionRows.filter((c) => deletedSet.has(c.earlierTrackId)).flatMap((c) => [c.earlierTrackId, c.laterTrackId]),
+            ];
+            for (const trackId of touchedTrackIds) {
+              const slug = showIdToSlug.get(showIdByTrackId.get(trackId) ?? "");
+              if (slug) changedSlugs.add(slug);
+            }
+          } catch (err) {
+            console.error("  ❌ failed to mirror completion links:", err);
+            stats.errors++;
+          }
+        }
+        if (compDiff.toUpsert.length > 0 || compDiff.toDeleteEarlierTrackIds.length > 0) {
+          console.log(
+            `  🔗 completions: ~${compDiff.toUpsert.length} -${compDiff.toDeleteEarlierTrackIds.length}${skipped.length > 0 ? ` (skipped ${skipped.length} out-of-scope)` : ""}`,
+          );
+        }
+      }
+    }
+
     // Step 8b: ghost-show detection. Local shows in the synced years whose
     // slug isn't in prod's per-year list are renames / merges / deletes
     // upstream — the step 8 reconcile loop never touches them because it
@@ -2600,6 +3320,8 @@ async function syncMissingShows(): Promise<void> {
           cacheInvalidation,
           changedSlugs,
           now,
+          prodShowIdToLocalId,
+          prodTrackIdToLocalId,
         });
         stats.userActivity = userActivityStats;
       } catch (err) {
@@ -2687,6 +3409,11 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Unresolved song slugs: ${stats.unresolvedSongSlugs}`);
   console.log(`Rock operas upserted: ${stats.rockOperasUpserted}`);
   console.log(`Rock opera assignments added / removed: ${stats.rockOperaAssignmentsAdded} / ${stats.rockOperaAssignmentsRemoved}`);
+  console.log(`Musicians / instruments created: ${stats.musiciansCreated} / ${stats.instrumentsCreated}`);
+  console.log(`Show lineup (upserted / deleted): ${stats.showMusiciansUpserted} / ${stats.showMusiciansDeleted}`);
+  console.log(`Track musicians (upserted / deleted): ${stats.trackMusiciansUpserted} / ${stats.trackMusiciansDeleted}`);
+  console.log(`Track flags (added / removed): ${stats.trackFlagsAdded} / ${stats.trackFlagsRemoved}`);
+  console.log(`Completions (upserted / deleted / skipped): ${stats.completionsUpserted} / ${stats.completionsDeleted} / ${stats.completionsSkipped}`);
   if (stats.userActivity) {
     const ua = stats.userActivity;
     console.log(`Users (created / updated / deleted): ${ua.usersCreated} / ${ua.usersUpdated} / ${ua.usersDeleted}`);

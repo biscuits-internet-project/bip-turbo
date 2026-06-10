@@ -11,7 +11,12 @@ import {
   buildVenueDriftUpdate,
   collectSongSlugs,
   collectVenueKeys,
+  diffCompletions,
+  diffShowMusicians,
   diffTrackAnnotations,
+  diffTrackFlags,
+  diffTrackMusicians,
+  resolveCompletionLinks,
   isStubSlug,
   matchVenue,
   parseYearsArg,
@@ -1677,6 +1682,196 @@ describe("buildRockOperaAssignmentDiff", () => {
   });
 });
 
+// diffShowMusicians mirrors a show's lineup the way diffTrackAnnotations
+// mirrors annotations: identity by musician slug (the
+// stable cross-env id), replace-not-merge, `undefined` = no opinion. The wrinkle
+// is the second level — the instruments each musician played — which is diffed
+// per retained musician so an unchanged re-run produces zero instrument writes.
+describe("diffShowMusicians", () => {
+  // Canonical case: prod adds Aron on keys, drops Marc. Sammy stays but picks
+  // up a second instrument. Create Aron, delete Marc's row, add the new
+  // instrument to Sammy without recreating his lineup row.
+  test("returns create/delete plus per-musician instrument deltas", () => {
+    const local = [
+      { showMusicianId: "sm-marc", musicianSlug: "marc-brownstein", instrumentSlugs: ["bass"] },
+      { showMusicianId: "sm-sammy", musicianSlug: "sam-altman", instrumentSlugs: ["drums"] },
+    ];
+    const remote = [
+      { musicianSlug: "sam-altman", instrumentSlugs: ["drums", "percussion"] },
+      { musicianSlug: "aron-magner", instrumentSlugs: ["keys"] },
+    ];
+    expect(diffShowMusicians(local, remote)).toEqual({
+      toCreate: [{ musicianSlug: "aron-magner", instrumentSlugs: ["keys"] }],
+      toDeleteShowMusicianIds: ["sm-marc"],
+      toUpdateInstruments: [{ showMusicianId: "sm-sammy", addInstrumentSlugs: ["percussion"], removeInstrumentSlugs: [] }],
+    });
+  });
+
+  // No drift: same musicians + instruments in any order. Zero ops keeps a
+  // re-run from churning row ids or updatedAt on the lineup.
+  test("returns empty deltas when local matches remote (order-insensitive)", () => {
+    const local = [{ showMusicianId: "sm-1", musicianSlug: "jon-gutwillig", instrumentSlugs: ["guitar", "vocals"] }];
+    const remote = [{ musicianSlug: "jon-gutwillig", instrumentSlugs: ["vocals", "guitar"] }];
+    expect(diffShowMusicians(local, remote)).toEqual({
+      toCreate: [],
+      toDeleteShowMusicianIds: [],
+      toUpdateInstruments: [],
+    });
+  });
+
+  // Pre-deploy MCP omits lineup entirely → no opinion, never wipe local.
+  test("returns empty deltas when remote is undefined", () => {
+    const local = [{ showMusicianId: "sm-1", musicianSlug: "jon-gutwillig", instrumentSlugs: ["guitar"] }];
+    expect(diffShowMusicians(local, undefined)).toEqual({
+      toCreate: [],
+      toDeleteShowMusicianIds: [],
+      toUpdateInstruments: [],
+    });
+  });
+
+  // Explicit empty array means prod cleared the lineup — delete every local row.
+  test("deletes all lineup rows when remote is explicitly empty", () => {
+    const local = [
+      { showMusicianId: "sm-1", musicianSlug: "jon-gutwillig", instrumentSlugs: ["guitar"] },
+      { showMusicianId: "sm-2", musicianSlug: "marc-brownstein", instrumentSlugs: ["bass"] },
+    ];
+    expect(diffShowMusicians(local, [])).toEqual({
+      toCreate: [],
+      toDeleteShowMusicianIds: ["sm-1", "sm-2"],
+      toUpdateInstruments: [],
+    });
+  });
+});
+
+// diffTrackMusicians is diffShowMusicians plus a `present` boolean (sit-in vs
+// sat-out). A flipped `present` on a retained musician is an update, not a
+// delete+create, so the row id survives.
+describe("diffTrackMusicians", () => {
+  // Sammy was a sat-out (present=false), prod now records him as a sit-in
+  // (present=true) on drums. Patch present, no row churn.
+  test("patches present when a retained musician's sit-in/sat-out flips", () => {
+    const local = [{ trackMusicianId: "tm-sammy", musicianSlug: "sam-altman", present: false, instrumentSlugs: [] }];
+    const remote = [{ musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }];
+    expect(diffTrackMusicians(local, remote)).toEqual({
+      toCreate: [],
+      toDeleteTrackMusicianIds: [],
+      toUpdate: [{ trackMusicianId: "tm-sammy", present: true, addInstrumentSlugs: ["drums"], removeInstrumentSlugs: [] }],
+    });
+  });
+
+  // New sit-in inserted, stale delta removed, untouched delta produces nothing.
+  test("creates new deltas and deletes ones prod dropped", () => {
+    const local = [{ trackMusicianId: "tm-old", musicianSlug: "allen-aucoin", present: true, instrumentSlugs: ["drums"] }];
+    const remote = [{ musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }];
+    expect(diffTrackMusicians(local, remote)).toEqual({
+      toCreate: [{ musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }],
+      toDeleteTrackMusicianIds: ["tm-old"],
+      toUpdate: [],
+    });
+  });
+
+  // No drift → no ops; omits `present` from the update when only instruments
+  // (here: nothing) would change.
+  test("returns empty deltas when local matches remote", () => {
+    const local = [{ trackMusicianId: "tm-1", musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }];
+    const remote = [{ musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }];
+    expect(diffTrackMusicians(local, remote)).toEqual({ toCreate: [], toDeleteTrackMusicianIds: [], toUpdate: [] });
+  });
+
+  test("returns empty deltas when remote is undefined", () => {
+    const local = [{ trackMusicianId: "tm-1", musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }];
+    expect(diffTrackMusicians(local, undefined)).toEqual({ toCreate: [], toDeleteTrackMusicianIds: [], toUpdate: [] });
+  });
+});
+
+// diffTrackFlags is the diffTrackAnnotations contract over the flag enum names.
+describe("diffTrackFlags", () => {
+  test("returns the add/remove delta to reach the remote flag set", () => {
+    expect(diffTrackFlags(["DYSLEXIC"], ["DYSLEXIC", "INVERTED"])).toEqual({ toAdd: ["INVERTED"], toRemove: [] });
+    expect(diffTrackFlags(["DYSLEXIC", "UNFINISHED"], ["DYSLEXIC"])).toEqual({ toAdd: [], toRemove: ["UNFINISHED"] });
+  });
+
+  test("returns empty deltas when remote is undefined (pre-deploy MCP)", () => {
+    expect(diffTrackFlags(["DYSLEXIC"], undefined)).toEqual({ toAdd: [], toRemove: [] });
+  });
+
+  test("removes all flags when remote is explicitly empty", () => {
+    expect(diffTrackFlags(["DYSLEXIC", "INVERTED"], [])).toEqual({ toAdd: [], toRemove: ["DYSLEXIC", "INVERTED"] });
+  });
+});
+
+// Completions cross shows and reference tracks by natural key. resolveCompletionLinks
+// turns the (slug,set,position) endpoints into local track ids, dropping links
+// whose other end isn't in the synced scope; diffCompletions then computes the
+// upsert/delete set keyed by the UNIQUE earlier track.
+describe("resolveCompletionLinks", () => {
+  const keyMap = new Map([
+    ["2026-01-01-show|S1|3", "track-earlier"],
+    ["2026-01-01-show|S2|1", "track-later"],
+  ]);
+
+  // Both endpoints local → resolved to their local track ids.
+  test("resolves links whose both endpoints are local", () => {
+    const links = [
+      {
+        later: { showSlug: "2026-01-01-show", set: "S2", position: 1 },
+        earlier: { showSlug: "2026-01-01-show", set: "S1", position: 3 },
+      },
+    ];
+    expect(resolveCompletionLinks(links, keyMap)).toEqual({
+      resolved: [{ earlierTrackId: "track-earlier", laterTrackId: "track-later" }],
+      skipped: [],
+    });
+  });
+
+  // Earlier track in an un-synced show → skipped, never a dangling FK.
+  test("skips links whose earlier track is out of scope", () => {
+    const links = [
+      {
+        later: { showSlug: "2026-01-01-show", set: "S2", position: 1 },
+        earlier: { showSlug: "1999-12-31-other", set: "S1", position: 5 },
+      },
+    ];
+    expect(resolveCompletionLinks(links, keyMap)).toEqual({ resolved: [], skipped: links });
+  });
+});
+
+describe("diffCompletions", () => {
+  // Re-point: the earlier track already has a completer locally, prod moved it
+  // to a different later track. Keyed by earlierTrackId, that's an upsert (one
+  // entry), not a second insert that would violate the unique constraint.
+  test("upserts a re-pointed completion rather than duplicating it", () => {
+    const local = [{ earlierTrackId: "e1", laterTrackId: "old-later" }];
+    const desired = [{ earlierTrackId: "e1", laterTrackId: "new-later" }];
+    expect(diffCompletions(local, desired)).toEqual({
+      toUpsert: [{ earlierTrackId: "e1", laterTrackId: "new-later" }],
+      toDeleteEarlierTrackIds: [],
+    });
+  });
+
+  // A chain A→B→C: B completes A, C completes B. Two distinct earlier tracks,
+  // two upserts, nothing deleted.
+  test("upserts each link of a completion chain independently", () => {
+    const desired = [
+      { earlierTrackId: "track-a", laterTrackId: "track-b" },
+      { earlierTrackId: "track-b", laterTrackId: "track-c" },
+    ];
+    expect(diffCompletions([], desired)).toEqual({ toUpsert: desired, toDeleteEarlierTrackIds: [] });
+  });
+
+  // Prod dropped a completion that exists locally → delete by earlier track id.
+  test("deletes local completions prod no longer reports", () => {
+    const local = [{ earlierTrackId: "e1", laterTrackId: "l1" }];
+    expect(diffCompletions(local, [])).toEqual({ toUpsert: [], toDeleteEarlierTrackIds: ["e1"] });
+  });
+
+  // No drift → no ops.
+  test("returns empty deltas when local matches desired", () => {
+    const same = [{ earlierTrackId: "e1", laterTrackId: "l1" }];
+    expect(diffCompletions(same, same)).toEqual({ toUpsert: [], toDeleteEarlierTrackIds: [] });
+  });
+});
+
 // buildSongDriftUpdate diffs an existing local Song row against the latest
 // MCP response and returns a patch — only the curated admin fields (title,
 // lyrics, cover, legacyAuthor, featuredLyric, tabs, notes, history,
@@ -2533,6 +2728,142 @@ describe("syncUserActivity — compound-key upserts", () => {
     expect(state.ratings).toHaveLength(1);
     expect(state.ratings[0].id).toBe("r-local-stale-id");
     expect(state.ratings[0].value).toBe(5);
+  });
+});
+
+// The show-id-drift fix: prod ratings/attendances reference prod's show/track
+// id, but a local show seeded from an old dump can carry a DIFFERENT id under
+// the same slug. The show/track passes build prodShowIdToLocalId /
+// prodTrackIdToLocalId; the user-activity loops resolve through them before the
+// FK check + upsert, mirroring the existing user prodIdToLocalId remap. Without
+// it, the rating/attendance FK-skips against the prod id that isn't local.
+describe("syncUserActivity — show/track id-drift remap", () => {
+  const driftUser = (): StubUserRow => ({
+    id: "u-marc",
+    email: "stub-u-marc@local.invalid",
+    passwordDigest: "STUB",
+    username: "trance-marc",
+    avatarFileId: null,
+    avatarFileUrl: null,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  });
+
+  test("lands a Show rating that would FK-skip, remapped onto the drifted local show id", async () => {
+    // Local show carries id "local-show"; prod's id for the same slug is
+    // "prod-show". The rating references "prod-show".
+    const { db, state } = makeStubDb({
+      users: [driftUser()],
+      shows: [{ id: "local-show", slug: "2026-01-01-show" }],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-1",
+              userId: "u-marc",
+              value: 5,
+              rateableType: "Show",
+              rateableId: "prod-show",
+              createdAt: "2026-01-02T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      prodShowIdToLocalId: new Map([["prod-show", "local-show"]]),
+      mcp,
+    });
+
+    // Without the remap this rating skips (prod-show isn't a local id). With it,
+    // the rating lands on the local show id.
+    expect(state.ratings).toHaveLength(1);
+    expect(state.ratings[0].rateableId).toBe("local-show");
+  });
+
+  test("lands an attendance remapped onto the drifted local show id", async () => {
+    const { db, state } = makeStubDb({
+      users: [driftUser()],
+      shows: [{ id: "local-show", slug: "2026-01-01-show" }],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [
+        {
+          attendances: [
+            { id: "a-1", userId: "u-marc", showId: "prod-show", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
+          ],
+          nextCursor: null,
+        },
+      ],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      prodShowIdToLocalId: new Map([["prod-show", "local-show"]]),
+      mcp,
+    });
+
+    expect(state.attendances).toHaveLength(1);
+    expect(state.attendances[0].showId).toBe("local-show");
+  });
+
+  test("still FK-skips when the show is genuinely absent (no remap entry)", async () => {
+    const { db, state } = makeStubDb({ users: [driftUser()], shows: [] });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-1",
+              userId: "u-marc",
+              value: 5,
+              rateableType: "Show",
+              rateableId: "prod-show",
+              createdAt: "2026-01-02T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+    });
+
+    await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: false,
+      pruneOrphans: false,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(state.ratings).toHaveLength(0);
   });
 });
 
