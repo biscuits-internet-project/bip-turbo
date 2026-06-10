@@ -2876,10 +2876,14 @@ async function syncMissingShows(): Promise<void> {
         else localShowMusiciansByShowId.set(row.showId, [entry]);
       }
 
+      // Filter the per-track rows by the show relation (showId IN performerShowIds,
+      // bounded by show count) rather than `trackId IN allTrackIds`: an all-years
+      // sync has tens of thousands of track ids, which blows past the database's
+      // bound-parameter limit.
       const localTrackMusicianRows = allTrackIds.length === 0
         ? []
         : await db.trackMusician.findMany({
-            where: { trackId: { in: allTrackIds } },
+            where: { track: { showId: { in: performerShowIds } } },
             select: {
               id: true,
               trackId: true,
@@ -2903,7 +2907,10 @@ async function syncMissingShows(): Promise<void> {
 
       const localFlagRows = allTrackIds.length === 0
         ? []
-        : await db.trackFlagAssignment.findMany({ where: { trackId: { in: allTrackIds } }, select: { trackId: true, flag: true } });
+        : await db.trackFlagAssignment.findMany({
+            where: { track: { showId: { in: performerShowIds } } },
+            select: { trackId: true, flag: true },
+          });
       const localFlagsByTrackId = new Map<string, string[]>();
       for (const row of localFlagRows) {
         const arr = localFlagsByTrackId.get(row.trackId);
@@ -2958,6 +2965,9 @@ async function syncMissingShows(): Promise<void> {
           smDiff.toCreate.length > 0 || smDiff.toDeleteShowMusicianIds.length > 0 || smDiff.toUpdateInstruments.length > 0;
         if (!lineupChanged && trackWork.length === 0) continue;
 
+        // +adds -deletes ~instrument-only-updates, so a lineup change that only
+        // re-instruments an existing member still shows in the log.
+        const lineupSummary = `lineup +${smDiff.toCreate.length} -${smDiff.toDeleteShowMusicianIds.length} ~${smDiff.toUpdateInstruments.length}, ${trackWork.length} track delta(s)`;
         const flagChanged = trackWork.some((w) => w.flagDiff.toAdd.length > 0 || w.flagDiff.toRemove.length > 0);
         // Tally before the write so dry runs report the same numbers.
         stats.showMusiciansUpserted += smDiff.toCreate.length + smDiff.toUpdateInstruments.length;
@@ -2970,7 +2980,7 @@ async function syncMissingShows(): Promise<void> {
         }
 
         if (isDryRun || isDryRunShow) {
-          console.log(`  🎙️  ${slug}: lineup ±${smDiff.toCreate.length + smDiff.toDeleteShowMusicianIds.length}, ${trackWork.length} track delta(s) (dry run)`);
+          console.log(`  🎙️  ${slug}: ${lineupSummary} (dry run)`);
           changedSlugs.add(slug);
           continue;
         }
@@ -3066,7 +3076,7 @@ async function syncMissingShows(): Promise<void> {
             const showDate = String(local.date);
             if (earliestInsertedDate === null || showDate < earliestInsertedDate) earliestInsertedDate = showDate;
           }
-          console.log(`  🎙️  ${slug}: lineup ±${smDiff.toCreate.length + smDiff.toDeleteShowMusicianIds.length}, ${trackWork.length} track delta(s)`);
+          console.log(`  🎙️  ${slug}: ${lineupSummary}`);
         } catch (err) {
           console.error(`  ❌ failed to mirror performers for ${slug}:`, err);
           stats.errors++;
@@ -3102,7 +3112,10 @@ async function syncMissingShows(): Promise<void> {
         // otherwise be absent from `resolved` (its link rides the later track's
         // payload, which we never fetched) and get wrongly deleted.
         const localCompletionRows = await db.trackCompletion.findMany({
-          where: { earlierTrackId: { in: allTrackIds }, laterTrackId: { in: allTrackIds } },
+          where: {
+            earlierTrack: { showId: { in: performerShowIds } },
+            laterTrack: { showId: { in: performerShowIds } },
+          },
           select: { earlierTrackId: true, laterTrackId: true },
         });
         const compDiff = diffCompletions(localCompletionRows, resolved);

@@ -1,5 +1,6 @@
 import type { ShowLineupMember } from "@bip/domain";
 import { Link } from "react-router-dom";
+import { formatInstrumentNames } from "~/lib/instruments";
 import { sortLineup } from "~/lib/musicians-constants";
 
 /**
@@ -15,7 +16,7 @@ export function ShowLineupSection({ lineup, bare = false }: { lineup: ShowLineup
   const list = (
     <ul className="space-y-1">
       {sortLineup(lineup).map((member) => {
-        const instruments = member.instruments.map((instrument) => instrument.name).join(", ");
+        const instruments = formatInstrumentNames(member.instruments);
         return (
           <li key={member.musician.id} className="text-sm text-content-text-secondary">
             <Link

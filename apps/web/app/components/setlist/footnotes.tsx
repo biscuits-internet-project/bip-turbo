@@ -6,6 +6,7 @@ import {
   gapFootnoteSuppressed,
   LAST_TIME_PLAYED_GAP_THRESHOLD,
 } from "~/lib/footnote-constants";
+import { formatInstrumentNames } from "~/lib/instruments";
 import { deriveShowLineupNotes, elevatedGuestIds } from "~/lib/lineup-notes";
 import { formatDateShort } from "~/lib/utils";
 
@@ -208,8 +209,9 @@ export function annotationFootnoteSources(annotations: Annotation[]): FootnoteSo
 }
 
 function instrumentNames(delta: TrackMusicianDelta): string {
-  // Display instrument names with the casing stored in the DB.
-  return delta.instruments.map((instrument) => instrument.name).join(", ");
+  // Display instrument names with the casing stored in the DB, sorted
+  // alphabetically so a multi-instrument list reads consistently.
+  return formatInstrumentNames(delta.instruments);
 }
 
 function musicianLink(delta: TrackMusicianDelta): ReactNode {

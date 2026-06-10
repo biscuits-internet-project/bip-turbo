@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
+import { sortInstrumentNames } from "~/lib/instruments";
 import { groupWholeShowGuests, type ShowLineupNotes } from "~/lib/lineup-notes";
 
 /** A musician name linked to their profile, rendered un-italicized inside the note. */
@@ -55,14 +56,14 @@ export function ShowLineupNote({ notes }: { notes: ShowLineupNotes }) {
       ))}
       {offInstrument.map((member) => (
         <div key={`off-${member.slug}`}>
-          <MusicianLink name={member.name} slug={member.slug} /> on {member.instruments.join(", ")} instead of{" "}
-          {member.defaultInstrument}
+          <MusicianLink name={member.name} slug={member.slug} /> on {sortInstrumentNames(member.instruments).join(", ")}{" "}
+          instead of {member.defaultInstrument}
         </div>
       ))}
       {guestGroups.map((group) => (
         <div key={`guest-${group.members.map((member) => member.slug).join("-")}`}>
           with <MusicianList members={group.members} />
-          {group.instruments.length > 0 ? ` on ${group.instruments.join(", ")}` : ""}
+          {group.instruments.length > 0 ? ` on ${sortInstrumentNames(group.instruments).join(", ")}` : ""}
           {group.exceptWhereNoted ? ", except where noted" : ""}
         </div>
       ))}
