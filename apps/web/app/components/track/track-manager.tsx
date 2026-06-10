@@ -1,4 +1,4 @@
-import type { Setlist, Track } from "@bip/domain";
+import type { Setlist, Track, TrackMusicianDelta } from "@bip/domain";
 import { formatDuration, parseDuration } from "@bip/domain";
 import {
   closestCenter,
@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SortableTrackItem } from "./sortable-track-item";
 import { compareSets, SET_OPTIONS } from "./track-constants";
 import { TrackEditForm } from "./track-edit-form";
+import { deltasToRows, type PerformerRow, rowsToDeltas, TrackPerformerEditor } from "./track-performer-editor";
 import { type TrackFormData, useTrackApi } from "./use-track-api";
 
 interface TrackManagerProps {
@@ -62,17 +63,29 @@ const INITIAL_FORM: TrackFormData = {
  */
 export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: TrackManagerProps) {
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
-  // Derive the show's footnotes once, then slice per track id. Keyed by id so
+  // The show's performer deltas, kept in local state so saving a track's
+  // performers refreshes its footnotes immediately. Seeded from the loader's
+  // setlist; replaced per-track from the save response.
+  const [liveDeltas, setLiveDeltas] = useState<TrackMusicianDelta[]>(footnoteSetlist?.trackMusicianDeltas ?? []);
+  // Derive the show's footnotes, then slice per track id. Keyed by id so
   // reordering or editing a row keeps each track's footnotes attached.
   const footnotesByTrackId = useMemo(
     () =>
-      footnoteSetlist ? footnotesByTrack(buildShowFootnotes(footnoteSetlist)) : new Map<string, React.ReactNode[]>(),
-    [footnoteSetlist],
+      footnoteSetlist
+        ? footnotesByTrack(buildShowFootnotes({ ...footnoteSetlist, trackMusicianDeltas: liveDeltas }))
+        : new Map<string, React.ReactNode[]>(),
+    [footnoteSetlist, liveDeltas],
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [deleteTrackId, setDeleteTrackId] = useState<string | null>(null);
   const [formData, setFormData] = useState<TrackFormData>(INITIAL_FORM);
+  // Performer deltas save through their own endpoint, so they live outside
+  // formData (which feeds the track PUT). `performersWereSeeded` records
+  // whether the open track started with deltas, so clearing them all still
+  // fires the save (to delete them) while a never-touched track skips it.
+  const [performerRows, setPerformerRows] = useState<PerformerRow[]>([]);
+  const [performersWereSeeded, setPerformersWereSeeded] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
   const api = useTrackApi(showId, setTracks);
@@ -87,10 +100,22 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
     // We only want to load once on mount when initialTracks is empty.
   }, [initialTracks.length, api.loadTracks]);
 
-  const resetForm = () => setFormData(INITIAL_FORM);
+  const resetForm = () => {
+    setFormData(INITIAL_FORM);
+    setPerformerRows([]);
+    setPerformersWereSeeded(false);
+  };
+
+  const startAdding = () => {
+    resetForm();
+    setIsAddingNew(true);
+  };
 
   const startEditing = (track: Track) => {
     setEditingId(track.id);
+    const deltas = liveDeltas.filter((delta) => delta.trackId === track.id);
+    setPerformerRows(deltasToRows(deltas));
+    setPerformersWereSeeded(deltas.length > 0);
     setFormData({
       id: track.id,
       songId: track.songId,
@@ -140,11 +165,25 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
       ? await api.updateTrack({ ...submitData, id: editingId })
       : await api.createTrack(submitData);
 
-    if (result) {
-      setEditingId(null);
-      setIsAddingNew(false);
-      resetForm();
+    if (!result) return;
+
+    // Save performer deltas under the same button, keyed by the resulting
+    // track id (the newly created id for an add). Skip the write entirely when
+    // the track had no deltas and none were added, so a plain note edit pays
+    // nothing for performers.
+    const deltas = rowsToDeltas(performerRows);
+    if (deltas.length > 0 || performersWereSeeded) {
+      const fresh = await api.setPerformers(result.id, deltas);
+      // Swap this track's deltas in local state so its read-only footnotes
+      // re-derive immediately, without reloading the page.
+      if (fresh) {
+        setLiveDeltas((prev) => [...prev.filter((delta) => delta.trackId !== result.id), ...fresh]);
+      }
     }
+
+    setEditingId(null);
+    setIsAddingNew(false);
+    resetForm();
   };
 
   const handleDelete = (id: string) => setDeleteTrackId(id);
@@ -211,7 +250,7 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-content-text-primary">Track List</CardTitle>
-          <Button onClick={() => setIsAddingNew(true)} disabled={isFormOpen} variant="brand">
+          <Button onClick={startAdding} disabled={isFormOpen} variant="brand">
             <Plus className="h-4 w-4 mr-1" />
             Add Track
           </Button>
@@ -224,10 +263,12 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
             formData={formData}
             onFormDataChange={setFormData}
             isEditing={false}
-            isSubmitting={api.isCreating}
+            isSubmitting={api.isCreating || api.isSavingPerformers}
             onSubmit={handleSubmit}
             onCancel={cancelEditing}
-          />
+          >
+            <TrackPerformerEditor rows={performerRows} onChange={setPerformerRows} />
+          </TrackEditForm>
         )}
 
         {Object.keys(tracksBySet).length === 0 ? (
@@ -262,10 +303,12 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
                               formData={formData}
                               onFormDataChange={setFormData}
                               isEditing
-                              isSubmitting={api.isUpdating}
+                              isSubmitting={api.isUpdating || api.isSavingPerformers}
                               onSubmit={handleSubmit}
                               onCancel={cancelEditing}
-                            />
+                            >
+                              <TrackPerformerEditor rows={performerRows} onChange={setPerformerRows} />
+                            </TrackEditForm>
                           ) : (
                             <SortableTrackItem
                               key={track.id}

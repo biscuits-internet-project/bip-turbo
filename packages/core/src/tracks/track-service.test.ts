@@ -225,3 +225,57 @@ describe("TrackService.setTrackMusicianDeltas", () => {
     expect(db.trackMusician.create).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("TrackService.getTrackMusicianDeltas", () => {
+  const created = new Date("2020-01-01");
+
+  // Reads a single track's saved performer rows back as domain deltas (resolved
+  // musician + instrument names), so the editor can refresh its footnotes after
+  // a save without reloading the page.
+  test("maps the track's performer rows to domain deltas", async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test mock
+    const db: any = {
+      track: {
+        findUnique: vi.fn().mockResolvedValue({
+          trackMusicians: [
+            {
+              present: true,
+              musician: {
+                id: "m-mike",
+                name: "Mike Gordon",
+                slug: "mike-gordon",
+                knownFrom: null,
+                defaultInstrument: null,
+              },
+              instruments: [
+                { instrument: { id: "i-bass", name: "Bass", slug: "bass", createdAt: created, updatedAt: created } },
+              ],
+            },
+          ],
+        }),
+      },
+    };
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    const deltas = await service.getTrackMusicianDeltas("track-id");
+
+    expect(deltas).toEqual([
+      {
+        trackId: "track-id",
+        present: true,
+        musician: { id: "m-mike", name: "Mike Gordon", slug: "mike-gordon", knownFrom: null, defaultInstrument: null },
+        instruments: [{ id: "i-bass", name: "Bass", slug: "bass", createdAt: created, updatedAt: created }],
+      },
+    ]);
+  });
+
+  // A track with no performer rows (or no track) yields an empty list, not a
+  // throw, so the caller can blindly replace its local deltas.
+  test("returns an empty list when the track has no performer rows", async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test mock
+    const db: any = { track: { findUnique: vi.fn().mockResolvedValue(null) } };
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    expect(await service.getTrackMusicianDeltas("missing")).toEqual([]);
+  });
+});

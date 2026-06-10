@@ -1,4 +1,4 @@
-import type { Track } from "@bip/domain";
+import type { Track, TrackMusicianDelta } from "@bip/domain";
 import { parseDuration } from "@bip/domain";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +21,14 @@ export interface TrackFormData {
 }
 
 type SetTracks = (updater: (prev: Track[]) => Track[]) => void;
+
+/** One per-track performer change as the performers endpoint expects it:
+ *  `present: true` is a sit-in (also played), `false` a sat-out. */
+export interface TrackPerformerDelta {
+  musicianId: string;
+  present: boolean;
+  instrumentIds: string[];
+}
 
 function sortTracks(tracks: Track[]): Track[] {
   return [...tracks].sort((a, b) => {
@@ -56,6 +64,7 @@ export function useTrackApi(showId: string, setTracks: SetTracks) {
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSavingPerformers, setIsSavingPerformers] = useState(false);
 
   const loadTracks = useCallback(async () => {
     try {
@@ -154,6 +163,34 @@ export function useTrackApi(showId: string, setTracks: SetTracks) {
     [setTracks],
   );
 
+  // Returns the saved deltas (resolved with names) so the caller can refresh
+  // its read-only footnotes, or null when the save failed.
+  const setPerformers = useCallback(
+    async (trackId: string, deltas: TrackPerformerDelta[]): Promise<TrackMusicianDelta[] | null> => {
+      setIsSavingPerformers(true);
+      try {
+        const response = await fetch(`/api/tracks/${trackId}/performers`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deltas }),
+        });
+        // The endpoint returns a 400 with a human-readable message (e.g. a
+        // sit-in for a musician already in the lineup); surface it verbatim.
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        const data = (await response.json()) as { deltas: TrackMusicianDelta[] };
+        return data.deltas;
+      } catch (error) {
+        toast.error(error instanceof Error && error.message ? error.message : "Failed to save performers");
+        return null;
+      } finally {
+        setIsSavingPerformers(false);
+      }
+    },
+    [],
+  );
+
   const reorderTracks = useCallback(
     async (updates: { id: string; position: number; set: string }[]): Promise<void> => {
       try {
@@ -187,8 +224,10 @@ export function useTrackApi(showId: string, setTracks: SetTracks) {
     updateTrack,
     deleteTrack,
     reorderTracks,
+    setPerformers,
     isCreating,
     isUpdating,
     isDeleting,
+    isSavingPerformers,
   };
 }
