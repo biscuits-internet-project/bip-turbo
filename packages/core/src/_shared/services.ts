@@ -94,7 +94,7 @@ export function createServices(container: ServiceContainer): Services {
     shows: new ShowService(container.db, container.logger, container.cacheInvalidation, statsService),
     songs: songService,
     stats: statsService,
-    tracks: new TrackService(container.db, container.logger, container.cacheInvalidation),
+    tracks: new TrackService(container.db, container.logger, container.cacheInvalidation, statsService),
     trackDurations: new TrackDurationService(
       container.db,
       nugsService,

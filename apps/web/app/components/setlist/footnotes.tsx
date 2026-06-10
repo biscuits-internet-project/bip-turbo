@@ -26,7 +26,7 @@ export type TrackFlag = "DYSLEXIC" | "INVERTED" | "UNFINISHED" | "ENDING_ONLY" |
 
 // How each structured flag reads in a footnote — the lowercase wording the
 // free-text annotations used, so the migrated setlists look unchanged.
-const FLAG_LABELS: Record<TrackFlag, string> = {
+export const FLAG_LABELS: Record<TrackFlag, string> = {
   INVERTED: "inverted",
   DYSLEXIC: "dyslexic",
   UNFINISHED: "unfinished",
@@ -36,8 +36,9 @@ const FLAG_LABELS: Record<TrackFlag, string> = {
 };
 
 // Fixed display order for a track's flags within its single consolidated
-// footnote, so combos read consistently across the setlist.
-const FLAG_DISPLAY_ORDER: TrackFlag[] = [
+// footnote, so combos read consistently across the setlist. The track flag
+// editor reuses it so the checkbox order matches the footnote order.
+export const FLAG_DISPLAY_ORDER: TrackFlag[] = [
   "DYSLEXIC",
   "INVERTED",
   "UNFINISHED",

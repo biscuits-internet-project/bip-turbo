@@ -1,4 +1,4 @@
-import type { Setlist, Track, TrackMusicianDelta } from "@bip/domain";
+import type { Setlist, Track, TrackFlag, TrackMusicianDelta } from "@bip/domain";
 import { formatDuration, parseDuration } from "@bip/domain";
 import {
   closestCenter,
@@ -12,7 +12,7 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { arrayMove, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { buildShowFootnotes, footnotesByTrack } from "~/components/setlist/footnotes";
 import {
@@ -28,10 +28,21 @@ import {
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SortableTrackItem } from "./sortable-track-item";
+import { TrackCompletionsEditor } from "./track-completions-editor";
 import { compareSets, SET_OPTIONS } from "./track-constants";
 import { TrackEditForm } from "./track-edit-form";
+import { TrackFlagEditor } from "./track-flag-editor";
 import { deltasToRows, type PerformerRow, rowsToDeltas, TrackPerformerEditor } from "./track-performer-editor";
-import { type TrackFormData, useTrackApi } from "./use-track-api";
+import { type EarlierPerformance, type TrackFlagFootnoteData, type TrackFormData, useTrackApi } from "./use-track-api";
+
+/** Per-track footnote fields overlaid on the loader's setlist after a save, so a
+ *  flag / completion change refreshes the read-only footnotes without a reload. */
+type TrackFootnoteOverride = {
+  flags?: TrackFlagFootnoteData["flags"];
+  flagRecurrences?: TrackFlagFootnoteData["flagRecurrences"];
+  segueRecurrences?: TrackFlagFootnoteData["segueRecurrences"];
+  completes?: Track["completes"];
+};
 
 interface TrackManagerProps {
   showId: string;
@@ -67,15 +78,36 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
   // performers refreshes its footnotes immediately. Seeded from the loader's
   // setlist; replaced per-track from the save response.
   const [liveDeltas, setLiveDeltas] = useState<TrackMusicianDelta[]>(footnoteSetlist?.trackMusicianDeltas ?? []);
+  // Per-track flag / completion overrides applied after a save so the read-only
+  // footnotes refresh without a reload (the performer equivalent is liveDeltas).
+  const [liveTrackOverrides, setLiveTrackOverrides] = useState<Map<string, TrackFootnoteOverride>>(new Map());
   // Derive the show's footnotes, then slice per track id. Keyed by id so
-  // reordering or editing a row keeps each track's footnotes attached.
-  const footnotesByTrackId = useMemo(
-    () =>
-      footnoteSetlist
-        ? footnotesByTrack(buildShowFootnotes({ ...footnoteSetlist, trackMusicianDeltas: liveDeltas }))
-        : new Map<string, React.ReactNode[]>(),
-    [footnoteSetlist, liveDeltas],
-  );
+  // reordering or editing a row keeps each track's footnotes attached. The live
+  // performer deltas and per-track overrides are overlaid before deriving.
+  const footnotesByTrackId = useMemo(() => {
+    if (!footnoteSetlist) return new Map<string, React.ReactNode[]>();
+    const overlaid = {
+      ...footnoteSetlist,
+      trackMusicianDeltas: liveDeltas,
+      sets: footnoteSetlist.sets.map((set) => ({
+        ...set,
+        tracks: set.tracks.map((track) => {
+          const override = liveTrackOverrides.get(track.id);
+          return override ? { ...track, ...override } : track;
+        }),
+      })),
+    };
+    return footnotesByTrack(buildShowFootnotes(overlaid));
+  }, [footnoteSetlist, liveDeltas, liveTrackOverrides]);
+  // The current flags per track, read from the setlist (the lighter edit-form
+  // tracks don't carry them) so editing a row can seed its flag checkboxes.
+  const flagsByTrackId = useMemo(() => {
+    const map = new Map<string, TrackFlag[]>();
+    for (const set of footnoteSetlist?.sets ?? []) {
+      for (const track of set.tracks) map.set(track.id, track.flags ?? []);
+    }
+    return map;
+  }, [footnoteSetlist]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [deleteTrackId, setDeleteTrackId] = useState<string | null>(null);
@@ -86,6 +118,19 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
   // fires the save (to delete them) while a never-touched track skips it.
   const [performerRows, setPerformerRows] = useState<PerformerRow[]>([]);
   const [performersWereSeeded, setPerformersWereSeeded] = useState(false);
+  // Flags and completion links save through their own endpoints, so like
+  // performers they live outside formData. The *WereSeeded flags record whether
+  // the open track started with any, so clearing them all still fires the save.
+  const [flagRows, setFlagRows] = useState<TrackFlag[]>([]);
+  const [flagsWereSeeded, setFlagsWereSeeded] = useState(false);
+  const [completionIds, setCompletionIds] = useState<string[]>([]);
+  const [completionsWereSeeded, setCompletionsWereSeeded] = useState(false);
+  const [earlierPerformances, setEarlierPerformances] = useState<EarlierPerformance[]>([]);
+  // Seeds the completion selection once per opened track (a later songId change
+  // on a new track must not re-seed and clobber the admin's edits).
+  const completionsSeedKeyRef = useRef<string | null>(null);
+
+  const isFormOpen = isAddingNew || editingId !== null;
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
   const api = useTrackApi(showId, setTracks);
@@ -104,7 +149,39 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
     setFormData(INITIAL_FORM);
     setPerformerRows([]);
     setPerformersWereSeeded(false);
+    setFlagRows([]);
+    setFlagsWereSeeded(false);
+    setCompletionIds([]);
+    setCompletionsWereSeeded(false);
+    setEarlierPerformances([]);
+    completionsSeedKeyRef.current = null;
   };
+
+  // Load the completions picker options for the open form's song + show date,
+  // and seed the current selection once per opened track. The completions shape
+  // carries only show date/slug, so the selected earlier-track ids come from the
+  // server, not the loader's tracks.
+  useEffect(() => {
+    const showDate = footnoteSetlist?.show.date;
+    if (!isFormOpen || formData.songId === "none" || !showDate) {
+      setEarlierPerformances([]);
+      return;
+    }
+    let cancelled = false;
+    api.loadEarlierPerformances(formData.songId, showDate, editingId ?? undefined).then((result) => {
+      if (cancelled) return;
+      setEarlierPerformances(result.performances ?? []);
+      const seedKey = editingId ?? "new";
+      if (completionsSeedKeyRef.current !== seedKey) {
+        completionsSeedKeyRef.current = seedKey;
+        setCompletionIds(result.selected ?? []);
+        setCompletionsWereSeeded((result.selected ?? []).length > 0);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFormOpen, formData.songId, editingId, footnoteSetlist?.show.date, api.loadEarlierPerformances]);
 
   const startAdding = () => {
     resetForm();
@@ -116,6 +193,12 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
     const deltas = liveDeltas.filter((delta) => delta.trackId === track.id);
     setPerformerRows(deltasToRows(deltas));
     setPerformersWereSeeded(deltas.length > 0);
+    // Flags come from the setlist (or a prior save's override), not the lighter
+    // edit-form track; completions are seeded by the picker-load effect.
+    const seedFlags = liveTrackOverrides.get(track.id)?.flags ?? flagsByTrackId.get(track.id) ?? [];
+    setFlagRows(seedFlags);
+    setFlagsWereSeeded(seedFlags.length > 0);
+    completionsSeedKeyRef.current = null;
     setFormData({
       id: track.id,
       songId: track.songId,
@@ -181,6 +264,31 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
       }
     }
 
+    // Flags save under the same button and recompute the song's recurrence;
+    // skip when the track had none and none were added so a plain note edit
+    // pays nothing.
+    if (flagRows.length > 0 || flagsWereSeeded) {
+      const fresh = await api.setFlags(result.id, flagRows);
+      if (fresh) {
+        setLiveTrackOverrides((prev) =>
+          new Map(prev).set(result.id, {
+            ...prev.get(result.id),
+            flags: fresh.flags,
+            flagRecurrences: fresh.flagRecurrences,
+            segueRecurrences: fresh.segueRecurrences,
+          }),
+        );
+      }
+    }
+
+    // Completion links likewise (display-only, no recompute).
+    if (completionIds.length > 0 || completionsWereSeeded) {
+      const fresh = await api.setCompletions(result.id, completionIds);
+      if (fresh) {
+        setLiveTrackOverrides((prev) => new Map(prev).set(result.id, { ...prev.get(result.id), completes: fresh }));
+      }
+    }
+
     setEditingId(null);
     setIsAddingNew(false);
     resetForm();
@@ -243,8 +351,6 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
     {} as Record<string, Track[]>,
   );
 
-  const isFormOpen = isAddingNew || editingId !== null;
-
   return (
     <Card className="card-premium">
       <CardHeader>
@@ -263,10 +369,12 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
             formData={formData}
             onFormDataChange={setFormData}
             isEditing={false}
-            isSubmitting={api.isCreating || api.isSavingPerformers}
+            isSubmitting={api.isCreating || api.isSavingPerformers || api.isSavingFlags || api.isSavingCompletions}
             onSubmit={handleSubmit}
             onCancel={cancelEditing}
           >
+            <TrackFlagEditor flags={flagRows} onChange={setFlagRows} />
+            <TrackCompletionsEditor options={earlierPerformances} value={completionIds} onChange={setCompletionIds} />
             <TrackPerformerEditor rows={performerRows} onChange={setPerformerRows} />
           </TrackEditForm>
         )}
@@ -303,10 +411,18 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
                               formData={formData}
                               onFormDataChange={setFormData}
                               isEditing
-                              isSubmitting={api.isUpdating || api.isSavingPerformers}
+                              isSubmitting={
+                                api.isUpdating || api.isSavingPerformers || api.isSavingFlags || api.isSavingCompletions
+                              }
                               onSubmit={handleSubmit}
                               onCancel={cancelEditing}
                             >
+                              <TrackFlagEditor flags={flagRows} onChange={setFlagRows} />
+                              <TrackCompletionsEditor
+                                options={earlierPerformances}
+                                value={completionIds}
+                                onChange={setCompletionIds}
+                              />
                               <TrackPerformerEditor rows={performerRows} onChange={setPerformerRows} />
                             </TrackEditForm>
                           ) : (

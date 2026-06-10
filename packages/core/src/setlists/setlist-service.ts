@@ -306,7 +306,7 @@ export function gateSegueRecurrences(
   return out;
 }
 
-function mapTrackToDomainEntity(
+export function mapTrackToDomainEntity(
   dbTrack: DbTrack & {
     song: (DbSong & { author?: { name: string | null } | null }) | null;
     previousPerformanceShow?: { date: string; slug: string | null } | null;
@@ -708,6 +708,16 @@ const TRACK_FLAGS_AND_COMPLETIONS_INCLUDE = {
       laterTrack: { select: { show: { select: { date: true, slug: true } }, song: { select: { title: true } } } },
     },
   },
+} as const;
+
+// Everything a single track needs to map to its footnote-bearing domain shape
+// (flags, gated recurrences, completion links) via `mapTrackToDomainEntity`.
+// Used by the track editor's post-save readers so a flag / completion change
+// can refresh its read-only footnotes without a full setlist reload.
+export const TRACK_FOOTNOTE_INCLUDE = {
+  song: { include: { author: { select: { name: true } } } },
+  previousPerformanceShow: { select: { date: true, slug: true } },
+  ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
 } as const;
 
 // Every show + track relation the heavy mapper (mapSetlistToDomainEntity) reads:

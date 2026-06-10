@@ -339,6 +339,106 @@ describe("useTrackApi", () => {
     });
   });
 
+  describe("setFlags", () => {
+    // Saves a track's flags through the dedicated endpoint and returns the
+    // recomputed footnote slice so the caller can refresh recurrence footnotes.
+    test("PUTs /api/tracks/:id/flags with the flags and returns the recomputed slice", async () => {
+      const fresh = { flags: ["DYSLEXIC"], flagRecurrences: [{ flag: "DYSLEXIC" }], segueRecurrences: [] };
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, ...fresh }) });
+      const { hook } = setupHook();
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.setFlags("t-1", ["DYSLEXIC", "INVERTED"]);
+      });
+
+      const [url, options] = fetchMock.mock.calls[0];
+      expect(url).toBe("/api/tracks/t-1/flags");
+      expect(options.method).toBe("PUT");
+      expect(JSON.parse(options.body)).toEqual({ flags: ["DYSLEXIC", "INVERTED"] });
+      expect(result).toEqual(fresh);
+    });
+
+    test("surfaces the server error message and returns null on failure", async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, text: async () => "not found" });
+      const { hook } = setupHook();
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.setFlags("t-1", ["DYSLEXIC"]);
+      });
+
+      expect(toastError).toHaveBeenCalledWith("not found");
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("setCompletions", () => {
+    // Saves the earlier versions a track completes and returns the resolved
+    // links for live footnote refresh.
+    test("PUTs /api/tracks/:id/completions with the earlierTrackIds and returns the links", async () => {
+      const completes = [{ date: "2010-01-01", slug: "2010-01-01-shimmy" }];
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, completes }) });
+      const { hook } = setupHook();
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.setCompletions("t-1", ["earlier-a", "earlier-b"]);
+      });
+
+      const [url, options] = fetchMock.mock.calls[0];
+      expect(url).toBe("/api/tracks/t-1/completions");
+      expect(options.method).toBe("PUT");
+      expect(JSON.parse(options.body)).toEqual({ earlierTrackIds: ["earlier-a", "earlier-b"] });
+      expect(result).toEqual(completes);
+    });
+
+    test("surfaces the server error message and returns null on failure", async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, text: async () => "already completed" });
+      const { hook } = setupHook();
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.setCompletions("t-1", ["earlier-a"]);
+      });
+
+      expect(toastError).toHaveBeenCalledWith("already completed");
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("loadEarlierPerformances", () => {
+    // Fetches the picker options + seeded selection for the completions editor,
+    // scoped by song + before-date + the completer track id.
+    test("GETs /api/tracks/earlier-performances with songId, before, trackId and returns the result", async () => {
+      const performances = [{ trackId: "t-9", showDate: "2010-01-01", showSlug: "2010-01-01-shimmy" }];
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ performances, selected: ["t-9"] }) });
+      const { hook } = setupHook();
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.loadEarlierPerformances("song-1", "2015-01-01", "later-1");
+      });
+
+      const [url] = fetchMock.mock.calls[0];
+      expect(url).toBe("/api/tracks/earlier-performances?songId=song-1&before=2015-01-01&trackId=later-1");
+      expect(result).toEqual({ performances, selected: ["t-9"] });
+    });
+
+    // Without a completer trackId (a track still being added) the request omits
+    // it and the selection comes back empty.
+    test("omits trackId when none is given", async () => {
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ performances: [], selected: [] }) });
+      const { hook } = setupHook();
+
+      await act(async () => {
+        await hook.result.current.loadEarlierPerformances("song-1", "2015-01-01");
+      });
+
+      expect(fetchMock.mock.calls[0][0]).toBe("/api/tracks/earlier-performances?songId=song-1&before=2015-01-01");
+    });
+  });
+
   describe("loadTracks", () => {
     // Initial-load helper: hits /api/tracks?showId=…, fills local state,
     // and swallows errors with a toast so the form doesn't blow up if the

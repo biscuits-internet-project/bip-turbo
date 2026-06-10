@@ -1,11 +1,52 @@
-import type { Annotation, Logger, Track, TrackMusicianDelta as TrackMusicianDeltaView } from "@bip/domain";
+import type {
+  Annotation,
+  FlagRecurrence,
+  Logger,
+  SegueRecurrence,
+  Track,
+  TrackFlag,
+  TrackMusicianDelta as TrackMusicianDeltaView,
+} from "@bip/domain";
 import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cache";
 import type { DbAnnotation, DbClient, DbSong, DbTrack } from "../_shared/database/models";
 import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
-import { mapTrackMusicianToDelta, TRACK_PERFORMER_INCLUDE } from "../setlists/setlist-service";
+import {
+  mapTrackMusicianToDelta,
+  mapTrackToDomainEntity as mapTrackRowToFootnoteDomain,
+  TRACK_FOOTNOTE_INCLUDE,
+  TRACK_PERFORMER_INCLUDE,
+} from "../setlists/setlist-service";
+import type { StatsService } from "../stats/stats-service";
 import { recomputeShowDuration } from "./show-duration";
+
+/** A track's structured-flag footnote inputs: the flags plus their gated recurrence. */
+export interface TrackFlagData {
+  flags: TrackFlag[];
+  flagRecurrences: FlagRecurrence[];
+  segueRecurrences: SegueRecurrence[];
+}
+
+/** An earlier same-song performance offered in the completions picker. */
+export interface EarlierPerformance {
+  trackId: string;
+  showDate: string;
+  showSlug: string;
+}
+
+/** How many recent earlier performances the completions picker offers. */
+const EARLIER_PERFORMANCES_LIMIT = 10;
+
+/** Shape a track-with-show row as an EarlierPerformance, dropping any with no show slug. */
+function mapToEarlierPerformance(track: {
+  id: string;
+  show: { date: string; slug: string | null } | null;
+}): EarlierPerformance[] {
+  const show = track.show;
+  if (!show?.slug) return [];
+  return [{ trackId: track.id, showDate: show.date, showSlug: show.slug }];
+}
 
 export interface TrackMusicianDelta {
   musicianId: string;
@@ -62,6 +103,12 @@ export class TrackService {
     protected readonly db: DbClient,
     protected readonly logger: Logger,
     protected readonly cacheInvalidation?: CacheInvalidationService,
+    /**
+     * Optional. Required only by `setTrackFlags`, which recomputes the edited
+     * song's recurrence after a flag change. Other write paths don't need it,
+     * so script contexts that wire TrackService without stats stay usable.
+     */
+    protected readonly stats?: StatsService,
   ) {}
 
   private async invalidateShowCaches(showId: string): Promise<void> {
@@ -401,5 +448,179 @@ export class TrackService {
       include: TRACK_PERFORMER_INCLUDE,
     });
     return (track?.trackMusicians ?? []).map((trackMusician) => mapTrackMusicianToDelta(trackMusician, trackId));
+  }
+
+  /**
+   * Full-set replace of a track's structured flags. Flags drive derived
+   * recurrence columns (`flag_gap` / `track_segue_recurrence`), so after
+   * rewriting the rows this recomputes ONLY the edited song's recurrence —
+   * cheap and scoped, unlike the date-wide `rebuildGapsAndSongStatsSince`.
+   * Mirrors the delete-all-then-insert shape of `setTrackMusicianDeltas`.
+   */
+  async setTrackFlags(trackId: string, flags: TrackFlag[]): Promise<void> {
+    if (!this.stats) {
+      throw new Error("TrackService.setTrackFlags requires a StatsService; constructed without one");
+    }
+    const track = await this.db.track.findUnique({
+      where: { id: trackId },
+      select: { showId: true, songId: true },
+    });
+    if (!track) {
+      throw new Error(`Track with id "${trackId}" not found`);
+    }
+
+    const uniqueFlags = [...new Set(flags)];
+    await this.db.$transaction([
+      this.db.trackFlagAssignment.deleteMany({ where: { trackId } }),
+      ...uniqueFlags.map((flag) =>
+        this.db.trackFlagAssignment.create({
+          // Leave the derived recurrence columns null; the recompute fills them.
+          data: { trackId, flag, createdAt: new Date(), updatedAt: new Date() },
+        }),
+      ),
+    ]);
+
+    await this.stats.recomputeSongRecurrence(track.songId);
+    await this.invalidateShowCaches(track.showId);
+    await this.cacheInvalidation?.invalidateSongCaches();
+  }
+
+  /**
+   * Full-set replace of the completion links where `laterTrackId` is the
+   * *completer* (the track that finishes earlier unfinished versions). The
+   * `earlier_track_id` column is UNIQUE — an earlier track has at most one
+   * completer — so this first rejects any earlier track another track already
+   * completes. Busts caches on both shows of every link (each renders the
+   * "completes …" / "completed by …" footnote). Display-only; no recompute.
+   */
+  async setTrackCompletions(laterTrackId: string, earlierTrackIds: string[]): Promise<void> {
+    const laterTrack = await this.db.track.findUnique({
+      where: { id: laterTrackId },
+      select: { showId: true },
+    });
+    if (!laterTrack) {
+      throw new Error(`Track with id "${laterTrackId}" not found`);
+    }
+
+    const uniqueEarlierIds = [...new Set(earlierTrackIds)];
+    if (uniqueEarlierIds.length > 0) {
+      const conflicting = await this.db.trackCompletion.findMany({
+        where: { earlierTrackId: { in: uniqueEarlierIds }, laterTrackId: { not: laterTrackId } },
+        select: { earlierTrackId: true },
+      });
+      if (conflicting.length > 0) {
+        throw new Error(
+          `These earlier tracks are already completed by another track: ${conflicting
+            .map((row) => row.earlierTrackId)
+            .join(", ")}`,
+        );
+      }
+    }
+
+    // The earlier tracks' shows also render the link, so bust their caches too.
+    const earlierTracks = uniqueEarlierIds.length
+      ? await this.db.track.findMany({ where: { id: { in: uniqueEarlierIds } }, select: { showId: true } })
+      : [];
+
+    await this.db.$transaction([
+      this.db.trackCompletion.deleteMany({ where: { laterTrackId } }),
+      ...uniqueEarlierIds.map((earlierTrackId) =>
+        this.db.trackCompletion.create({
+          data: { earlierTrackId, laterTrackId, createdAt: new Date(), updatedAt: new Date() },
+        }),
+      ),
+    ]);
+
+    const showIds = new Set<string>([laterTrack.showId, ...earlierTracks.map((track) => track.showId)]);
+    for (const showId of showIds) {
+      await this.invalidateShowCaches(showId);
+    }
+  }
+
+  /**
+   * The most recent earlier same-song performances (shows strictly before
+   * `beforeDate`) for the completions picker, shaped for dated-chip display.
+   * Capped at `EARLIER_PERFORMANCES_LIMIT` most-recent-first — a song completed
+   * later was almost always left unfinished recently, so the full back-catalog
+   * would just bloat the picker. Scoped to one song; cross-name completions
+   * aren't offered in the UI.
+   */
+  async findEarlierPerformances(songId: string, beforeDate: string): Promise<EarlierPerformance[]> {
+    const tracks = await this.db.track.findMany({
+      where: { songId, show: { date: { lt: beforeDate } } },
+      select: { id: true, show: { select: { date: true, slug: true } } },
+      orderBy: [
+        { show: { date: "desc" } },
+        { show: { dayOrder: { sort: "desc", nulls: "first" } } },
+        { position: "desc" },
+        { show: { id: "desc" } },
+      ],
+      take: EARLIER_PERFORMANCES_LIMIT,
+    });
+    return tracks.flatMap((track) => mapToEarlierPerformance(track));
+  }
+
+  /**
+   * Earlier-performance shapes for a specific set of track ids. Used to keep an
+   * already-linked completion visible (with its date) in the editor even when it
+   * falls outside the recent-performances cap above.
+   */
+  async findPerformancesByTrackIds(trackIds: string[]): Promise<EarlierPerformance[]> {
+    if (trackIds.length === 0) return [];
+    const tracks = await this.db.track.findMany({
+      where: { id: { in: trackIds } },
+      select: { id: true, show: { select: { date: true, slug: true } } },
+    });
+    return tracks.flatMap((track) => mapToEarlierPerformance(track));
+  }
+
+  /**
+   * The earlier-track ids this (later) track currently completes. The completions
+   * editor seeds its selection from these so a save's full-set replace preserves
+   * existing links — the domain `completes` shape carries only show date/slug,
+   * not the track id, so it can't drive the picker selection.
+   */
+  async getCompletionEarlierTrackIds(laterTrackId: string): Promise<string[]> {
+    const rows = await this.db.trackCompletion.findMany({
+      where: { laterTrackId },
+      select: { earlierTrackId: true },
+    });
+    return rows.map((row) => row.earlierTrackId);
+  }
+
+  /**
+   * Reads a track's flags and gated flag/segue recurrence back as the domain
+   * footnote slice, so the show-edit page can refresh its read-only flag
+   * footnotes right after a save (the recompute has already run) instead of
+   * waiting for a reload.
+   */
+  async getTrackFlagData(trackId: string): Promise<TrackFlagData> {
+    const mapped = await this.readTrackFootnoteDomain(trackId);
+    if (!mapped) {
+      return { flags: [], flagRecurrences: [], segueRecurrences: [] };
+    }
+    return {
+      flags: mapped.flags,
+      flagRecurrences: mapped.flagRecurrences,
+      segueRecurrences: mapped.segueRecurrences,
+    };
+  }
+
+  /**
+   * Reads a track's completion links ("completes …") back as the domain shape,
+   * so the editor can refresh that footnote after a completions save.
+   */
+  async getTrackCompletes(trackId: string): Promise<Track["completes"]> {
+    const mapped = await this.readTrackFootnoteDomain(trackId);
+    return mapped?.completes ?? [];
+  }
+
+  /** Load one track and map it to its footnote-bearing domain shape, or null. */
+  private async readTrackFootnoteDomain(trackId: string): Promise<Track | null> {
+    const track = await this.db.track.findUnique({
+      where: { id: trackId },
+      include: TRACK_FOOTNOTE_INCLUDE,
+    });
+    return track ? mapTrackRowToFootnoteDomain(track) : null;
   }
 }

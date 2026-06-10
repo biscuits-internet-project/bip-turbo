@@ -19,6 +19,27 @@ import {
 
 const ONE_DAY_SECONDS = 86400;
 
+/** A track loaded for the gap / recurrence walk: scalar fields plus its show and flags. */
+type RebuildSongTrack = {
+  id: string;
+  songId: string;
+  set: string;
+  position: number;
+  segue: string | null;
+  gap: number | null;
+  previousPerformanceShowId: string | null;
+  show: { id: string; date: string; dayOrder: number | null; countForStats: boolean } | null;
+  trackFlags: Array<{ flag: string }>;
+};
+
+/** The denormalized song-stat columns the rebuild diffs its fresh compute against. */
+type CurrentSongStats = {
+  timesPlayed: number;
+  dateFirstPlayed: Date | null;
+  dateLastPlayed: Date | null;
+  yearlyPlayData: unknown;
+};
+
 /**
  * Cross-domain aggregates that span shows and songs and back rarity /
  * normalization features (per-year graph denominator, "shows since debut",
@@ -273,49 +294,11 @@ export class StatsService {
     const segueRecurrences: SegueRecurrenceResult[] = [];
 
     for (const [songId, songTracks] of tracksBySong) {
-      const recurrenceInput: RecurrenceTrackForWalk[] = songTracks.flatMap((t) => {
-        if (!t.show) return [];
-        return [
-          {
-            trackId: t.id,
-            showId: t.show.id,
-            showDate: t.show.date,
-            dayOrder: t.show.dayOrder,
-            showCountForStats: t.show.countForStats,
-            set: t.set,
-            position: t.position,
-            segue: t.segue,
-            seguedIn: seguedInTrackIds.has(t.id),
-            flags: t.trackFlags.map((f) => f.flag),
-          },
-        ];
-      });
-      const sortedTracks = sortTracksForGapWalk(recurrenceInput);
-      const gapResults = computeTrackGaps(sortedTracks, statsShowDates);
-
-      const songRecurrence = computeRecurrenceForSong(recurrenceInput, statsShowDates);
-      flagRecurrences.push(...songRecurrence.flagRecurrences);
-      segueRecurrences.push(...songRecurrence.segueRecurrences);
-
-      // Diff each computed (gap, prevId) against the current row. Tracks
-      // before sinceDate can't change, but they're cheap to check and the
-      // filter is the whole point.
-      const trackById = new Map(songTracks.map((t) => [t.id, t]));
-      for (const r of gapResults) {
-        const existing = trackById.get(r.trackId);
-        if (!existing) continue;
-        if (existing.gap !== r.gap || existing.previousPerformanceShowId !== r.previousPerformanceShowId) {
-          changedGapResults.push(r);
-        }
-      }
-
-      const songStats = computeSongStats(
-        recurrenceInput.filter((t) => t.showCountForStats).map((t) => ({ showId: t.showId, showDate: t.showDate })),
-      );
-      const current = currentSongById.get(songId);
-      if (!current || songStatsChanged(current, songStats)) {
-        changedSongUpdates.push({ songId, stats: songStats });
-      }
+      const result = this.computeSongRebuild(songId, songTracks, statsShowDates, seguedInTrackIds, currentSongById);
+      changedGapResults.push(...result.changedGapResults);
+      changedSongUpdates.push(...result.changedSongUpdates);
+      flagRecurrences.push(...result.flagRecurrences);
+      segueRecurrences.push(...result.segueRecurrences);
     }
 
     const affectedTrackIds = allTracks.map((t) => t.id);
@@ -325,6 +308,118 @@ export class StatsService {
       this.replaceFlagRecurrence(affectedTrackIds, flagRecurrences),
       this.replaceSegueRecurrence(affectedTrackIds, segueRecurrences),
     ]);
+  }
+
+  /**
+   * Recompute gaps, song stats, and flag/segue recurrence for ONE song, then
+   * write the diffed results. The cheap path an admin flag edit takes: a flag
+   * change only moves that song's recurrence, so there's no need to walk the
+   * whole catalog from a date like `rebuildGapsAndSongStatsSince`. Loads the
+   * song's tracks (same shape the full rebuild uses) and applies the four bulk
+   * writes scoped to those track ids.
+   */
+  async recomputeSongRecurrence(songId: string): Promise<void> {
+    const [statsShows, songTracks, currentSongs, seguedInTrackIds] = await Promise.all([
+      this.db.show.findMany({
+        where: STATS_SHOWS_WHERE,
+        select: { date: true },
+        orderBy: { date: "asc" },
+      }),
+      this.db.track.findMany({
+        where: { songId },
+        include: {
+          show: { select: { id: true, date: true, dayOrder: true, countForStats: true } },
+          trackFlags: { select: { flag: true } },
+        },
+        orderBy: TRACK_BY_SHOW_ORDER_ASC,
+      }),
+      this.db.song.findMany({
+        where: { id: songId },
+        select: {
+          id: true,
+          timesPlayed: true,
+          dateFirstPlayed: true,
+          dateLastPlayed: true,
+          yearlyPlayData: true,
+        },
+      }),
+      this.seguedInTrackIds([songId]),
+    ]);
+    const statsShowDates = statsShows.map((s) => s.date);
+    const currentSongById = new Map(currentSongs.map((s) => [s.id, s]));
+
+    const result = this.computeSongRebuild(songId, songTracks, statsShowDates, seguedInTrackIds, currentSongById);
+
+    const affectedTrackIds = songTracks.map((t) => t.id);
+    await Promise.all([
+      this.bulkUpdateTrackGaps(result.changedGapResults),
+      this.bulkUpdateSongStats(result.changedSongUpdates),
+      this.replaceFlagRecurrence(affectedTrackIds, result.flagRecurrences),
+      this.replaceSegueRecurrence(affectedTrackIds, result.segueRecurrences),
+    ]);
+  }
+
+  /**
+   * Recompute one song's gap / song-stat / recurrence results and diff them
+   * against the current rows, returning only the changed writes. Shared by the
+   * date-wide rebuild (called per song) and the single-song recompute so both
+   * derive identical numbers from the same walk.
+   */
+  private computeSongRebuild(
+    songId: string,
+    songTracks: RebuildSongTrack[],
+    statsShowDates: string[],
+    seguedInTrackIds: Set<string>,
+    currentSongById: Map<string, CurrentSongStats>,
+  ): {
+    changedGapResults: GapResult[];
+    changedSongUpdates: Array<{ songId: string; stats: ReturnType<typeof computeSongStats> }>;
+    flagRecurrences: FlagRecurrenceResult[];
+    segueRecurrences: SegueRecurrenceResult[];
+  } {
+    const recurrenceInput: RecurrenceTrackForWalk[] = songTracks.flatMap((t) => {
+      if (!t.show) return [];
+      return [
+        {
+          trackId: t.id,
+          showId: t.show.id,
+          showDate: t.show.date,
+          dayOrder: t.show.dayOrder,
+          showCountForStats: t.show.countForStats,
+          set: t.set,
+          position: t.position,
+          segue: t.segue,
+          seguedIn: seguedInTrackIds.has(t.id),
+          flags: t.trackFlags.map((f) => f.flag),
+        },
+      ];
+    });
+    const sortedTracks = sortTracksForGapWalk(recurrenceInput);
+    const gapResults = computeTrackGaps(sortedTracks, statsShowDates);
+    const { flagRecurrences, segueRecurrences } = computeRecurrenceForSong(recurrenceInput, statsShowDates);
+
+    // Diff each computed (gap, prevId) against the current row so only moved
+    // tracks get written.
+    const changedGapResults: GapResult[] = [];
+    const trackById = new Map(songTracks.map((t) => [t.id, t]));
+    for (const r of gapResults) {
+      const existing = trackById.get(r.trackId);
+      if (!existing) continue;
+      if (existing.gap !== r.gap || existing.previousPerformanceShowId !== r.previousPerformanceShowId) {
+        changedGapResults.push(r);
+      }
+    }
+
+    const changedSongUpdates: Array<{ songId: string; stats: ReturnType<typeof computeSongStats> }> = [];
+    const songStats = computeSongStats(
+      recurrenceInput.filter((t) => t.showCountForStats).map((t) => ({ showId: t.showId, showDate: t.showDate })),
+    );
+    const current = currentSongById.get(songId);
+    if (!current || songStatsChanged(current, songStats)) {
+      changedSongUpdates.push({ songId, stats: songStats });
+    }
+
+    return { changedGapResults, changedSongUpdates, flagRecurrences, segueRecurrences };
   }
 
   /**

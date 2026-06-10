@@ -84,7 +84,7 @@ describe("TrackEditForm", () => {
       />,
     );
 
-    expect(screen.getByLabelText(/track notes/i)).toHaveValue("The jam emerges as minimal trance");
+    expect(screen.getByLabelText(/jam charts/i)).toHaveValue("The jam emerges as minimal trance");
   });
 
   // We drive the change directly via fireEvent because the form is fully
@@ -105,7 +105,7 @@ describe("TrackEditForm", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText(/track notes/i), {
+    fireEvent.change(screen.getByLabelText(/jam charts/i), {
       target: { value: "The jam emerges" },
     });
 
@@ -128,7 +128,7 @@ describe("TrackEditForm", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText(/track notes/i), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/jam charts/i), { target: { value: "" } });
 
     const updater = onFormDataChange.mock.calls.at(-1)?.[0] as (p: TrackFormData) => TrackFormData;
     expect(updater({ ...BASE_FORM, note: "x" }).note).toBeNull();
