@@ -1,6 +1,6 @@
 import type { Venue } from "@bip/domain";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { redirect, useNavigate } from "react-router-dom";
 import { Card, CardContent } from "~/components/ui/card";
 import { PageHeader } from "~/components/ui/page-header";
 import { VenueForm, type VenueFormValues } from "~/components/venue/venue-form";
@@ -32,7 +32,9 @@ export const action = adminAction(async ({ request, params }) => {
   const state = (formData.get("state") as string) || null;
   const country = formData.get("country") as string;
 
-  // Update the venue
+  // Update the venue. A name/city/state change re-slugs it, so redirect to the
+  // new slug (the client navigates to the redirect target) rather than returning
+  // the venue, which a plain fetch would receive as an HTML document.
   const venue = await services.venues.update(slug as string, {
     name,
     city,
@@ -40,7 +42,7 @@ export const action = adminAction(async ({ request, params }) => {
     country,
   });
 
-  return { venue };
+  return redirect(`/venues/${venue.slug}`);
 });
 
 export default function EditVenue() {
@@ -75,7 +77,10 @@ export default function EditVenue() {
     });
 
     if (response.ok) {
-      navigate(`/venues/${venue.slug}`);
+      // The action redirects to the (possibly re-slugged) venue URL; fetch
+      // follows it, so response.url is the canonical slug. Navigate there
+      // instead of the stale loader slug, which 404s on a rename.
+      navigate(new URL(response.url).pathname);
     }
   };
 
