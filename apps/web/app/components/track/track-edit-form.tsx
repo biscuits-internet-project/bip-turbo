@@ -1,4 +1,5 @@
 import { Check, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { SongSearch } from "~/components/song/song-search";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -16,6 +17,9 @@ interface TrackEditFormProps {
   isSubmitting: boolean;
   onSubmit: () => void;
   onCancel: () => void;
+  /** Extra fields rendered above the save row — the performer-delta editor,
+   *  which saves alongside the track under the same button. */
+  children?: ReactNode;
 }
 
 /**
@@ -31,6 +35,7 @@ export function TrackEditForm({
   isSubmitting,
   onSubmit,
   onCancel,
+  children,
 }: TrackEditFormProps) {
   return (
     <div className="flex flex-col gap-4 p-4 bg-content-bg/50 rounded-lg border border-content-bg-secondary">
@@ -139,6 +144,8 @@ export function TrackEditForm({
           rows={3}
         />
       </div>
+
+      {children}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button onClick={onCancel} variant="cancel">

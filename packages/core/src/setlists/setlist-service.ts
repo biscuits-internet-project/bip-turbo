@@ -456,7 +456,7 @@ export function mapShowMusicianToLineupMember(db: DbShowMusicianWithRelations): 
   };
 }
 
-function mapTrackMusicianToDelta(db: DbTrackMusicianWithRelations, trackId: string): TrackMusicianDelta {
+export function mapTrackMusicianToDelta(db: DbTrackMusicianWithRelations, trackId: string): TrackMusicianDelta {
   return {
     trackId,
     musician: mapMusicianRefToDomainEntity(db.musician),
@@ -674,7 +674,7 @@ const SINGLE_SHOW_PERFORMER_INCLUDE = {
   },
 } as const;
 
-const TRACK_PERFORMER_INCLUDE = {
+export const TRACK_PERFORMER_INCLUDE = {
   trackMusicians: {
     include: {
       musician: { include: { defaultInstrument: true } },

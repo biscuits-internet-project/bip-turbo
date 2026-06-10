@@ -233,6 +233,154 @@ describe("TrackManager", () => {
     expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
   });
 
+  describe("performer deltas", () => {
+    const mike = {
+      id: "m-mike",
+      name: "Mike Gordon",
+      slug: "mike-gordon",
+      knownFrom: null,
+      defaultInstrument: null,
+    };
+    const bass = { id: "i-bass", name: "Bass", slug: "bass", createdAt: new Date(), updatedAt: new Date() };
+
+    // Two tracks so a sit-in on one is a genuine per-track footnote — a guest
+    // who covers 100% of the show is elevated into the show-level lineup note
+    // instead, which would suppress the per-track footnote we assert on.
+    function footnoteSetlistWith(trackMusicianDeltas: unknown[]) {
+      return {
+        show: { id: "show-1", date: "2025-11-15" },
+        sets: [
+          {
+            label: "S1",
+            sort: 1,
+            tracks: [
+              { id: "t-1", songId: "song-1", gap: 5, previousPerformanceShow: null, flags: [] },
+              { id: "t-2", songId: "song-2", gap: 5, previousPerformanceShow: null, flags: [] },
+            ],
+          },
+        ],
+        annotations: [],
+        lineup: [],
+        trackMusicianDeltas,
+      } as never;
+    }
+    const oneDelta = [{ trackId: "t-1", musician: mike, present: true, instruments: [bass] }];
+
+    // Editing a track seeds the performer editor from the show's saved deltas;
+    // saving the track PUTs those deltas to the performers endpoint, keyed by
+    // the edited track's id and converted to the id-only service shape.
+    test("seeds the editor from footnoteSetlist and PUTs the deltas on save", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager
+          showId="show-1"
+          initialTracks={[makeTrack({ id: "t-1" })]}
+          footnoteSetlist={footnoteSetlistWith(oneDelta)}
+        />,
+      );
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find((c) => String(c[0]) === "/api/tracks/t-1/performers");
+        expect(call).toBeTruthy();
+        expect(JSON.parse(call?.[1].body)).toEqual({
+          deltas: [{ musicianId: "m-mike", present: true, instrumentIds: ["i-bass"] }],
+        });
+      });
+    });
+
+    // The read-only footnotes derive from the show's deltas; after removing a
+    // performer and saving, the track's footnote must disappear without a page
+    // reload (the editor re-derives from the server's fresh deltas).
+    test("clears a track's footnote after its only performer is removed and saved", async () => {
+      const fetchMock = vi.fn((url: string) => {
+        const u = String(url);
+        if (u === "/api/tracks/t-1/performers") {
+          return Promise.resolve({ ok: true, json: async () => ({ ok: true, deltas: [] }) });
+        }
+        if (u.startsWith("/api/musicians/")) return Promise.resolve({ ok: true, json: async () => mike });
+        if (u.startsWith("/api/musicians")) return Promise.resolve({ ok: true, json: async () => [mike] });
+        if (u.startsWith("/api/instruments")) return Promise.resolve({ ok: true, json: async () => [bass] });
+        return Promise.resolve({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager
+          showId="show-1"
+          initialTracks={[makeTrack({ id: "t-1" })]}
+          footnoteSetlist={footnoteSetlistWith(oneDelta)}
+        />,
+      );
+
+      expect(capturedRowProps.find((p) => p.track.id === "t-1")?.footnotes).toHaveLength(1);
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("button", { name: /remove performer/i }));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        const latest = capturedRowProps.filter((p) => p.track.id === "t-1").at(-1);
+        expect(latest?.footnotes ?? []).toHaveLength(0);
+      });
+    });
+
+    // Symmetric to the removal case: adding a performer to a track with none and
+    // saving makes its footnote appear immediately.
+    test("renders a track's footnote after a performer is added and saved", async () => {
+      const fresh = [{ trackId: "t-1", musician: mike, present: true, instruments: [bass] }];
+      const fetchMock = vi.fn((url: string) => {
+        const u = String(url);
+        if (u === "/api/tracks/t-1/performers") {
+          return Promise.resolve({ ok: true, json: async () => ({ ok: true, deltas: fresh }) });
+        }
+        if (u.startsWith("/api/musicians/")) return Promise.resolve({ ok: true, json: async () => mike });
+        if (u.startsWith("/api/musicians")) return Promise.resolve({ ok: true, json: async () => [mike] });
+        if (u.startsWith("/api/instruments")) return Promise.resolve({ ok: true, json: async () => [bass] });
+        return Promise.resolve({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      });
+      globalThis.fetch = fetchMock as never;
+
+      const footnoteSetlist = footnoteSetlistWith([]);
+
+      const { user } = await setup(
+        <TrackManager showId="show-1" initialTracks={[makeTrack({ id: "t-1" })]} footnoteSetlist={footnoteSetlist} />,
+      );
+
+      expect(capturedRowProps.find((p) => p.track.id === "t-1")?.footnotes ?? []).toHaveLength(0);
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("button", { name: /add performer/i }));
+      await user.type(await screen.findByPlaceholderText("Search musicians..."), "Mike");
+      await user.click(await screen.findByText("Mike Gordon", undefined, { timeout: 1500 }));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        const latest = capturedRowProps.filter((p) => p.track.id === "t-1").at(-1);
+        expect(latest?.footnotes ?? []).toHaveLength(1);
+      });
+    });
+
+    // A note-only edit on a track that had no performers must not pay for the
+    // performer write — the track PUT goes out, the performers PUT does not.
+    test("does not PUT performers when the track had none and none were added", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(<TrackManager showId="show-1" initialTracks={[makeTrack({ id: "t-1" })]} />);
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]) === "/api/tracks/t-1")).toBe(true));
+      expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith("/performers"))).toBe(false);
+    });
+  });
+
   describe("drag-and-drop reorder", () => {
     // Same-set reorder: drop t-2 onto t-1's position. The component should
     // PUT /api/tracks/reorder with the new index-based positions for the

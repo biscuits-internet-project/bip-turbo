@@ -297,6 +297,48 @@ describe("useTrackApi", () => {
     });
   });
 
+  describe("setPerformers", () => {
+    // Saves a track's performer deltas through the dedicated endpoint, separate
+    // from the track PUT so the cheap note save never touches performers.
+    test("PUTs /api/tracks/:id/performers with the deltas and returns the fresh deltas", async () => {
+      const fresh = [{ trackId: "t-1", musician: { id: "m-mike" }, present: true, instruments: [{ id: "i-guitar" }] }];
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, deltas: fresh }) });
+      const { hook } = setupHook();
+      const deltas = [
+        { musicianId: "m-mike", present: true, instrumentIds: ["i-guitar"] },
+        { musicianId: "m-marc", present: false, instrumentIds: [] },
+      ];
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.setPerformers("t-1", deltas);
+      });
+
+      const [url, options] = fetchMock.mock.calls[0];
+      expect(url).toBe("/api/tracks/t-1/performers");
+      expect(options.method).toBe("PUT");
+      expect(JSON.parse(options.body)).toEqual({ deltas });
+      expect(result).toEqual(fresh);
+    });
+
+    // The service rejects a sit-in for a lineup member with a 400 + message;
+    // that message surfaces to the admin as a toast and the call returns null.
+    test("surfaces the server error message and returns null on failure", async () => {
+      fetchMock.mockResolvedValueOnce({ ok: false, text: async () => "already in lineup" });
+      const { hook } = setupHook();
+
+      let result: unknown;
+      await act(async () => {
+        result = await hook.result.current.setPerformers("t-1", [
+          { musicianId: "m-1", present: true, instrumentIds: [] },
+        ]);
+      });
+
+      expect(toastError).toHaveBeenCalledWith("already in lineup");
+      expect(result).toBeNull();
+    });
+  });
+
   describe("loadTracks", () => {
     // Initial-load helper: hits /api/tracks?showId=…, fills local state,
     // and swallows errors with a toast so the form doesn't blow up if the

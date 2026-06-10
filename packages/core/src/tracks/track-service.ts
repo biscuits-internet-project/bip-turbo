@@ -1,9 +1,10 @@
-import type { Annotation, Logger, Track } from "@bip/domain";
+import type { Annotation, Logger, Track, TrackMusicianDelta as TrackMusicianDeltaView } from "@bip/domain";
 import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cache";
 import type { DbAnnotation, DbClient, DbSong, DbTrack } from "../_shared/database/models";
 import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
+import { mapTrackMusicianToDelta, TRACK_PERFORMER_INCLUDE } from "../setlists/setlist-service";
 import { recomputeShowDuration } from "./show-duration";
 
 export interface TrackMusicianDelta {
@@ -387,5 +388,18 @@ export class TrackService {
     ]);
 
     await this.invalidateShowCaches(track.showId);
+  }
+
+  /**
+   * Reads a track's saved performer deltas back as domain entities (resolved
+   * musician + instrument names), so the show-edit page can refresh its
+   * read-only footnotes right after a save instead of waiting for a reload.
+   */
+  async getTrackMusicianDeltas(trackId: string): Promise<TrackMusicianDeltaView[]> {
+    const track = await this.db.track.findUnique({
+      where: { id: trackId },
+      include: TRACK_PERFORMER_INCLUDE,
+    });
+    return (track?.trackMusicians ?? []).map((trackMusician) => mapTrackMusicianToDelta(trackMusician, trackId));
   }
 }
