@@ -185,6 +185,7 @@ export default function SongPage() {
     filteredData: filteredPerformances,
     isLoading,
     selectedTimeRange,
+    selectedMusician,
     activeToggleSet,
     hasActiveFilters,
     searchText,
@@ -215,7 +216,7 @@ export default function SongPage() {
   // Server-narrowing filter active = any UI filter that affects the
   // performance set the server returned. Excludes `searchText` (client-only).
   // Used to render the Filtered Gap column in the performances table.
-  const hasServerNarrowingFilter = selectedTimeRange !== "all" || activeToggleSet.size > 0;
+  const hasServerNarrowingFilter = selectedTimeRange !== "all" || !!selectedMusician || activeToggleSet.size > 0;
   // Tab-specific noteworthy-toggle suppression: when the active tab is
   // already scoped to "all-timers" or "jam-charts", the matching chip
   // (and the chip that strictly subsets it) shouldn't reappear in the
@@ -225,6 +226,7 @@ export default function SongPage() {
   const renderFilterContent = (overrides?: { hideAllTimerToggle?: boolean; hideJamChartToggle?: boolean }) => (
     <PerformanceFilterControls
       selectedTimeRange={selectedTimeRange}
+      selectedMusician={selectedMusician}
       activeToggleSet={activeToggleSet}
       updateFilter={updateFilter}
       toggleFilter={toggleFilter}

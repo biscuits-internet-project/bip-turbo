@@ -254,6 +254,37 @@ describe("PerformanceFilterControls", () => {
     expect(toggle.textContent).toMatch(/3/);
   });
 
+  // The Musician picker is opt-in via the selectedMusician prop (mirrors the
+  // Author picker). Rendering the label confirms the control is wired in.
+  test("renders the Musician picker when selectedMusician is provided", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} selectedMusician={null} />);
+
+    expect(screen.getByText("Musician")).toBeInTheDocument();
+  });
+
+  test("does not render the Musician picker when selectedMusician is omitted", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} />);
+
+    expect(screen.queryByText("Musician")).not.toBeInTheDocument();
+  });
+
+  // A selected musician counts toward the active-filter badge so the collapsed
+  // mobile chrome reflects the hidden filter.
+  test("Filters toggle counts a selected musician toward the active-filter badge", async () => {
+    await setup(
+      <PerformanceFilterControls
+        {...defaultProps}
+        searchValue=""
+        onSearchChange={() => {}}
+        hasActiveFilters
+        selectedMusician="sam-altman"
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: /^Search & Filters/ });
+    expect(toggle.textContent).toMatch(/1/);
+  });
+
   // Clicking Clear All delegates to the parent's clearFilters callback, which
   // resets all URL params and search text in the hook.
   test("clicking Clear All calls clearFilters", async () => {

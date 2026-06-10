@@ -380,6 +380,27 @@ describe("buildFilterQuery", () => {
     expect(sql).not.toContain("annotations");
   });
 
+  // The "played by musician" filter resolves to an EXISTS condition (not a
+  // JOIN — a JOIN over the bridge tables would multiply track rows). It must
+  // express lineup-minus-sat-outs OR sit-ins: a track counts when the
+  // musician is in the show lineup and has no sat-out delta, OR has a
+  // present=true delta on that track.
+  test("playedByMusicianId produces an EXISTS condition over the lineup and delta tables", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], {
+      playedByMusicianId: "11111111-1111-1111-1111-111111111111",
+    });
+
+    expect(conditions).toHaveLength(1);
+    expect(extraJoins).toHaveLength(0);
+    const sql = conditions[0].strings.join(" ");
+    // In-lineup branch over show_musicians, sat-out exclusion + sit-in branch
+    // over track_musicians (present), ORed together.
+    expect(sql).toContain("show_musicians");
+    expect(sql).toContain("track_musicians");
+    expect(sql).toContain("present");
+    expect(sql).toMatch(/EXISTS.*OR.*EXISTS/s);
+  });
+
   // The attended filter is special: it produces a JOIN (on the attendances
   // table) rather than a WHERE condition. Important because JOINs and
   // conditions are injected at different points in the SQL template.
@@ -481,6 +502,21 @@ describe("buildSongPerformanceCounts", () => {
     await composer.buildSongPerformanceCounts({ encore: true, segueIn: true });
 
     expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  // The "Filtered Plays" count must count distinct SHOWS, matching
+  // Song.timesPlayed (which counts unique shows — a song played twice in one
+  // show counts once). Counting distinct tracks would let same-show repeats
+  // push a filtered count above the all-time total, which is impossible for a
+  // subset of those plays.
+  test("counts distinct shows, not distinct tracks, to stay consistent with timesPlayed", async () => {
+    const { composer, mockDb } = createComposer([]);
+
+    await composer.buildSongPerformanceCounts({ playedByMusicianId: "musician-1" });
+
+    const sql = (mockDb.$queryRaw.mock.calls[0][0] as readonly string[]).join("");
+    expect(sql).toContain("COUNT(DISTINCT tracks.show_id)");
+    expect(sql).not.toContain("COUNT(DISTINCT tracks.id)");
   });
 });
 
@@ -646,6 +682,7 @@ describe("isNarrowingFilter", () => {
     ["unfinished", { unfinished: true }],
     ["allTimer", { allTimer: true }],
     ["monthDay", { monthDay: "07-26" }],
+    ["playedByMusicianId", { playedByMusicianId: "musician-1" }],
   ])("returns true when %s is set", (_label, options) => {
     expect(isNarrowingFilter(options)).toBe(true);
   });

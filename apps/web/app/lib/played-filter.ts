@@ -2,18 +2,21 @@ interface NarrowingFilterInputs {
   hasDateRange: boolean;
   hasAttendedUser: boolean;
   hasToggleFilters: boolean;
+  hasMusician: boolean;
 }
 
 /**
  * True when at least one filter is active that restricts which performances
- * contribute to a count (date range, attended-shows, or a toggle like
- * encore/setOpener). Cover and author filters intentionally don't count —
- * they pick which songs appear but every matching song still surfaces its
- * full play history. Used by the "not played" gate and by the /songs UI to
- * decide whether the Filtered Plays column is meaningful.
+ * contribute to a count (date range, attended-shows, a toggle like
+ * encore/setOpener, or a musician). Cover and author filters intentionally
+ * don't count — they pick which songs appear but every matching song still
+ * surfaces its full play history. A musician DOES count: it restricts the
+ * performances to that player's, just like the time range. Used by the "not
+ * played" gate and by the /songs UI to decide whether the filtered columns
+ * are meaningful.
  */
 export function hasNarrowingFilter(inputs: NarrowingFilterInputs): boolean {
-  return inputs.hasDateRange || inputs.hasAttendedUser || inputs.hasToggleFilters;
+  return inputs.hasDateRange || inputs.hasAttendedUser || inputs.hasToggleFilters || inputs.hasMusician;
 }
 
 /**

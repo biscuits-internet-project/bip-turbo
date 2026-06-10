@@ -124,15 +124,8 @@ clientLoader.hydrate = true;
 const ALL_TIMERS_PAGE_SIZE = 10;
 
 export default function OnThisDay() {
-  const {
-    setlists,
-    performances,
-    displayLabel,
-    monthDay,
-    previousMonthDay,
-    nextMonthDay,
-    externalSources,
-  } = useSerializedLoaderData<LoaderData>();
+  const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay, externalSources } =
+    useSerializedLoaderData<LoaderData>();
 
   const {
     filteredData: filteredPerformances,
@@ -140,6 +133,7 @@ export default function OnThisDay() {
     selectedTimeRange,
     kindFilter,
     selectedAuthor,
+    selectedMusician,
     activeToggleSet,
     hasActiveFilters,
     searchText,
@@ -216,6 +210,7 @@ export default function OnThisDay() {
                     clearFilters={clearFilters}
                     kindFilter={kindFilter}
                     selectedAuthor={selectedAuthor}
+                    selectedMusician={selectedMusician}
                     showAllTimerToggle={false}
                     searchValue={searchText}
                     onSearchChange={setSearchText}

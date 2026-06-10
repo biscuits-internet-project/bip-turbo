@@ -68,6 +68,7 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
   const filtersParam = url.searchParams.get("filters");
   const attendedParam = url.searchParams.get("attended");
   const monthDayParam = url.searchParams.get("monthDay");
+  const musicianParam = url.searchParams.get("musician");
 
   const filters: PerformanceFilterOptions = {};
 
@@ -84,6 +85,14 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
   }
   if (authorParam && UUID_REGEX.test(authorParam)) filters.authorId = authorParam;
   if (monthDayParam) filters.monthDay = monthDayParam;
+
+  // The musician filter carries a readable slug (e.g. ?musician=sam-altman)
+  // for shareable URLs; resolve it to the id the composer filters on. An
+  // unknown slug resolves to nothing and the filter is simply inactive.
+  if (musicianParam) {
+    const musician = await services.musicians.findBySlug(musicianParam);
+    if (musician) filters.playedByMusicianId = musician.id;
+  }
 
   const attendedUserId = await resolveAttendedUserId(attendedParam, context);
   if (attendedUserId) filters.attendedUserId = attendedUserId;
@@ -106,6 +115,7 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
   const timeRange = getTimeRangeParam(url.searchParams);
   const kindParam = url.searchParams.get("kind");
   const authorParam = url.searchParams.get("author");
+  const musicianParam = url.searchParams.get("musician");
   const filtersParam = url.searchParams.get("filters");
   const monthDay = url.searchParams.get("monthDay");
 
@@ -114,6 +124,7 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
     timeRange: timeRange || null,
     kind: kindParam || null,
     author: authorParam || null,
+    musician: musicianParam || null,
     filters: filtersParam || null,
     attended: attendedUserId || null,
     monthDay: monthDay || null,

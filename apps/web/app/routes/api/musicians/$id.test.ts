@@ -6,8 +6,9 @@ vi.mock("~/lib/base-loaders", () => ({
 }));
 
 const findById = vi.fn();
+const findBySlug = vi.fn();
 vi.mock("~/server/services", () => ({
-  services: { musicians: { findById } },
+  services: { musicians: { findById, findBySlug } },
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -24,23 +25,43 @@ function makeArgs(id: string | undefined): LoaderFunctionArgs & { context: unkno
   } as unknown as LoaderFunctionArgs & { context: unknown };
 }
 
+const MUSICIAN_UUID = "11111111-1111-1111-1111-111111111111";
+
 describe("GET /api/musicians/:id", () => {
   beforeEach(() => {
     findById.mockReset();
+    findBySlug.mockReset();
   });
 
-  test("returns the musician when found", async () => {
-    const musician = { id: "am", name: "Aron Magner", slug: "aron-magner", defaultInstrumentId: "keys-id" };
+  // A uuid-shaped param looks up by id (admin editors pre-fill this way).
+  test("looks up by id when the param is a uuid", async () => {
+    const musician = { id: MUSICIAN_UUID, name: "Aron Magner", slug: "aron-magner", defaultInstrumentId: "keys-id" };
     findById.mockResolvedValue(musician);
 
-    const response = (await loader(makeArgs("am"))) as Response;
+    const response = (await loader(makeArgs(MUSICIAN_UUID))) as Response;
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(musician);
+    expect(findById).toHaveBeenCalledWith(MUSICIAN_UUID);
+    expect(findBySlug).not.toHaveBeenCalled();
   });
 
-  test("returns 404 when no musician matches the id", async () => {
-    findById.mockResolvedValue(null);
+  // A non-uuid param looks up by slug — the shareable ?musician= filter
+  // pre-fills the picker this way.
+  test("looks up by slug when the param is not a uuid", async () => {
+    const musician = { id: MUSICIAN_UUID, name: "Aron Magner", slug: "aron-magner", defaultInstrumentId: "keys-id" };
+    findBySlug.mockResolvedValue(musician);
+
+    const response = (await loader(makeArgs("aron-magner"))) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(musician);
+    expect(findBySlug).toHaveBeenCalledWith("aron-magner");
+    expect(findById).not.toHaveBeenCalled();
+  });
+
+  test("returns 404 when no musician matches", async () => {
+    findBySlug.mockResolvedValue(null);
 
     const response = (await loader(makeArgs("nobody"))) as Response;
 

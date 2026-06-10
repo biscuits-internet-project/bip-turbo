@@ -28,7 +28,7 @@ interface BaseFilter {
  * The canonical all-time list comes from `services.songs.findMany` keyed
  * only on cover/author — those filters pick which songs appear, not which
  * performances contribute to a count. Narrowing filters (date range,
- * attended, toggle flags) compute scope counts as a separate
+ * attended, toggle flags, musician) compute scope counts as a separate
  * `Map<songId, count>` and attach as `filteredTimesPlayed`. `timesPlayed`
  * always means the all-time count from the denormalized song column.
  */
@@ -40,6 +40,7 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
   const kindParam = params.get("kind");
   const attendedParam = params.get("attended");
   const filtersParam = params.get("filters");
+  const musicianParam = params.get("musician");
 
   const kindFilter =
     kindParam === "original" || kindParam === "cover" || kindParam === "mashup" || kindParam === "improvisation"
@@ -50,12 +51,14 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
 
   const hasDateRange = timeRangeParam === "last10shows" || (timeRangeParam !== null && timeRangeParam in SONG_FILTERS);
   const hasToggleFilters = !!filtersParam;
+  const hasMusician = !!musicianParam;
   const hasAttendedUser = !!attendedUserId;
   const showNotPlayed = shouldShowNotPlayed({
     playedParam,
     hasDateRange,
     hasAttendedUser,
     hasToggleFilters,
+    hasMusician,
   });
 
   const baseFilter: BaseFilter = {};
@@ -67,6 +70,7 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
     played: playedParam || null,
     author: authorId || null,
     kind: kindParam || null,
+    musician: musicianParam || null,
     attended: attendedUserId || null,
     filters: filtersParam || null,
   });
@@ -85,6 +89,7 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
         hasDateRange,
         hasAttendedUser,
         hasToggleFilters,
+        hasMusician,
       });
 
       let result: Song[];
@@ -165,22 +170,37 @@ interface ScopeContext {
   hasDateRange: boolean;
   hasAttendedUser: boolean;
   hasToggleFilters: boolean;
+  hasMusician: boolean;
 }
 
 /**
  * Returns scope counts as a `Map<songId, count>` for whichever narrowing
  * filter is active, or `null` when no narrowing is happening. Dispatch:
  * `buildSongPerformanceCounts` is the only counter that understands toggle
- * flags, so any toggle wins; otherwise date range or attended routes
- * through the song service. The two paths count differently on same-show
- * repeats (distinct-tracks vs distinct-shows-with-track) — call sites
- * surface whichever the active filter selects.
+ * flags and the musician predicate, so either of those wins; otherwise date
+ * range or attended routes through the song service. Both paths count distinct
+ * shows (matching `Song.timesPlayed`), so a filtered count never exceeds the
+ * all-time count.
  */
 async function computeScopeCounts(scope: ScopeContext): Promise<Map<string, number> | null> {
-  const { url, context, baseFilter, attendedUserId, timeRangeParam, hasDateRange, hasAttendedUser, hasToggleFilters } =
-    scope;
+  const {
+    url,
+    context,
+    baseFilter,
+    attendedUserId,
+    timeRangeParam,
+    hasDateRange,
+    hasAttendedUser,
+    hasToggleFilters,
+    hasMusician,
+  } = scope;
 
-  if (hasToggleFilters) {
+  // buildSongPerformanceCounts is the per-performance counter — it understands
+  // both the toggle chips (?filters=) and the musician predicate (?musician=)
+  // via FILTER_BUILDERS, so either routes here. They stay separate flags
+  // because they're separate params and separate kinds of filter (a musician
+  // isn't a toggle); date range and attended count through the song service.
+  if (hasToggleFilters || hasMusician) {
     const performanceFilters = await parsePerformanceFilters(url, context);
     const counts = await services.songPageComposer.buildSongPerformanceCounts(performanceFilters);
     return new Map(Object.entries(counts).filter(([, c]) => c > 0));

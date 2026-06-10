@@ -39,6 +39,7 @@ export function usePerformancePageFilters<T>({
   const selectedTimeRange = getTimeRangeParam(searchParams) || "all";
   const kindFilter = (searchParams.get("kind") as "all" | "original" | "cover" | "mashup" | "improvisation") || "all";
   const selectedAuthor = searchParams.get("author") || null;
+  const selectedMusician = searchParams.get("musician") || null;
   const filtersParam = searchParams.get("filters") || "";
   const attendedParam = searchParams.get("attended") || "";
   const playedParam = searchParams.get("played") || "";
@@ -58,6 +59,7 @@ export function usePerformancePageFilters<T>({
     selectedTimeRange !== "all" ||
     kindFilter !== "all" ||
     !!selectedAuthor ||
+    !!selectedMusician ||
     filtersParam !== "" ||
     attendedParam !== "" ||
     playedParam !== "";
@@ -87,6 +89,7 @@ export function usePerformancePageFilters<T>({
     if (selectedTimeRange !== "all") params.set("timeRange", selectedTimeRange);
     if (kindFilter !== "all") params.set("kind", kindFilter);
     if (selectedAuthor) params.set("author", selectedAuthor);
+    if (selectedMusician) params.set("musician", selectedMusician);
     if (filtersParam) params.set("filters", filtersParam);
     if (attendedParam) params.set("attended", attendedParam);
     if (playedParam) params.set("played", playedParam);
@@ -131,6 +134,7 @@ export function usePerformancePageFilters<T>({
     selectedTimeRange,
     kindFilter,
     selectedAuthor,
+    selectedMusician,
     filtersParam,
     attendedParam,
     playedParam,
@@ -197,6 +201,7 @@ export function usePerformancePageFilters<T>({
       era: null,
       kind: null,
       author: null,
+      musician: null,
       filters: null,
       attended: null,
       played: null,
@@ -211,6 +216,7 @@ export function usePerformancePageFilters<T>({
     selectedTimeRange,
     kindFilter,
     selectedAuthor,
+    selectedMusician,
     playedFilter: playedParam || "all",
     activeToggleSet,
     hasFilters,

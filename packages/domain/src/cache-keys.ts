@@ -92,14 +92,14 @@ export const CacheKeys = {
     allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v5`,
     /** Every On-This-Day all-timer cache across all calendar days (for pattern deletion). */
     allTimersOnThisDayAll: () => "songs:all-timers:on-this-day:*",
-    /** Filtered song results by era/author/kind/tags/attended */
+    /** Filtered song results by era/author/kind/musician/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
       const attendedUserId = filters.attended;
       if (attendedUserId) {
-        return `songs:filtered:user:${attendedUserId}:${filterHash}:v5`;
+        return `songs:filtered:user:${attendedUserId}:${filterHash}:v7`;
       }
-      return `songs:filtered:${filterHash}:v5`;
+      return `songs:filtered:${filterHash}:v7`;
     },
     /** All filtered song caches (for pattern deletion) */
     allFiltered: () => "songs:filtered:*",
