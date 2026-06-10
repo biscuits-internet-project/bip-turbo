@@ -1,6 +1,6 @@
 import type { Band, RockOpera, Setlist, Show, ShowLineupMember, Track, Venue } from "@bip/domain";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { redirect, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { DeleteEntityButton } from "~/components/admin/delete-entity-button";
 import { ShowDayOrderManager, type ShowDayOrderRow } from "~/components/show/show-day-order-manager";
@@ -106,10 +106,12 @@ export const action = adminAction(async ({ request, params }) => {
     rockOperaIds: formData.getAll("rockOperaIds").map(String),
   };
 
-  // Update the show
+  // Update the show. A date/venue change re-slugs it, so redirect to the new
+  // slug (the client navigates to the redirect target) rather than returning
+  // the show, which a plain fetch would receive as an HTML document.
   const show = await services.shows.update(slug as string, data);
 
-  return { show };
+  return redirect(`/shows/${show.slug}`);
 });
 
 export default function EditShow() {
@@ -156,8 +158,11 @@ export default function EditShow() {
       });
 
       if (response.ok) {
+        // The action redirects to the (possibly re-slugged) show URL; fetch
+        // follows it, so response.url is the canonical slug. Navigate there
+        // instead of the stale loader slug, which 404s on a date/venue change.
         toast.success("Show updated successfully!", { id: loadingToast });
-        navigate(`/shows/${show.slug}`);
+        navigate(new URL(response.url).pathname);
       } else {
         toast.error("Failed to update show. Please try again.", { id: loadingToast });
       }

@@ -262,14 +262,14 @@ export default function SongPage() {
             </AdminOnly>
           }
         />
-        {(song.authorName || song.kind === "mashup") && (
+        {(song.authorName || song.kind) && (
           <div className="flex flex-wrap items-baseline justify-center gap-x-3 text-content-text-secondary text-lg">
             {song.authorName && (
               <span>
                 by <span className="text-brand-primary">{song.authorName}</span>
               </span>
             )}
-            {song.kind === "mashup" && <span className="text-content-text-tertiary">mashup</span>}
+            {song.kind && <span className="text-content-text-tertiary">{song.kind}</span>}
           </div>
         )}
       </div>

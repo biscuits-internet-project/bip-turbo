@@ -414,4 +414,50 @@ describe("SongPage", () => {
     expect(value.className).toContain("text-xl");
     expect(value.className).toContain("sm:text-3xl");
   });
+
+  // The song's kind (original/cover/mashup/improvisation) is editable in the
+  // admin form, so the public page must surface it for every value — not just
+  // mashup — or an admin can set a kind and never see it reflected.
+  function loaderDataWithKind(kind: string | null) {
+    return {
+      song: {
+        title: "Basis for a Day",
+        slug: "basis-for-a-day",
+        timesPlayed: 100,
+        dateFirstPlayed: null,
+        dateLastPlayed: null,
+        kind,
+        history: null,
+        lyrics: null,
+        tabs: null,
+        guitarTabsUrl: null,
+        notes: null,
+        yearlyPlayData: {},
+      },
+      performances: [],
+      showsByYear: {},
+    };
+  }
+
+  test.each([
+    "original",
+    "cover",
+    "mashup",
+    "improvisation",
+  ])("renders the '%s' kind label on the song page", (kind) => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce(loaderDataWithKind(kind));
+    renderSongPage();
+
+    expect(screen.getByText(kind)).toBeInTheDocument();
+  });
+
+  // A song with no kind and no author must not render an empty subtitle row.
+  test("renders no kind label when kind is null", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValueOnce(loaderDataWithKind(null));
+    renderSongPage();
+
+    for (const kind of ["original", "cover", "mashup", "improvisation"]) {
+      expect(screen.queryByText(kind)).not.toBeInTheDocument();
+    }
+  });
 });

@@ -147,17 +147,17 @@ export class VenueService {
   }
 
   async update(
-    id: string,
+    slug: string,
     data: Partial<Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">>,
   ): Promise<Venue> {
-    // Get current venue for validation and fallback values
-    const current = await this.db.venue.findUnique({
-      where: { id },
-      select: { name: true, city: true, state: true, country: true },
+    // Resolve by slug — that's what the admin edit route passes in (the URL param).
+    const current = await this.db.venue.findFirst({
+      where: { slug },
+      select: { id: true, name: true, city: true, state: true, country: true },
     });
 
     if (!current) {
-      throw new Error(`Venue with id "${id}" not found`);
+      throw new Error(`Venue with slug "${slug}" not found`);
     }
 
     // Validate required fields (using current values as fallback)
@@ -230,11 +230,11 @@ export class VenueService {
       const name = cleanData.name || current.name || "";
       const city = cleanData.city || current.city;
       const state = cleanData.state !== undefined ? cleanData.state : current.state;
-      updateData.slug = await this.generateVenueSlug(name, city, state, id);
+      updateData.slug = await this.generateVenueSlug(name, city, state, current.id);
     }
 
     const result = await this.db.venue.update({
-      where: { id },
+      where: { id: current.id },
       data: updateData,
     });
     return mapVenueToDomainEntity(result);
