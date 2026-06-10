@@ -187,10 +187,10 @@ describe("TrackManager", () => {
   test("clicking 'Add Track' opens the edit form with an 'Add' CTA", async () => {
     const { user } = await setup(<TrackManager showId="show-1" initialTracks={[makeTrack({ id: "t-1" })]} />);
 
-    expect(screen.queryByLabelText(/track notes/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/jam charts/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /add track/i }));
 
-    expect(screen.getByLabelText(/track notes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/jam charts/i)).toBeInTheDocument();
     // Add CTA inside the form (distinct from the "Add Track" header button).
     expect(screen.getAllByRole("button", { name: /^add$/i }).length).toBeGreaterThanOrEqual(1);
   });
@@ -203,7 +203,7 @@ describe("TrackManager", () => {
     await user.click(screen.getByRole("button", { name: /add track/i }));
     await user.click(screen.getByRole("button", { name: /cancel/i }));
 
-    expect(screen.queryByLabelText(/track notes/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/jam charts/i)).not.toBeInTheDocument();
   });
 
   // While the form is open, the "Add Track" header button is disabled so
@@ -229,7 +229,7 @@ describe("TrackManager", () => {
     // The stub above renders an edit button labeled "edit-<id>".
     await user.click(screen.getByText("edit-t-1"));
 
-    expect(screen.getByLabelText(/track notes/i)).toHaveValue("The jam emerges as minimal trance");
+    expect(screen.getByLabelText(/jam charts/i)).toHaveValue("The jam emerges as minimal trance");
     expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
   });
 
@@ -378,6 +378,186 @@ describe("TrackManager", () => {
 
       await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]) === "/api/tracks/t-1")).toBe(true));
       expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith("/performers"))).toBe(false);
+    });
+  });
+
+  describe("track flags", () => {
+    function footnoteSetlistWith(flags: string[]) {
+      return {
+        show: { id: "show-1", date: "2025-11-15" },
+        sets: [
+          {
+            label: "S1",
+            sort: 1,
+            tracks: [{ id: "t-1", songId: "song-1", gap: 5, previousPerformanceShow: null, flags }],
+          },
+        ],
+        annotations: [],
+        lineup: [],
+        trackMusicianDeltas: [],
+      } as never;
+    }
+
+    function routeFetch(handlers: Record<string, unknown>) {
+      return vi.fn((url: string, _init?: { body?: string }) => {
+        const u = String(url);
+        if (u.startsWith("/api/tracks/earlier-performances")) {
+          return Promise.resolve({ ok: true, json: async () => ({ performances: [], selected: [] }) });
+        }
+        for (const [path, body] of Object.entries(handlers)) {
+          if (u === path) return Promise.resolve({ ok: true, json: async () => body });
+        }
+        return Promise.resolve({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      });
+    }
+
+    // Editing a track seeds the flag checkboxes from the setlist; saving the
+    // track PUTs them to the flags endpoint keyed by the edited track's id.
+    test("seeds the flag editor from the setlist and PUTs flags on save", async () => {
+      const fetchMock = routeFetch({
+        "/api/tracks/t-1/flags": { ok: true, flags: ["DYSLEXIC"], flagRecurrences: [], segueRecurrences: [] },
+      });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager
+          showId="show-1"
+          initialTracks={[makeTrack({ id: "t-1" })]}
+          footnoteSetlist={footnoteSetlistWith(["DYSLEXIC"])}
+        />,
+      );
+
+      await user.click(screen.getByText("edit-t-1"));
+      expect(screen.getByRole("checkbox", { name: /dyslexic/i })).toBeChecked();
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find((c) => String(c[0]) === "/api/tracks/t-1/flags");
+        expect(call).toBeTruthy();
+        expect(JSON.parse(call?.[1]?.body ?? "null")).toEqual({ flags: ["DYSLEXIC"] });
+      });
+    });
+
+    // Adding a flag to a track with none and saving makes its footnote appear
+    // immediately (the live override re-derives without a reload).
+    test("renders a flag footnote after a flag is added and saved", async () => {
+      const fetchMock = routeFetch({
+        "/api/tracks/t-1/flags": { ok: true, flags: ["INVERTED"], flagRecurrences: [], segueRecurrences: [] },
+      });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager
+          showId="show-1"
+          initialTracks={[makeTrack({ id: "t-1" })]}
+          footnoteSetlist={footnoteSetlistWith([])}
+        />,
+      );
+
+      expect(capturedRowProps.find((p) => p.track.id === "t-1")?.footnotes ?? []).toHaveLength(0);
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("checkbox", { name: /inverted/i }));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        const latest = capturedRowProps.filter((p) => p.track.id === "t-1").at(-1);
+        expect(latest?.footnotes ?? []).toHaveLength(1);
+      });
+    });
+
+    // A note-only edit on a track with no flags must not PUT flags.
+    test("does not PUT flags when the track had none and none were added", async () => {
+      const fetchMock = routeFetch({});
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager
+          showId="show-1"
+          initialTracks={[makeTrack({ id: "t-1" })]}
+          footnoteSetlist={footnoteSetlistWith([])}
+        />,
+      );
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]) === "/api/tracks/t-1")).toBe(true));
+      expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith("/flags"))).toBe(false);
+    });
+  });
+
+  describe("track completions", () => {
+    const footnoteSetlist = {
+      show: { id: "show-1", date: "2025-11-15" },
+      sets: [
+        {
+          label: "S1",
+          sort: 1,
+          tracks: [{ id: "t-1", songId: "song-1", gap: 5, previousPerformanceShow: null, flags: [] }],
+        },
+      ],
+      annotations: [],
+      lineup: [],
+      trackMusicianDeltas: [],
+    } as never;
+
+    function routeFetch(selected: string[], completionsBody: unknown) {
+      return vi.fn((url: string, _init?: { body?: string }) => {
+        const u = String(url);
+        if (u.startsWith("/api/tracks/earlier-performances")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              performances: [{ trackId: "e1", showDate: "2010-01-01", showSlug: "2010-01-01-shimmy" }],
+              selected,
+            }),
+          });
+        }
+        if (u === "/api/tracks/t-1/completions") {
+          return Promise.resolve({ ok: true, json: async () => completionsBody });
+        }
+        return Promise.resolve({ ok: true, json: async () => makeTrack({ id: "t-1" }) });
+      });
+    }
+
+    // The editor seeds its selection from the server (the completes shape lacks
+    // the earlier-track id); saving PUTs those earlier-track ids so a full-set
+    // replace preserves the existing links.
+    test("seeds the selection from the server and PUTs earlierTrackIds on save", async () => {
+      const fetchMock = routeFetch(["e1"], { ok: true, completes: [{ date: "2010-01-01", slug: "2010-01-01-shimmy" }] });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager showId="show-1" initialTracks={[makeTrack({ id: "t-1" })]} footnoteSetlist={footnoteSetlist} />,
+      );
+
+      await user.click(screen.getByText("edit-t-1"));
+      // The seeded chip proves the selection loaded before we save.
+      await screen.findByText("Jan 1, 2010");
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => {
+        const call = fetchMock.mock.calls.find((c) => String(c[0]) === "/api/tracks/t-1/completions");
+        expect(call).toBeTruthy();
+        expect(JSON.parse(call?.[1]?.body ?? "null")).toEqual({ earlierTrackIds: ["e1"] });
+      });
+    });
+
+    // A track with no completions and none added must not PUT completions.
+    test("does not PUT completions when the track had none and none were added", async () => {
+      const fetchMock = routeFetch([], { ok: true, completes: [] });
+      globalThis.fetch = fetchMock as never;
+
+      const { user } = await setup(
+        <TrackManager showId="show-1" initialTracks={[makeTrack({ id: "t-1" })]} footnoteSetlist={footnoteSetlist} />,
+      );
+
+      await user.click(screen.getByText("edit-t-1"));
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => expect(fetchMock.mock.calls.some((c) => String(c[0]) === "/api/tracks/t-1")).toBe(true));
+      expect(fetchMock.mock.calls.some((c) => String(c[0]).endsWith("/completions"))).toBe(false);
     });
   });
 

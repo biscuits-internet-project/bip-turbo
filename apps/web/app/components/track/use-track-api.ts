@@ -1,8 +1,28 @@
-import type { Track, TrackMusicianDelta } from "@bip/domain";
+import type { FlagRecurrence, SegueRecurrence, Track, TrackFlag, TrackMusicianDelta } from "@bip/domain";
 import { parseDuration } from "@bip/domain";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { compareSets } from "./track-constants";
+
+/** A track's flags plus their recomputed recurrence, returned from a flag save. */
+export interface TrackFlagFootnoteData {
+  flags: TrackFlag[];
+  flagRecurrences: FlagRecurrence[];
+  segueRecurrences: SegueRecurrence[];
+}
+
+/** An earlier same-song performance offered in the completions picker. */
+export interface EarlierPerformance {
+  trackId: string;
+  showDate: string;
+  showSlug: string;
+}
+
+/** The completions picker's options plus the completer's already-linked ids. */
+export interface EarlierPerformancesResult {
+  performances: EarlierPerformance[];
+  selected: string[];
+}
 
 export interface TrackFormData {
   id?: string;
@@ -65,6 +85,8 @@ export function useTrackApi(showId: string, setTracks: SetTracks) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingPerformers, setIsSavingPerformers] = useState(false);
+  const [isSavingFlags, setIsSavingFlags] = useState(false);
+  const [isSavingCompletions, setIsSavingCompletions] = useState(false);
 
   const loadTracks = useCallback(async () => {
     try {
@@ -191,6 +213,75 @@ export function useTrackApi(showId: string, setTracks: SetTracks) {
     [],
   );
 
+  // Returns the recomputed flag footnote slice so the caller can refresh its
+  // read-only footnotes, or null when the save failed.
+  const setFlags = useCallback(async (trackId: string, flags: TrackFlag[]): Promise<TrackFlagFootnoteData | null> => {
+    setIsSavingFlags(true);
+    try {
+      const response = await fetch(`/api/tracks/${trackId}/flags`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flags }),
+      });
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const data = (await response.json()) as TrackFlagFootnoteData;
+      return { flags: data.flags, flagRecurrences: data.flagRecurrences, segueRecurrences: data.segueRecurrences };
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "Failed to save flags");
+      return null;
+    } finally {
+      setIsSavingFlags(false);
+    }
+  }, []);
+
+  // Returns the resolved "completes …" links so the caller can refresh its
+  // read-only footnotes, or null when the save failed (e.g. the earlier track
+  // is already completed by another track).
+  const setCompletions = useCallback(
+    async (trackId: string, earlierTrackIds: string[]): Promise<Track["completes"] | null> => {
+      setIsSavingCompletions(true);
+      try {
+        const response = await fetch(`/api/tracks/${trackId}/completions`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ earlierTrackIds }),
+        });
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+        const data = (await response.json()) as { completes: Track["completes"] };
+        return data.completes;
+      } catch (error) {
+        toast.error(error instanceof Error && error.message ? error.message : "Failed to save completions");
+        return null;
+      } finally {
+        setIsSavingCompletions(false);
+      }
+    },
+    [],
+  );
+
+  // Loads the completions picker's options plus, for an existing completer
+  // (`trackId`), the earlier-track ids it already completes (the seeded
+  // selection). Omit trackId for a track still being added.
+  const loadEarlierPerformances = useCallback(
+    async (songId: string, before: string, trackId?: string): Promise<EarlierPerformancesResult> => {
+      try {
+        const params = new URLSearchParams({ songId, before });
+        if (trackId) params.set("trackId", trackId);
+        const response = await fetch(`/api/tracks/earlier-performances?${params.toString()}`);
+        if (!response.ok) throw new Error("Failed to load earlier performances");
+        return (await response.json()) as EarlierPerformancesResult;
+      } catch {
+        toast.error("Failed to load earlier performances");
+        return { performances: [], selected: [] };
+      }
+    },
+    [],
+  );
+
   const reorderTracks = useCallback(
     async (updates: { id: string; position: number; set: string }[]): Promise<void> => {
       try {
@@ -225,9 +316,14 @@ export function useTrackApi(showId: string, setTracks: SetTracks) {
     deleteTrack,
     reorderTracks,
     setPerformers,
+    setFlags,
+    setCompletions,
+    loadEarlierPerformances,
     isCreating,
     isUpdating,
     isDeleting,
     isSavingPerformers,
+    isSavingFlags,
+    isSavingCompletions,
   };
 }

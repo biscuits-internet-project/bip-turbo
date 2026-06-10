@@ -281,3 +281,79 @@ describe("StatsService.getSongPlayDates", () => {
     expect(await service.getSongPlayDates()).toEqual({});
   });
 });
+
+// The per-song recurrence recompute is what a GUI flag edit triggers: it must
+// rebuild ONLY the edited song's recurrence (cheap, scoped) rather than the
+// date-wide fan-out. These pin the scoping and the flag-recurrence write.
+describe("StatsService.recomputeSongRecurrence", () => {
+  type StubTrack = {
+    id: string;
+    songId: string;
+    set: string;
+    position: number;
+    segue: string | null;
+    gap: number | null;
+    previousPerformanceShowId: string | null;
+    show: { id: string; date: string; dayOrder: number | null; countForStats: boolean };
+    trackFlags: Array<{ flag: string }>;
+  };
+
+  function stubTrack(id: string, showId: string, date: string, flags: string[]): StubTrack {
+    return {
+      id,
+      songId: "tractorbeam",
+      set: "S1",
+      position: 1,
+      segue: null,
+      gap: null,
+      previousPerformanceShowId: null,
+      show: { id: showId, date, dayOrder: null, countForStats: true },
+      trackFlags: flags.map((flag) => ({ flag })),
+    };
+  }
+
+  function makeService(songTracks: StubTrack[], statsShowDates: string[]) {
+    const db = {
+      show: { findMany: vi.fn().mockResolvedValue(statsShowDates.map((date) => ({ date }))) },
+      track: { findMany: vi.fn().mockResolvedValue(songTracks) },
+      song: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { id: "tractorbeam", timesPlayed: 2, dateFirstPlayed: null, dateLastPlayed: null, yearlyPlayData: {} },
+          ]),
+      },
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $executeRaw: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ConstructorParameters<typeof StatsService>[0];
+    return new StatsService(db);
+  }
+
+  // Two dyslexic versions of one song: the recompute writes flag recurrence for
+  // exactly those two track ids (proves it doesn't touch the whole catalog).
+  test("recomputes only the given song's tracks and writes their flag recurrence", async () => {
+    const statsShows = ["2003-01-01", "2003-01-10", "2003-01-20"];
+    const tracks = [
+      stubTrack("a", "A", "2003-01-01", ["DYSLEXIC"]),
+      stubTrack("b", "B", "2003-01-20", ["DYSLEXIC"]),
+    ];
+    const service = makeService(tracks, statsShows);
+    const replaceFlag = vi.spyOn(
+      service as unknown as { replaceFlagRecurrence: (ids: string[], recs: unknown[]) => Promise<void> },
+      "replaceFlagRecurrence",
+    );
+    const replaceSegue = vi.spyOn(
+      service as unknown as { replaceSegueRecurrence: (ids: string[], recs: unknown[]) => Promise<void> },
+      "replaceSegueRecurrence",
+    );
+
+    await service.recomputeSongRecurrence("tractorbeam");
+
+    expect(replaceFlag).toHaveBeenCalledTimes(1);
+    expect(replaceFlag.mock.calls[0][0]).toEqual(["a", "b"]);
+    expect(replaceFlag.mock.calls[0][1]).toContainEqual(
+      expect.objectContaining({ trackId: "b", flag: "DYSLEXIC", previousShowId: "A" }),
+    );
+    expect(replaceSegue).toHaveBeenCalledWith(["a", "b"], expect.any(Array));
+  });
+});

@@ -17,8 +17,8 @@ interface TrackEditFormProps {
   isSubmitting: boolean;
   onSubmit: () => void;
   onCancel: () => void;
-  /** Extra fields rendered above the save row — the performer-delta editor,
-   *  which saves alongside the track under the same button. */
+  /** The flag / completion / performer editors, rendered between the top fields
+   *  and the annotations; they save alongside the track under the same button. */
   children?: ReactNode;
 }
 
@@ -110,22 +110,7 @@ export function TrackEditForm({
         </div>
       </div>
 
-      <div>
-        <label htmlFor="track-note" className={formLabelClass}>
-          Track Notes
-        </label>
-        <Textarea
-          id="track-note"
-          value={formData.note || ""}
-          onChange={(e) => {
-            const value = e.target.value;
-            onFormDataChange((prev) => ({ ...prev, note: value || null }));
-          }}
-          placeholder="Add a note about this track..."
-          className={formInputClass}
-          rows={3}
-        />
-      </div>
+      {children}
 
       <div>
         <label htmlFor="track-annotation" className={formLabelClass}>
@@ -145,7 +130,22 @@ export function TrackEditForm({
         />
       </div>
 
-      {children}
+      <div>
+        <label htmlFor="track-note" className={formLabelClass}>
+          Jam Charts
+        </label>
+        <Textarea
+          id="track-note"
+          value={formData.note || ""}
+          onChange={(e) => {
+            const value = e.target.value;
+            onFormDataChange((prev) => ({ ...prev, note: value || null }));
+          }}
+          placeholder="Add jam chart notes..."
+          className={formInputClass}
+          rows={3}
+        />
+      </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button onClick={onCancel} variant="cancel">
