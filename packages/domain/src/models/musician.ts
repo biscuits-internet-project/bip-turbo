@@ -74,7 +74,7 @@ export type MusicianWithStats = {
   slug: string;
   knownFrom: string | null;
   defaultInstrumentName: string | null;
-  trackCount: number;
+  songCount: number;
   showCount: number;
   firstShowDate: string | null;
   lastShowDate: string | null;
@@ -93,7 +93,7 @@ export type MusicianAppearanceShow = {
 /** A musician's appearance summary for their profile header and tables. */
 export type MusicianAppearances = {
   showIds: string[];
-  trackCount: number;
+  songCount: number;
   firstShow: MusicianAppearanceShow | null;
   lastShow: MusicianAppearanceShow | null;
 };

@@ -50,6 +50,11 @@ export interface PerformanceFilterOptions {
   jamChart?: boolean;
   allTimer?: boolean;
   monthDay?: string;
+  /**
+   * Narrow to tracks a given musician played: in the show lineup with no
+   * sat-out delta, OR carrying a present=true sit-in delta on the track.
+   */
+  playedByMusicianId?: string;
 }
 
 export class SongPageComposer {
@@ -319,7 +324,10 @@ export class SongPageComposer {
 
   /**
    * Count matching performances per song, grouped by song_id.
-   * Used by /songs to show per-song counts when toggle filters are active.
+   * Used by /songs to show per-song counts when narrowing filters are active.
+   * Counts distinct SHOWS (not tracks) so the "Filtered Plays" value shares the
+   * all-time `Song.timesPlayed` semantic — unique shows, a song played twice in
+   * one show counting once — and so stays at or below the all-time total.
    */
   async buildSongPerformanceCounts(options?: PerformanceFilterOptions): Promise<Record<string, number>> {
     // Always exclude count_for_stats=false shows so the "filtered plays"
@@ -331,7 +339,7 @@ export class SongPageComposer {
     const extraJoinsSql = extraJoins.length > 0 ? Prisma.sql`${Prisma.join(extraJoins, "\n      ")}` : Prisma.empty;
 
     const rows = await this.db.$queryRaw<Array<{ song_id: string; count: string }>>`
-      SELECT tracks.song_id, COUNT(DISTINCT tracks.id)::text as count
+      SELECT tracks.song_id, COUNT(DISTINCT tracks.show_id)::text as count
       FROM tracks
       JOIN shows ON tracks.show_id = shows.id
       JOIN songs ON tracks.song_id = songs.id
@@ -521,6 +529,25 @@ export class SongPageComposer {
       o.unfinished
         ? {
             condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'UNFINISHED'::track_flag)`,
+          }
+        : null,
+    // "Played by musician": the track matches when the musician is in the
+    // show lineup AND has no sat-out delta on this track, OR has a sit-in
+    // (present=true) delta on this track. EXISTS (not a JOIN) so the track
+    // row isn't multiplied. Parenthesized — it contains a top-level OR.
+    playedByMusicianId: (o) =>
+      o.playedByMusicianId
+        ? {
+            condition: Prisma.sql`(
+              (
+                EXISTS (SELECT 1 FROM show_musicians sm
+                        WHERE sm.show_id = tracks.show_id AND sm.musician_id = ${o.playedByMusicianId}::uuid)
+                AND NOT EXISTS (SELECT 1 FROM track_musicians tm
+                        WHERE tm.track_id = tracks.id AND tm.musician_id = ${o.playedByMusicianId}::uuid AND tm.present = false)
+              )
+              OR EXISTS (SELECT 1 FROM track_musicians tm
+                        WHERE tm.track_id = tracks.id AND tm.musician_id = ${o.playedByMusicianId}::uuid AND tm.present = true)
+            )`,
           }
         : null,
   };
@@ -729,7 +756,8 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.unfinished ||
       options.jamChart ||
       options.allTimer ||
-      options.monthDay,
+      options.monthDay ||
+      options.playedByMusicianId,
   );
 }
 

@@ -58,6 +58,30 @@ describe("MusicianService.create — dedupe by slug", () => {
   });
 });
 
+describe("MusicianService.findTopBySongCount", () => {
+  // The picker's default list surfaces the most-played musicians first (the
+  // core lineup + frequent guests) so the common picks aren't buried under an
+  // alphabetical list. Ties break alphabetically for a stable order.
+  test("orders by song count desc, breaking ties alphabetically, and caps at the limit", async () => {
+    const service = new MusicianService({} as never, logger);
+    vi.spyOn(service, "findAllWithStats").mockResolvedValue([
+      { id: "1", name: "Allen Aucoin", slug: "allen-aucoin", songCount: 5 },
+      { id: "2", name: "Marc Brownstein", slug: "marc-brownstein", songCount: 40 },
+      { id: "3", name: "Aron Magner", slug: "aron-magner", songCount: 40 },
+      { id: "4", name: "Sam Altman", slug: "sam-altman", songCount: 12 },
+    ] as never);
+
+    const result = await service.findTopBySongCount(3);
+
+    expect(result.map((m) => m.slug)).toEqual([
+      // 40 (Aron < Marc alphabetically), then 40, then 12 — Allen's 5 is cut.
+      "aron-magner",
+      "marc-brownstein",
+      "sam-altman",
+    ]);
+  });
+});
+
 describe("InstrumentService.create — dedupe by slug", () => {
   test("returns the existing instrument when the slug already exists, without creating", async () => {
     const existing = {
@@ -350,8 +374,7 @@ describe("MusicianService.findAppearances", () => {
   function makeAppearancesDb(args: {
     lineupShowIds: string[];
     presentDeltaShowIds: string[];
-    absentDeltaCount: number;
-    lineupTrackCount: number;
+    songCount: number;
     firstShowDate?: string;
     lastShowDate?: string;
   }) {
@@ -361,11 +384,9 @@ describe("MusicianService.findAppearances", () => {
       },
       trackMusician: {
         findMany: vi.fn(() => Promise.resolve(args.presentDeltaShowIds.map((showId) => ({ track: { showId } })))),
-        count: vi.fn(() => Promise.resolve(args.absentDeltaCount)),
       },
-      track: {
-        count: vi.fn(() => Promise.resolve(args.lineupTrackCount)),
-      },
+      // findAppearances counts distinct (song, show) via a raw query.
+      $queryRaw: vi.fn(() => Promise.resolve([{ song_count: BigInt(args.songCount) }])),
       show: {
         findFirst: vi.fn(({ orderBy }: { orderBy: { date: "asc" | "desc" } }) => {
           const date = orderBy.date === "asc" ? (args.firstShowDate ?? null) : (args.lastShowDate ?? null);
@@ -381,8 +402,7 @@ describe("MusicianService.findAppearances", () => {
     const db = makeAppearancesDb({
       lineupShowIds: ["show-1", "show-2"],
       presentDeltaShowIds: ["show-2", "show-3"],
-      absentDeltaCount: 0,
-      lineupTrackCount: 20,
+      songCount: 0,
     });
     const service = new MusicianService(db as never, logger);
 
@@ -391,28 +411,24 @@ describe("MusicianService.findAppearances", () => {
     expect([...result.showIds].sort()).toEqual(["show-1", "show-2", "show-3"]);
   });
 
-  test("track count is lineup tracks minus sat-outs plus sit-ins on non-lineup shows", async () => {
-    // 20 lineup tracks, 3 sat-outs, one sit-in on a lineup show (not added
-    // again) and one on a non-lineup show (added). 20 - 3 + 1 = 18.
+  test("song count comes from the distinct (song, show) query", async () => {
     const db = makeAppearancesDb({
       lineupShowIds: ["show-1"],
-      presentDeltaShowIds: ["show-1", "show-9"],
-      absentDeltaCount: 3,
-      lineupTrackCount: 20,
+      presentDeltaShowIds: ["show-9"],
+      songCount: 42,
     });
     const service = new MusicianService(db as never, logger);
 
     const result = await service.findAppearances("musician-1");
 
-    expect(result.trackCount).toBe(18);
+    expect(result.songCount).toBe(42);
   });
 
   test("surfaces first and last show dates from the appearance show set", async () => {
     const db = makeAppearancesDb({
       lineupShowIds: ["show-1"],
       presentDeltaShowIds: [],
-      absentDeltaCount: 0,
-      lineupTrackCount: 5,
+      songCount: 5,
       firstShowDate: "2003-04-12",
       lastShowDate: "2019-09-01",
     });

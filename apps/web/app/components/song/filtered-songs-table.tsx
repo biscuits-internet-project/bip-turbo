@@ -19,6 +19,7 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
     selectedTimeRange,
     kindFilter,
     selectedAuthor,
+    selectedMusician,
     playedFilter,
     activeToggleSet,
     hasActiveFilters,
@@ -39,16 +40,18 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
   });
 
   // Show the Filtered Plays column only when a narrowing filter is active
-  // (date range, attended, or a toggle like Set Opener/Encore). Cover and
-  // author aren't narrowing — they pick which songs appear but every
-  // matching song still surfaces its full play history. Tab-baked
+  // (date range, attended, a toggle like Set Opener/Encore, or a musician).
+  // Cover and author aren't narrowing — they pick which songs appear but every
+  // matching song still surfaces its full play history. A musician IS narrowing
+  // (like the time range), so it surfaces the filtered columns. Tab-baked
   // extraParams (e.g. /songs/this-year) always carry a time range, so they
   // count as a date range here.
   const hasDateRange = selectedTimeRange !== "all" || !!extraParams;
   const hasAttendedUser = activeToggleSet.has("attended");
   const hasToggleFilters = [...activeToggleSet].some((key) => key !== "attended");
   const showFilteredPlays =
-    hasNarrowingFilter({ hasDateRange, hasAttendedUser, hasToggleFilters }) && playedFilter !== "notPlayed";
+    hasNarrowingFilter({ hasDateRange, hasAttendedUser, hasToggleFilters, hasMusician: !!selectedMusician }) &&
+    playedFilter !== "notPlayed";
 
   const filterControls = (
     <PerformanceFilterControls
@@ -59,6 +62,7 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange }: Filter
       clearFilters={clearFilters}
       kindFilter={kindFilter}
       selectedAuthor={selectedAuthor}
+      selectedMusician={selectedMusician}
       playedFilter={playedFilter}
       searchValue={searchText}
       onSearchChange={setSearchText}

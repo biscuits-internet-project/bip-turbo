@@ -65,7 +65,7 @@ const columns: ColumnDef<MusicianWithStats>[] = [
     header: ({ column }) => <SortableHeader column={column} label="Shows" />,
   },
   {
-    accessorKey: "trackCount",
+    accessorKey: "songCount",
     meta: { fixedWidth: "5rem", cellClassName: "tabular-nums" },
     header: ({ column }) => <SortableHeader column={column} label="Songs" />,
   },

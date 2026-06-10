@@ -42,6 +42,7 @@ const mockBuildFilteredSongRarity = vi.fn().mockResolvedValue(new Map());
 const mockCacheGetOrSet = vi.fn().mockImplementation((_key: string, fn: () => Promise<unknown>) => fn());
 const mockFindByEmail = vi.fn();
 const mockFindByUsername = vi.fn();
+const mockMusicianFindBySlug = vi.fn();
 const mockGetShowsByYear = vi.fn();
 const mockGetShowsSinceLastPlayedBySongIds = vi.fn();
 const mockGetAverageGapShowsBySongIds = vi.fn();
@@ -66,6 +67,9 @@ vi.mock("~/server/services", () => ({
     users: {
       findByEmail: (...args: unknown[]) => mockFindByEmail(...args),
       findByUsername: (...args: unknown[]) => mockFindByUsername(...args),
+    },
+    musicians: {
+      findBySlug: (...args: unknown[]) => mockMusicianFindBySlug(...args),
     },
     stats: {
       getShowsByYear: (...args: unknown[]) => mockGetShowsByYear(...args),
@@ -174,6 +178,24 @@ describe("fetchFilteredSongs", () => {
     expect(result[0].id).toBe("2");
     expect(result[0].timesPlayed).toBe(50); // Home Again all-time
     expect(result[0].filteredTimesPlayed).toBe(4);
+  });
+
+  // The musician filter is a per-performance predicate, so — like toggles —
+  // it routes through buildSongPerformanceCounts (with the slug resolved to an
+  // id) to narrow the song list and attach filteredTimesPlayed, rather than the
+  // non-narrowing song-level treatment that author/kind get.
+  test("musician filter: resolves the slug, narrows via buildSongPerformanceCounts, attaches filteredTimesPlayed", async () => {
+    mockMusicianFindBySlug.mockResolvedValue({ id: "musician-1", slug: "sam-altman" });
+    mockBuildSongPerformanceCounts.mockResolvedValueOnce({ "3": 9 }); // only Crickets
+
+    const result = await fetchFilteredSongs(new URL("http://test/songs?musician=sam-altman"), ctx);
+
+    expect(mockMusicianFindBySlug).toHaveBeenCalledWith("sam-altman");
+    expect(mockBuildSongPerformanceCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ playedByMusicianId: "musician-1" }),
+    );
+    expect(result.map((s) => s.id)).toEqual(["3"]);
+    expect(result[0].filteredTimesPlayed).toBe(9);
   });
 
   // played=notPlayed combined with a narrowing filter returns songs that

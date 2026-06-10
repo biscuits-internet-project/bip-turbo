@@ -10,6 +10,19 @@ export interface EntityPickerProps {
   allowCreate?: boolean;
   /** Start open with the search input focused — for a freshly added picker row. */
   autoOpen?: boolean;
+  /**
+   * The token used as the picker's value (in the URL / form). Defaults to the
+   * record id. The public musician filter overrides this to the slug so its
+   * URL is shareable; the record must still be fetchable by that token.
+   */
+  itemId?: (item: { id: string; slug?: string }) => string;
+  /**
+   * How many records the open-on-focus list shows before the user types.
+   * Defaults to 10 (fine for the small admin vocabularies); the public
+   * musician filter raises it so most of the 130+ roster is visible at a
+   * glance. The API caps this at 50.
+   */
+  topLimit?: number;
 }
 
 interface EntitySearchProps<T extends { id: string }> extends EntityPickerProps {
@@ -40,6 +53,8 @@ export function EntitySearch<T extends { id: string }>({
   resource,
   noneLabel,
   itemLabel,
+  itemId = (item) => item.id,
+  topLimit = 10,
 }: EntitySearchProps<T>) {
   const searchPlaceholder = placeholder ?? `Search ${resource}...`;
   return (
@@ -54,14 +69,14 @@ export function EntitySearch<T extends { id: string }>({
       emptyMessage={`No ${resource} found.`}
       loadingMessage="Loading..."
       loadOnOpen
-      itemId={(item) => item.id}
+      itemId={itemId}
       itemLabel={itemLabel}
       noneLabel={noneLabel}
       fetchResults={async (query) => {
         const url =
           query && query.length >= 2
             ? `/api/${resource}?q=${encodeURIComponent(query)}&limit=20`
-            : `/api/${resource}?top=10`;
+            : `/api/${resource}?top=${topLimit}`;
         const response = await fetch(url);
         if (!response.ok) return [];
         return (await response.json()) as T[];

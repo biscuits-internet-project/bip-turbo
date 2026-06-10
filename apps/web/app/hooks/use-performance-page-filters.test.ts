@@ -142,6 +142,40 @@ describe("usePerformancePageFilters", () => {
     expect(result.current.hasFilters).toBe(true);
   });
 
+  test("hasFilters is true when musician is set", () => {
+    mockSearchParams = new URLSearchParams("musician=sam-altman");
+
+    const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
+
+    expect(result.current.hasFilters).toBe(true);
+    expect(result.current.selectedMusician).toBe("sam-altman");
+  });
+
+  // selectedMusician is null when the param is absent (mirrors selectedAuthor).
+  test("selectedMusician is null when the param is absent", () => {
+    const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
+
+    expect(result.current.selectedMusician).toBeNull();
+  });
+
+  // The musician param threads into the client fetch URL so the filtered
+  // API call narrows to that musician.
+  test("fetch URL carries the musician param", async () => {
+    mockSearchParams = new URLSearchParams("musician=sam-altman");
+    const fetchMock = vi.fn().mockImplementation(() => new Promise(() => {}));
+    globalThis.fetch = fetchMock;
+
+    renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrl = fetchMock.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("musician=sam-altman");
+  });
+
   test("hasFilters is true when toggle filters are set", () => {
     mockSearchParams = new URLSearchParams("filters=encore,setOpener");
 
@@ -250,7 +284,7 @@ describe("usePerformancePageFilters", () => {
   // need to confirm the function produces the right params.
   test("clearFilters resets all params", () => {
     mockSearchParams = new URLSearchParams(
-      "timeRange=2024&kind=cover&author=Trey&filters=encore&attended=attended&played=notPlayed",
+      "timeRange=2024&kind=cover&author=Trey&musician=sam-altman&filters=encore&attended=attended&played=notPlayed",
     );
 
     const { result } = renderHook(() => usePerformancePageFilters({ initialData: EMPTY, apiUrl: "/api/test" }));
@@ -263,12 +297,15 @@ describe("usePerformancePageFilters", () => {
 
     const updaterFn = mockSetSearchParams.mock.calls[0][0];
     const nextParams = updaterFn(
-      new URLSearchParams("timeRange=2024&kind=cover&author=Trey&filters=encore&attended=attended&played=notPlayed"),
+      new URLSearchParams(
+        "timeRange=2024&kind=cover&author=Trey&musician=sam-altman&filters=encore&attended=attended&played=notPlayed",
+      ),
     );
 
     expect(nextParams.get("timeRange")).toBeNull();
     expect(nextParams.get("kind")).toBeNull();
     expect(nextParams.get("author")).toBeNull();
+    expect(nextParams.get("musician")).toBeNull();
     expect(nextParams.get("filters")).toBeNull();
     expect(nextParams.get("attended")).toBeNull();
     expect(nextParams.get("played")).toBeNull();

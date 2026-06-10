@@ -33,6 +33,7 @@ export function NoteworthyPerformancePage({
     selectedTimeRange,
     kindFilter,
     selectedAuthor,
+    selectedMusician,
     activeToggleSet,
     hasActiveFilters,
     searchText,
@@ -64,6 +65,7 @@ export function NoteworthyPerformancePage({
             clearFilters={clearFilters}
             kindFilter={kindFilter}
             selectedAuthor={selectedAuthor}
+            selectedMusician={selectedMusician}
             showAllTimerToggle={!hideAllTimerToggle}
             showJamChartToggle={!hideJamChartToggle}
             searchValue={searchText}

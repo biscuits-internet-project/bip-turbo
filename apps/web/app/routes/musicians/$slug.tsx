@@ -35,7 +35,7 @@ interface ShowRow {
 interface LoaderData {
   musician: MusicianWithInstrument;
   tier: MusicianTier;
-  stats: { showCount: number; trackCount: number };
+  stats: { showCount: number; songCount: number };
   firstShow: MusicianAppearanceShow | null;
   lastShow: MusicianAppearanceShow | null;
   // Empty for core members (counts only); for drummers, shows outside their
@@ -58,7 +58,7 @@ export const loader = publicLoader(async ({ params }): Promise<LoaderData> => {
     ? await services.instruments.findById(musician.defaultInstrumentId)
     : null;
 
-  const { showIds, trackCount, firstShow, lastShow } = await services.musicians.findAppearances(musician.id);
+  const { showIds, songCount, firstShow, lastShow } = await services.musicians.findAppearances(musician.id);
   const tier = classifyMusician(slug);
 
   // Core members appear on essentially every show, so their tables are omitted;
@@ -96,7 +96,7 @@ export const loader = publicLoader(async ({ params }): Promise<LoaderData> => {
   return {
     musician: { ...musician, defaultInstrument },
     tier,
-    stats: { showCount: showIds.length, trackCount },
+    stats: { showCount: showIds.length, songCount },
     firstShow,
     lastShow,
     shows,
@@ -287,7 +287,7 @@ export default function MusicianPage() {
       <div className="space-y-8">
         <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatBox label="Shows Played" value={stats.showCount} />
-          <StatBox label="Songs Played" value={stats.trackCount} />
+          <StatBox label="Songs Played" value={stats.songCount} />
           <PerformanceStatBox label="First Performance" show={firstShow} />
           <PerformanceStatBox label="Last Performance" show={lastShow} />
         </dl>

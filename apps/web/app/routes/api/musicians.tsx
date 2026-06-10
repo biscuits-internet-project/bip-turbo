@@ -24,11 +24,13 @@ export const loader = publicLoader(async ({ request }) => {
   const limit = parseBoundedPositiveInt(url.searchParams.get("limit"), DEFAULT_LIMIT);
   const topParam = url.searchParams.get("top");
 
-  // The picker's loadOnOpen asks for the top list; return musicians alphabetically.
+  // The picker's loadOnOpen asks for the top list; most-played musicians first
+  // (track count desc, ties alphabetical) so the core lineup and frequent
+  // guests sit at the top rather than being buried in an alphabetical list.
   if (topParam) {
     const topLimit = parseBoundedPositiveInt(topParam, DEFAULT_TOP_LIMIT);
     try {
-      const musicians = await services.musicians.findMany({ pagination: { limit: topLimit } });
+      const musicians = await services.musicians.findTopBySongCount(topLimit);
       logger.info(`Fetched top ${musicians.length} musicians`);
       return json(musicians, 200);
     } catch (error) {

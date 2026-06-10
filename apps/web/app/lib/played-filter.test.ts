@@ -6,23 +6,28 @@ const defaults = {
   hasDateRange: false,
   hasAttendedUser: false,
   hasToggleFilters: false,
+  hasMusician: false,
 };
 
 describe("hasNarrowingFilter", () => {
-  // None of date range / attended / toggles → no narrowing happening.
+  // None of date range / attended / toggles / musician → no narrowing.
   // (Cover and author are deliberately not "narrowing" — they pick which
   // songs appear but don't restrict which performances contribute to a
-  // count, so they stay out of this predicate.)
+  // count. Musician IS narrowing: it restricts performances to the ones that
+  // player appeared on, like the time range, so it surfaces filtered columns.)
   test("returns false when no narrowing input is set", () => {
-    expect(hasNarrowingFilter({ hasDateRange: false, hasAttendedUser: false, hasToggleFilters: false })).toBe(false);
+    expect(
+      hasNarrowingFilter({ hasDateRange: false, hasAttendedUser: false, hasToggleFilters: false, hasMusician: false }),
+    ).toBe(false);
   });
 
-  // Each of the three narrowing inputs is sufficient on its own. Parameterized
-  // to keep the rule visible in one place if a fourth narrowing kind is added.
+  // Each narrowing input is sufficient on its own. Parameterized to keep the
+  // rule visible in one place if another narrowing kind is added.
   test.each([
-    ["hasDateRange", { hasDateRange: true, hasAttendedUser: false, hasToggleFilters: false }],
-    ["hasAttendedUser", { hasDateRange: false, hasAttendedUser: true, hasToggleFilters: false }],
-    ["hasToggleFilters", { hasDateRange: false, hasAttendedUser: false, hasToggleFilters: true }],
+    ["hasDateRange", { hasDateRange: true, hasAttendedUser: false, hasToggleFilters: false, hasMusician: false }],
+    ["hasAttendedUser", { hasDateRange: false, hasAttendedUser: true, hasToggleFilters: false, hasMusician: false }],
+    ["hasToggleFilters", { hasDateRange: false, hasAttendedUser: false, hasToggleFilters: true, hasMusician: false }],
+    ["hasMusician", { hasDateRange: false, hasAttendedUser: false, hasToggleFilters: false, hasMusician: true }],
   ])("returns true when %s is set", (_label, input) => {
     expect(hasNarrowingFilter(input)).toBe(true);
   });
@@ -58,5 +63,11 @@ describe("shouldShowNotPlayed", () => {
   // never had a matching performance.
   test("returns true when notPlayed with toggle filters", () => {
     expect(shouldShowNotPlayed({ ...defaults, playedParam: "notPlayed", hasToggleFilters: true })).toBe(true);
+  });
+
+  // Musician narrows the view to a player's performances, so "not played" =
+  // songs that player has never performed.
+  test("returns true when notPlayed with a musician filter", () => {
+    expect(shouldShowNotPlayed({ ...defaults, playedParam: "notPlayed", hasMusician: true })).toBe(true);
   });
 });

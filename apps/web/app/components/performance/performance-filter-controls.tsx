@@ -1,6 +1,7 @@
 import { ChevronDown, Filter } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { AuthorSearch } from "~/components/author/author-search";
+import { MusicianSearch } from "~/components/musician/musician-search";
 import { SelectFilter } from "~/components/ui/filters";
 import { ToggleFilterGroup } from "~/components/ui/filters/toggle-filter-group";
 import { Input } from "~/components/ui/input";
@@ -31,6 +32,7 @@ interface PerformanceFilterControlsProps {
   hideTimeRange?: boolean;
   kindFilter?: string;
   selectedAuthor?: string | null;
+  selectedMusician?: string | null;
   playedFilter?: string;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
@@ -49,6 +51,7 @@ export function PerformanceFilterControls({
   hideTimeRange = false,
   kindFilter,
   selectedAuthor,
+  selectedMusician,
   playedFilter,
   searchValue,
   onSearchChange,
@@ -77,6 +80,7 @@ export function PerformanceFilterControls({
     (!hideTimeRange && selectedTimeRange !== "all" ? 1 : 0) +
     (kindFilter && kindFilter !== "all" ? 1 : 0) +
     (selectedAuthor ? 1 : 0) +
+    (selectedMusician ? 1 : 0) +
     (playedFilter && playedFilter !== "all" ? 1 : 0) +
     activeToggleSet.size;
 
@@ -134,6 +138,26 @@ export function PerformanceFilterControls({
               groups={TIME_RANGE_GROUPS}
               width="w-[200px]"
             />
+          )}
+          {selectedMusician !== undefined && (
+            <div className="flex flex-col">
+              <label htmlFor="musician-search" className={labelClass}>
+                Musician
+              </label>
+              <MusicianSearch
+                value={selectedMusician}
+                onValueChange={(value) => updateFilter({ musician: value === "none" ? null : value })}
+                // Carry the slug (not the id) in the URL so a shared
+                // ?musician= link is readable. The /api/musicians endpoint
+                // resolves the slug back to a record for pre-fill.
+                itemId={(musician) => musician.slug ?? musician.id}
+                // Show a deep open-list (the roster is 130+) so most names are
+                // visible without typing.
+                topLimit={40}
+                placeholder="All Musicians"
+                className="w-[150px] sm:w-[200px] h-[34px] text-sm"
+              />
+            </div>
           )}
           {kindFilter !== undefined && (
             <SelectFilter
