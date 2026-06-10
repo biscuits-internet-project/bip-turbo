@@ -94,7 +94,12 @@ type DbTrackLight = {
     previousShow: { date: string; slug: string | null } | null;
   }[];
   completionsAsLater?: {
-    earlierTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
+    earlierTrack: {
+      set: string;
+      position: number;
+      show: { date: string; slug: string | null };
+      song: { title: string } | null;
+    };
   }[];
   completionAsEarlier?: {
     laterTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
@@ -197,16 +202,28 @@ function mapAnnotationToDomainEntity(dbAnnotation: DbAnnotation): Annotation {
 // reads "… version of <name>".
 function completionShowsFromDb(
   currentSongTitle: string | null | undefined,
-  rows: Array<{ show: { date: string; slug: string | null }; songTitle: string | null }> | null | undefined,
-): Array<{ date: string; slug: string; otherSongTitle?: string }> {
+  rows:
+    | Array<{ show: { date: string; slug: string | null }; songTitle: string | null; set?: string; position?: number }>
+    | null
+    | undefined,
+): Array<{ date: string; slug: string; otherSongTitle?: string; set?: string; position?: number }> {
   return (rows ?? [])
-    .filter((row): row is { show: { date: string; slug: string }; songTitle: string | null } => Boolean(row.show.slug))
+    .filter(
+      (
+        row,
+      ): row is { show: { date: string; slug: string }; songTitle: string | null; set?: string; position?: number } =>
+        Boolean(row.show.slug),
+    )
     .map((row) => {
       const differs = Boolean(row.songTitle) && row.songTitle !== currentSongTitle;
       return {
         date: String(row.show.date),
         slug: row.show.slug,
         ...(differs ? { otherSongTitle: row.songTitle as string } : {}),
+        // Carried only for the completed (earlier) track so sync can natural-key
+        // match it; undefined elsewhere (e.g. completedBy).
+        ...(row.set !== undefined ? { set: row.set } : {}),
+        ...(row.position !== undefined ? { position: row.position } : {}),
       };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -323,7 +340,12 @@ export function mapTrackToDomainEntity(
       previousShow: { date: string; slug: string | null } | null;
     }[];
     completionsAsLater?: {
-      earlierTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
+      earlierTrack: {
+        set: string;
+        position: number;
+        show: { date: string; slug: string | null };
+        song: { title: string } | null;
+      };
     }[];
     completionAsEarlier?: {
       laterTrack: { show: { date: string; slug: string | null }; song: { title: string } | null };
@@ -365,6 +387,8 @@ export function mapTrackToDomainEntity(
       completionsAsLater?.map((row) => ({
         show: row.earlierTrack.show,
         songTitle: row.earlierTrack.song?.title ?? null,
+        set: row.earlierTrack.set,
+        position: row.earlierTrack.position,
       })),
     ),
     completedBy: completionShowsFromDb(
@@ -580,6 +604,8 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
       track.completionsAsLater?.map((row) => ({
         show: row.earlierTrack.show,
         songTitle: row.earlierTrack.song?.title ?? null,
+        set: row.earlierTrack.set,
+        position: row.earlierTrack.position,
       })),
     ),
     completedBy: completionShowsFromDb(
@@ -700,7 +726,14 @@ const TRACK_FLAGS_AND_COMPLETIONS_INCLUDE = {
   },
   completionsAsLater: {
     select: {
-      earlierTrack: { select: { show: { select: { date: true, slug: true } }, song: { select: { title: true } } } },
+      earlierTrack: {
+        select: {
+          set: true,
+          position: true,
+          show: { select: { date: true, slug: true } },
+          song: { select: { title: true } },
+        },
+      },
     },
   },
   completionAsEarlier: {

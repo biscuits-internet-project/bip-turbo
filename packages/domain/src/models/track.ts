@@ -68,6 +68,11 @@ const completionShowsSchema = z
       date: z.string(),
       slug: z.string(),
       otherSongTitle: z.string().optional(),
+      // The completed track's set + position, carried so the prod→local sync
+      // can match it by natural key (show slug, set, position). Footnote
+      // rendering ignores these; only `completes` populates them.
+      set: z.string().optional(),
+      position: z.number().optional(),
     }),
   )
   .default([]);

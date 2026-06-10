@@ -1,6 +1,6 @@
 # BIP MCP Server - User Guide
 
-The BIP setlist database is now available as a Model Context Protocol (MCP) server! This allows LLMs like Claude to directly query our comprehensive database of show information, setlists, songs, and venues.
+The BIP setlist database is available as a Model Context Protocol (MCP) server. This lets LLMs like Claude directly query our comprehensive database of show information, setlists, songs, and venues.
 
 ## What is MCP?
 
@@ -8,266 +8,324 @@ Model Context Protocol (MCP) is an open standard that allows AI assistants to se
 
 ## Requirements
 
-- Claude Pro, Team, Max, or Enterprise subscription (for remote MCP servers)
-- Or Claude Code (supports MCP)
+- Claude Pro, Team, Max, or Enterprise subscription (for remote MCP servers), or
+- Claude Code, Cursor, or any other MCP-capable client
+
+The server is public and read-only — no account, API key, or authentication is required.
 
 ## Setup
 
-### For Claude Desktop
+The server endpoint is `https://discobiscuits.net/mcp` (HTTP transport).
 
-Add the BIP MCP server to your Claude Desktop configuration:
+### Claude Code (CLI)
 
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+```bash
+claude mcp add discobiscuits --transport http https://discobiscuits.net/mcp
+```
+
+### Claude Desktop
+
+Add the server to your config file:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
-    "bip-setlist": {
-      "url": "https://biscuits.app/mcp",
-      "transport": "http"
+    "discobiscuits": {
+      "type": "http",
+      "url": "https://discobiscuits.net/mcp"
     }
   }
 }
 ```
 
-### For Claude Code
+Restart Claude Desktop to enable the server.
 
-```bash
-claude mcp add https://biscuits.app/mcp --transport http
-```
+### Cursor
+
+Add the same block to `.cursor/mcp.json`, or use **Settings → Features → MCP Servers → Add Server** with type `HTTP` and URL `https://discobiscuits.net/mcp`.
 
 ## Available Tools
 
-The MCP server provides 14 specialized tools for querying the setlist database:
+The server exposes 23 tools: 17 for querying the database (below) and 6 internal Sync / Replication tools (documented at the end of this section) used to mirror prod into local dev environments.
 
 ### 🔍 Search Tools
 
 #### `search_shows`
-Search for shows by song names, venue, date, or any combination.
 
-**Example queries:**
-- "fillmore swell" - Shows at Fillmore featuring Swell
-- "12/30/99" - Shows on December 30, 1999
-- "red rocks 2022" - Shows at Red Rocks in 2022
+Search for shows by song, venue, date, or any combination.
+
+**Input:** `query` (required), `limit` (default 50, max 100)
+
+**Returns:** `results`, each `{ slug, date, venue, location }`.
+
+**Example queries:** "fillmore swell", "12/30/99", "red rocks 2022"
 
 #### `search_songs`
+
 Search the song catalog by title.
 
-**Example:** "basis", "shimmy"
+**Input:** `query` (required), `limit` (default 50)
+
+**Returns:** `results`, each `{ slug, title, author }`.
 
 #### `search_venues`
+
 Find venues by name, city, state, or country.
 
-**Example:** "fillmore", "colorado venues", "red rocks"
+**Input:** `query` (required), `limit` (default 50)
+
+**Returns:** `results`, each `{ slug, name, city, state }`.
 
 #### `search_segues`
-Find specific song sequences using ">" notation.
 
-**Example:** "Shimmy > Basis > Woody"
+Find specific song sequences using `>` notation.
+
+**Input:** `sequence` (required, e.g. "Shimmy > Basis > Woody"), `venueFilter` (optional)
+
+**Returns:** `results`, each `{ showSlug, showDate, venueName, set, matchedSequence }`.
 
 #### `search_by_date`
+
 Find shows by exact date, month, or year.
 
-**Examples:**
-- Exact: "12/30/1999"
-- Month: "December"
-- Year: "1999"
+**Input:** `date` (required, e.g. "1999-12-31", "1999-12", "1999"), `dateType` (required: `exact` | `month` | `year`)
+
+**Returns:** `results`, each `{ slug, date, venueName, venueCity }`.
 
 ### 📊 Data Retrieval Tools
 
-#### `get_shows`
-Get detailed information for multiple shows at once.
+#### `get_setlist`
 
-**Input:** Array of show slugs (e.g., ["1999-12-30", "2000-01-01"])
+Get a single show's setlist in a compact, human-readable shape.
 
-**Returns:** Show metadata including venue, ratings, counts
+**Input:** `slug` (required, e.g. "1999-12-31")
 
-#### `get_songs`
-Get detailed song information including lyrics, tabs, and history.
-
-**Input:** Array of song slugs
-
-**Returns:** Full song details, play statistics, author info
-
-#### `get_venues`
-Get venue details including location and show history.
-
-**Input:** Array of venue slugs
-
-**Returns:** Venue information with contact details and coordinates
+**Returns:** `{ date, venue, location, sets }` — each set `{ name, tracks }`, each track `{ position, song, segue, notes }`. For the full structured payload (ids, performer lineup, flags, completions), use `get_setlists`.
 
 #### `get_setlists`
-Get complete setlists organized by sets.
 
-**Input:** Array of show slugs
+Get complete setlists for multiple shows at once, with the full structured payload.
 
-**Returns:** Full setlists with songs, segues, notes, and annotations
+**Input:** `showSlugs` (required, array of show slugs)
+
+**Returns:** `setlists`, each with `showSlug`, `showDate`, `venue`, and `sets`. Per track: `id`, `position`, `songTitle`, `songSlug`, `segue`, `note`, `allTimer`, `duration`, `durationSource`, `annotations`, plus the structured performer data the local sync mirrors:
+
+- `lineup` (per show): the whole-show performer lineup — each member `{ musicianSlug, musicianName, knownFrom, defaultInstrument, instruments }`, with musicians and instruments carried by slug (the stable cross-environment id) plus name.
+- `trackMusicians` (per track): sit-in / sat-out deltas `{ musicianSlug, musicianName, present, defaultInstrument, instruments }` (`present: true` = sit-in, `false` = sat-out).
+- `flags` (per track): structured flag enum names (e.g. `DYSLEXIC`, `INVERTED`, `UNFINISHED`, `ENDING_ONLY`). Derived recurrence columns are excluded — the consumer recomputes them.
+- `completes` (per track): completion links where this is the later (completing) track, each pointing at the earlier track by natural key `{ showSlug, set, position }`.
+
+Unknown slugs come back in an `errors` array.
+
+#### `get_song`
+
+Get a single song's lyrics and headline play info.
+
+**Input:** `slug` (required)
+
+**Returns:** `{ title, author, lyrics, notes, timesPlayed, debut, lastPlayed }`. Use `get_songs` for the full curated field set.
+
+#### `get_songs`
+
+Get detailed information for multiple songs at once.
+
+**Input:** `slugs` (required, array of song slugs)
+
+**Returns:** `songs`, each with `slug`, `title`, `author`, `lyrics`, `timesPlayed`, `dateFirstPlayed`, `dateLastPlayed`, plus the curated admin fields `kind` (original / cover / mashup / improvisation), `legacyAuthor`, `featuredLyric`, `tabs`, `notes`, `history`, and `guitarTabsUrl`. Unknown slugs come back in an `errors` array.
+
+#### `get_shows`
+
+Get detailed information for multiple shows at once.
+
+**Input:** `slugs` (required, array of show slugs, e.g. ["1999-12-30", "2000-01-01"])
+
+**Returns:** `shows`, each with `id`, `slug`, `date`, `venueName`, `venueCity`, `averageRating`, `ratingsCount`, `notes`, `relistenUrl`, the admin-curated stat flags `countForStats` and `dayOrder`, and `rockOperaSlugs` (full-album performances tagged on the show). Unknown slugs come back in an `errors` array.
+
+#### `get_venues`
+
+Get venue details including location and contact info.
+
+**Input:** `slugs` (required, array of venue slugs)
+
+**Returns:** `venues`, each with `slug`, `name`, `city`, `state`, `country`, `timesPlayed`, and the geocode/contact columns `street`, `postalCode`, `phone`, `website`, `latitude`, `longitude`. Unknown slugs come back in an `errors` array.
+
+#### `get_rock_operas`
+
+List the rock operas / full-album performances the catalog tracks.
+
+**Input:** None
+
+**Returns:** `rockOperas`, each `{ slug, name, shortName }`. The slugs match `rockOperaSlugs` from `get_shows`.
 
 #### `get_song_performances`
+
 Get all performances of a specific song across all shows.
 
-**Input:** Song slug, optional limit and sort preferences
+**Input:** `songSlug` (required), `limit` (default 50, max 500), `sortBy` (`date` | `rating`, default `date`)
 
-**Returns:** List of shows where the song was played with ratings and context
+**Returns:** `{ song, performances }` — each performance `{ showSlug, showDate, venueName, venueCity, set, position, averageRating, allTimer }`.
 
 ### 📈 Analytics Tools
 
 #### `get_trending_songs`
+
 See which songs have been played most frequently in recent shows.
 
-**Input:** Number of recent shows to analyze (default: 50)
+**Input:** `lastXShows` (default 50, max 200), `limit` (default 50, max 100)
 
-**Returns:** Songs sorted by play frequency
+**Returns:** `songs`, each `{ slug, title, playCount, lastPlayed }`.
 
 #### `get_song_statistics`
-Get detailed analytics for any song.
 
-**Input:** Song slug
+Get detailed analytics for a song.
 
-**Returns:**
-- Times played
-- First/last played dates
-- Yearly play data
-- Longest gaps between performances
-- Most/least common years
+**Input:** `songSlug` (required)
+
+**Returns:** `{ song, statistics }` — statistics include `timesPlayed`, `dateFirstPlayed`, `dateLastPlayed`, `yearlyPlayData`, `longestGapsData`, `mostCommonYear`, `leastCommonYear`.
 
 #### `get_venue_history`
+
 Get all shows performed at a specific venue.
 
-**Input:** Venue slug, optional limit and sort
+**Input:** `venueSlug` (required), `limit` (default 50, max 500), `sortBy` (`date` | `rating`, default `date`)
 
-**Returns:** List of shows at that venue with dates and ratings
+**Returns:** `{ venue, shows }` — each show `{ slug, date, averageRating, ratingsCount }`.
 
 #### `get_shows_by_year`
+
 List all shows from a specific year.
 
-**Input:** Year (e.g., 1999)
+**Input:** `year` (required), `limit` (default 50, max 500), `sortBy` (`date` | `rating`, default `date`)
 
-**Returns:** All shows from that year with venue info and ratings
+**Returns:** `{ year, shows }` — each show `{ slug, date, venueName, venueCity, averageRating }`.
+
+### 🔄 Sync / Replication Tools (internal)
+
+These tools mirror prod's user-activity tables into local dev databases (see `packages/core/scripts/sync-missing-shows.ts`); they are not meant for general LLM querying. They expose a PII-free projection only — the service-layer `select` allowlist enforces the shape.
+
+#### `list_users_since`, `list_ratings_since`, `list_attendances_since`
+
+Cursor-paginated pulls of rows changed since a timestamp.
+
+**Input:** `since` (required, ISO-8601 timestamp), `cursor` (optional, opaque base64 of `updatedAt|id`), `limit` (default 2000, max 5000)
+
+**Returns:** A `users` / `ratings` / `attendances` array plus `nextCursor` (null when the page isn't full). Users carry no email or password — only the fields needed to attach activity (`id`, `username`, avatar references, timestamps). Ratings carry `id`, `userId`, `value`, `rateableType`, `rateableId`, timestamps; attendances carry `id`, `userId`, `showId`, timestamps.
+
+#### `list_all_user_ids`, `list_all_rating_ids`, `list_all_attendance_ids`
+
+Full id dumps used by the sync's `--full-users` / prune reconcile to delete local rows no longer present on prod.
+
+**Input:** None
+
+**Returns:** `{ ids: string[] }`
 
 ## Example Queries
 
 Once configured, you can ask Claude questions like:
 
 ### Show Information
+
 - "Show me the setlist from the 12/30/99 show"
 - "Find all shows at the Fillmore in 1999 where they played Swell"
 - "What were the highest rated shows in 2022?"
 
 ### Song Information
+
 - "What are the lyrics to 'Basis'?"
 - "When was the last time they played 'Aceetobee'?"
 - "Show me all performances of 'Swell' sorted by rating"
 - "What songs have been trending in the last 50 shows?"
 
 ### Venue Information
+
 - "What venues in Colorado have they played?"
 - "Show me all shows at Red Rocks"
 - "Find venues in Philadelphia"
 
 ### Advanced Queries
+
 - "Find all shows where they played 'Shimmy > Basis > Woody'"
 - "What are the song statistics for 'The Devil's Waltz'?"
 - "List all shows from 1999 sorted by rating"
 - "Get me the setlists for both 12/30/99 and 12/31/99"
 
 ### Cross-referencing
+
 - "Compare the setlists from the top 3 rated shows in 2023"
 - "What songs appeared in multiple shows at the Fillmore in 1999?"
 - "Show me lyrics for all songs that were trending in 2022"
 
-## API Endpoints
+## Protocol
 
-For developers, all tools are accessible as HTTP POST endpoints:
+The server speaks [JSON-RPC 2.0](https://www.jsonrpc.org/specification) over a single HTTP endpoint:
 
-```bash
-# Base URL
-https://biscuits.app/mcp/
-
-# Endpoints
-POST /mcp/search-shows
-POST /mcp/search-songs
-POST /mcp/search-venues
-POST /mcp/search-segues
-POST /mcp/search-by-date
-POST /mcp/get-shows
-POST /mcp/get-songs
-POST /mcp/get-venues
-POST /mcp/get-setlists
-POST /mcp/get-song-performances
-POST /mcp/get-trending-songs
-POST /mcp/get-song-statistics
-POST /mcp/get-venue-history
-POST /mcp/get-shows-by-year
+```text
+POST https://discobiscuits.net/mcp
 ```
 
-### Example API Call
+(A `GET` on the same URL returns server identity metadata.)
+
+Three methods are supported:
+
+- `initialize` — handshake; returns `protocolVersion`, `capabilities`, and `serverInfo`.
+- `tools/list` — returns the full `tools` array with names, descriptions, and input schemas.
+- `tools/call` — invokes a tool. `params` is `{ name, arguments }`, where `arguments` matches the tool's input schema.
+
+A `tools/call` result wraps the tool's JSON payload as text:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "{ ...the tool's JSON output... }" }]
+  }
+}
+```
+
+On a tool error the same shape is returned with `"isError": true` and an `Error: …` message in the text.
+
+### Example Call
 
 ```bash
-curl -X POST https://biscuits.app/mcp/search-shows \
+curl -X POST https://discobiscuits.net/mcp \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "fillmore swell",
-    "limit": 10
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "search_shows",
+      "arguments": { "query": "red rocks 2022", "limit": 10 }
+    }
   }'
 ```
 
 ## Data Coverage
 
 The database includes:
+
 - **2,400+** shows dating back to the 1990s
 - **700+** songs including lyrics, tabs, and history
 - **500+** venues worldwide
-- Complete setlists with song positions and segues
-- User ratings and reviews
-- Show photos and videos
+- Complete setlists with song positions, segues, and per-track performer/flag/completion data
+- User ratings and attendance
 - Annotations and performance notes
-
-## Response Format
-
-All endpoints return JSON with consistent formatting:
-
-```json
-{
-  "results": [...],
-  // or
-  "shows": [...],
-  "songs": [...],
-  etc.
-}
-```
-
-Errors are returned with descriptive messages:
-
-```json
-{
-  "error": "Description of error",
-  "details": "Additional context"
-}
-```
 
 ## Rate Limits
 
-Currently no rate limits are enforced, but please use the API responsibly. If you're building an integration, consider caching responses.
-
-## Support
-
-Questions or issues?
-- GitHub: [bip-turbo repository](https://github.com/...)
-- Contact: [Your contact info]
+No rate limits are currently enforced, but please use the server responsibly. If you're building an integration, consider caching responses.
 
 ## Privacy
 
-The MCP server only accesses publicly available show and song data. No user account information is exposed through these endpoints.
+The query tools expose only publicly available show, song, and venue data. The Sync / Replication tools expose a deliberately PII-free user projection (id, username, avatar reference, timestamps) plus ratings and attendance rows — no emails, passwords, or other account details are ever returned.
 
-## Future Enhancements
+## Support
 
-Planned features:
-- SSE (Server-Sent Events) support for streaming responses
-- Authentication for API access
-- Webhooks for new show announcements
-- Advanced filtering and aggregation tools
+Questions or issues? Open an issue on the [bip-turbo repository](https://github.com/biscuits-internet-project/bip-turbo).
 
 ---
 

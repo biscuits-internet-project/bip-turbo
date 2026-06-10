@@ -1,8 +1,26 @@
+import type { Instrument, TrackMusicianDelta } from "@bip/domain";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { services } from "~/server/services";
 
 // MCP JSON-RPC Protocol Handler
 // Implements Model Context Protocol for Claude Code and other MCP clients
+
+// Performer wire mappers for get_setlists. Musicians + instruments travel by
+// slug (the stable cross-environment id) plus name, so sync-missing-shows can
+// resolve an existing row or seed a missing one idempotently.
+function instrumentToWire(instrument: Instrument | null): { slug: string; name: string } | null {
+  return instrument ? { slug: instrument.slug, name: instrument.name } : null;
+}
+
+function mapDeltaToWire(delta: TrackMusicianDelta) {
+  return {
+    musicianSlug: delta.musician.slug,
+    musicianName: delta.musician.name,
+    present: delta.present,
+    defaultInstrument: instrumentToWire(delta.musician.defaultInstrument),
+    instruments: delta.instruments.map((i) => ({ slug: i.slug, name: i.name })),
+  };
+}
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -589,10 +607,28 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               list.push(ann.desc ?? "");
               annotationsByTrackId.set(ann.trackId, list);
             }
+            // Per-track musician deltas (sit-ins / sat-outs). Grouped by trackId
+            // so each track carries its own; sync's diffTrackMusicians replaces
+            // local-by-trackId. Musicians + instruments travel by slug (stable
+            // cross-env id) plus name (so sync can seed a missing row).
+            const trackMusiciansByTrackId = new Map<string, ReturnType<typeof mapDeltaToWire>[]>();
+            for (const delta of setlist.trackMusicianDeltas) {
+              const list = trackMusiciansByTrackId.get(delta.trackId) ?? [];
+              list.push(mapDeltaToWire(delta));
+              trackMusiciansByTrackId.set(delta.trackId, list);
+            }
             setlists.push({
               showSlug: setlist.show.slug,
               showDate: setlist.show.date,
               venue: { name: setlist.venue.name, city: setlist.venue.city, state: setlist.venue.state },
+              // Whole-show performer lineup. Sync's diffShowMusicians mirrors it.
+              lineup: setlist.lineup.map((member) => ({
+                musicianSlug: member.musician.slug,
+                musicianName: member.musician.name,
+                knownFrom: member.musician.knownFrom,
+                defaultInstrument: instrumentToWire(member.musician.defaultInstrument),
+                instruments: member.instruments.map((i) => ({ slug: i.slug, name: i.name })),
+              })),
               sets: setlist.sets.map((set) => ({
                 label: set.label,
                 tracks: set.tracks.map((t) => ({
@@ -616,6 +652,17 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
                   duration: t.duration ?? null,
                   durationSource: t.durationSource ?? null,
                   annotations: annotationsByTrackId.get(t.id) ?? [],
+                  // Structured flags (enum names) — sync's diffTrackFlags
+                  // mirrors them; the derived recurrence columns stay local.
+                  flags: t.flags,
+                  trackMusicians: trackMusiciansByTrackId.get(t.id) ?? [],
+                  // Completion links where this is the later (completing) track.
+                  // The earlier track travels by natural key (slug/set/position)
+                  // so sync resolves it even across id drift. completionShowsFromDb
+                  // only populates set/position on `completes`, so both are present.
+                  completes: t.completes
+                    .filter((c) => c.set !== undefined && c.position !== undefined)
+                    .map((c) => ({ showSlug: c.slug, set: c.set as string, position: c.position as number })),
                 })),
               })),
             });
