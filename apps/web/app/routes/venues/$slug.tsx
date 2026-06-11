@@ -1,13 +1,13 @@
 import type { Setlist, Venue } from "@bip/domain";
 import { type DehydratedState, dehydrate } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
-import { Card, CardContent } from "~/components/ui/card";
+import { ShowDate } from "~/components/show-date";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
+import { StatBox } from "~/components/ui/stat-box";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey } from "~/lib/query-keys";
@@ -68,28 +68,6 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
   return { venue, setlists, stats, externalSources, dehydratedState: dehydrate(queryClient) };
 });
 
-interface StatBoxProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number | null;
-  sublabel?: string;
-}
-
-function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
-  return (
-    <Card className="glass-content">
-      <CardContent className="p-6">
-        <div className="flex items-center space-x-2 text-content-text-secondary mb-2">
-          {icon}
-          <span className="text-sm font-medium">{label}</span>
-        </div>
-        <div className="text-2xl font-bold text-content-text-primary">{value || "—"}</div>
-        {sublabel && <div className="text-xs text-content-text-tertiary mt-1">{sublabel}</div>}
-      </CardContent>
-    </Card>
-  );
-}
-
 export function meta({ data }: { data: LoaderData }) {
   return getVenueMeta({
     ...data.venue,
@@ -132,17 +110,17 @@ export default function VenuePage() {
 
       <div className="space-y-6">
         {/* Stats Grid */}
-        <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <dl className="grid grid-cols-2 lg:grid-cols-4 short:!grid-cols-4 gap-4 short:!gap-2">
           <StatBox icon={<Ticket className="h-4 w-4" />} label="Total Shows" value={stats.totalShows} />
           <StatBox
             icon={<CalendarDays className="h-4 w-4" />}
             label="First Show"
-            value={stats.firstShow ? format(stats.firstShow, "MMM d, yyyy") : null}
+            value={stats.firstShow ? <ShowDate date={stats.firstShow} /> : "—"}
           />
           <StatBox
             icon={<CalendarDays className="h-4 w-4" />}
             label="Last Show"
-            value={stats.lastShow ? format(stats.lastShow, "MMM d, yyyy") : null}
+            value={stats.lastShow ? <ShowDate date={stats.lastShow} /> : "—"}
           />
           <StatBox
             icon={<CalendarDays className="h-4 w-4" />}

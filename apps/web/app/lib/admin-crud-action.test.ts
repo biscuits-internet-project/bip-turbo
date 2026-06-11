@@ -65,4 +65,13 @@ describe("handleAdminCrud", () => {
     const res = await handleAdminCrud(jsonRequest("PATCH", {}), makeConfig());
     expect(res.status).toBe(405);
   });
+
+  // DELETE-only resources (e.g. venues) omit create/update; those methods 405
+  // instead of crashing on an undefined handler.
+  test("POST/PUT 405 when create/update are not configured", async () => {
+    const config = { label: "venue", remove: vi.fn(async () => true) };
+    expect((await handleAdminCrud(jsonRequest("POST", { name: "X" }), config)).status).toBe(405);
+    expect((await handleAdminCrud(jsonRequest("PUT", { slug: "x", name: "X" }), config)).status).toBe(405);
+    expect((await handleAdminCrud(jsonRequest("DELETE", { id: "x" }), config)).status).toBe(200);
+  });
 });

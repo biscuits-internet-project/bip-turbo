@@ -2,7 +2,7 @@ import { type ArchiveDotOrgRecording, pickPrimaryArchiveRecording } from "@bip/d
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import ArchiveMusicPlayer from "~/components/player";
-import { cn } from "~/lib/utils";
+import { cn, formatDateLong } from "~/lib/utils";
 import { ExternalSourceCard } from "./external-source-card";
 
 /**
@@ -15,12 +15,7 @@ interface ArchiveRecordingsCardProps {
 }
 
 function formatAddedOn(addedDate: string | undefined): string | null {
-  if (!addedDate) return null;
-  return new Date(addedDate).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return addedDate ? formatDateLong(addedDate) : null;
 }
 
 /**

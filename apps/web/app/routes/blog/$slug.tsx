@@ -11,6 +11,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { getBlogMeta, getBlogStructuredData } from "~/lib/seo";
+import { formatDateLong } from "~/lib/utils";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -44,16 +45,6 @@ export function meta({ data }: { data: LoaderData }) {
 export default function BlogPostPage() {
   const { blogPost } = useSerializedLoaderData<LoaderData>();
 
-  // Function to format date
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return "No date";
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="space-y-6 md:space-y-8">
       {/* Structured Data */}
@@ -83,7 +74,7 @@ export default function BlogPostPage() {
         />
         <div className="flex items-center justify-center gap-2 text-content-text-secondary">
           <CalendarDays className="h-4 w-4" />
-          <span className="text-lg">{formatDate(blogPost.publishedAt)}</span>
+          <span className="text-lg">{blogPost.publishedAt ? formatDateLong(blogPost.publishedAt) : "No date"}</span>
         </div>
       </div>
 

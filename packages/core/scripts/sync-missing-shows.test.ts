@@ -4,9 +4,9 @@ import {
   buildRockOperaAssignmentDiff,
   buildSetlistReconciliation,
   buildShowCreateInput,
+  buildShowDriftUpdate,
   buildSongCreateInput,
   buildSongDriftUpdate,
-  buildShowDriftUpdate,
   buildVenueCreateInput,
   buildVenueDriftUpdate,
   collectSongSlugs,
@@ -16,18 +16,19 @@ import {
   diffTrackAnnotations,
   diffTrackFlags,
   diffTrackMusicians,
-  resolveCompletionLinks,
   isStubSlug,
-  matchVenue,
-  parseYearsArg,
-  showNeedsUpdate,
-  stubUserEmail,
-  STUB_USER_PASSWORD_DIGEST,
-  syncUserActivity,
   type LocalTrackForReconcile,
   type McpSearchVenueResult,
   type McpSetlist,
   type McpShow,
+  matchVenue,
+  parseYearsArg,
+  planVenueOrphans,
+  resolveCompletionLinks,
+  STUB_USER_PASSWORD_DIGEST,
+  showNeedsUpdate,
+  stubUserEmail,
+  syncUserActivity,
 } from "./sync-missing-shows";
 
 // parseYearsArg governs the "what years to sync" decision. Default (no flag)
@@ -327,7 +328,13 @@ describe("showNeedsUpdate", () => {
   test("returns false when every aggregate matches", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+        },
         remote,
       ),
     ).toBe(false);
@@ -339,7 +346,13 @@ describe("showNeedsUpdate", () => {
   test("returns true when ratingsCount drifts", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 18, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 18,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+        },
         remote,
       ),
     ).toBe(true);
@@ -350,7 +363,13 @@ describe("showNeedsUpdate", () => {
   test("returns false for averageRating differences within float tolerance", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.1999999, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        {
+          date: "2025-07-04",
+          averageRating: 4.1999999,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+        },
         remote,
       ),
     ).toBe(false);
@@ -360,7 +379,13 @@ describe("showNeedsUpdate", () => {
   test("returns true for averageRating differences beyond float tolerance", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.1, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        {
+          date: "2025-07-04",
+          averageRating: 4.1,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+        },
         remote,
       ),
     ).toBe(true);
@@ -370,7 +395,13 @@ describe("showNeedsUpdate", () => {
   test("returns true when notes drifts", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "old note", relistenUrl: "https://relisten.example/rr" },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "old note",
+          relistenUrl: "https://relisten.example/rr",
+        },
         remote,
       ),
     ).toBe(true);
@@ -380,7 +411,13 @@ describe("showNeedsUpdate", () => {
   test("returns true when relistenUrl drifts from null to a value", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: null },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: null,
+        },
         remote,
       ),
     ).toBe(true);
@@ -405,7 +442,15 @@ describe("showNeedsUpdate", () => {
     const remoteWithFlag: McpShow = { ...remote, countForStats: false };
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: null },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+          countForStats: true,
+          dayOrder: null,
+        },
         remoteWithFlag,
       ),
     ).toBe(true);
@@ -417,7 +462,15 @@ describe("showNeedsUpdate", () => {
     const remoteWithOrder: McpShow = { ...remote, dayOrder: 2 };
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: true, dayOrder: 1 },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+          countForStats: true,
+          dayOrder: 1,
+        },
         remoteWithOrder,
       ),
     ).toBe(true);
@@ -429,7 +482,15 @@ describe("showNeedsUpdate", () => {
   test("ignores countForStats/dayOrder when remote omits them", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-04", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr", countForStats: false, dayOrder: 3 },
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+          countForStats: false,
+          dayOrder: 3,
+        },
         remote,
       ),
     ).toBe(false);
@@ -441,7 +502,13 @@ describe("showNeedsUpdate", () => {
   test("returns true when date drifts", () => {
     expect(
       showNeedsUpdate(
-        { date: "2025-07-03", averageRating: 4.2, ratingsCount: 19, notes: "Fourth of July run opener", relistenUrl: "https://relisten.example/rr" },
+        {
+          date: "2025-07-03",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+        },
         remote,
       ),
     ).toBe(true);
@@ -538,9 +605,9 @@ describe("matchVenue", () => {
       { slug: "the-new-higher-ground", name: "Higher Ground", city: "South Burlington", state: "VT" },
       { slug: "higher-ground", name: "Higher Ground", city: "South Burlington", state: "VT" },
     ];
-    expect(
-      matchVenue(candidates, { name: "Higher Ground", city: "South Burlington", state: "VT" }),
-    ).toBe("higher-ground");
+    expect(matchVenue(candidates, { name: "Higher Ground", city: "South Burlington", state: "VT" })).toBe(
+      "higher-ground",
+    );
   });
 
   // Regression for the Brooklyn Bowl Las Vegas bug: search_venues returned
@@ -782,6 +849,32 @@ describe("buildVenueCreateInput", () => {
   });
 });
 
+// planVenueOrphans partitions local venues prod no longer returns into safe
+// deletes (zero-show — nothing references them) and manual-cleanup warnings
+// (still have local shows, likely a rename/merge upstream).
+describe("planVenueOrphans", () => {
+  const venues = [
+    { id: "a", slug: "the-fillmore", name: "The Fillmore", showCount: 12 },
+    { id: "b", slug: "stale-typo-venue", name: "Stale Typo Venue", showCount: 0 },
+    { id: "c", slug: "renamed-venue", name: "Renamed Venue", showCount: 4 },
+  ];
+
+  // Only venues whose slug prod didn't return are candidates; a present venue
+  // is never touched even if it has zero shows.
+  test("ignores venues prod still returns", () => {
+    const plan = planVenueOrphans(venues, new Set<string>());
+    expect(plan.toDelete).toEqual([]);
+    expect(plan.toWarn).toEqual([]);
+  });
+
+  test("deletes zero-show orphans and warns on orphans that still have shows", () => {
+    const plan = planVenueOrphans(venues, new Set(["stale-typo-venue", "renamed-venue"]));
+
+    expect(plan.toDelete).toEqual([{ id: "b", slug: "stale-typo-venue" }]);
+    expect(plan.toWarn).toEqual([{ slug: "renamed-venue", name: "Renamed Venue", showCount: 4 }]);
+  });
+});
+
 // buildVenueDriftUpdate mirrors prod's curated venue fields onto an existing
 // local row. Identity is the venue slug; diff covers every column except
 // `timesPlayed` (derived from Show count, not curated) and the search/legacy
@@ -999,7 +1092,15 @@ describe("buildSetlistReconciliation", () => {
         {
           label: "S1",
           tracks: [
-            { position: 1, songTitle: "Basis for a Day", songSlug: "basis-for-a-day", segue: ">", allTimer: false, note: null, annotations: [] },
+            {
+              position: 1,
+              songTitle: "Basis for a Day",
+              songSlug: "basis-for-a-day",
+              segue: ">",
+              allTimer: false,
+              note: null,
+              annotations: [],
+            },
           ],
         },
       ],
@@ -1220,7 +1321,14 @@ describe("buildSetlistReconciliation", () => {
         {
           label: "S1",
           tracks: [
-            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: null, duration: 845, durationSource: "nugs" },
+            {
+              position: 1,
+              songTitle: "Crystal Ball",
+              songSlug: "crystal-ball",
+              segue: null,
+              duration: 845,
+              durationSource: "nugs",
+            },
           ],
         },
       ],
@@ -1241,7 +1349,14 @@ describe("buildSetlistReconciliation", () => {
         {
           label: "S1",
           tracks: [
-            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: null, duration: 845, durationSource: "archive" },
+            {
+              position: 1,
+              songTitle: "Crystal Ball",
+              songSlug: "crystal-ball",
+              segue: null,
+              duration: 845,
+              durationSource: "archive",
+            },
           ],
         },
       ],
@@ -1276,7 +1391,14 @@ describe("buildSetlistReconciliation", () => {
         {
           label: "S1",
           tracks: [
-            { position: 1, songTitle: "Crystal Ball", songSlug: "crystal-ball", segue: ",", allTimer: true, note: "Glow-stick war peak" },
+            {
+              position: 1,
+              songTitle: "Crystal Ball",
+              songSlug: "crystal-ball",
+              segue: ",",
+              allTimer: true,
+              note: "Glow-stick war peak",
+            },
           ],
         },
       ],
@@ -1337,7 +1459,10 @@ describe("buildSetlistReconciliation", () => {
         allTimer: false,
         duration: null,
         durationSource: null,
-        annotations: [{ id: "ann-keep-uuid", desc: "first time played" }, { id: "ann-drop-uuid", desc: "to remove" }],
+        annotations: [
+          { id: "ann-keep-uuid", desc: "first time played" },
+          { id: "ann-drop-uuid", desc: "to remove" },
+        ],
       },
     ];
     const remote: McpSetlist = {
@@ -1516,9 +1641,7 @@ describe("buildSetlistReconciliation", () => {
     };
     const recon = buildSetlistReconciliation(local, remote, songMap);
     expect(recon.structurallyChanged).toBe(true);
-    expect(recon.toDelete).toEqual([
-      { trackId: "local-only-uuid-from-buggy-sync", annotationIds: ["ann-local"] },
-    ]);
+    expect(recon.toDelete).toEqual([{ trackId: "local-only-uuid-from-buggy-sync", annotationIds: ["ann-local"] }]);
     expect(recon.toInsert).toHaveLength(1);
     expect(recon.toInsert[0]).toMatchObject({
       id: "prod-track-uuid",
@@ -1660,8 +1783,12 @@ describe("buildRockOperaAssignmentDiff", () => {
   // No drift: same set in any order. No writes — keeps re-runs idempotent and
   // avoids churning updatedAt on either side.
   test("returns empty deltas when local and remote match (order-insensitive)", () => {
-    expect(buildRockOperaAssignmentDiff(["hot-air-balloon", "chemical-warfare-brigade"], ["chemical-warfare-brigade", "hot-air-balloon"]))
-      .toEqual({ toAdd: [], toRemove: [] });
+    expect(
+      buildRockOperaAssignmentDiff(
+        ["hot-air-balloon", "chemical-warfare-brigade"],
+        ["chemical-warfare-brigade", "hot-air-balloon"],
+      ),
+    ).toEqual({ toAdd: [], toRemove: [] });
   });
 
   // Pre-deploy MCP omits rockOperaSlugs entirely. `undefined` means "no
@@ -1703,7 +1830,9 @@ describe("diffShowMusicians", () => {
     expect(diffShowMusicians(local, remote)).toEqual({
       toCreate: [{ musicianSlug: "aron-magner", instrumentSlugs: ["keys"] }],
       toDeleteShowMusicianIds: ["sm-marc"],
-      toUpdateInstruments: [{ showMusicianId: "sm-sammy", addInstrumentSlugs: ["percussion"], removeInstrumentSlugs: [] }],
+      toUpdateInstruments: [
+        { showMusicianId: "sm-sammy", addInstrumentSlugs: ["percussion"], removeInstrumentSlugs: [] },
+      ],
     });
   });
 
@@ -1755,13 +1884,17 @@ describe("diffTrackMusicians", () => {
     expect(diffTrackMusicians(local, remote)).toEqual({
       toCreate: [],
       toDeleteTrackMusicianIds: [],
-      toUpdate: [{ trackMusicianId: "tm-sammy", present: true, addInstrumentSlugs: ["drums"], removeInstrumentSlugs: [] }],
+      toUpdate: [
+        { trackMusicianId: "tm-sammy", present: true, addInstrumentSlugs: ["drums"], removeInstrumentSlugs: [] },
+      ],
     });
   });
 
   // New sit-in inserted, stale delta removed, untouched delta produces nothing.
   test("creates new deltas and deletes ones prod dropped", () => {
-    const local = [{ trackMusicianId: "tm-old", musicianSlug: "allen-aucoin", present: true, instrumentSlugs: ["drums"] }];
+    const local = [
+      { trackMusicianId: "tm-old", musicianSlug: "allen-aucoin", present: true, instrumentSlugs: ["drums"] },
+    ];
     const remote = [{ musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }];
     expect(diffTrackMusicians(local, remote)).toEqual({
       toCreate: [{ musicianSlug: "sam-altman", present: true, instrumentSlugs: ["drums"] }],
@@ -2078,21 +2211,15 @@ function makeStubDb(seed: {
           return matching.map((u) => ({ id: u.id }));
         },
       ),
-      upsert: vi.fn(
-        async (args: {
-          where: { id: string };
-          create: StubUserRow;
-          update: Partial<StubUserRow>;
-        }) => {
-          const existing = users.find((u) => u.id === args.where.id);
-          if (existing) {
-            Object.assign(existing, args.update);
-            return existing;
-          }
-          users.push(args.create);
-          return args.create;
-        },
-      ),
+      upsert: vi.fn(async (args: { where: { id: string }; create: StubUserRow; update: Partial<StubUserRow> }) => {
+        const existing = users.find((u) => u.id === args.where.id);
+        if (existing) {
+          Object.assign(existing, args.update);
+          return existing;
+        }
+        users.push(args.create);
+        return args.create;
+      }),
       create: vi.fn(async (args: { data: StubUserRow }) => {
         users.push(args.data);
         return args.data;
@@ -2113,7 +2240,9 @@ function makeStubDb(seed: {
     },
     rating: {
       findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(ratings)),
-      findMany: vi.fn(async () => ratings.map((r) => ({ id: r.id, rateableId: r.rateableId, rateableType: r.rateableType }))),
+      findMany: vi.fn(async () =>
+        ratings.map((r) => ({ id: r.id, rateableId: r.rateableId, rateableType: r.rateableType })),
+      ),
       upsert: vi.fn(
         async (args: {
           where: {
@@ -2166,8 +2295,7 @@ function makeStubDb(seed: {
             ? attendances.find((a) => a.id === args.where.id)
             : args.where.userId_showId
               ? attendances.find(
-                  (a) =>
-                    a.userId === args.where.userId_showId?.userId && a.showId === args.where.userId_showId.showId,
+                  (a) => a.userId === args.where.userId_showId?.userId && a.showId === args.where.userId_showId.showId,
                 )
               : undefined;
           if (existing) {
@@ -2345,9 +2473,7 @@ describe("syncUserActivity — incremental mode", () => {
 
     expect(state.ratings).toHaveLength(1);
     expect(state.ratings[0]).toMatchObject({ id: "r-1", userId: "u-marc", value: 5 });
-    expect(ratingService.rebuildAggregatesFor).toHaveBeenCalledWith([
-      { rateableId: "show-1", rateableType: "Show" },
-    ]);
+    expect(ratingService.rebuildAggregatesFor).toHaveBeenCalledWith([{ rateableId: "show-1", rateableType: "Show" }]);
     expect(changedSlugs.has("2024-08-12-cap-theatre")).toBe(true);
   });
 
@@ -2551,9 +2677,7 @@ describe("syncUserActivity — full-users mode", () => {
 
     expect(state.ratings).toHaveLength(0);
     expect(result.ratingsDeleted).toBe(1);
-    expect(ratingService.rebuildAggregatesFor).toHaveBeenCalledWith([
-      { rateableId: "show-1", rateableType: "Show" },
-    ]);
+    expect(ratingService.rebuildAggregatesFor).toHaveBeenCalledWith([{ rateableId: "show-1", rateableType: "Show" }]);
   });
 
   // Default (non-full) mode never deletes — additive sync is the safe
@@ -2806,7 +2930,13 @@ describe("syncUserActivity — show/track id-drift remap", () => {
       list_attendances_since: [
         {
           attendances: [
-            { id: "a-1", userId: "u-marc", showId: "prod-show", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
+            {
+              id: "a-1",
+              userId: "u-marc",
+              showId: "prod-show",
+              createdAt: "2026-01-02T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
           ],
           nextCursor: null,
         },

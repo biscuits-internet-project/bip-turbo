@@ -156,6 +156,7 @@ export default [
     route("admin/authors", "routes/api/admin/authors.tsx"),
     route("admin/instruments", "routes/api/admin/instruments.tsx"),
     route("admin/musicians", "routes/api/admin/musicians.tsx"),
+    route("admin/venues", "routes/api/admin/venues.tsx"),
   ]),
 
   // Admin routes

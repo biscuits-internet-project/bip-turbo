@@ -1,6 +1,6 @@
+import { PrismaClient } from "@prisma/client";
 import { createClient, type User } from "@supabase/supabase-js";
 import { z } from "zod";
-import { PrismaClient } from "@prisma/client";
 
 // Validate environment variables
 const envSchema = z.object({

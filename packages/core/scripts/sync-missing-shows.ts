@@ -16,16 +16,16 @@
  * We therefore write directly via Prisma with the prod-supplied slugs.
  */
 
-import { Prisma, type TrackFlag } from "@prisma/client";
+import type { Prisma, TrackFlag } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
+import { createTestLogger } from "../src/_shared/test-logger";
 import { InstrumentService, MusicianService } from "../src/musicians/musician-service";
 import { RatingService } from "../src/ratings/rating-service";
 import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
 import { recomputeShowDuration } from "../src/tracks/show-duration";
-import { createTestLogger } from "../src/_shared/test-logger";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
 const DEFAULT_BAND_SLUG = "the-disco-biscuits";
@@ -340,9 +340,7 @@ export function collectSongSlugs(setlists: McpSetlist[]): string[] {
   return ordered;
 }
 
-export function collectVenueKeys(
-  setlists: McpSetlist[],
-): Array<{ name: string; city: string; state: string }> {
+export function collectVenueKeys(setlists: McpSetlist[]): Array<{ name: string; city: string; state: string }> {
   const seen = new Set<string>();
   const keys: Array<{ name: string; city: string; state: string }> = [];
   for (const setlist of setlists) {
@@ -488,8 +486,7 @@ export function buildShowDriftUpdate(
     averageRatingDrift(local.averageRating, remote.averageRating);
   const countForStatsDrift =
     remote.countForStats !== undefined && (local.countForStats ?? true) !== remote.countForStats;
-  const dayOrderDrift =
-    remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder;
+  const dayOrderDrift = remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder;
   const venueDrift = local.venueId === null && resolvedVenueId !== null;
   if (!dateDrift && !aggregatesDrift && !countForStatsDrift && !dayOrderDrift && !venueDrift) return null;
   const update: ShowDriftUpdate = {};
@@ -663,6 +660,41 @@ export function buildVenueDriftUpdate(local: LocalVenueCurated, remote: McpVenue
   if (remote.latitude !== undefined && local.latitude !== remote.latitude) patch.latitude = remote.latitude;
   if (remote.longitude !== undefined && local.longitude !== remote.longitude) patch.longitude = remote.longitude;
   return Object.keys(patch).length === 0 ? null : patch;
+}
+
+// Shape-minimal local venue row for orphan planning — slug identity plus the
+// show count that gates a safe delete.
+export interface LocalVenueForOrphan {
+  id: string;
+  slug: string;
+  name: string | null;
+  showCount: number;
+}
+
+export interface VenueOrphanPlan {
+  toDelete: Array<{ id: string; slug: string }>;
+  toWarn: Array<{ slug: string; name: string | null; showCount: number }>;
+}
+
+/**
+ * Partition local venues that prod no longer returns (their slug erred on
+ * get_venues) into safe deletes and manual-cleanup warnings. A zero-show orphan
+ * is deleted — nothing references it (shows are the only FK to venues). An
+ * orphan that still has local shows is a likely rename/merge upstream, so it's
+ * surfaced for manual re-point rather than deleted (which would orphan shows).
+ */
+export function planVenueOrphans(localVenues: LocalVenueForOrphan[], orphanSlugs: Set<string>): VenueOrphanPlan {
+  const toDelete: VenueOrphanPlan["toDelete"] = [];
+  const toWarn: VenueOrphanPlan["toWarn"] = [];
+  for (const venue of localVenues) {
+    if (!orphanSlugs.has(venue.slug)) continue;
+    if (venue.showCount === 0) {
+      toDelete.push({ id: venue.id, slug: venue.slug });
+    } else {
+      toWarn.push({ slug: venue.slug, name: venue.name, showCount: venue.showCount });
+    }
+  }
+  return { toDelete, toWarn };
 }
 
 // Shape-minimal local Track row used by the setlist reconciliation path.
@@ -860,7 +892,11 @@ export function buildSetlistReconciliation(
     if (annotationDiff.toCreateDescs.length > 0 || annotationDiff.toDeleteIds.length > 0) {
       cosmeticallyChanged = true;
     }
-    if (Object.keys(patch).length > 0 || annotationDiff.toCreateDescs.length > 0 || annotationDiff.toDeleteIds.length > 0) {
+    if (
+      Object.keys(patch).length > 0 ||
+      annotationDiff.toCreateDescs.length > 0 ||
+      annotationDiff.toDeleteIds.length > 0
+    ) {
       toUpdate.push({
         trackId: localTrack.id,
         patch,
@@ -908,10 +944,7 @@ export interface RockOperaAssignmentDiff {
   toRemove: string[];
 }
 
-export function buildRockOperaAssignmentDiff(
-  local: string[],
-  remote: string[] | undefined,
-): RockOperaAssignmentDiff {
+export function buildRockOperaAssignmentDiff(local: string[], remote: string[] | undefined): RockOperaAssignmentDiff {
   if (remote === undefined) return { toAdd: [], toRemove: [] };
   const localSet = new Set(local);
   const remoteSet = new Set(remote);
@@ -977,7 +1010,11 @@ export function diffShowMusicians(
     if (!r) continue;
     const { add, remove } = diffSlugSets(m.instrumentSlugs, r.instrumentSlugs);
     if (add.length > 0 || remove.length > 0) {
-      toUpdateInstruments.push({ showMusicianId: m.showMusicianId, addInstrumentSlugs: add, removeInstrumentSlugs: remove });
+      toUpdateInstruments.push({
+        showMusicianId: m.showMusicianId,
+        addInstrumentSlugs: add,
+        removeInstrumentSlugs: remove,
+      });
     }
   }
   return { toCreate, toDeleteShowMusicianIds, toUpdateInstruments };
@@ -1106,7 +1143,9 @@ export function diffCompletions(
   const localByEarlier = new Map(local.map((c) => [c.earlierTrackId, c.laterTrackId]));
   const desiredByEarlier = new Map(desired.map((c) => [c.earlierTrackId, c.laterTrackId]));
   const toUpsert = desired.filter((c) => localByEarlier.get(c.earlierTrackId) !== c.laterTrackId);
-  const toDeleteEarlierTrackIds = local.filter((c) => !desiredByEarlier.has(c.earlierTrackId)).map((c) => c.earlierTrackId);
+  const toDeleteEarlierTrackIds = local
+    .filter((c) => !desiredByEarlier.has(c.earlierTrackId))
+    .map((c) => c.earlierTrackId);
   return { toUpsert, toDeleteEarlierTrackIds };
 }
 
@@ -1156,7 +1195,9 @@ async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Prom
     } catch (err) {
       lastErr = err;
       const isLast = attempt === MCP_MAX_ATTEMPTS;
-      console.warn(`  ⚠️  MCP ${toolName} attempt ${attempt}/${MCP_MAX_ATTEMPTS} failed${isLast ? "" : "; retrying"}: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn(
+        `  ⚠️  MCP ${toolName} attempt ${attempt}/${MCP_MAX_ATTEMPTS} failed${isLast ? "" : "; retrying"}: ${err instanceof Error ? err.message : String(err)}`,
+      );
       if (isLast) break;
       // Linear backoff: 2s, 4s. Keeps the total wait small while still
       // giving an upstream cold-start a chance to warm up.
@@ -1276,7 +1317,7 @@ export async function syncUserActivity(
   db: typeof prisma,
   options: SyncUserActivityOptions,
 ): Promise<UserActivityStats> {
-  const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, now, changedSlugs } = options;
+  const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, changedSlugs } = options;
   const mcp = options.mcp ?? mcpCall;
   const prodShowIdToLocalId = options.prodShowIdToLocalId ?? new Map<string, string>();
   const prodTrackIdToLocalId = options.prodTrackIdToLocalId ?? new Map<string, string>();
@@ -1302,8 +1343,10 @@ export async function syncUserActivity(
   async function localMaxUpdatedAt(table: "user" | "rating" | "attendance"): Promise<Date> {
     if (pullFromEpoch) return new Date(0);
     let row: { updatedAt: Date } | null;
-    if (table === "user") row = await db.user.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
-    else if (table === "rating") row = await db.rating.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    if (table === "user")
+      row = await db.user.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    else if (table === "rating")
+      row = await db.rating.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
     else row = await db.attendance.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
     return row?.updatedAt ?? new Date(0);
   }
@@ -1449,9 +1492,9 @@ export async function syncUserActivity(
       // row was seeded under a different id. No-drift case = the same id back.
       localRateableId:
         r.rateableType === "Show"
-          ? prodShowIdToLocalId.get(r.rateableId) ?? r.rateableId
+          ? (prodShowIdToLocalId.get(r.rateableId) ?? r.rateableId)
           : r.rateableType === "Track"
-            ? prodTrackIdToLocalId.get(r.rateableId) ?? r.rateableId
+            ? (prodTrackIdToLocalId.get(r.rateableId) ?? r.rateableId)
             : r.rateableId,
     }));
     // Batched FK existence check per page. The realistic miss is show/track:
@@ -1497,7 +1540,10 @@ export async function syncUserActivity(
       }
       if (isDryRun) {
         stats.ratingsUpserted++;
-        touchedRateables.set(`${r.rateableType}|${r.localRateableId}`, { rateableId: r.localRateableId, rateableType: r.rateableType });
+        touchedRateables.set(`${r.rateableType}|${r.localRateableId}`, {
+          rateableId: r.localRateableId,
+          rateableType: r.rateableType,
+        });
         continue;
       }
       try {
@@ -1755,6 +1801,8 @@ interface SyncStats {
   venuesCreated: number;
   venuesLinked: number;
   venuesUnmatched: number;
+  venuesOrphanedDeleted: number;
+  venuesOrphanedWithShows: number;
   setlistsReconciled: number;
   setlistsStructurallyChanged: number;
   tracksCreated: number;
@@ -1950,6 +1998,8 @@ async function syncMissingShows(): Promise<void> {
     venuesCreated: 0,
     venuesLinked: 0,
     venuesUnmatched: 0,
+    venuesOrphanedDeleted: 0,
+    venuesOrphanedWithShows: 0,
     setlistsReconciled: 0,
     setlistsStructurallyChanged: 0,
     tracksCreated: 0,
@@ -2055,7 +2105,9 @@ async function syncMissingShows(): Promise<void> {
     // can back-fill venueId. Their setlists MUST be fetched alongside missing
     // shows so we know the (name, city, state) tuple to search by.
     const needsVenueSlugs = existingLocal.filter((s) => s.venueId === null).map((s) => s.slug);
-    console.log(`📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`);
+    console.log(
+      `📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`,
+    );
 
     // Step 3: fetch the full setlist for EVERY in-scope show in one batched
     // call. Drives both the missing-show inserts and the per-existing-show
@@ -2245,7 +2297,7 @@ async function syncMissingShows(): Promise<void> {
         ? `${setlist.venue.name}|${setlist.venue.city ?? ""}|${setlist.venue.state ?? ""}`
         : null;
       const venueSlug = venueKey ? venueKeyToSlug.get(venueKey) : null;
-      const resolvedVenueId = venueSlug ? venueSlugToId.get(venueSlug) ?? null : null;
+      const resolvedVenueId = venueSlug ? (venueSlugToId.get(venueSlug) ?? null) : null;
       const patch = buildShowDriftUpdate(local, remote, resolvedVenueId);
       if (patch === null) {
         stats.showsUnchanged++;
@@ -2378,7 +2430,7 @@ async function syncMissingShows(): Promise<void> {
         ? `${setlist.venue.name}|${setlist.venue.city ?? ""}|${setlist.venue.state ?? ""}`
         : null;
       const venueSlug = venueKey ? venueKeyToSlug.get(venueKey) : null;
-      const venueId = venueSlug ? venueSlugToId.get(venueSlug) ?? null : null;
+      const venueId = venueSlug ? (venueSlugToId.get(venueSlug) ?? null) : null;
       if (venueId) stats.venuesLinked++;
 
       if (isDryRun) {
@@ -2442,12 +2494,13 @@ async function syncMissingShows(): Promise<void> {
       const reconcileShowIds = Array.from(existingBySlug.values())
         .filter((s) => !String(s.id).startsWith("dry-run-show-"))
         .map((s) => s.id);
-      const localTagRows = reconcileShowIds.length === 0
-        ? []
-        : await db.rockOperaPerformance.findMany({
-            where: { showId: { in: reconcileShowIds } },
-            include: { rockOpera: { select: { slug: true } } },
-          });
+      const localTagRows =
+        reconcileShowIds.length === 0
+          ? []
+          : await db.rockOperaPerformance.findMany({
+              where: { showId: { in: reconcileShowIds } },
+              include: { rockOpera: { select: { slug: true } } },
+            });
       const localTagsByShowId = new Map<string, string[]>();
       for (const row of localTagRows) {
         const arr = localTagsByShowId.get(row.showId);
@@ -2473,15 +2526,15 @@ async function syncMissingShows(): Promise<void> {
         if (diff.toAdd.length === 0 && diff.toRemove.length === 0) continue;
 
         if (isDryRun || isDryRunShow) {
-          console.log(`  🎭 ${slug}: +[${diff.toAdd.join(",")}] -[${diff.toRemove.join(",")}] rock opera tag(s) (dry run)`);
+          console.log(
+            `  🎭 ${slug}: +[${diff.toAdd.join(",")}] -[${diff.toRemove.join(",")}] rock opera tag(s) (dry run)`,
+          );
           stats.rockOperaAssignmentsAdded += diff.toAdd.length;
           stats.rockOperaAssignmentsRemoved += diff.toRemove.length;
           continue;
         }
 
-        const addIds = diff.toAdd
-          .map((s) => rockOperaSlugToId.get(s))
-          .filter((id): id is string => id !== undefined);
+        const addIds = diff.toAdd.map((s) => rockOperaSlugToId.get(s)).filter((id): id is string => id !== undefined);
         const removeIds = diff.toRemove
           .map((s) => rockOperaSlugToId.get(s))
           .filter((id): id is string => id !== undefined);
@@ -2605,7 +2658,11 @@ async function syncMissingShows(): Promise<void> {
         }
         for (const del of recon.toDelete) stats.annotationsDeleted += del.annotationIds.length;
         changedSlugs.add(slug);
-        if (recon.structurallyChanged && local.countForStats && (earliestInsertedDate === null || showDate < earliestInsertedDate)) {
+        if (
+          recon.structurallyChanged &&
+          local.countForStats &&
+          (earliestInsertedDate === null || showDate < earliestInsertedDate)
+        ) {
           earliestInsertedDate = showDate;
         }
         continue;
@@ -2650,11 +2707,12 @@ async function syncMissingShows(): Promise<void> {
                 durationSource: ins.durationSource,
                 createdAt: now,
                 updatedAt: now,
-                annotations: ins.annotationDescs.length > 0
-                  ? {
-                      create: ins.annotationDescs.map((desc) => ({ desc, createdAt: now, updatedAt: now })),
-                    }
-                  : undefined,
+                annotations:
+                  ins.annotationDescs.length > 0
+                    ? {
+                        create: ins.annotationDescs.map((desc) => ({ desc, createdAt: now, updatedAt: now })),
+                      }
+                    : undefined,
               },
             });
             stats.tracksCreated++;
@@ -2743,7 +2801,10 @@ async function syncMissingShows(): Promise<void> {
       // in-scope setlists to a local id, seeding missing rows idempotently by
       // slug. Instruments first so a musician's defaultInstrument FK resolves.
       const instrumentNameBySlug = new Map<string, string>();
-      const musicianRefBySlug = new Map<string, { name: string; knownFrom: string | null; defaultInstrumentSlug: string | null }>();
+      const musicianRefBySlug = new Map<
+        string,
+        { name: string; knownFrom: string | null; defaultInstrumentSlug: string | null }
+      >();
       const noteInstrument = (i: { slug: string; name: string } | null | undefined): void => {
         if (i) instrumentNameBySlug.set(i.slug, i.name);
       };
@@ -2809,7 +2870,9 @@ async function syncMissingShows(): Promise<void> {
             const created = await musicianService.create({
               name: ref.name,
               knownFrom: ref.knownFrom,
-              defaultInstrumentId: ref.defaultInstrumentSlug ? instrumentSlugToId.get(ref.defaultInstrumentSlug) ?? null : null,
+              defaultInstrumentId: ref.defaultInstrumentSlug
+                ? (instrumentSlugToId.get(ref.defaultInstrumentSlug) ?? null)
+                : null,
             });
             musicianSlugToId.set(created.slug, created.id);
           }
@@ -2825,12 +2888,13 @@ async function syncMissingShows(): Promise<void> {
       for (const [slug, local] of existingBySlug) {
         if (!String(local.id).startsWith("dry-run-show-")) showIdToSlug.set(local.id, slug);
       }
-      const localTrackRows = performerShowIds.length === 0
-        ? []
-        : await db.track.findMany({
-            where: { showId: { in: performerShowIds } },
-            select: { id: true, showId: true, set: true, position: true },
-          });
+      const localTrackRows =
+        performerShowIds.length === 0
+          ? []
+          : await db.track.findMany({
+              where: { showId: { in: performerShowIds } },
+              select: { id: true, showId: true, set: true, position: true },
+            });
       const trackKeyToLocalId = new Map<string, string>();
       const allTrackIds: string[] = [];
       for (const row of localTrackRows) {
@@ -2853,17 +2917,18 @@ async function syncMissingShows(): Promise<void> {
       }
 
       // 8c.3 — load local performer + flag rows for the in-scope shows/tracks.
-      const localShowMusicianRows = performerShowIds.length === 0
-        ? []
-        : await db.showMusician.findMany({
-            where: { showId: { in: performerShowIds } },
-            select: {
-              id: true,
-              showId: true,
-              musician: { select: { slug: true } },
-              instruments: { select: { instrument: { select: { slug: true } } } },
-            },
-          });
+      const localShowMusicianRows =
+        performerShowIds.length === 0
+          ? []
+          : await db.showMusician.findMany({
+              where: { showId: { in: performerShowIds } },
+              select: {
+                id: true,
+                showId: true,
+                musician: { select: { slug: true } },
+                instruments: { select: { instrument: { select: { slug: true } } } },
+              },
+            });
       const localShowMusiciansByShowId = new Map<string, LocalShowMusician[]>();
       for (const row of localShowMusicianRows) {
         const entry: LocalShowMusician = {
@@ -2880,18 +2945,19 @@ async function syncMissingShows(): Promise<void> {
       // bounded by show count) rather than `trackId IN allTrackIds`: an all-years
       // sync has tens of thousands of track ids, which blows past the database's
       // bound-parameter limit.
-      const localTrackMusicianRows = allTrackIds.length === 0
-        ? []
-        : await db.trackMusician.findMany({
-            where: { track: { showId: { in: performerShowIds } } },
-            select: {
-              id: true,
-              trackId: true,
-              present: true,
-              musician: { select: { slug: true } },
-              instruments: { select: { instrument: { select: { slug: true } } } },
-            },
-          });
+      const localTrackMusicianRows =
+        allTrackIds.length === 0
+          ? []
+          : await db.trackMusician.findMany({
+              where: { track: { showId: { in: performerShowIds } } },
+              select: {
+                id: true,
+                trackId: true,
+                present: true,
+                musician: { select: { slug: true } },
+                instruments: { select: { instrument: { select: { slug: true } } } },
+              },
+            });
       const localTrackMusiciansByTrackId = new Map<string, LocalTrackMusician[]>();
       for (const row of localTrackMusicianRows) {
         const entry: LocalTrackMusician = {
@@ -2905,12 +2971,13 @@ async function syncMissingShows(): Promise<void> {
         else localTrackMusiciansByTrackId.set(row.trackId, [entry]);
       }
 
-      const localFlagRows = allTrackIds.length === 0
-        ? []
-        : await db.trackFlagAssignment.findMany({
-            where: { track: { showId: { in: performerShowIds } } },
-            select: { trackId: true, flag: true },
-          });
+      const localFlagRows =
+        allTrackIds.length === 0
+          ? []
+          : await db.trackFlagAssignment.findMany({
+              where: { track: { showId: { in: performerShowIds } } },
+              select: { trackId: true, flag: true },
+            });
       const localFlagsByTrackId = new Map<string, string[]>();
       for (const row of localFlagRows) {
         const arr = localFlagsByTrackId.get(row.trackId);
@@ -2928,7 +2995,10 @@ async function syncMissingShows(): Promise<void> {
         const isDryRunShow = String(local.id).startsWith("dry-run-show-");
 
         const localSM = localShowMusiciansByShowId.get(local.id) ?? [];
-        const remoteSM = setlist.lineup?.map((m) => ({ musicianSlug: m.musicianSlug, instrumentSlugs: m.instruments.map((i) => i.slug) }));
+        const remoteSM = setlist.lineup?.map((m) => ({
+          musicianSlug: m.musicianSlug,
+          instrumentSlugs: m.instruments.map((i) => i.slug),
+        }));
         const smDiff = diffShowMusicians(localSM, remoteSM);
 
         type TrackPerformerWork = {
@@ -2962,7 +3032,9 @@ async function syncMissingShows(): Promise<void> {
         }
 
         const lineupChanged =
-          smDiff.toCreate.length > 0 || smDiff.toDeleteShowMusicianIds.length > 0 || smDiff.toUpdateInstruments.length > 0;
+          smDiff.toCreate.length > 0 ||
+          smDiff.toDeleteShowMusicianIds.length > 0 ||
+          smDiff.toUpdateInstruments.length > 0;
         if (!lineupChanged && trackWork.length === 0) continue;
 
         // +adds -deletes ~instrument-only-updates, so a lineup change that only
@@ -3001,7 +3073,9 @@ async function syncMissingShows(): Promise<void> {
                   createdAt: now,
                   updatedAt: now,
                   instruments:
-                    instrumentIds.length > 0 ? { create: instrumentIds.map((instrumentId) => ({ instrumentId })) } : undefined,
+                    instrumentIds.length > 0
+                      ? { create: instrumentIds.map((instrumentId) => ({ instrumentId })) }
+                      : undefined,
                 },
               });
             }
@@ -3035,13 +3109,18 @@ async function syncMissingShows(): Promise<void> {
                     createdAt: now,
                     updatedAt: now,
                     instruments:
-                      instrumentIds.length > 0 ? { create: instrumentIds.map((instrumentId) => ({ instrumentId })) } : undefined,
+                      instrumentIds.length > 0
+                        ? { create: instrumentIds.map((instrumentId) => ({ instrumentId })) }
+                        : undefined,
                   },
                 });
               }
               for (const u of w.tmDiff.toUpdate) {
                 if (u.present !== undefined) {
-                  await tx.trackMusician.update({ where: { id: u.trackMusicianId }, data: { present: u.present, updatedAt: now } });
+                  await tx.trackMusician.update({
+                    where: { id: u.trackMusicianId },
+                    data: { present: u.present, updatedAt: now },
+                  });
                 }
                 const removeIds = instrumentIdsFor(u.removeInstrumentSlugs);
                 const addIds = instrumentIdsFor(u.addInstrumentSlugs);
@@ -3063,7 +3142,12 @@ async function syncMissingShows(): Promise<void> {
               }
               if (w.flagDiff.toAdd.length > 0) {
                 await tx.trackFlagAssignment.createMany({
-                  data: w.flagDiff.toAdd.map((flag) => ({ trackId: w.trackId, flag: flag as TrackFlag, createdAt: now, updatedAt: now })),
+                  data: w.flagDiff.toAdd.map((flag) => ({
+                    trackId: w.trackId,
+                    flag: flag as TrackFlag,
+                    createdAt: now,
+                    updatedAt: now,
+                  })),
                 });
               }
             }
@@ -3125,13 +3209,20 @@ async function syncMissingShows(): Promise<void> {
           try {
             await db.$transaction(async (tx) => {
               if (compDiff.toDeleteEarlierTrackIds.length > 0) {
-                await tx.trackCompletion.deleteMany({ where: { earlierTrackId: { in: compDiff.toDeleteEarlierTrackIds } } });
+                await tx.trackCompletion.deleteMany({
+                  where: { earlierTrackId: { in: compDiff.toDeleteEarlierTrackIds } },
+                });
               }
               for (const link of compDiff.toUpsert) {
                 await tx.trackCompletion.upsert({
                   where: { earlierTrackId: link.earlierTrackId },
                   update: { laterTrackId: link.laterTrackId, updatedAt: now },
-                  create: { earlierTrackId: link.earlierTrackId, laterTrackId: link.laterTrackId, createdAt: now, updatedAt: now },
+                  create: {
+                    earlierTrackId: link.earlierTrackId,
+                    laterTrackId: link.laterTrackId,
+                    createdAt: now,
+                    updatedAt: now,
+                  },
                 });
               }
             });
@@ -3142,7 +3233,9 @@ async function syncMissingShows(): Promise<void> {
             const deletedSet = new Set(compDiff.toDeleteEarlierTrackIds);
             const touchedTrackIds = [
               ...compDiff.toUpsert.flatMap((l) => [l.earlierTrackId, l.laterTrackId]),
-              ...localCompletionRows.filter((c) => deletedSet.has(c.earlierTrackId)).flatMap((c) => [c.earlierTrackId, c.laterTrackId]),
+              ...localCompletionRows
+                .filter((c) => deletedSet.has(c.earlierTrackId))
+                .flatMap((c) => [c.earlierTrackId, c.laterTrackId]),
             ];
             for (const trackId of touchedTrackIds) {
               const slug = showIdToSlug.get(showIdByTrackId.get(trackId) ?? "");
@@ -3172,10 +3265,7 @@ async function syncMissingShows(): Promise<void> {
     const inYearLocalShows = await db.show.findMany({
       where: {
         OR: years.map((y) => ({
-          AND: [
-            { date: { gte: `${y}-01-01` } },
-            { date: { lte: `${y}-12-31` } },
-          ],
+          AND: [{ date: { gte: `${y}-01-01` } }, { date: { lte: `${y}-12-31` } }],
         })),
       },
       select: {
@@ -3317,6 +3407,49 @@ async function syncMissingShows(): Promise<void> {
       }
     }
 
+    // Step 8d: orphan-venue detection. Local venues whose slug prod doesn't
+    // return on get_venues are renames / merges / deletes upstream. Delete the
+    // zero-show orphans (FK-safe: shows are the only reference to a venue) and
+    // log the rest for manual re-point. Runs after ghost-show deletion so
+    // venues that became zero-show via that cleanup get auto-deleted here.
+    const localVenueCountRows = await db.venue.findMany({
+      select: { id: true, slug: true, name: true, _count: { select: { shows: true } } },
+    });
+    if (localVenueCountRows.length > 0) {
+      const { errors: venueOrphanErrors } = await mcpBulkChunked<string, McpVenue>(
+        "get_venues",
+        "slugs",
+        localVenueCountRows.map((v) => v.slug),
+        "venues",
+      );
+      const orphanVenueSlugs = new Set(venueOrphanErrors.map((e) => e.slug));
+      const { toDelete, toWarn } = planVenueOrphans(
+        localVenueCountRows.map((v) => ({ id: v.id, slug: v.slug, name: v.name, showCount: v._count.shows })),
+        orphanVenueSlugs,
+      );
+      for (const venue of toDelete) {
+        if (isDryRun) {
+          console.log(`  🗑️  venue ${venue.slug} (0 shows) would be deleted (not on prod) (dry run)`);
+        } else {
+          try {
+            await db.venue.delete({ where: { id: venue.id } });
+            console.log(`  🗑️  venue ${venue.slug} (0 shows) deleted (not on prod)`);
+          } catch (err) {
+            console.error(`  ❌ failed to delete orphan venue ${venue.slug}:`, err);
+            stats.errors++;
+            continue;
+          }
+        }
+        stats.venuesOrphanedDeleted++;
+      }
+      for (const venue of toWarn) {
+        stats.venuesOrphanedWithShows++;
+        console.warn(
+          `  ⚠️  venue ${venue.slug} ("${venue.name}") has ${venue.showCount} local show(s) but isn't on prod; likely a rename or merge upstream, manual cleanup needed`,
+        );
+      }
+    }
+
     // Step 9: user-activity sync (users + ratings + attendances). Runs
     // after the show/song/venue/track passes so FK lookups can resolve
     // (every show/track a rating or attendance might reference is already
@@ -3369,7 +3502,9 @@ async function syncMissingShows(): Promise<void> {
       }
       if (songsChanged) await cacheInvalidation.invalidateSongCaches();
     } else if (!isDryRun && !cacheInvalidation && (changedSlugs.size > 0 || songsChanged)) {
-      console.warn("⚠️  REDIS_URL not set; skipping cache invalidation. Cached pages may show stale data until TTL expires or you restart the app.");
+      console.warn(
+        "⚠️  REDIS_URL not set; skipping cache invalidation. Cached pages may show stale data until TTL expires or you restart the app.",
+      );
     }
 
     // Rebuild Track.gap + Song.* aggregates once for the whole batch. Bulk
@@ -3409,29 +3544,46 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Shows created: ${stats.showsCreated}`);
   console.log(`Songs fetched: ${stats.songsFetched}`);
   console.log(`Songs created: ${stats.songsCreated}`);
-  console.log(`Songs orphaned (deleted / with tracks): ${stats.songsOrphanedDeleted} / ${stats.songsOrphanedWithTracks}`);
-  console.log(`Shows orphaned (deleted / with user data): ${stats.showsOrphanedDeleted} / ${stats.showsOrphanedWithUserData}`);
+  console.log(
+    `Songs orphaned (deleted / with tracks): ${stats.songsOrphanedDeleted} / ${stats.songsOrphanedWithTracks}`,
+  );
+  console.log(
+    `Shows orphaned (deleted / with user data): ${stats.showsOrphanedDeleted} / ${stats.showsOrphanedWithUserData}`,
+  );
   console.log(`Venues created: ${stats.venuesCreated}`);
   console.log(`Venues linked on shows: ${stats.venuesLinked}`);
   console.log(`Venues unmatched (left NULL): ${stats.venuesUnmatched}`);
+  console.log(
+    `Venues orphaned (deleted / with shows): ${stats.venuesOrphanedDeleted} / ${stats.venuesOrphanedWithShows}`,
+  );
   console.log(`Setlists reconciled: ${stats.setlistsReconciled}`);
   console.log(`Setlists structurally changed: ${stats.setlistsStructurallyChanged}`);
-  console.log(`Tracks created / updated / deleted: ${stats.tracksCreated} / ${stats.tracksUpdated} / ${stats.tracksDeleted}`);
+  console.log(
+    `Tracks created / updated / deleted: ${stats.tracksCreated} / ${stats.tracksUpdated} / ${stats.tracksDeleted}`,
+  );
   console.log(`Annotations created / deleted: ${stats.annotationsCreated} / ${stats.annotationsDeleted}`);
   console.log(`SegueRuns regenerated: ${stats.segueRunsRegenerated}`);
   console.log(`Unresolved song slugs: ${stats.unresolvedSongSlugs}`);
   console.log(`Rock operas upserted: ${stats.rockOperasUpserted}`);
-  console.log(`Rock opera assignments added / removed: ${stats.rockOperaAssignmentsAdded} / ${stats.rockOperaAssignmentsRemoved}`);
+  console.log(
+    `Rock opera assignments added / removed: ${stats.rockOperaAssignmentsAdded} / ${stats.rockOperaAssignmentsRemoved}`,
+  );
   console.log(`Musicians / instruments created: ${stats.musiciansCreated} / ${stats.instrumentsCreated}`);
   console.log(`Show lineup (upserted / deleted): ${stats.showMusiciansUpserted} / ${stats.showMusiciansDeleted}`);
   console.log(`Track musicians (upserted / deleted): ${stats.trackMusiciansUpserted} / ${stats.trackMusiciansDeleted}`);
   console.log(`Track flags (added / removed): ${stats.trackFlagsAdded} / ${stats.trackFlagsRemoved}`);
-  console.log(`Completions (upserted / deleted / skipped): ${stats.completionsUpserted} / ${stats.completionsDeleted} / ${stats.completionsSkipped}`);
+  console.log(
+    `Completions (upserted / deleted / skipped): ${stats.completionsUpserted} / ${stats.completionsDeleted} / ${stats.completionsSkipped}`,
+  );
   if (stats.userActivity) {
     const ua = stats.userActivity;
     console.log(`Users (created / updated / deleted): ${ua.usersCreated} / ${ua.usersUpdated} / ${ua.usersDeleted}`);
-    console.log(`Ratings (upserted / deleted / FK skipped): ${ua.ratingsUpserted} / ${ua.ratingsDeleted} / ${ua.ratingsFkSkipped}`);
-    console.log(`Attendances (upserted / deleted / FK skipped): ${ua.attendancesUpserted} / ${ua.attendancesDeleted} / ${ua.attendancesFkSkipped}`);
+    console.log(
+      `Ratings (upserted / deleted / FK skipped): ${ua.ratingsUpserted} / ${ua.ratingsDeleted} / ${ua.ratingsFkSkipped}`,
+    );
+    console.log(
+      `Attendances (upserted / deleted / FK skipped): ${ua.attendancesUpserted} / ${ua.attendancesDeleted} / ${ua.attendancesFkSkipped}`,
+    );
     console.log(`Rating aggregates rebuilt: ${ua.aggregatesRebuilt}`);
   } else {
     console.log(`User activity sync: skipped`);
