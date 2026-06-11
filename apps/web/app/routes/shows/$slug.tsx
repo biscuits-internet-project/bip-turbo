@@ -25,6 +25,7 @@ import { useShowUserData } from "~/hooks/use-show-user-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
+import { deriveShowLineupNotes } from "~/lib/lineup-notes";
 import { logger } from "~/lib/logger";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
@@ -310,7 +311,15 @@ export default function Show() {
             defaultView={setlistView}
             onViewChange={setSetlistView}
           />
-          <ShowLineupSection lineup={setlist.lineup} />
+          <ShowLineupSection
+            lineup={setlist.lineup}
+            notes={deriveShowLineupNotes(
+              setlist.show.date,
+              setlist.lineup,
+              setlist.trackMusicianDeltas,
+              setlist.sets.flatMap((set) => set.tracks).map((track) => track.id),
+            )}
+          />
           {/* Note when count_for_stats=false (soundchecks, radio sessions,
               cancelled stubs, late-night Tractorbeam sets). Yellow accent on
               the left edge for attention, no full background so it doesn't
