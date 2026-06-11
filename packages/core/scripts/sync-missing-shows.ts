@@ -409,6 +409,30 @@ export function buildShowCreateInput(
   };
 }
 
+/**
+ * Pair prod shows that look "missing" (no local row under their slug) against
+ * local rows carrying the same prod id under a DIFFERENT slug. Those are slug
+ * renames (an admin changed the show slug on prod), not new shows: handling
+ * them as insert-new would collide on the primary key, and the stale-slug local
+ * row would then trip the ghost-delete (FK from its ratings/attendances).
+ * Match by id (the stable cross-environment key) since the slug is exactly what
+ * drifted. Returns the (oldSlug to newSlug) updates to apply in place.
+ */
+export function planShowRenames(
+  missingRemote: Array<{ id?: string; slug: string }>,
+  localById: Map<string, { slug: string | null }>,
+): Array<{ id: string; oldSlug: string | null; newSlug: string }> {
+  const renames: Array<{ id: string; oldSlug: string | null; newSlug: string }> = [];
+  for (const remote of missingRemote) {
+    if (!remote.id) continue;
+    const local = localById.get(remote.id);
+    if (!local) continue; // genuinely new show — leave it for the insert path
+    if (local.slug === remote.slug) continue; // already aligned (defensive)
+    renames.push({ id: remote.id, oldSlug: local.slug, newSlug: remote.slug });
+  }
+  return renames;
+}
+
 // Shape-minimal view of a local Show row (only the aggregate fields we mirror)
 // — used as the left operand to showNeedsUpdate.
 export interface LocalShowAggregates {
@@ -1923,6 +1947,9 @@ interface SyncStats {
   showsUpdated: number;
   showsUnchanged: number;
   showsCreated: number;
+  // Local shows whose slug was realigned to prod's after an admin renamed the
+  // show on prod (matched by id). See planShowRenames.
+  showsRenamed: number;
   songsFetched: number;
   songsCreated: number;
   songsOrphanedDeleted: number;
@@ -2120,6 +2147,7 @@ async function syncMissingShows(): Promise<void> {
     showsUpdated: 0,
     showsUnchanged: 0,
     showsCreated: 0,
+    showsRenamed: 0,
     songsFetched: 0,
     songsCreated: 0,
     songsOrphanedDeleted: 0,
@@ -2206,21 +2234,19 @@ async function syncMissingShows(): Promise<void> {
     // Step 2c: partition into missing-locally vs already-local. We pull venueId
     // for existing rows so the drift-update branch can back-fill venues that
     // landed NULL under an older sync (caused 404s on /shows/:slug).
-    const existingLocal = await db.show.findMany({
-      where: { slug: { in: realSlugs } },
-      select: {
-        id: true,
-        slug: true,
-        date: true,
-        averageRating: true,
-        ratingsCount: true,
-        notes: true,
-        relistenUrl: true,
-        venueId: true,
-        countForStats: true,
-        dayOrder: true,
-      },
-    });
+    const localShowSelect = {
+      id: true,
+      slug: true,
+      date: true,
+      averageRating: true,
+      ratingsCount: true,
+      notes: true,
+      relistenUrl: true,
+      venueId: true,
+      countForStats: true,
+      dayOrder: true,
+    } as const;
+    const existingLocal = await db.show.findMany({ where: { slug: { in: realSlugs } }, select: localShowSelect });
     // Local Show.slug is nullable in the schema, but every show this script
     // touches has a slug (we filter the prod summary by slug earlier in step
     // 2). Narrowing here keeps `existingBySlug` keyed by `string` so every
@@ -2229,13 +2255,44 @@ async function syncMissingShows(): Promise<void> {
     const existingBySlug = new Map(
       existingLocal.filter((s): s is typeof s & { slug: string } => s.slug !== null).map((s) => [s.slug, s]),
     );
+
+    // Step 2d: realign renamed shows. A prod show with no local row under its
+    // slug, but whose prod id already exists locally under a different slug, is
+    // a slug rename (admin renamed it on prod), not a new show. Update the local
+    // row's slug in place and fold it into existingBySlug so it flows through
+    // the drift/setlist reconcile as an existing show. Without this the show
+    // would insert-collide on the primary key and then FK-fail when the
+    // stale-slug ghost is pruned.
+    const slugRenameCandidates = remoteFullShows.filter((s) => !existingBySlug.has(s.slug));
+    const renameCandidateIds = slugRenameCandidates.flatMap((s) => (s.id ? [s.id] : []));
+    const renameLocalRows =
+      renameCandidateIds.length > 0
+        ? await db.show.findMany({ where: { id: { in: renameCandidateIds } }, select: localShowSelect })
+        : [];
+    const renameLocalById = new Map(renameLocalRows.map((r) => [r.id, r]));
+    for (const rename of planShowRenames(slugRenameCandidates, renameLocalById)) {
+      const localRow = renameLocalById.get(rename.id);
+      if (!localRow) continue;
+      if (!isDryRun) {
+        await db.show.update({ where: { id: rename.id }, data: { slug: rename.newSlug, updatedAt: now } });
+      }
+      if (rename.oldSlug) changedSlugs.add(rename.oldSlug);
+      changedSlugs.add(rename.newSlug);
+      existingBySlug.set(rename.newSlug, { ...localRow, slug: rename.newSlug });
+      stats.showsRenamed++;
+      console.log(`  🔀 show slug realigned ${rename.oldSlug ?? "(null)"} → ${rename.newSlug}`);
+    }
+
     stats.showsAlreadyLocal = existingBySlug.size;
     const missingShows = remoteFullShows.filter((s) => !existingBySlug.has(s.slug));
     const existingRemoteShows = remoteFullShows.filter((s) => existingBySlug.has(s.slug));
     // Existing shows whose venue we still need to resolve so the drift loop
     // can back-fill venueId. Their setlists MUST be fetched alongside missing
-    // shows so we know the (name, city, state) tuple to search by.
-    const needsVenueSlugs = existingLocal.filter((s) => s.venueId === null).map((s) => s.slug);
+    // shows so we know the (name, city, state) tuple to search by. Sourced from
+    // existingBySlug (not existingLocal) so realigned renames are covered too.
+    const needsVenueSlugs = Array.from(existingBySlug.values())
+      .filter((s) => s.venueId === null)
+      .map((s) => s.slug);
     console.log(
       `📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`,
     );
@@ -2329,9 +2386,14 @@ async function syncMissingShows(): Promise<void> {
     const venueKeyToSlug = new Map<string, string>(); // "name|city|state" -> slug
     for (const key of venueKeys) {
       try {
+        // Query by name only, then disambiguate on city+state in matchVenue.
+        // The limit must exceed the largest count of venues sharing a name, or
+        // the exact city+state match can be truncated away (16 "House of Blues"
+        // rows overflowed the old limit of 10, leaving those shows venue-less).
+        // 50 is the prod search default and comfortably covers real name reuse.
         const { results } = await mcpCall<{ results: McpSearchVenueResult[] }>("search_venues", {
           query: key.name,
-          limit: 10,
+          limit: 50,
         });
         const slug = matchVenue(results, key);
         if (slug) {
@@ -3673,6 +3735,7 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Shows updated (drift): ${stats.showsUpdated}`);
   console.log(`Shows unchanged: ${stats.showsUnchanged}`);
   console.log(`Shows created: ${stats.showsCreated}`);
+  console.log(`Shows renamed (slug realigned): ${stats.showsRenamed}`);
   console.log(`Songs fetched: ${stats.songsFetched}`);
   console.log(`Songs created: ${stats.songsCreated}`);
   console.log(

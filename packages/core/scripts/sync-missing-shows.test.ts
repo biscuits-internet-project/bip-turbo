@@ -24,6 +24,7 @@ import {
   type McpShow,
   matchVenue,
   parseYearsArg,
+  planShowRenames,
   planVenueOrphans,
   resolveCompletionLinks,
   STUB_USER_PASSWORD_DIGEST,
@@ -570,6 +571,38 @@ describe("collectVenueKeys", () => {
   });
 });
 
+// planShowRenames detects prod shows that look "missing" (no local row under
+// their slug) but already exist locally by id, i.e. the slug was renamed on
+// prod. Matching by id (stable cross-env) lets the caller update the slug in
+// place instead of insert-colliding on the primary key + FK-failing the ghost
+// delete. The Disco Biscuits 9-30 Club / 930 Club rename is the live case.
+describe("planShowRenames", () => {
+  test("pairs a missing prod slug with the local row that shares its id", () => {
+    const missingRemote = [
+      { id: "show-fca", slug: "2009-10-02-930-club-washington-dc" },
+      { id: "show-new", slug: "2024-08-12-cap-theatre" }, // genuinely new — no local row
+    ];
+    const localById = new Map([["show-fca", { slug: "2009-10-02-9-30-club-washington-dc" }]]);
+    expect(planShowRenames(missingRemote, localById)).toEqual([
+      {
+        id: "show-fca",
+        oldSlug: "2009-10-02-9-30-club-washington-dc",
+        newSlug: "2009-10-02-930-club-washington-dc",
+      },
+    ]);
+  });
+
+  test("ignores remotes with no id (can't match cross-env)", () => {
+    const localById = new Map([["show-fca", { slug: "old-slug" }]]);
+    expect(planShowRenames([{ slug: "new-slug" }], localById)).toEqual([]);
+  });
+
+  test("skips a row whose local slug already equals the prod slug", () => {
+    const localById = new Map([["show-fca", { slug: "same-slug" }]]);
+    expect(planShowRenames([{ id: "show-fca", slug: "same-slug" }], localById)).toEqual([]);
+  });
+});
+
 // matchVenue disambiguates search_venues results. Name alone is insufficient —
 // "Fox Theatre" appears in multiple cities. We only return a match when city AND
 // state both agree (case-insensitive). Anything else is null so the caller can
@@ -631,6 +664,38 @@ describe("matchVenue", () => {
     ];
     expect(matchVenue(candidates, { name: "Brooklyn Bowl Las Vegas", city: "Las Vegas", state: "NV" })).toBe(
       "brooklyn-bowl-las-vegas",
+    );
+  });
+
+  // Many venues share the exact name "House of Blues" across different cities.
+  // Disambiguation must hold no matter how many same-name rows the search
+  // returns — the bug was the *caller* truncating search_venues to 10 results
+  // so the wanted city never reached matchVenue; given the full set it picks
+  // the right one. Guards the city+state discriminator at scale.
+  test("picks the right city among many same-name venues", () => {
+    const cities = [
+      ["West Hollywood", "CA"],
+      ["Chicago", "IL"],
+      ["Las Vegas", "NV"],
+      ["Anaheim", "CA"],
+      ["Atlantic City", "NJ"],
+      ["San Diego", "CA"],
+      ["Orlando", "FL"],
+      ["New Orleans", "LA"],
+      ["Boston", "MA"],
+      ["Cleveland", "OH"],
+      ["Myrtle Beach", "SC"],
+      ["Dallas", "TX"],
+      ["Houston", "TX"],
+    ];
+    const candidates: McpSearchVenueResult[] = cities.map(([city, state]) => ({
+      slug: `house-of-blues-${city.toLowerCase().replace(/ /g, "-")}`,
+      name: "House of Blues",
+      city,
+      state,
+    }));
+    expect(matchVenue(candidates, { name: "House of Blues", city: "Atlantic City", state: "NJ" })).toBe(
+      "house-of-blues-atlantic-city",
     );
   });
 });
