@@ -1,31 +1,72 @@
 import type { ShowLineupMember } from "@bip/domain";
+import { ChevronDown, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { formatInstrumentNames } from "~/lib/instruments";
+import type { ShowLineupNotes } from "~/lib/lineup-notes";
 import { sortLineup } from "~/lib/musicians-constants";
+import { cn } from "~/lib/utils";
+
+/** Slugs of lineup members who deviate from the expected core lineup — a
+ *  whole-show guest/sit-in, or a core member on a non-default instrument.
+ *  Missing members aren't in the list, so they only drive the header indicator. */
+function deviatingMemberSlugs(notes: ShowLineupNotes): Set<string> {
+  return new Set([...notes.guests, ...notes.offInstrument].map((member) => member.slug));
+}
+
+/** True when anything about the lineup differs from the expected core lineup:
+ *  a missing core member, a whole-show guest, or an off-instrument play. */
+function hasDeviation(notes: ShowLineupNotes): boolean {
+  return notes.missing.length > 0 || notes.guests.length > 0 || notes.offInstrument.length > 0;
+}
 
 /**
- * The show's default performer lineup, shown below the setlist. Each member's
- * name links to their profile page, followed by the instruments they played.
+ * The show's default performer lineup, shown below the setlist as a card. Each
+ * member's name links to their profile, followed by the instruments they
+ * played. A sparkle marks any member who differs from the expected core lineup
+ * (a sit-in, or a core member on an off-instrument), and a matching header
+ * indicator surfaces that the lineup is non-standard while the card is
+ * collapsed on mobile. The card starts collapsed on mobile (tap the header to
+ * expand) and is always expanded at >= md.
+ *
  * Renders nothing when no lineup is recorded. Pass `bare` to render just the
- * member list (no heading or top divider) when the caller supplies its own
- * chrome — e.g. the admin edit page's read-only lineup card.
+ * member list (no card, heading, or indicators) when the caller supplies its
+ * own chrome — e.g. the admin edit page's read-only lineup card; `notes` is
+ * ignored in that mode.
  */
-export function ShowLineupSection({ lineup, bare = false }: { lineup: ShowLineupMember[]; bare?: boolean }) {
+export function ShowLineupSection({
+  lineup,
+  notes,
+  bare = false,
+}: {
+  lineup: ShowLineupMember[];
+  notes?: ShowLineupNotes;
+  bare?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
   if (lineup.length === 0) return null;
+
+  const deviating = !bare && notes ? deviatingMemberSlugs(notes) : null;
 
   const list = (
     <ul className="space-y-1">
       {sortLineup(lineup).map((member) => {
         const instruments = formatInstrumentNames(member.instruments);
         return (
-          <li key={member.musician.id} className="text-sm text-content-text-secondary">
-            <Link
-              to={`/musicians/${member.musician.slug}`}
-              className="text-brand-primary hover:text-brand-secondary hover:underline"
-            >
-              {member.musician.name}
-            </Link>
-            {instruments ? <span className="lowercase"> · {instruments}</span> : ""}
+          <li key={member.musician.id} className="flex items-center gap-1.5 text-sm text-content-text-secondary">
+            <span>
+              <Link
+                to={`/musicians/${member.musician.slug}`}
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
+              >
+                {member.musician.name}
+              </Link>
+              {instruments ? <span className="lowercase"> · {instruments}</span> : ""}
+            </span>
+            {deviating?.has(member.musician.slug) && (
+              <Sparkles data-testid="lineup-member-sparkle" className="h-3.5 w-3.5 shrink-0 text-brand-primary" />
+            )}
           </li>
         );
       })}
@@ -35,9 +76,32 @@ export function ShowLineupSection({ lineup, bare = false }: { lineup: ShowLineup
   if (bare) return list;
 
   return (
-    <div className="mt-6 pt-4 border-t border-glass-border/30">
-      <h3 className="text-base font-medium text-content-text-tertiary mb-2">Lineup</h3>
-      {list}
-    </div>
+    <Card className="card-premium relative overflow-hidden mt-4">
+      <CardHeader
+        onClick={() => setOpen((value) => !value)}
+        className="flex flex-row items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3 cursor-pointer md:cursor-default"
+      >
+        <h3 className="flex items-center gap-1.5 text-base font-medium text-content-text-tertiary">
+          Lineup
+          {notes && hasDeviation(notes) && (
+            <Sparkles data-testid="lineup-deviation-indicator" className="h-4 w-4 text-brand-primary" />
+          )}
+        </h3>
+        <ChevronDown
+          aria-hidden
+          className={cn("h-4 w-4 shrink-0 transition-transform md:hidden", open && "rotate-180")}
+        />
+      </CardHeader>
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-300 ease-out md:grid-rows-[1fr]",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden md:overflow-visible">
+          <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-5">{list}</CardContent>
+        </div>
+      </div>
+    </Card>
   );
 }
