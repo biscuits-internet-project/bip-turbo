@@ -525,7 +525,10 @@ describe("TrackManager", () => {
     // the earlier-track id); saving PUTs those earlier-track ids so a full-set
     // replace preserves the existing links.
     test("seeds the selection from the server and PUTs earlierTrackIds on save", async () => {
-      const fetchMock = routeFetch(["e1"], { ok: true, completes: [{ date: "2010-01-01", slug: "2010-01-01-shimmy" }] });
+      const fetchMock = routeFetch(["e1"], {
+        ok: true,
+        completes: [{ date: "2010-01-01", slug: "2010-01-01-shimmy" }],
+      });
       globalThis.fetch = fetchMock as never;
 
       const { user } = await setup(
