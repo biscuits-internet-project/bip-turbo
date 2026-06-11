@@ -16,6 +16,7 @@ import {
   diffTrackAnnotations,
   diffTrackFlags,
   diffTrackMusicians,
+  findSquatterIds,
   isStubSlug,
   type LocalTrackForReconcile,
   type McpSearchVenueResult,
@@ -30,6 +31,13 @@ import {
   stubUserEmail,
   syncUserActivity,
 } from "./sync-missing-shows";
+
+// Mirrors Prisma's P2002 on the ratings/attendances primary key — thrown by the
+// stub db when a create reuses an id already held by a different compound-key
+// row, the exact failure the epoch id-binding reconcile resolves.
+function prismaUniqueIdError(): Error {
+  return Object.assign(new Error("Unique constraint failed on the fields: (`id`)"), { code: "P2002" });
+}
 
 // parseYearsArg governs the "what years to sync" decision. Default (no flag)
 // must be the current calendar year per the user's chosen behavior; explicit
@@ -2241,7 +2249,7 @@ function makeStubDb(seed: {
     rating: {
       findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(ratings)),
       findMany: vi.fn(async () =>
-        ratings.map((r) => ({ id: r.id, rateableId: r.rateableId, rateableType: r.rateableType })),
+        ratings.map((r) => ({ id: r.id, userId: r.userId, rateableId: r.rateableId, rateableType: r.rateableType })),
       ),
       upsert: vi.fn(
         async (args: {
@@ -2270,6 +2278,10 @@ function makeStubDb(seed: {
             Object.assign(existing, args.update);
             return existing;
           }
+          // Mirror the primary-key constraint: a create whose id is already
+          // taken by a different (compound-key) row throws P2002, exactly as
+          // Postgres does on the id-preserving insert path.
+          if (ratings.some((r) => r.id === args.create.id)) throw prismaUniqueIdError();
           ratings.push(args.create);
           return args.create;
         },
@@ -2284,7 +2296,7 @@ function makeStubDb(seed: {
     },
     attendance: {
       findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(attendances)),
-      findMany: vi.fn(async () => attendances.map((a) => ({ id: a.id, showId: a.showId }))),
+      findMany: vi.fn(async () => attendances.map((a) => ({ id: a.id, userId: a.userId, showId: a.showId }))),
       upsert: vi.fn(
         async (args: {
           where: { id?: string; userId_showId?: { userId: string; showId: string } };
@@ -2302,6 +2314,7 @@ function makeStubDb(seed: {
             Object.assign(existing, args.update);
             return existing;
           }
+          if (attendances.some((a) => a.id === args.create.id)) throw prismaUniqueIdError();
           attendances.push(args.create);
           return args.create;
         },
@@ -2329,14 +2342,16 @@ function makeStubDb(seed: {
         const t = tracks.find((row) => row.id === args.where.id);
         return t ? { id: t.id } : null;
       }),
-      findMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+      findMany: vi.fn(async (args: { where: { id: { in: string[] } }; select?: { id?: boolean } }) => {
         const ids = new Set(args.where.id.in);
-        return tracks
-          .filter((t) => ids.has(t.id))
-          .map((t) => {
-            const show = shows.find((s) => s.id === t.showId);
-            return { show: { slug: show?.slug ?? null } };
-          });
+        const matching = tracks.filter((t) => ids.has(t.id));
+        // The FK existence check selects { id }; the aggregate-rebuild slug
+        // lookup selects { show: { slug } }. Return the requested shape.
+        if (args.select?.id) return matching.map((t) => ({ id: t.id }));
+        return matching.map((t) => {
+          const show = shows.find((s) => s.id === t.showId);
+          return { show: { slug: show?.slug ?? null } };
+        });
       }),
     },
   };
@@ -2852,6 +2867,200 @@ describe("syncUserActivity — compound-key upserts", () => {
     expect(state.ratings).toHaveLength(1);
     expect(state.ratings[0].id).toBe("r-local-stale-id");
     expect(state.ratings[0].value).toBe(5);
+  });
+});
+
+describe("findSquatterIds", () => {
+  // A local row whose id prod binds to a DIFFERENT compound key is a squatter:
+  // it occupies an id prod needs for other content. Only those ids are returned.
+  test("flags local ids prod binds to a different compound key", () => {
+    const prodKeyById = new Map([
+      ["id-1", "user-a rate-cap Show"],
+      ["id-2", "user-a rate-starland Show"],
+    ]);
+    const local = [
+      { id: "id-1", key: "user-a rate-starland Show" }, // squatter: prod says id-1 is the cap rating
+      { id: "id-2", key: "user-a rate-starland Show" }, // matches prod — not a squatter
+    ];
+    expect(findSquatterIds(local, prodKeyById)).toEqual(["id-1"]);
+  });
+
+  // A local id absent from prod's map is the prune's job (id not on prod at
+  // all), not a binding conflict — the reconcile leaves it alone.
+  test("ignores local ids prod doesn't have", () => {
+    const prodKeyById = new Map([["id-1", "user-a rate-cap Show"]]);
+    const local = [{ id: "id-orphan", key: "user-a rate-cap Show" }];
+    expect(findSquatterIds(local, prodKeyById)).toEqual([]);
+  });
+
+  test("returns nothing when every binding matches", () => {
+    const prodKeyById = new Map([["id-1", "user-a rate-cap Show"]]);
+    expect(findSquatterIds([{ id: "id-1", key: "user-a rate-cap Show" }], prodKeyById)).toEqual([]);
+  });
+});
+
+// The epoch id-binding reconcile: prod owns the rating/attendance id namespace.
+// A local DB can hold an id prod has since rebound to different content; the
+// id-preserving create then collides on the primary key (the compound-key
+// upsert can't help — different key → falls to create). Epoch mode deletes the
+// squatter first, so prod's real row inserts under its id and the squatter's own
+// content re-inserts under ITS prod id in the same pass. Without it, the prod
+// row that wanted the squatted id is silently dropped (the live-run failure).
+describe("syncUserActivity — epoch id-binding reconcile", () => {
+  test("rebinds a rating whose id prod now assigns to a different show", async () => {
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [
+        { id: "show-cap", slug: "2024-08-12-cap-theatre" },
+        { id: "show-starland", slug: "2025-03-15-starland-ballroom" },
+      ],
+      ratings: [
+        {
+          id: "r-shared",
+          userId: "u-marc",
+          value: 3,
+          rateableType: "Show",
+          rateableId: "show-starland",
+          createdAt: new Date("2023-01-01T00:00:00Z"),
+          updatedAt: new Date("2023-01-01T00:00:00Z"),
+        },
+      ],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [
+        {
+          ratings: [
+            {
+              id: "r-shared",
+              userId: "u-marc",
+              value: 5,
+              rateableType: "Show",
+              rateableId: "show-cap",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+            {
+              id: "r-starland-real",
+              userId: "u-marc",
+              value: 4,
+              rateableType: "Show",
+              rateableId: "show-starland",
+              createdAt: "2025-03-15T00:00:00Z",
+              updatedAt: "2025-03-15T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_attendances_since: [{ attendances: [], nextCursor: null }],
+      list_all_attendance_ids: [{ ids: [] }],
+      list_all_rating_ids: [{ ids: ["r-shared", "r-starland-real"] }],
+      list_all_user_ids: [{ ids: ["u-marc"] }],
+    });
+
+    const result = await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: true,
+      pruneOrphans: true,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(result.ratingsReconciled).toBe(1);
+    const byId = new Map(state.ratings.map((r) => [r.id, r]));
+    expect(byId.get("r-shared")).toMatchObject({ rateableId: "show-cap", value: 5 });
+    expect(byId.get("r-starland-real")).toMatchObject({ rateableId: "show-starland", value: 4 });
+    expect(state.ratings).toHaveLength(2);
+  });
+
+  test("rebinds an attendance whose id prod now assigns to a different show", async () => {
+    const { db, state } = makeStubDb({
+      users: [
+        {
+          id: "u-marc",
+          email: "stub-u-marc@local.invalid",
+          passwordDigest: "STUB",
+          username: "trance-marc",
+          avatarFileId: null,
+          avatarFileUrl: null,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      shows: [
+        { id: "show-cap", slug: "2024-08-12-cap-theatre" },
+        { id: "show-starland", slug: "2025-03-15-starland-ballroom" },
+      ],
+      attendances: [
+        {
+          id: "a-shared",
+          userId: "u-marc",
+          showId: "show-starland",
+          createdAt: new Date("2023-01-01T00:00:00Z"),
+          updatedAt: new Date("2023-01-01T00:00:00Z"),
+        },
+      ],
+    });
+    const mcp = makeStubMcp({
+      list_users_since: [{ users: [], nextCursor: null }],
+      list_ratings_since: [{ ratings: [], nextCursor: null }],
+      list_attendances_since: [
+        {
+          attendances: [
+            {
+              id: "a-shared",
+              userId: "u-marc",
+              showId: "show-cap",
+              createdAt: "2024-08-12T00:00:00Z",
+              updatedAt: "2024-08-12T00:00:00Z",
+            },
+            {
+              id: "a-starland-real",
+              userId: "u-marc",
+              showId: "show-starland",
+              createdAt: "2025-03-15T00:00:00Z",
+              updatedAt: "2025-03-15T00:00:00Z",
+            },
+          ],
+          nextCursor: null,
+        },
+      ],
+      list_all_attendance_ids: [{ ids: ["a-shared", "a-starland-real"] }],
+      list_all_rating_ids: [{ ids: [] }],
+      list_all_user_ids: [{ ids: ["u-marc"] }],
+    });
+
+    const result = await syncUserActivity(db as never, {
+      isDryRun: false,
+      pullFromEpoch: true,
+      pruneOrphans: true,
+      ratingService: stubRatingService(),
+      cacheInvalidation: null,
+      changedSlugs: new Set(),
+      now: new Date(),
+      mcp,
+    });
+
+    expect(result.attendancesReconciled).toBe(1);
+    const byId = new Map(state.attendances.map((a) => [a.id, a]));
+    expect(byId.get("a-shared")).toMatchObject({ showId: "show-cap" });
+    expect(byId.get("a-starland-real")).toMatchObject({ showId: "show-starland" });
+    expect(state.attendances).toHaveLength(2);
   });
 });
 
