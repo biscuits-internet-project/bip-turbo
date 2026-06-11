@@ -38,6 +38,7 @@ type CurrentSongStats = {
   dateFirstPlayed: Date | null;
   dateLastPlayed: Date | null;
   yearlyPlayData: unknown;
+  mostCommonYear: number | null;
 };
 
 /**
@@ -274,6 +275,7 @@ export class StatsService {
           dateFirstPlayed: true,
           dateLastPlayed: true,
           yearlyPlayData: true,
+          mostCommonYear: true,
         },
       }),
       this.seguedInTrackIds(affectedSongIds),
@@ -341,6 +343,7 @@ export class StatsService {
           dateFirstPlayed: true,
           dateLastPlayed: true,
           yearlyPlayData: true,
+          mostCommonYear: true,
         },
       }),
       this.seguedInTrackIds([songId]),
@@ -545,12 +548,14 @@ export class StatsService {
     const dateFirstPlayed = updates.map((u) => u.stats.dateFirstPlayed);
     const dateLastPlayed = updates.map((u) => u.stats.dateLastPlayed);
     const yearlyPlayData = updates.map((u) => JSON.stringify(u.stats.yearlyPlayData));
+    const mostCommonYear = updates.map((u) => u.stats.mostCommonYear);
     await this.db.$executeRaw`
       UPDATE songs s
          SET times_played      = u.times_played,
              date_first_played = u.date_first_played,
              date_last_played  = u.date_last_played,
              yearly_play_data  = u.yearly_play_data::jsonb,
+             most_common_year  = u.most_common_year,
              updated_at        = NOW()
         FROM (
           SELECT
@@ -558,7 +563,8 @@ export class StatsService {
             UNNEST(${timesPlayed}::int[])        AS times_played,
             UNNEST(${dateFirstPlayed}::date[])   AS date_first_played,
             UNNEST(${dateLastPlayed}::date[])    AS date_last_played,
-            UNNEST(${yearlyPlayData}::text[])    AS yearly_play_data
+            UNNEST(${yearlyPlayData}::text[])    AS yearly_play_data,
+            UNNEST(${mostCommonYear}::int[])     AS most_common_year
         ) AS u
        WHERE s.id = u.song_id
     `;
@@ -666,12 +672,14 @@ export function songStatsChanged(
     dateFirstPlayed: Date | null;
     dateLastPlayed: Date | null;
     yearlyPlayData: unknown;
+    mostCommonYear: number | null;
   },
   fresh: ReturnType<typeof computeSongStats>,
 ): boolean {
   if (current.timesPlayed !== fresh.timesPlayed) return true;
   if (dateMs(current.dateFirstPlayed) !== dateMs(fresh.dateFirstPlayed)) return true;
   if (dateMs(current.dateLastPlayed) !== dateMs(fresh.dateLastPlayed)) return true;
+  if (current.mostCommonYear !== fresh.mostCommonYear) return true;
   return stableYearlyJson(current.yearlyPlayData) !== stableYearlyJson(fresh.yearlyPlayData);
 }
 

@@ -458,7 +458,6 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
           yearlyPlayData: song.yearlyPlayData || {},
           longestGapsData: song.longestGapsData || {},
           mostCommonYear: song.mostCommonYear,
-          leastCommonYear: song.leastCommonYear,
         },
       };
     }
@@ -755,7 +754,6 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               // mirrors them on insert + drift-update (see
               // buildSongDriftUpdate).
               kind: song.kind,
-              legacyAuthor: song.legacyAuthor,
               featuredLyric: song.featuredLyric,
               tabs: song.tabs,
               notes: song.notes,

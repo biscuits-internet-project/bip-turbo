@@ -112,7 +112,6 @@ model Band {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String?  @db.VarChar
   slug      String   @unique(map: "bands_slug_unique") @db.VarChar
-  legacyId  Int?     @map("legacy_id")
   createdAt DateTime @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @map("updated_at") @db.Timestamp(6)
   shows     Show[]
@@ -258,13 +257,11 @@ model Review {
   userId     String   @map("user_id") @db.Uuid
   createdAt  DateTime @map("created_at") @db.Timestamp(6)
   updatedAt  DateTime @map("updated_at") @db.Timestamp(6)
-  likesCount Int      @default(0) @map("likes_count")
   showId     String?  @map("show_id") @db.Uuid
   user       User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_users_user_id")
   show       Show?    @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_shows_show_id")
 
   @@unique([showId, userId])
-  @@index([likesCount])
   @@index([showId])
   @@index([userId])
   @@map("reviews")
@@ -319,7 +316,6 @@ model Show {
   venueId           String?                  @map("venue_id") @db.Uuid
   bandId            String?                  @map("band_id") @db.Uuid
   notes             String?
-  legacyId          Int?                     @map("legacy_id")
   createdAt         DateTime                 @map("created_at") @db.Timestamp(6)
   updatedAt         DateTime                 @map("updated_at") @db.Timestamp(6)
   likesCount        Int                      @default(0) @map("likes_count")
@@ -524,12 +520,8 @@ model Song {
   lyrics          String?
   tabs            String?
   notes           String?
-  legacyAbbr      String?                  @map("legacy_abbr") @db.VarChar
-  legacyId        Int?                     @map("legacy_id")
-  cover           Boolean?                 @default(false)
   kind            String?
   authorId        String?                  @map("author_id") @db.Uuid
-  legacyAuthor    String?                  @map("legacy_author")
   history         String?
   featuredLyric   String?                  @map("featured_lyric")
   timesPlayed     Int                      @default(0) @map("times_played")
@@ -538,7 +530,6 @@ model Song {
   yearlyPlayData  Json                     @default("{}") @map("yearly_play_data")
   longestGapsData Json                     @default("{}") @map("longest_gaps_data")
   mostCommonYear  Int?                     @map("most_common_year")
-  leastCommonYear Int?                     @map("least_common_year")
   guitarTabsUrl   String?                  @map("guitar_tabs_url")
   searchText      String?                  @map("search_text") @db.Text
   searchVector    Unsupported("tsvector")? @map("search_vector")
@@ -791,7 +782,6 @@ model Venue {
   longitude    Float?
   phone        String?                  @db.VarChar
   website      String?                  @db.VarChar
-  legacyId     Int?                     @map("legacy_id")
   createdAt    DateTime                 @map("created_at") @db.Timestamp(6)
   updatedAt    DateTime                 @map("updated_at") @db.Timestamp(6)
   timesPlayed  Int                      @default(0) @map("times_played")

@@ -186,7 +186,6 @@ export interface McpSong {
   // buildSongDriftUpdate. `null` is distinct from `undefined` here: explicit
   // null means "prod has cleared the value" and DOES drift.
   kind?: string | null;
-  legacyAuthor?: string | null;
   featuredLyric?: string | null;
   tabs?: string | null;
   notes?: string | null;
@@ -520,7 +519,6 @@ export function buildSongCreateInput(song: McpSong, now: Date): Prisma.SongUnche
     // to a stable explicit value, matching the existing buildShowCreateInput
     // pattern.
     kind: song.kind ?? null,
-    legacyAuthor: song.legacyAuthor ?? null,
     featuredLyric: song.featuredLyric ?? null,
     tabs: song.tabs ?? null,
     notes: song.notes ?? null,
@@ -538,7 +536,6 @@ export interface LocalSongCurated {
   title: string;
   lyrics: string | null;
   kind: string | null;
-  legacyAuthor: string | null;
   featuredLyric: string | null;
   tabs: string | null;
   notes: string | null;
@@ -550,7 +547,6 @@ export interface SongDriftUpdate {
   title?: string;
   lyrics?: string | null;
   kind?: string | null;
-  legacyAuthor?: string | null;
   featuredLyric?: string | null;
   tabs?: string | null;
   notes?: string | null;
@@ -573,9 +569,6 @@ export function buildSongDriftUpdate(local: LocalSongCurated, remote: McpSong): 
   if (local.title !== remote.title) patch.title = remote.title;
   if (local.lyrics !== remote.lyrics) patch.lyrics = remote.lyrics;
   if (remote.kind !== undefined && local.kind !== remote.kind) patch.kind = remote.kind;
-  if (remote.legacyAuthor !== undefined && local.legacyAuthor !== remote.legacyAuthor) {
-    patch.legacyAuthor = remote.legacyAuthor;
-  }
   if (remote.featuredLyric !== undefined && local.featuredLyric !== remote.featuredLyric) {
     patch.featuredLyric = remote.featuredLyric;
   }
@@ -2354,7 +2347,6 @@ async function syncMissingShows(): Promise<void> {
         title: true,
         lyrics: true,
         kind: true,
-        legacyAuthor: true,
         featuredLyric: true,
         tabs: true,
         notes: true,

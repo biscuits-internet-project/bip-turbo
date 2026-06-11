@@ -16,3 +16,4 @@ apps/web/.react-router/*
 .beads
 .gitattributes
 .playwright-mcp/*
+backups/
