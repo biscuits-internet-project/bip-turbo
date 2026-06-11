@@ -409,6 +409,30 @@ export function buildShowCreateInput(
   };
 }
 
+/**
+ * Pair prod shows that look "missing" (no local row under their slug) against
+ * local rows carrying the same prod id under a DIFFERENT slug. Those are slug
+ * renames (an admin changed the show slug on prod), not new shows: handling
+ * them as insert-new would collide on the primary key, and the stale-slug local
+ * row would then trip the ghost-delete (FK from its ratings/attendances).
+ * Match by id (the stable cross-environment key) since the slug is exactly what
+ * drifted. Returns the (oldSlug to newSlug) updates to apply in place.
+ */
+export function planShowRenames(
+  missingRemote: Array<{ id?: string; slug: string }>,
+  localById: Map<string, { slug: string | null }>,
+): Array<{ id: string; oldSlug: string | null; newSlug: string }> {
+  const renames: Array<{ id: string; oldSlug: string | null; newSlug: string }> = [];
+  for (const remote of missingRemote) {
+    if (!remote.id) continue;
+    const local = localById.get(remote.id);
+    if (!local) continue; // genuinely new show — leave it for the insert path
+    if (local.slug === remote.slug) continue; // already aligned (defensive)
+    renames.push({ id: remote.id, oldSlug: local.slug, newSlug: remote.slug });
+  }
+  return renames;
+}
+
 // Shape-minimal view of a local Show row (only the aggregate fields we mirror)
 // — used as the left operand to showNeedsUpdate.
 export interface LocalShowAggregates {
@@ -1249,6 +1273,46 @@ async function mcpBulkChunked<TItem, TRow>(
 
 // --- User activity sync (users + ratings + attendances) ---
 
+// Compound-key strings mirroring the rating / attendance unique constraints
+// (ratings_user_id_rateable_id_rateable_type_unique,
+// attendances_user_id_show_id_unique). The space separator can't appear in a
+// uuid or rateableType, so distinct tuples never collide. Detects id↔content
+// divergence
+// between local and prod — see findSquatterIds.
+export function ratingBindingKey(userId: string, rateableId: string, rateableType: string): string {
+  return `${userId} ${rateableId} ${rateableType}`;
+}
+
+export function attendanceBindingKey(userId: string, showId: string): string {
+  return `${userId} ${showId}`;
+}
+
+/**
+ * Local rows that squat on an id prod has assigned to DIFFERENT content.
+ *
+ * Prod owns the rating/attendance id namespace. A local row whose id maps (on
+ * prod) to a different (user, rateable) binding blocks the id-preserving insert
+ * of prod's real row — the compound-key upsert misses, falls to create, and
+ * collides on the primary key. Such squatters must be deleted before the upsert
+ * pass; the squatter's own content is re-created under its correct prod id later
+ * in the same pass (or correctly dropped if prod no longer has it).
+ *
+ * Only sound with prod's complete id→binding map (epoch full-reconcile), where
+ * every prod row is appliable so deleting a squatter never strands local data.
+ * Returns the local ids to delete.
+ */
+export function findSquatterIds(
+  localRows: Array<{ id: string; key: string }>,
+  prodKeyById: Map<string, string>,
+): string[] {
+  const stale: string[] = [];
+  for (const row of localRows) {
+    const prodKey = prodKeyById.get(row.id);
+    if (prodKey !== undefined && prodKey !== row.key) stale.push(row.id);
+  }
+  return stale;
+}
+
 interface UserActivityStats {
   usersCreated: number;
   usersUpdated: number;
@@ -1259,6 +1323,11 @@ interface UserActivityStats {
   usersDeleted: number;
   ratingsDeleted: number;
   attendancesDeleted: number;
+  // Squatter rows deleted by the epoch id-binding reconcile (re-inserted under
+  // their correct prod id during the same upsert pass). Separate from the
+  // prune's *Deleted counters, which remove rows prod no longer has at all.
+  ratingsReconciled: number;
+  attendancesReconciled: number;
   aggregatesRebuilt: number;
 }
 
@@ -1331,6 +1400,8 @@ export async function syncUserActivity(
     usersDeleted: 0,
     ratingsDeleted: 0,
     attendancesDeleted: 0,
+    ratingsReconciled: 0,
+    attendancesReconciled: 0,
     aggregatesRebuilt: 0,
   };
 
@@ -1472,6 +1543,11 @@ export async function syncUserActivity(
   const touchedRateables = new Map<string, { rateableId: string; rateableType: string }>();
   const ratingCursor = await localMaxUpdatedAt("rating");
   console.log(`⭐ Ratings: ${pullFromEpoch ? "full epoch pull" : `incremental since ${ratingCursor.toISOString()}`}`);
+
+  // Buffer the whole prod stream before writing. Epoch mode needs prod's
+  // complete id→(user, rateable) picture to reconcile stale id bindings up
+  // front; incremental mode just buffers its small delta.
+  const prodRatings: McpSyncRating[] = [];
   pageCursor = null;
   do {
     const args: Record<string, unknown> = { since: ratingCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
@@ -1480,32 +1556,80 @@ export async function syncUserActivity(
       "list_ratings_since",
       args,
     );
-    // Resolve each rating's userId through prodIdToLocalId. The map is
-    // populated above for every prod user we saw this run; rows owned by
-    // users we didn't see fall through to their prod id (which equals the
-    // local id in the common case where local was seeded from prod).
-    const resolvedRatings = ratings.map((r) => ({
-      ...r,
-      localUserId: prodIdToLocalId.get(r.userId) ?? r.userId,
-      // Resolve the rateable through the show/track drift maps so a rating that
-      // references prod's show/track id lands on the local row even when that
-      // row was seeded under a different id. No-drift case = the same id back.
-      localRateableId:
-        r.rateableType === "Show"
-          ? (prodShowIdToLocalId.get(r.rateableId) ?? r.rateableId)
-          : r.rateableType === "Track"
-            ? (prodTrackIdToLocalId.get(r.rateableId) ?? r.rateableId)
-            : r.rateableId,
-    }));
-    // Batched FK existence check per page. The realistic miss is show/track:
-    // a dev DB synced for a narrow --years window legitimately lacks older
-    // shows that older ratings reference.
-    const ratingUserIds = Array.from(new Set(resolvedRatings.map((r) => r.localUserId)));
+    prodRatings.push(...ratings);
+    pageCursor = nextCursor;
+  } while (pageCursor !== null);
+
+  // Resolve each rating's userId through prodIdToLocalId. The map is populated
+  // above for every prod user we saw this run; rows owned by users we didn't
+  // see fall through to their prod id (which equals the local id in the common
+  // case where local was seeded from prod). The rateable resolves through the
+  // show/track drift maps so a rating referencing prod's show/track id lands on
+  // the local row even when that row was seeded under a different id. No-drift
+  // case = the same id back.
+  const resolvedRatings = prodRatings.map((r) => ({
+    ...r,
+    localUserId: prodIdToLocalId.get(r.userId) ?? r.userId,
+    localRateableId:
+      r.rateableType === "Show"
+        ? (prodShowIdToLocalId.get(r.rateableId) ?? r.rateableId)
+        : r.rateableType === "Track"
+          ? (prodTrackIdToLocalId.get(r.rateableId) ?? r.rateableId)
+          : r.rateableId,
+  }));
+
+  // Epoch id-binding reconcile. Prod owns the rating id namespace, so a local
+  // row holding an id prod now binds to different content squats the slot the
+  // id-preserving create below needs — and the compound-key upsert can't fix it
+  // (different key → falls to create → primary-key collision). Delete those
+  // squatters; each re-inserts under its correct prod id in the upsert pass.
+  // Mark the squatter's old rateable touched so one whose content prod dropped
+  // still gets its aggregate rebuilt. Epoch-only: the full picture guarantees a
+  // deleted squatter's content is re-created (or rightly gone), never stranded.
+  if (pullFromEpoch && !isDryRun) {
+    const prodKeyById = new Map<string, string>();
+    for (const r of resolvedRatings) {
+      prodKeyById.set(r.id, ratingBindingKey(r.localUserId, r.localRateableId, r.rateableType));
+    }
+    const localRatings = await db.rating.findMany({
+      select: { id: true, userId: true, rateableId: true, rateableType: true },
+    });
+    const squatterIds = new Set(
+      findSquatterIds(
+        localRatings.map((r) => ({
+          id: r.id,
+          key: ratingBindingKey(r.userId, r.rateableId, r.rateableType),
+        })),
+        prodKeyById,
+      ),
+    );
+    if (squatterIds.size > 0) {
+      for (const r of localRatings) {
+        if (!squatterIds.has(r.id)) continue;
+        touchedRateables.set(`${r.rateableType}|${r.rateableId}`, {
+          rateableId: r.rateableId,
+          rateableType: r.rateableType,
+        });
+      }
+      await db.rating.deleteMany({ where: { id: { in: Array.from(squatterIds) } } });
+      stats.ratingsReconciled = squatterIds.size;
+      console.log(`🧩 Ratings: reconciled ${squatterIds.size} stale id binding(s)`);
+    }
+  }
+
+  // Apply in chunks so the FK existence IN-lists stay bounded (same shape the
+  // paged pull used). The realistic FK miss is show/track: a dev DB synced for
+  // a narrow --years window legitimately lacks older shows that older ratings
+  // reference. Squatters are gone, so the id-preserving create can't collide in
+  // epoch mode.
+  for (let offset = 0; offset < resolvedRatings.length; offset += SYNC_PAGE_LIMIT) {
+    const chunk = resolvedRatings.slice(offset, offset + SYNC_PAGE_LIMIT);
+    const ratingUserIds = Array.from(new Set(chunk.map((r) => r.localUserId)));
     const ratingShowIds = Array.from(
-      new Set(resolvedRatings.filter((r) => r.rateableType === "Show").map((r) => r.localRateableId)),
+      new Set(chunk.filter((r) => r.rateableType === "Show").map((r) => r.localRateableId)),
     );
     const ratingTrackIds = Array.from(
-      new Set(resolvedRatings.filter((r) => r.rateableType === "Track").map((r) => r.localRateableId)),
+      new Set(chunk.filter((r) => r.rateableType === "Track").map((r) => r.localRateableId)),
     );
     const [existingRatingUsers, existingRatingShows, existingRatingTracks] = await Promise.all([
       ratingUserIds.length > 0
@@ -1522,7 +1646,7 @@ export async function syncUserActivity(
     const localRatingShowSet = new Set(existingRatingShows.map((s) => s.id));
     const localRatingTrackSet = new Set(existingRatingTracks.map((t) => t.id));
 
-    for (const r of resolvedRatings) {
+    for (const r of chunk) {
       if (!localRatingUserSet.has(r.localUserId)) {
         stats.ratingsFkSkipped++;
         console.warn(`  ⚠️  rating ${r.id}: skipping — user ${r.localUserId} not local`);
@@ -1548,14 +1672,11 @@ export async function syncUserActivity(
       }
       try {
         // Upsert by the compound unique (userId, rateableId, rateableType)
-        // instead of id. Local DBs seeded from older prod dumps can hold a
-        // row with the same compound key but a different id; upserting by
-        // id would then hit ratings_user_id_rateable_id_rateable_type_unique
-        // on insert. Using the compound key as the upsert target lets the
-        // existing local row absorb the new value cleanly. The local id may
-        // drift from prod; --full-users converges by deleting the stale-id
-        // local row, after which the next incremental run inserts with the
-        // prod id.
+        // instead of id. A local row with the same compound key but a different
+        // id (older dump) absorbs the new value in place — upserting by id would
+        // hit ratings_user_id_rateable_id_rateable_type_unique on insert. The
+        // inverse — a local row with this id bound to a DIFFERENT compound key —
+        // is cleared by the epoch reconcile above before we reach create.
         await db.rating.upsert({
           where: {
             userId_rateableId_rateableType: {
@@ -1587,13 +1708,14 @@ export async function syncUserActivity(
         console.error(`  ❌ rating ${r.id} upsert failed:`, err);
       }
     }
-    pageCursor = nextCursor;
-  } while (pageCursor !== null);
+  }
   console.log(`⭐ Ratings: +${stats.ratingsUpserted} (skipped ${stats.ratingsFkSkipped} on missing FK)`);
 
   // --- Attendances ---
+  // Same buffer → resolve → epoch-reconcile → chunked-apply shape as ratings.
   const attCursor = await localMaxUpdatedAt("attendance");
   console.log(`🎫 Attendances: ${pullFromEpoch ? "full epoch pull" : `incremental since ${attCursor.toISOString()}`}`);
+  const prodAttendances: McpSyncAttendance[] = [];
   pageCursor = null;
   do {
     const args: Record<string, unknown> = { since: attCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
@@ -1602,15 +1724,50 @@ export async function syncUserActivity(
       "list_attendances_since",
       args,
     );
-    // Same userId remap + batched FK check as the ratings loop.
-    const resolvedAttendances = attendances.map((a) => ({
-      ...a,
-      localUserId: prodIdToLocalId.get(a.userId) ?? a.userId,
-      // Same show-id drift remap as the rating loop.
-      localShowId: prodShowIdToLocalId.get(a.showId) ?? a.showId,
-    }));
-    const attUserIds = Array.from(new Set(resolvedAttendances.map((a) => a.localUserId)));
-    const attShowIds = Array.from(new Set(resolvedAttendances.map((a) => a.localShowId)));
+    prodAttendances.push(...attendances);
+    pageCursor = nextCursor;
+  } while (pageCursor !== null);
+
+  // Same userId + show-id drift remap as the ratings loop.
+  const resolvedAttendances = prodAttendances.map((a) => ({
+    ...a,
+    localUserId: prodIdToLocalId.get(a.userId) ?? a.userId,
+    localShowId: prodShowIdToLocalId.get(a.showId) ?? a.showId,
+  }));
+
+  // Epoch id-binding reconcile — same rationale as ratings: clear local rows
+  // squatting an id prod now binds to a different (user, show) before the
+  // id-preserving create runs. Show slugs of cleared squatters land in
+  // changedSlugs so the affected listings get their cache invalidated.
+  if (pullFromEpoch && !isDryRun) {
+    const prodKeyById = new Map<string, string>();
+    for (const a of resolvedAttendances) {
+      prodKeyById.set(a.id, attendanceBindingKey(a.localUserId, a.localShowId));
+    }
+    const localAttendances = await db.attendance.findMany({ select: { id: true, userId: true, showId: true } });
+    const squatterIds = new Set(
+      findSquatterIds(
+        localAttendances.map((a) => ({ id: a.id, key: attendanceBindingKey(a.userId, a.showId) })),
+        prodKeyById,
+      ),
+    );
+    if (squatterIds.size > 0) {
+      const squatterShowIds = new Set(localAttendances.filter((a) => squatterIds.has(a.id)).map((a) => a.showId));
+      const squatterShows = await db.show.findMany({
+        where: { id: { in: Array.from(squatterShowIds) } },
+        select: { slug: true },
+      });
+      for (const s of squatterShows) if (s.slug) changedSlugs.add(s.slug);
+      await db.attendance.deleteMany({ where: { id: { in: Array.from(squatterIds) } } });
+      stats.attendancesReconciled = squatterIds.size;
+      console.log(`🧩 Attendances: reconciled ${squatterIds.size} stale id binding(s)`);
+    }
+  }
+
+  for (let offset = 0; offset < resolvedAttendances.length; offset += SYNC_PAGE_LIMIT) {
+    const chunk = resolvedAttendances.slice(offset, offset + SYNC_PAGE_LIMIT);
+    const attUserIds = Array.from(new Set(chunk.map((a) => a.localUserId)));
+    const attShowIds = Array.from(new Set(chunk.map((a) => a.localShowId)));
     const [existingAttUsers, existingAttShows] = await Promise.all([
       attUserIds.length > 0
         ? db.user.findMany({ where: { id: { in: attUserIds } }, select: { id: true } })
@@ -1622,7 +1779,7 @@ export async function syncUserActivity(
     const localAttUserSet = new Set(existingAttUsers.map((u) => u.id));
     const localAttShowBySlug = new Map(existingAttShows.map((s) => [s.id, s.slug]));
 
-    for (const a of resolvedAttendances) {
+    for (const a of chunk) {
       if (!localAttUserSet.has(a.localUserId)) {
         stats.attendancesFkSkipped++;
         console.warn(`  ⚠️  attendance ${a.id}: skipping — user ${a.localUserId} not local`);
@@ -1640,11 +1797,10 @@ export async function syncUserActivity(
         continue;
       }
       try {
-        // Same compound-key upsert reasoning as the rating loop above —
-        // local DBs from old prod dumps can hold (userId, showId) with a
-        // different id, which would violate attendances_user_id_show_id_unique
-        // on an id-keyed insert. --full-users converges the local id back
-        // to prod's over two runs.
+        // Compound-key upsert: a local row with the same (userId, showId) but a
+        // different id (older dump) absorbs the update in place. The inverse —
+        // this id bound to a different (userId, showId) — is cleared by the
+        // epoch reconcile above before we reach create.
         await db.attendance.upsert({
           where: { userId_showId: { userId: a.localUserId, showId: a.localShowId } },
           update: { updatedAt: new Date(a.updatedAt) },
@@ -1662,8 +1818,7 @@ export async function syncUserActivity(
         console.error(`  ❌ attendance ${a.id} upsert failed:`, err);
       }
     }
-    pageCursor = nextCursor;
-  } while (pageCursor !== null);
+  }
   console.log(`🎫 Attendances: +${stats.attendancesUpserted} (skipped ${stats.attendancesFkSkipped} on missing FK)`);
 
   // --- Full-mode reconciliation: delete local rows not on prod ---
@@ -1792,6 +1947,9 @@ interface SyncStats {
   showsUpdated: number;
   showsUnchanged: number;
   showsCreated: number;
+  // Local shows whose slug was realigned to prod's after an admin renamed the
+  // show on prod (matched by id). See planShowRenames.
+  showsRenamed: number;
   songsFetched: number;
   songsCreated: number;
   songsOrphanedDeleted: number;
@@ -1989,6 +2147,7 @@ async function syncMissingShows(): Promise<void> {
     showsUpdated: 0,
     showsUnchanged: 0,
     showsCreated: 0,
+    showsRenamed: 0,
     songsFetched: 0,
     songsCreated: 0,
     songsOrphanedDeleted: 0,
@@ -2075,21 +2234,19 @@ async function syncMissingShows(): Promise<void> {
     // Step 2c: partition into missing-locally vs already-local. We pull venueId
     // for existing rows so the drift-update branch can back-fill venues that
     // landed NULL under an older sync (caused 404s on /shows/:slug).
-    const existingLocal = await db.show.findMany({
-      where: { slug: { in: realSlugs } },
-      select: {
-        id: true,
-        slug: true,
-        date: true,
-        averageRating: true,
-        ratingsCount: true,
-        notes: true,
-        relistenUrl: true,
-        venueId: true,
-        countForStats: true,
-        dayOrder: true,
-      },
-    });
+    const localShowSelect = {
+      id: true,
+      slug: true,
+      date: true,
+      averageRating: true,
+      ratingsCount: true,
+      notes: true,
+      relistenUrl: true,
+      venueId: true,
+      countForStats: true,
+      dayOrder: true,
+    } as const;
+    const existingLocal = await db.show.findMany({ where: { slug: { in: realSlugs } }, select: localShowSelect });
     // Local Show.slug is nullable in the schema, but every show this script
     // touches has a slug (we filter the prod summary by slug earlier in step
     // 2). Narrowing here keeps `existingBySlug` keyed by `string` so every
@@ -2098,13 +2255,44 @@ async function syncMissingShows(): Promise<void> {
     const existingBySlug = new Map(
       existingLocal.filter((s): s is typeof s & { slug: string } => s.slug !== null).map((s) => [s.slug, s]),
     );
+
+    // Step 2d: realign renamed shows. A prod show with no local row under its
+    // slug, but whose prod id already exists locally under a different slug, is
+    // a slug rename (admin renamed it on prod), not a new show. Update the local
+    // row's slug in place and fold it into existingBySlug so it flows through
+    // the drift/setlist reconcile as an existing show. Without this the show
+    // would insert-collide on the primary key and then FK-fail when the
+    // stale-slug ghost is pruned.
+    const slugRenameCandidates = remoteFullShows.filter((s) => !existingBySlug.has(s.slug));
+    const renameCandidateIds = slugRenameCandidates.flatMap((s) => (s.id ? [s.id] : []));
+    const renameLocalRows =
+      renameCandidateIds.length > 0
+        ? await db.show.findMany({ where: { id: { in: renameCandidateIds } }, select: localShowSelect })
+        : [];
+    const renameLocalById = new Map(renameLocalRows.map((r) => [r.id, r]));
+    for (const rename of planShowRenames(slugRenameCandidates, renameLocalById)) {
+      const localRow = renameLocalById.get(rename.id);
+      if (!localRow) continue;
+      if (!isDryRun) {
+        await db.show.update({ where: { id: rename.id }, data: { slug: rename.newSlug, updatedAt: now } });
+      }
+      if (rename.oldSlug) changedSlugs.add(rename.oldSlug);
+      changedSlugs.add(rename.newSlug);
+      existingBySlug.set(rename.newSlug, { ...localRow, slug: rename.newSlug });
+      stats.showsRenamed++;
+      console.log(`  🔀 show slug realigned ${rename.oldSlug ?? "(null)"} → ${rename.newSlug}`);
+    }
+
     stats.showsAlreadyLocal = existingBySlug.size;
     const missingShows = remoteFullShows.filter((s) => !existingBySlug.has(s.slug));
     const existingRemoteShows = remoteFullShows.filter((s) => existingBySlug.has(s.slug));
     // Existing shows whose venue we still need to resolve so the drift loop
     // can back-fill venueId. Their setlists MUST be fetched alongside missing
-    // shows so we know the (name, city, state) tuple to search by.
-    const needsVenueSlugs = existingLocal.filter((s) => s.venueId === null).map((s) => s.slug);
+    // shows so we know the (name, city, state) tuple to search by. Sourced from
+    // existingBySlug (not existingLocal) so realigned renames are covered too.
+    const needsVenueSlugs = Array.from(existingBySlug.values())
+      .filter((s) => s.venueId === null)
+      .map((s) => s.slug);
     console.log(
       `📥 ${missingShows.length} missing locally (${stats.showsAlreadyLocal} already present, ${needsVenueSlugs.length} need venue back-fill)`,
     );
@@ -2198,9 +2386,14 @@ async function syncMissingShows(): Promise<void> {
     const venueKeyToSlug = new Map<string, string>(); // "name|city|state" -> slug
     for (const key of venueKeys) {
       try {
+        // Query by name only, then disambiguate on city+state in matchVenue.
+        // The limit must exceed the largest count of venues sharing a name, or
+        // the exact city+state match can be truncated away (16 "House of Blues"
+        // rows overflowed the old limit of 10, leaving those shows venue-less).
+        // 50 is the prod search default and comfortably covers real name reuse.
         const { results } = await mcpCall<{ results: McpSearchVenueResult[] }>("search_venues", {
           query: key.name,
-          limit: 10,
+          limit: 50,
         });
         const slug = matchVenue(results, key);
         if (slug) {
@@ -3542,6 +3735,7 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Shows updated (drift): ${stats.showsUpdated}`);
   console.log(`Shows unchanged: ${stats.showsUnchanged}`);
   console.log(`Shows created: ${stats.showsCreated}`);
+  console.log(`Shows renamed (slug realigned): ${stats.showsRenamed}`);
   console.log(`Songs fetched: ${stats.songsFetched}`);
   console.log(`Songs created: ${stats.songsCreated}`);
   console.log(
@@ -3579,10 +3773,10 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
     const ua = stats.userActivity;
     console.log(`Users (created / updated / deleted): ${ua.usersCreated} / ${ua.usersUpdated} / ${ua.usersDeleted}`);
     console.log(
-      `Ratings (upserted / deleted / FK skipped): ${ua.ratingsUpserted} / ${ua.ratingsDeleted} / ${ua.ratingsFkSkipped}`,
+      `Ratings (upserted / deleted / reconciled / FK skipped): ${ua.ratingsUpserted} / ${ua.ratingsDeleted} / ${ua.ratingsReconciled} / ${ua.ratingsFkSkipped}`,
     );
     console.log(
-      `Attendances (upserted / deleted / FK skipped): ${ua.attendancesUpserted} / ${ua.attendancesDeleted} / ${ua.attendancesFkSkipped}`,
+      `Attendances (upserted / deleted / reconciled / FK skipped): ${ua.attendancesUpserted} / ${ua.attendancesDeleted} / ${ua.attendancesReconciled} / ${ua.attendancesFkSkipped}`,
     );
     console.log(`Rating aggregates rebuilt: ${ua.aggregatesRebuilt}`);
   } else {
