@@ -1051,7 +1051,6 @@ describe("buildSongCreateInput", () => {
       dateFirstPlayed: new Date("1998-07-04"),
       dateLastPlayed: new Date("2026-02-06"),
       kind: null,
-      legacyAuthor: null,
       featuredLyric: null,
       tabs: null,
       notes: null,
@@ -1063,10 +1062,10 @@ describe("buildSongCreateInput", () => {
   });
 
   // Curated text fields (lyrics, tabs, notes, history, featuredLyric,
-  // guitarTabsUrl) and the `cover`/`legacyAuthor` admin flags must mirror
-  // verbatim on insert. These are the prod-curated columns the sync didn't
-  // previously write — leaving them null on first insert meant Song pages
-  // looked empty on local even though prod had content.
+  // guitarTabsUrl) and the `kind` admin flag must mirror verbatim on insert.
+  // These are the prod-curated columns the sync didn't previously write —
+  // leaving them null on first insert meant Song pages looked empty on local
+  // even though prod had content.
   test("mirrors curated admin fields when MCP supplies them", () => {
     const now = new Date("2026-04-23T12:00:00Z");
     const input = buildSongCreateInput(
@@ -1079,7 +1078,6 @@ describe("buildSongCreateInput", () => {
         dateFirstPlayed: "2002-12-31",
         dateLastPlayed: "2025-07-04",
         kind: "original",
-        legacyAuthor: "Disco Biscuits",
         featuredLyric: "And the sky lights up",
         tabs: "https://example/tabs",
         notes: "Type II launches frequent",
@@ -1090,7 +1088,6 @@ describe("buildSongCreateInput", () => {
     );
     expect(input).toMatchObject({
       kind: "original",
-      legacyAuthor: "Disco Biscuits",
       featuredLyric: "And the sky lights up",
       tabs: "https://example/tabs",
       notes: "Type II launches frequent",
@@ -2080,8 +2077,8 @@ describe("diffCompletions", () => {
 
 // buildSongDriftUpdate diffs an existing local Song row against the latest
 // MCP response and returns a patch — only the curated admin fields (title,
-// lyrics, cover, legacyAuthor, featuredLyric, tabs, notes, history,
-// guitarTabsUrl). It intentionally does NOT touch the derived stats columns
+// lyrics, kind, featuredLyric, tabs, notes, history, guitarTabsUrl). It
+// intentionally does NOT touch the derived stats columns
 // (timesPlayed, dateFirstPlayed, dateLastPlayed, yearlyPlayData) — those are
 // owned by the post-sync rebuild and would otherwise race against it.
 describe("buildSongDriftUpdate", () => {
@@ -2089,7 +2086,6 @@ describe("buildSongDriftUpdate", () => {
     title: "Crystal Ball",
     lyrics: "And the sky lights up...",
     kind: "original",
-    legacyAuthor: "Disco Biscuits",
     featuredLyric: "And the sky lights up",
     tabs: null,
     notes: null,
@@ -2110,7 +2106,6 @@ describe("buildSongDriftUpdate", () => {
         dateFirstPlayed: null,
         dateLastPlayed: null,
         kind: "original",
-        legacyAuthor: "Disco Biscuits",
         featuredLyric: "And the sky lights up",
       }),
     ).toBeNull();
@@ -2153,9 +2148,9 @@ describe("buildSongDriftUpdate", () => {
   });
 
   // Pre-deploy MCP omits the new curated fields. Sparse remote payload must
-  // never claim drift on `kind` / `legacyAuthor` / `featuredLyric` / `tabs`
-  // / `notes` / `history` / `guitarTabsUrl` — otherwise every existing song
-  // would have those fields clobbered to null on the next sync.
+  // never claim drift on `kind` / `featuredLyric` / `tabs` / `notes` /
+  // `history` / `guitarTabsUrl` — otherwise every existing song would have
+  // those fields clobbered to null on the next sync.
   test("ignores curated fields when remote omits them", () => {
     expect(
       buildSongDriftUpdate(localBase, {

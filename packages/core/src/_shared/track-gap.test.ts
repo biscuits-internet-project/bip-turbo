@@ -364,6 +364,7 @@ describe("computeSongStats", () => {
       dateFirstPlayed: null,
       dateLastPlayed: null,
       yearlyPlayData: {},
+      mostCommonYear: null,
     });
   });
 
@@ -398,5 +399,31 @@ describe("computeSongStats", () => {
       { showId: "D", showDate: "2010-06-01" },
     ]);
     expect(stats.yearlyPlayData).toEqual({ "1999": 1, "2001": 2, "2010": 1 });
+  });
+
+  // mostCommonYear is the year a song was played most — the argmax of
+  // yearlyPlayData. Backs the "Most Common Year" stat box.
+  test("mostCommonYear is the year with the most plays", () => {
+    const stats = computeSongStats([
+      { showId: "A", showDate: "2010-06-01" },
+      { showId: "B", showDate: "2012-03-15" },
+      { showId: "C", showDate: "2012-07-15" },
+      { showId: "D", showDate: "2012-11-15" },
+      { showId: "E", showDate: "2015-06-01" },
+    ]);
+    expect(stats.mostCommonYear).toBe(2012);
+  });
+
+  // Ties resolve to the earliest year so the value is deterministic across
+  // recomputes (object key order is otherwise unspecified). Mid-year dates
+  // keep the year unambiguous regardless of the runner's timezone.
+  test("mostCommonYear breaks ties toward the earliest year", () => {
+    const stats = computeSongStats([
+      { showId: "A", showDate: "2015-06-01" },
+      { showId: "B", showDate: "2015-09-01" },
+      { showId: "C", showDate: "2010-06-01" },
+      { showId: "D", showDate: "2010-09-01" },
+    ]);
+    expect(stats.mostCommonYear).toBe(2010);
   });
 });

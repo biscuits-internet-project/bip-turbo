@@ -637,7 +637,7 @@ describe("CacheKeys.songs.jamCharts", () => {
   // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
   // bumped together with the rest of the songs cache family.
   test("returns a stable, versioned key string", () => {
-    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v6");
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v7");
   });
 });
 
@@ -1006,7 +1006,7 @@ describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v5");
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v6");
   });
 
   // The on-this-day counts cache key is used by the home page to cache

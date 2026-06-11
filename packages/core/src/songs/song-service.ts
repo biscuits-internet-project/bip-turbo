@@ -8,7 +8,6 @@ import { slugify } from "../_shared/utils/slugify";
 
 export interface SongFilter {
   title?: string;
-  legacyId?: number;
   startDate?: Date;
   endDate?: Date;
   authorId?: string;
@@ -32,8 +31,7 @@ export type UpdateSongInput = Partial<CreateSongInput>;
 
 // Mapper function
 function mapSongToDomainEntity(dbSong: DbSong): Song {
-  const { createdAt, updatedAt, dateLastPlayed, dateFirstPlayed, yearlyPlayData, longestGapsData, cover, ...rest } =
-    dbSong;
+  const { createdAt, updatedAt, dateLastPlayed, dateFirstPlayed, yearlyPlayData, longestGapsData, ...rest } = dbSong;
 
   return {
     ...rest,
@@ -57,7 +55,6 @@ function mapSongToDomainEntity(dbSong: DbSong): Song {
     longestGapShows: null,
     yearlyPlayData: yearlyPlayData as Record<string, unknown>,
     longestGapsData: longestGapsData as Record<string, unknown>,
-    cover: cover ?? false,
     kind: narrowSongKind(dbSong.kind),
   };
 }
@@ -366,6 +363,7 @@ export class SongService {
           dateFirstPlayed: null,
           dateLastPlayed: null,
           yearlyPlayData: {},
+          mostCommonYear: null,
         },
       });
       return;
@@ -418,6 +416,7 @@ export class SongService {
           dateFirstPlayed: songStats.dateFirstPlayed,
           dateLastPlayed: songStats.dateLastPlayed,
           yearlyPlayData: songStats.yearlyPlayData,
+          mostCommonYear: songStats.mostCommonYear,
           updatedAt: new Date(),
         },
       }),

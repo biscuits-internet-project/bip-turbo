@@ -41,6 +41,7 @@ export type SongStatsAggregate = {
   dateFirstPlayed: Date | null;
   dateLastPlayed: Date | null;
   yearlyPlayData: Record<string, number>;
+  mostCommonYear: number | null;
 };
 
 /** The fields the chronological sort reads — a subset of TrackForGapWalk so
@@ -304,6 +305,18 @@ export function computeSongStats(statsTracks: { showId: string; showDate: string
     yearlyPlayData[year] = (yearlyPlayData[year] || 0) + 1;
   }
 
+  // The year with the most plays. uniqueShowDates is sorted ascending, so
+  // walking years in ascending order and keeping a strict `>` comparison
+  // makes ties resolve to the earliest year — deterministic across recomputes.
+  let mostCommonYear: number | null = null;
+  let mostCommonCount = 0;
+  for (const year of Object.keys(yearlyPlayData).sort()) {
+    if (yearlyPlayData[year] > mostCommonCount) {
+      mostCommonCount = yearlyPlayData[year];
+      mostCommonYear = Number(year);
+    }
+  }
+
   return {
     timesPlayed: uniqueShowDates.length,
     dateFirstPlayed: uniqueShowDates[0] ? new Date(uniqueShowDates[0]) : null,
@@ -311,5 +324,6 @@ export function computeSongStats(statsTracks: { showId: string; showDate: string
       ? new Date(uniqueShowDates[uniqueShowDates.length - 1])
       : null,
     yearlyPlayData,
+    mostCommonYear,
   };
 }

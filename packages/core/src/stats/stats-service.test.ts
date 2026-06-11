@@ -8,6 +8,7 @@ const baseFresh = {
   dateFirstPlayed: new Date("2010-01-01"),
   dateLastPlayed: new Date("2012-06-15"),
   yearlyPlayData: { "2010": 1, "2011": 1, "2012": 1 },
+  mostCommonYear: 2010,
 };
 
 describe("songStatsChanged", () => {
@@ -19,6 +20,7 @@ describe("songStatsChanged", () => {
       dateFirstPlayed: new Date("2010-01-01"),
       dateLastPlayed: new Date("2012-06-15"),
       yearlyPlayData: { "2010": 1, "2011": 1, "2012": 1 },
+      mostCommonYear: 2010,
     };
     expect(songStatsChanged(current, baseFresh)).toBe(false);
   });
@@ -38,6 +40,7 @@ describe("songStatsChanged", () => {
       dateFirstPlayed: new Date("2010-01-01"),
       dateLastPlayed: new Date("2012-06-15"),
       yearlyPlayData: { "2010": 1, "2011": 1, "2012": 1 },
+      mostCommonYear: 2010,
     };
     expect(songStatsChanged(current, baseFresh)).toBe(false);
   });
@@ -62,8 +65,16 @@ describe("songStatsChanged", () => {
       dateFirstPlayed: null,
       dateLastPlayed: null,
       yearlyPlayData: {},
+      mostCommonYear: null,
     };
     expect(songStatsChanged(empty, empty)).toBe(false);
+  });
+
+  // most_common_year is a denormalized stat that recompute owns; a drift in
+  // it alone (e.g. a backfill on a stale column) must trigger a write.
+  test("returns true when mostCommonYear changed", () => {
+    const current = { ...baseFresh, mostCommonYear: 2011 };
+    expect(songStatsChanged(current, baseFresh)).toBe(true);
   });
 
   // jsonb doesn't preserve insertion order on round-trip, so the comparator
@@ -317,11 +328,16 @@ describe("StatsService.recomputeSongRecurrence", () => {
       show: { findMany: vi.fn().mockResolvedValue(statsShowDates.map((date) => ({ date }))) },
       track: { findMany: vi.fn().mockResolvedValue(songTracks) },
       song: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            { id: "tractorbeam", timesPlayed: 2, dateFirstPlayed: null, dateLastPlayed: null, yearlyPlayData: {} },
-          ]),
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "tractorbeam",
+            timesPlayed: 2,
+            dateFirstPlayed: null,
+            dateLastPlayed: null,
+            yearlyPlayData: {},
+            mostCommonYear: null,
+          },
+        ]),
       },
       $queryRaw: vi.fn().mockResolvedValue([]),
       $executeRaw: vi.fn().mockResolvedValue(undefined),

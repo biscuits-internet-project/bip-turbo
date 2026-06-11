@@ -9,15 +9,10 @@ export const songSchema = z.object({
   lyrics: z.string().nullable(),
   tabs: z.string().nullable(),
   notes: z.string().nullable(),
-  // Dormant: superseded by `kind`, dropped in a follow-up migration. New code
-  // reads `kind`, not this.
-  cover: z.boolean().nullable().default(false),
   // The song's origin/form in one axis. null = unclassified (treated as original
   // for debut text). A mashup is neither a pure original nor a single cover.
   kind: z.enum(["original", "cover", "mashup", "improvisation"]).nullable().optional(),
   authorId: z.string().uuid().nullable(),
-  // Optional — mirrors prod's legacy_author column, surfaced via sync.
-  legacyAuthor: z.string().nullable().optional(),
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   timesPlayed: z.number().default(0),
@@ -66,7 +61,6 @@ export const songSchema = z.object({
   yearlyPlayData: z.record(z.string(), z.unknown()).default({}),
   longestGapsData: z.record(z.string(), z.unknown()).default({}),
   mostCommonYear: z.number().nullable(),
-  leastCommonYear: z.number().nullable(),
   guitarTabsUrl: z.string().nullable(),
 
   // Relations
