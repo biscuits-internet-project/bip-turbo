@@ -333,10 +333,7 @@ describe("StatsService.recomputeSongRecurrence", () => {
   // exactly those two track ids (proves it doesn't touch the whole catalog).
   test("recomputes only the given song's tracks and writes their flag recurrence", async () => {
     const statsShows = ["2003-01-01", "2003-01-10", "2003-01-20"];
-    const tracks = [
-      stubTrack("a", "A", "2003-01-01", ["DYSLEXIC"]),
-      stubTrack("b", "B", "2003-01-20", ["DYSLEXIC"]),
-    ];
+    const tracks = [stubTrack("a", "A", "2003-01-01", ["DYSLEXIC"]), stubTrack("b", "B", "2003-01-20", ["DYSLEXIC"])];
     const service = makeService(tracks, statsShows);
     const replaceFlag = vi.spyOn(
       service as unknown as { replaceFlagRecurrence: (ids: string[], recs: unknown[]) => Promise<void> },

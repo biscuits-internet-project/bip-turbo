@@ -6,6 +6,7 @@
     "build": "cd apps/web && bun run build",
     "lint": "biome lint --error-on-warnings .",
     "format": "biome format . --write",
+    "format:check": "biome format .",
     "typecheck": "cd apps/web && bun react-router typegen && cd ../.. && bun tsc --noEmit",
     "typecheck:all": "bun run -F '*' typecheck",
     "test": "bun run -F '*' test",

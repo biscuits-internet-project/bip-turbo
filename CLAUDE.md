@@ -36,7 +36,7 @@ bun run lint                         # Lint all code with Biome
 make lint                            # Same as bun run lint
 ```
 
-**Formatting:** Always run `make format FILES="file1.ts file2.tsx"` on files you changed before committing. Only format files you modified — never run project-wide formatting. Biome handles formatting, import sorting, and lint fixes — never use Prettier or other formatters.
+**Formatting:** The whole repo is Biome-formatted and CI fails on unformatted files (`bun run format:check`). Run `bun run format` (`make format-all`) to format everything, or `make format FILES="file1.ts file2.tsx"` to fix just the files you touched. Biome handles formatting, import sorting, and lint fixes — never use Prettier or other formatters.
 
 **Testing:**
 ```bash

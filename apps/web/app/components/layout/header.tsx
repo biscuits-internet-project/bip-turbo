@@ -160,59 +160,59 @@ export function Header() {
             {/* Mobile Auth & User Menu */}
             <div className="border-t border-border/10 pt-4 mt-4">
               {user ? (
-                  <div className="space-y-1">
-                    {/* User Info */}
-                    <div className="flex items-center space-x-3 px-4 py-3 rounded-md bg-brand-primary/5">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={user.avatarUrl ?? undefined} />
-                        <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-sm font-medium">
-                          {username?.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">{username}</span>
-                        <span className="text-xs text-content-text-secondary">{user.email}</span>
-                      </div>
+                <div className="space-y-1">
+                  {/* User Info */}
+                  <div className="flex items-center space-x-3 px-4 py-3 rounded-md bg-brand-primary/5">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={user.avatarUrl ?? undefined} />
+                      <AvatarFallback className="bg-brand-primary/20 text-brand-primary text-sm font-medium">
+                        {username?.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-foreground">{username}</span>
+                      <span className="text-xs text-content-text-secondary">{user.email}</span>
                     </div>
-
-                    {/* User Menu Items */}
-                    <Link
-                      to={`/users/${username}`}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
-                    >
-                      <Eye className="h-5 w-5 mr-3" />
-                      View Profile
-                    </Link>
-
-                    <Link
-                      to="/profile/edit"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-secondary hover:bg-hover-glass"
-                    >
-                      <Edit className="h-5 w-5 mr-3" />
-                      Edit Profile
-                    </Link>
-
-                    <Link
-                      to="/auth/logout"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center rounded-md px-4 py-3 text-base font-medium text-red-400 transition-all duration-200 hover:text-red-300 hover:bg-red-500/10"
-                    >
-                      <LogOut className="h-5 w-5 mr-3" />
-                      Sign out
-                    </Link>
                   </div>
-                ) : (
+
+                  {/* User Menu Items */}
                   <Link
-                    to="/auth/login"
+                    to={`/users/${username}`}
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
                   >
-                    <User className="h-5 w-5 mr-3" />
-                    Sign in
+                    <Eye className="h-5 w-5 mr-3" />
+                    View Profile
                   </Link>
-                )}
+
+                  <Link
+                    to="/profile/edit"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-secondary hover:bg-hover-glass"
+                  >
+                    <Edit className="h-5 w-5 mr-3" />
+                    Edit Profile
+                  </Link>
+
+                  <Link
+                    to="/auth/logout"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center rounded-md px-4 py-3 text-base font-medium text-red-400 transition-all duration-200 hover:text-red-300 hover:bg-red-500/10"
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    Sign out
+                  </Link>
+                </div>
+              ) : (
+                <Link
+                  to="/auth/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
+                >
+                  <User className="h-5 w-5 mr-3" />
+                  Sign in
+                </Link>
+              )}
             </div>
           </nav>
         </div>
