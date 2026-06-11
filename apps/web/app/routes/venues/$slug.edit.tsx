@@ -1,6 +1,7 @@
 import type { Venue } from "@bip/domain";
 import { useEffect, useState } from "react";
 import { redirect, useNavigate } from "react-router-dom";
+import { DeleteEntityButton } from "~/components/admin/delete-entity-button";
 import { Card, CardContent } from "~/components/ui/card";
 import { PageHeader } from "~/components/ui/page-header";
 import { VenueForm, type VenueFormValues } from "~/components/venue/venue-form";
@@ -11,6 +12,7 @@ import { services } from "~/server/services";
 
 interface LoaderData {
   venue: Venue;
+  showCount: number;
 }
 
 export const loader = adminLoader(async ({ params }) => {
@@ -21,7 +23,9 @@ export const loader = adminLoader(async ({ params }) => {
     throw notFound(`Venue with slug "${slug}" not found`);
   }
 
-  return { venue };
+  const showCount = await services.venues.countShows(venue.id);
+
+  return { venue, showCount };
 });
 
 export const action = adminAction(async ({ request, params }) => {
@@ -46,7 +50,7 @@ export const action = adminAction(async ({ request, params }) => {
 });
 
 export default function EditVenue() {
-  const { venue } = useSerializedLoaderData<LoaderData>();
+  const { venue, showCount } = useSerializedLoaderData<LoaderData>();
   const navigate = useNavigate();
   const [defaultValues, setDefaultValues] = useState<VenueFormValues | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +108,23 @@ export default function EditVenue() {
           />
         </CardContent>
       </Card>
+
+      <div className="mt-6">
+        {showCount > 0 ? (
+          <p className="text-sm text-content-text-secondary">
+            In use by {showCount} show(s); a venue can only be deleted once it has no shows.
+          </p>
+        ) : (
+          <DeleteEntityButton
+            entityId={venue.id}
+            entityName={venue.name}
+            entityLabel="venue"
+            endpoint="/api/admin/venues"
+            onDeleted={() => navigate("/venues")}
+            variant="button"
+          />
+        )}
+      </div>
     </div>
   );
 }

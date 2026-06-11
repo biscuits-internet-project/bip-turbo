@@ -5,8 +5,8 @@
  * This includes timesPlayed, yearlyPlayData, dateFirstPlayed, dateLastPlayed
  */
 
-import { SongRepository } from "../packages/core/src/songs/song-repository";
 import { prisma } from "../packages/core/src/_shared/prisma/client";
+import { SongRepository } from "../packages/core/src/songs/song-repository";
 
 async function updateAllSongStatistics() {
   const songRepository = new SongRepository(prisma);

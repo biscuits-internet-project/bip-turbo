@@ -1,5 +1,4 @@
 import type { ReviewMinimal } from "@bip/domain";
-import { format } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -8,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Textarea } from "~/components/ui/textarea";
+import { formatDateLong } from "~/lib/utils";
 
 interface ReviewCardProps {
   review: ReviewMinimal;
@@ -66,9 +66,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
               </div>
               <div>
                 <h3 className="font-medium text-content-text-primary">{review.user.username}</h3>
-                <p className="text-sm text-content-text-secondary">
-                  {format(new Date(review.createdAt), "MMM d, yyyy")}
-                </p>
+                <p className="text-sm text-content-text-secondary">{formatDateLong(review.createdAt)}</p>
               </div>
             </div>
             {isOwner && (

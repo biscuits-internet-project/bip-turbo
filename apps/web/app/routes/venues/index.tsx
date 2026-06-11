@@ -1,396 +1,87 @@
-import type { Venue } from "@bip/domain";
-import { Globe, MapPin, Plus, Search, Ticket } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LoaderFunctionArgs } from "react-router";
-import { Link, useSearchParams } from "react-router-dom";
+import { Globe, MapPin, Plus, Ticket } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useRevalidator } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
+import { DataTable } from "~/components/ui/data-table";
+import { GlassSelect } from "~/components/ui/glass-select";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
+import { StatBox } from "~/components/ui/stat-box";
+import { getVenuesColumns } from "~/components/venue/venues-columns";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getVenuesMeta } from "~/lib/seo";
-import { cn } from "~/lib/utils";
+import { matchesStateFilter } from "~/lib/venue-filters";
+import { buildVenueRows, type VenueRow } from "~/lib/venue-rows";
 import { services } from "~/server/services";
-
-const ITEMS_PER_PAGE = 50;
 
 export function meta() {
   return getVenuesMeta();
 }
 
 interface LoaderData {
-  venues: Venue[];
-  recentVenues: Venue[];
+  rows: VenueRow[];
+  isAdmin: boolean;
   stats: {
     totalVenues: number;
     totalShows: number;
     totalStates: number;
-    recentShowCount: number;
+    internationalCount: number;
   };
   states: string[];
-  nonUSACount: number;
 }
 
-export const loader = publicLoader(async ({ request }: LoaderFunctionArgs): Promise<LoaderData> => {
-  const url = new URL(request.url);
-  const _stateFilter = url.searchParams.get("state") || undefined;
+export const loader = publicLoader(async ({ context }): Promise<LoaderData> => {
+  const isAdmin = context.currentUser?.isAdmin ?? false;
+  const [venues, aggregates] = await Promise.all([
+    services.venues.findMany({ sort: [{ field: "name", direction: "asc" }] }),
+    services.venues.getShowAggregates(),
+  ]);
 
-  const venues = await services.venues.findMany({
-    sort: [{ field: "timesPlayed", direction: "desc" }],
-  });
+  // buildVenueRows returns every venue; zero-show ones get zeroed stats. The
+  // stats and the public table count only venues with shows — admins also see
+  // the zero-show rows so they can delete those stale entries.
+  const allRows = buildVenueRows(venues, aggregates);
+  const withShows = allRows.filter((row) => row.showCount > 0);
 
-  // Define the specific list of US states to display in the filter
-  const usStates = [
-    "AL",
-    "AR",
-    "AZ",
-    "CA",
-    "CO",
-    "CT",
-    "DC",
-    "DE",
-    "FL",
-    "GA",
-    "IA",
-    "ID",
-    "IL",
-    "IN",
-    "KS",
-    "KY",
-    "LA",
-    "MA",
-    "MD",
-    "ME",
-    "MI",
-    "MN",
-    "MO",
-    "MS",
-    "MT",
-    "NC",
-    "NE",
-    "NH",
-    "NJ",
-    "NM",
-    "NV",
-    "NY",
-    "OH",
-    "OK",
-    "OR",
-    "PA",
-    "RI",
-    "SC",
-    "TN",
-    "TX",
-    "UT",
-    "VA",
-    "VT",
-    "WA",
-    "WI",
-    "WV",
-    "WY",
+  const states = [
+    ...new Set(withShows.map((row) => row.state).filter((state): state is string => Boolean(state))),
   ].sort();
+  const internationalCount = withShows.filter((row) => matchesStateFilter(row, "international")).length;
 
-  // Count non-USA venues (those without a state or with a country other than USA)
-  const nonUSACount = venues.filter(
-    (v) =>
-      (!v.state && v.country) ||
-      (v.country && v.country.toLowerCase() !== "usa" && v.country.toLowerCase() !== "united states"),
-  ).length;
-
-  const recentVenues = venues.slice(0, 6);
-
-  // Calculate stats
-  const stats = {
-    totalVenues: venues.length,
-    totalShows: venues.reduce((acc, venue) => acc + (venue.timesPlayed || 0), 0),
-    totalStates: usStates.length,
-    recentShowCount: recentVenues.reduce((acc, venue) => acc + (venue.timesPlayed || 0), 0),
+  return {
+    rows: isAdmin ? allRows : withShows,
+    isAdmin,
+    stats: {
+      totalVenues: withShows.length,
+      totalShows: withShows.reduce((total, row) => total + row.showCount, 0),
+      totalStates: states.length,
+      internationalCount,
+    },
+    states,
   };
-
-  return { venues, recentVenues, stats, states: usStates, nonUSACount };
 });
 
-interface StatBoxProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  sublabel?: string;
-}
-
-function StatBox({ icon, label, value, sublabel }: StatBoxProps) {
-  return (
-    <div className="glass-content p-6 rounded-lg">
-      <dt className="flex items-center gap-2 text-sm font-medium text-content-text-secondary">
-        {icon}
-        {label}
-      </dt>
-      <dd className="mt-2">
-        <span className="text-3xl font-bold text-content-text-primary">{value}</span>
-        {sublabel && <span className="ml-2 text-sm text-content-text-tertiary">{sublabel}</span>}
-      </dd>
-    </div>
-  );
-}
-
-interface VenueCardProps {
-  venue: Venue;
-  showStats?: boolean;
-}
-
-function VenueCard({ venue, showStats = true }: VenueCardProps) {
-  return (
-    <Card className="card-premium hover:border-brand-primary/60 transition-all duration-300">
-      <CardHeader>
-        <CardTitle className="text-xl">
-          <Link to={`/venues/${venue.slug}`} className="text-brand-primary hover:text-brand-secondary">
-            {venue.name || "Unnamed Venue"}
-          </Link>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-start gap-2">
-            <MapPin className="h-4 w-4 mt-1 text-content-text-secondary shrink-0" />
-            <p className="text-content-text-secondary">
-              {[venue.city, venue.state].filter(Boolean).join(", ") || "Location Unknown"}
-              {venue.country &&
-                venue.country.toLowerCase() !== "usa" &&
-                venue.country.toLowerCase() !== "united states" &&
-                ` (${venue.country})`}
-            </p>
-          </div>
-          {showStats && venue.timesPlayed > 0 && (
-            <div className="flex items-start gap-2">
-              <Ticket className="h-4 w-4 mt-1 text-content-text-secondary shrink-0" />
-              <div className="space-y-1">
-                <p className="text-content-text-secondary text-sm">
-                  {venue.timesPlayed} {venue.timesPlayed === 1 ? "show" : "shows"}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SearchForm({ onSearch }: { onSearch: (query: string) => void }) {
-  const [searchValue, setSearchValue] = useState("");
-
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setSearchValue(value);
-      onSearch(value);
-    },
-    [onSearch],
-  );
-
-  return (
-    <div className="relative max-w-2xl mx-auto">
-      <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-content-text-secondary" />
-      <Input
-        type="search"
-        value={searchValue}
-        onChange={handleChange}
-        placeholder="Search venues..."
-        className="search-input w-full pl-10"
-      />
-    </div>
-  );
-}
-
-// Update the getStateAbbreviation function to handle all exceptions
-function getStateAbbreviation(state: string): string {
-  // US States
-  const stateMap: Record<string, string> = {
-    Alabama: "AL",
-    Alaska: "AK",
-    Arizona: "AZ",
-    Arkansas: "AR",
-    California: "CA",
-    Colorado: "CO",
-    Connecticut: "CT",
-    Delaware: "DE",
-    Florida: "FL",
-    Georgia: "GA",
-    Hawaii: "HI",
-    Idaho: "ID",
-    Illinois: "IL",
-    Indiana: "IN",
-    Iowa: "IA",
-    Kansas: "KS",
-    Kentucky: "KY",
-    Louisiana: "LA",
-    Maine: "ME",
-    Maryland: "MD",
-    Massachusetts: "MA",
-    Michigan: "MI",
-    Minnesota: "MN",
-    Mississippi: "MS",
-    Missouri: "MO",
-    Montana: "MT",
-    Nebraska: "NE",
-    Nevada: "NV",
-    "New Hampshire": "NH",
-    "New Jersey": "NJ",
-    "New Mexico": "NM",
-    "New York": "NY",
-    "North Carolina": "NC",
-    "North Dakota": "ND",
-    Ohio: "OH",
-    Oklahoma: "OK",
-    Oregon: "OR",
-    Pennsylvania: "PA",
-    "Rhode Island": "RI",
-    "South Carolina": "SC",
-    "South Dakota": "SD",
-    Tennessee: "TN",
-    Texas: "TX",
-    Utah: "UT",
-    Vermont: "VT",
-    Virginia: "VA",
-    Washington: "WA",
-    "West Virginia": "WV",
-    Wisconsin: "WI",
-    Wyoming: "WY",
-    "District of Columbia": "DC",
-    // Canadian Provinces
-    "British Columbia": "BC",
-    Ontario: "ON",
-    // Countries (keep full name for non-US/Canada)
-    Canada: "Canada",
-    Germany: "Germany",
-    Iceland: "Iceland",
-    Jamaica: "Jamaica",
-    Japan: "Japan",
-    Mexico: "Mexico",
-    Scotland: "Scotland",
-    Sweden: "Sweden",
-    "U.K.": "U.K.",
-    "United Kingdom": "U.K.",
-  };
-
-  // If the state is already an abbreviation, return it as is
-  if (
-    state.length <= 3 ||
-    ["U.K."].includes(state) ||
-    ["Canada", "Germany", "Iceland", "Jamaica", "Japan", "Mexico", "Scotland", "Sweden"].includes(state)
-  ) {
-    return state;
-  }
-
-  return stateMap[state] || state;
-}
+// Radix Select forbids an empty-string item value, so "All States" uses a
+// sentinel that maps back to the "" (match-everything) filter value.
+const ALL_STATES = "all";
 
 export default function VenuesPage() {
-  const { venues, recentVenues, stats, states, nonUSACount } = useSerializedLoaderData<LoaderData>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const searchQuery = searchParams.get("q") || "";
-  const stateFilter = searchParams.get("state") || "";
+  const { rows, stats, states, isAdmin } = useSerializedLoaderData<LoaderData>();
+  const { revalidate } = useRevalidator();
+  const [stateFilter, setStateFilter] = useState("");
 
-  // Filter venues based on search query and state filter
-  const filteredVenues = useMemo(() => {
-    return venues.filter((venue) => {
-      // Apply search filter if present
-      const matchesSearch =
-        searchQuery === null || searchQuery === "" || searchQuery === undefined
-          ? true
-          : venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (venue.city?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-            (venue.state?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-            (venue.country?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  const columns = useMemo(() => getVenuesColumns({ isAdmin, onDeleted: revalidate }), [isAdmin, revalidate]);
+  const filteredRows = useMemo(() => rows.filter((row) => matchesStateFilter(row, stateFilter)), [rows, stateFilter]);
 
-      // Apply state filter if present
-      let matchesState = true;
-      if (stateFilter) {
-        if (stateFilter === "international") {
-          matchesState = Boolean(
-            (!venue.state && venue.country) ||
-              (venue.country &&
-                venue.country.toLowerCase().trim() !== "usa" &&
-                venue.country.toLowerCase().trim() !== "united states"),
-          );
-        } else {
-          matchesState = venue.state === stateFilter;
-        }
-      }
-
-      return matchesSearch && matchesState;
-    });
-  }, [venues, searchQuery, stateFilter]);
-
-  const handleSearch = useCallback(
-    (query: string) => {
-      const newParams = new URLSearchParams(searchParams);
-      if (query) {
-        newParams.set("q", query);
-      } else {
-        newParams.delete("q");
-      }
-      setSearchParams(newParams);
-    },
-    [searchParams, setSearchParams],
+  const stateOptions = useMemo(
+    () => [
+      { value: ALL_STATES, label: "All States / Countries" },
+      { value: "international", label: "International" },
+      ...states.map((state) => ({ value: state, label: state })),
+    ],
+    [states],
   );
-
-  const handleStateFilter = useCallback(
-    (state: string) => {
-      const newParams = new URLSearchParams(searchParams);
-      if (state && state !== stateFilter) {
-        newParams.set("state", state);
-      } else {
-        newParams.delete("state");
-      }
-      // Keep search query if present
-      if (searchQuery) {
-        newParams.set("q", searchQuery);
-      }
-      setSearchParams(newParams);
-    },
-    [searchParams, setSearchParams, stateFilter, searchQuery],
-  );
-
-  const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
-  const [isLoading, setIsLoading] = useState(false);
-  const nodeRef = useRef<HTMLDivElement | null>(null);
-
-  // Callback ref to capture the node
-  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
-    nodeRef.current = node;
-  }, []);
-
-  // useEffect handles observer lifecycle with proper cleanup
-  useEffect(() => {
-    const node = nodeRef.current;
-    if (!node) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const first = entries[0];
-        if (first.isIntersecting && !isLoading && displayCount < filteredVenues.length) {
-          setIsLoading(true);
-          setTimeout(() => {
-            setDisplayCount((prev) => Math.min(prev + ITEMS_PER_PAGE, filteredVenues.length));
-            setIsLoading(false);
-          }, 100);
-        }
-      },
-      { rootMargin: "800px" },
-    );
-
-    observer.observe(node);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [displayCount, filteredVenues.length, isLoading]);
-
-  const visibleVenues = useMemo(() => filteredVenues.slice(0, displayCount), [filteredVenues, displayCount]);
-  const hasMore = displayCount < filteredVenues.length;
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -404,134 +95,31 @@ export default function VenuesPage() {
           </AdminOnly>
         }
       />
-      {/* Stats Grid */}
-      <dl className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <dl className="grid grid-cols-2 lg:grid-cols-4 short:!grid-cols-4 gap-4 short:!gap-2">
         <StatBox icon={<MapPin className="h-4 w-4" />} label="Total Venues" value={stats.totalVenues} />
         <StatBox icon={<Ticket className="h-4 w-4" />} label="Total Shows" value={stats.totalShows} />
-        <StatBox icon={<MapPin className="h-4 w-4" />} label="US States" value={stats.totalStates} />
-        <StatBox icon={<Globe className="h-4 w-4" />} label="International Venues" value={nonUSACount} />
+        <StatBox icon={<MapPin className="h-4 w-4" />} label="States" value={stats.totalStates} />
+        <StatBox icon={<Globe className="h-4 w-4" />} label="International Venues" value={stats.internationalCount} />
       </dl>
 
-      {/* State Filter */}
-      <div className="glass-content rounded-lg p-4">
-        <h2 className="text-sm font-medium text-content-text-secondary mb-3">Filter by State</h2>
-        <div className="flex flex-wrap gap-2 mb-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "px-3 py-1 text-sm rounded-md transition-colors",
-              !stateFilter
-                ? "bg-filter-active text-white"
-                : "text-content-text-secondary hover:bg-hover-glass hover:text-white",
-            )}
-            onClick={() => handleStateFilter("")}
-          >
-            All
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "px-3 py-1 text-sm rounded-md transition-colors",
-              stateFilter === "international"
-                ? "bg-filter-active text-white"
-                : "text-content-text-secondary hover:bg-hover-glass hover:text-white",
-            )}
-            onClick={() => handleStateFilter("international")}
-          >
-            <Globe className="h-3 w-3 mr-1" />
-            International
-          </Button>
-
-          {states.map((state) => (
-            <Button
-              key={state}
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "px-3 py-1 text-sm rounded-md transition-colors",
-                stateFilter === state
-                  ? "bg-filter-active text-white"
-                  : "text-content-text-secondary hover:bg-hover-glass hover:text-white",
-              )}
-              onClick={() => handleStateFilter(state)}
-            >
-              {getStateAbbreviation(state)}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {recentVenues.length > 0 && !stateFilter && !searchQuery && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4 text-content-text-primary">Recent Venues</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentVenues.map((venue) => (
-              <VenueCard key={venue.id} venue={venue} showStats={false} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <SearchForm onSearch={handleSearch} />
-
-      {/* Filter information */}
-      {(stateFilter || searchQuery) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {stateFilter && (
-            <div className="flex items-center gap-2 glass-content rounded-md px-3 py-1">
-              <span className="text-content-text-primary">
-                {stateFilter === "international" ? "International Venues" : `State: ${stateFilter}`}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 text-content-text-secondary hover:text-white"
-                onClick={() => handleStateFilter("")}
-              >
-                <span className="sr-only">Clear state filter</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {filteredVenues.length === 0 ? (
-        <p className="text-content-text-secondary">
-          {searchQuery || stateFilter ? "No venues found matching your filters" : "No venues found"}
-        </p>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleVenues.map((venue) => (
-              <VenueCard key={venue.id} venue={venue} />
-            ))}
-          </div>
-
-          {hasMore && (
-            <div ref={loadMoreRef} className="py-8 text-center text-content-text-secondary">
-              {isLoading ? "Loading more venues..." : `${filteredVenues.length - displayCount} more venues`}
-            </div>
-          )}
-        </>
-      )}
+      <DataTable
+        columns={columns}
+        data={filteredRows}
+        getRowId={(row) => row.id}
+        searchKey="name"
+        searchPlaceholder="Search venues..."
+        initialSorting={[{ id: "shows", desc: true }]}
+        filterComponent={
+          <GlassSelect
+            value={stateFilter || ALL_STATES}
+            onValueChange={(value) => setStateFilter(value === ALL_STATES ? "" : value)}
+            options={stateOptions}
+            ariaLabel="Filter by state"
+            className="w-[200px]"
+          />
+        }
+      />
     </div>
   );
 }

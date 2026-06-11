@@ -9,8 +9,11 @@ interface CrudEntity {
 export interface AdminCrudConfig<T extends CrudEntity> {
   /** Lowercase noun used in messages/logs, e.g. "author" or "instrument". */
   label: string;
-  create: (name: string) => Promise<T>;
-  update: (slug: string, name: string) => Promise<T>;
+  // create/update are optional so a resource can be DELETE-only (e.g. venues,
+  // which are created/edited through their own multi-field routes). The
+  // corresponding method 405s when the handler isn't provided.
+  create?: (name: string) => Promise<T>;
+  update?: (slug: string, name: string) => Promise<T>;
   remove: (id: string) => Promise<boolean>;
 }
 
@@ -34,6 +37,7 @@ export async function handleAdminCrud<T extends CrudEntity>(
 
   try {
     if (method === "POST") {
+      if (!config.create) return methodNotAllowed();
       const { name } = await request.json();
       if (!name || typeof name !== "string") {
         return badRequest(`${titleLabel} name is required`);
@@ -44,6 +48,7 @@ export async function handleAdminCrud<T extends CrudEntity>(
     }
 
     if (method === "PUT") {
+      if (!config.update) return methodNotAllowed();
       const { slug, name } = await request.json();
       if (!slug || typeof slug !== "string") {
         return badRequest(`${titleLabel} slug is required`);

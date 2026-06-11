@@ -17,11 +17,11 @@
  *   RECORD_TYPE=ShowPhoto  - Only process specific type (User, ShowPhoto, BlogPost)
  */
 
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { Logger } from "@bip/domain";
 import { PrismaClient } from "@prisma/client";
 import { CloudflareImagesClient } from "../packages/core/src/files/cloudflare-images";
-import type { Logger } from "@bip/domain";
 
 // Configuration
 const DRY_RUN = process.env.DRY_RUN === "true";
@@ -42,7 +42,7 @@ if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_IMAGES_API_TOKEN) {
 
 // Simple console logger
 const logger: Logger = {
-  info: (msg: string, _meta?: Record<string, unknown>) => {
+  info: (_msg: string, _meta?: Record<string, unknown>) => {
     // Suppress verbose logging during migration
   },
   warn: (msg: string, meta?: Record<string, unknown>) => console.warn(`[WARN] ${msg}`, meta || ""),
@@ -53,7 +53,7 @@ const logger: Logger = {
 const prisma = new PrismaClient();
 const cloudflare = new CloudflareImagesClient(
   { accountId: CLOUDFLARE_ACCOUNT_ID, apiToken: CLOUDFLARE_IMAGES_API_TOKEN },
-  logger
+  logger,
 );
 
 // Stats tracking
@@ -135,7 +135,7 @@ function fileExists(blobKey: string): boolean {
 
 async function uploadToCloudflare(
   blobKey: string,
-  filename: string
+  filename: string,
 ): Promise<{ cloudflareId: string; variants: Record<string, string> } | null> {
   const filePath = getFilePath(blobKey);
 
@@ -164,7 +164,7 @@ async function createFileRecord(
   cloudflareId: string,
   variants: Record<string, string>,
   userId: string,
-  extraMetadata?: Record<string, string | null>
+  extraMetadata?: Record<string, string | null>,
 ): Promise<string> {
   // Parse blob metadata for dimensions
   let blobMetadata: Record<string, unknown> = {};
@@ -222,7 +222,7 @@ async function createShowFileAssociation(
   showPhotoId: string,
   fileId: string,
   userId: string,
-  createdAt: Date
+  createdAt: Date,
 ): Promise<void> {
   const showPhoto = await prisma.showPhoto.findUnique({
     where: { id: showPhotoId },
@@ -354,7 +354,8 @@ async function processAttachment(attachment: AttachmentWithBlob, systemUserId: s
     const fileId = await createFileRecord(attachment, uploadResult.cloudflareId, uploadResult.variants, userId);
 
     // Create association based on record type
-    const avatarUrl = uploadResult.variants.avatar || uploadResult.variants.public || Object.values(uploadResult.variants)[0];
+    const avatarUrl =
+      uploadResult.variants.avatar || uploadResult.variants.public || Object.values(uploadResult.variants)[0];
 
     if (recordType === "User") {
       await createUserAvatarAssociation(recordId, fileId, avatarUrl);
@@ -384,7 +385,9 @@ async function verifySchema(): Promise<void> {
     if (error instanceof Error && error.message.includes("metadata")) {
       console.error("\nERROR: The 'metadata' column does not exist on the 'files' table.");
       console.error("Please run the Prisma migration first:");
-      console.error("  doppler run --config prd -- bunx prisma migrate deploy --schema=packages/core/src/_shared/prisma/schema.prisma");
+      console.error(
+        "  doppler run --config prd -- bunx prisma migrate deploy --schema=packages/core/src/_shared/prisma/schema.prisma",
+      );
       process.exit(1);
     }
   }
@@ -395,7 +398,9 @@ async function verifySchema(): Promise<void> {
     if (error instanceof Error && error.message.includes("show_files")) {
       console.error("\nERROR: The 'show_files' table does not exist.");
       console.error("Please run the Prisma migration first:");
-      console.error("  doppler run --config prd -- bunx prisma migrate deploy --schema=packages/core/src/_shared/prisma/schema.prisma");
+      console.error(
+        "  doppler run --config prd -- bunx prisma migrate deploy --schema=packages/core/src/_shared/prisma/schema.prisma",
+      );
       process.exit(1);
     }
   }
@@ -440,7 +445,7 @@ async function main() {
       acc[a.recordType] = (acc[a.recordType] || 0) + 1;
       return acc;
     },
-    {} as Record<string, number>
+    {} as Record<string, number>,
   );
   console.log("By type:", byType);
 
@@ -460,7 +465,9 @@ async function main() {
 
     // Progress update
     const progress = ((stats.processed / stats.total) * 100).toFixed(1);
-    console.log(`Progress: ${progress}% | Uploaded: ${stats.uploaded} | Skipped: ${stats.skipped} | Errors: ${stats.errors}\n`);
+    console.log(
+      `Progress: ${progress}% | Uploaded: ${stats.uploaded} | Skipped: ${stats.skipped} | Errors: ${stats.errors}\n`,
+    );
   }
 
   // Final report
@@ -486,7 +493,7 @@ async function main() {
 
   // Output missing files
   if (missingFileKeys.length > 0) {
-    console.log("\n" + "=".repeat(60));
+    console.log(`\n${"=".repeat(60)}`);
     console.log("MISSING FILES");
     console.log("=".repeat(60));
     console.log("The following blob keys have no corresponding file on disk:\n");

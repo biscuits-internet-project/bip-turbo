@@ -155,16 +155,19 @@ export function getAnniversaryYears(showDate: string): number | null {
   return years;
 }
 
-// this input will be in the format "2025-01-01"
-// this should output as "January 1, 2025"
-export function formatDateLong(date: string): string {
-  const dateParts = date.split("T")[0].split("-");
-  if (dateParts.length === 3) {
-    const [year, month, day] = dateParts;
-    const monthName = new Date(Number(year), Number(month) - 1, Number(day)).toLocaleString("default", {
-      month: "long",
-    });
-    return `${monthName} ${day}, ${year}`;
-  }
-  return date;
+/**
+ * Long, spelled-out date for prose contexts — "January 1, 2025". The
+ * project's one opinionated "content date" format (blog posts, podcast
+ * episodes, reviews, show-page titles). Accepts an ISO-like string or a Date
+ * and is UTC-anchored (via `extractDateParts`) so a date never shifts a day
+ * for viewers east of UTC. Unparseable strings pass through unchanged.
+ */
+export function formatDateLong(date: string | Date): string {
+  const parts = extractDateParts(date);
+  if (!parts) return typeof date === "string" ? date : "";
+  const monthName = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).toLocaleString("default", {
+    month: "long",
+    timeZone: "UTC",
+  });
+  return `${monthName} ${parts.day}, ${parts.year}`;
 }

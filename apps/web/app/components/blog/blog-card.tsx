@@ -2,21 +2,14 @@ import type { BlogPostWithUser } from "@bip/domain";
 import Markdown from "react-markdown";
 import { Link } from "react-router-dom";
 import { Card } from "~/components/ui/card";
+import { formatDateLong } from "~/lib/utils";
 
 interface BlogCardProps {
   blogPost: BlogPostWithUser;
   compact?: boolean;
 }
 
-// Function to format date
-export const formatDate = (date: Date | string | undefined) => {
-  if (!date) return "No date";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
+export const formatDate = (date: Date | string | undefined) => (date ? formatDateLong(date) : "No date");
 
 // Function to calculate read time
 export const getReadTime = (content: string | undefined | null) => {

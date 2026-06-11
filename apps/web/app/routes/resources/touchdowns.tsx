@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BackLink } from "~/components/ui/back-link";
 import { publicLoader } from "~/lib/base-loaders";
+import { formatDateLong } from "~/lib/utils";
 
 export const loader = publicLoader<void>(async () => {});
 
@@ -82,16 +83,7 @@ export default function Touchdowns() {
 
                 <div className="text-content-text-tertiary text-sm mb-6 space-y-1">
                   <div>Duration: {Math.floor(episode.duration / 60)} minutes</div>
-                  <div>
-                    Published:{" "}
-                    {episode.publishDate
-                      ? new Date(episode.publishDate).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })
-                      : "Date unavailable"}
-                  </div>
+                  <div>Published: {episode.publishDate ? formatDateLong(episode.publishDate) : "Date unavailable"}</div>
                 </div>
 
                 <div className="mt-auto">

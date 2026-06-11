@@ -1,12 +1,85 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   addDaysYearAgnostic,
+  formatDateLong,
+  formatDateMedium,
+  formatDateShort,
+  formatDateShortMobile,
   formatMonthDay,
   getAnniversaryYears,
   getOrdinalSuffix,
   isValidMonthDay,
   slugifyAnchor,
 } from "./utils";
+
+// Show dates are stored as bare "YYYY-MM-DD" strings with no time/zone, but
+// these helpers also accept Date objects. JS parses a bare date string as UTC
+// midnight, so the danger is reading it back in LOCAL time (a day east of UTC
+// rolls forward). Every assertion below holds on any CI machine BECAUSE the
+// helpers read UTC fields / pin timeZone:"UTC" — the boundary cases lock that
+// in: an instant late on the 15th UTC must never render as the 16th.
+const LATE_UTC_15TH = new Date("2024-06-15T23:30:00Z");
+
+describe("formatDateShort", () => {
+  test("formats a YYYY-MM-DD string as M/D/YYYY", () => {
+    expect(formatDateShort("2024-06-05")).toBe("6/5/2024");
+  });
+
+  // Reads UTC fields, so a Date late on the 15th UTC stays the 15th regardless
+  // of the test runner's timezone.
+  test("uses UTC fields for a Date near the day boundary", () => {
+    expect(formatDateShort(LATE_UTC_15TH)).toBe("6/15/2024");
+  });
+
+  // Fallback only fires when the input doesn't split into 3 dash-segments;
+  // "a-b-c" would parse to NaN instead, but real inputs are always YYYY-MM-DD.
+  test("returns the original string when it isn't a parseable date", () => {
+    expect(formatDateShort("nope")).toBe("nope");
+  });
+});
+
+describe("formatDateShortMobile", () => {
+  test("formats a YYYY-MM-DD string as M/D/YY", () => {
+    expect(formatDateShortMobile("2024-06-05")).toBe("6/5/24");
+  });
+
+  test("uses UTC fields for a Date near the day boundary", () => {
+    expect(formatDateShortMobile(LATE_UTC_15TH)).toBe("6/15/24");
+  });
+});
+
+describe("formatDateMedium", () => {
+  test("formats as abbreviated month, day, year", () => {
+    expect(formatDateMedium("2024-06-05")).toBe("Jun 5, 2024");
+  });
+
+  // Pins timeZone:"UTC", so the late-UTC instant must not roll to the 16th.
+  test("pins UTC for a Date near the day boundary", () => {
+    expect(formatDateMedium(LATE_UTC_15TH)).toBe("Jun 15, 2024");
+  });
+});
+
+describe("formatDateLong", () => {
+  // Day is rendered without a leading zero ("June 5", not "June 05").
+  test("formats a YYYY-MM-DD string as Month D, YYYY", () => {
+    expect(formatDateLong("2024-06-05")).toBe("June 5, 2024");
+  });
+
+  test("formats first and last day of the month without a leading zero", () => {
+    expect(formatDateLong("2024-01-01")).toBe("January 1, 2024");
+    expect(formatDateLong("2024-12-31")).toBe("December 31, 2024");
+  });
+
+  // Accepts a Date too (content dates arrive as Date or ISO string); reads UTC
+  // fields so a Date late on the 15th UTC stays the 15th on any test runner.
+  test("formats a Date near the day boundary using UTC fields", () => {
+    expect(formatDateLong(LATE_UTC_15TH)).toBe("June 15, 2024");
+  });
+
+  test("returns the original string when it isn't a parseable date", () => {
+    expect(formatDateLong("nope")).toBe("nope");
+  });
+});
 
 describe("formatMonthDay", () => {
   // Converts zero-padded MM-DD to human-readable "Month Day" format

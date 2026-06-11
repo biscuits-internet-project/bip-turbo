@@ -2,8 +2,24 @@ import type { Logger, Venue } from "@bip/domain";
 import type { DbClient, DbVenue } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
+import { showOrderBySql } from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
 import { VALID_CANADIAN_PROVINCES, VALID_COUNTRIES, VALID_US_STATES } from "./venue-constants";
+
+/**
+ * Per-venue show stats for the /venues table — first/last show (slug + date
+ * for linking) and the distinct years played. Computed in one grouped query
+ * rather than denormalized, since the index renders them for every venue.
+ */
+export interface VenueShowAggregate {
+  venueId: string;
+  showCount: number;
+  years: number[];
+  firstSlug: string;
+  firstDate: string;
+  lastSlug: string;
+  lastDate: string;
+}
 
 // Mapper functions
 function mapVenueToDomainEntity(dbVenue: DbVenue): Venue {
@@ -87,6 +103,52 @@ export class VenueService {
     });
 
     return results.map((result: DbVenue) => mapVenueToDomainEntity(result));
+  }
+
+  /**
+   * Show counts and first/last/years stats for every venue with shows, in
+   * one grouped pass. Counts ALL shows at the venue (not the stats-only
+   * subset) so the totals match the venue detail page's `setlists.length`.
+   * First/last shows order by the canonical show tiebreak so same-day shows
+   * resolve deterministically.
+   */
+  async getShowAggregates(): Promise<VenueShowAggregate[]> {
+    const orderAsc = showOrderBySql("shows", "ASC");
+    const orderDesc = showOrderBySql("shows", "DESC");
+    const rows = await this.db.$queryRaw<
+      Array<{
+        venue_id: string;
+        show_count: number;
+        years: number[];
+        first_slug: string;
+        first_date: string;
+        last_slug: string;
+        last_date: string;
+      }>
+    >`
+      SELECT
+        shows.venue_id,
+        COUNT(*)::int AS show_count,
+        array_agg(DISTINCT date_part('year', shows.date::date)::int
+                  ORDER BY date_part('year', shows.date::date)::int DESC) AS years,
+        (array_agg(shows.slug ORDER BY ${orderAsc}))[1]  AS first_slug,
+        (array_agg(shows.date ORDER BY ${orderAsc}))[1]  AS first_date,
+        (array_agg(shows.slug ORDER BY ${orderDesc}))[1] AS last_slug,
+        (array_agg(shows.date ORDER BY ${orderDesc}))[1] AS last_date
+      FROM shows
+      WHERE shows.venue_id IS NOT NULL AND shows.date IS NOT NULL
+      GROUP BY shows.venue_id
+    `;
+
+    return rows.map((row) => ({
+      venueId: row.venue_id,
+      showCount: row.show_count,
+      years: row.years,
+      firstSlug: row.first_slug,
+      firstDate: row.first_date,
+      lastSlug: row.last_slug,
+      lastDate: row.last_date,
+    }));
   }
 
   async create(data: Omit<Venue, "id" | "slug" | "createdAt" | "updatedAt" | "timesPlayed">): Promise<Venue> {
@@ -240,7 +302,22 @@ export class VenueService {
     return mapVenueToDomainEntity(result);
   }
 
+  /** Number of shows that reference this venue. */
+  async countShows(id: string): Promise<number> {
+    return this.db.show.count({ where: { venueId: id } });
+  }
+
+  /**
+   * Delete a venue. Refuses if any show still references it — that's the only
+   * FK to venues, and an in-use venue isn't a stale row. The thrown message is
+   * surfaced to the admin who attempted the delete.
+   */
   async delete(id: string): Promise<boolean> {
+    const showCount = await this.countShows(id);
+    if (showCount > 0) {
+      throw new Error(`Cannot delete venue with ${showCount} show(s)`);
+    }
+
     try {
       await this.db.venue.delete({
         where: { id },
