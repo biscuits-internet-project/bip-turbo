@@ -96,7 +96,7 @@ This is a **monorepo** using **pnpm workspaces** with **Bun** as the runtime:
 - **Backend**: TypeScript, Prisma ORM, PostgreSQL, Redis, Supabase
 - **Code Quality**: Biome (replaces ESLint/Prettier)
 - **Environment**: Doppler for secrets management
-- **Deployment**: Fly.io with Docker
+- **Deployment**: Hetzner via Kamal 2 (Docker); auto-deploys on merge to main
 
 ## File Naming Conventions
 
