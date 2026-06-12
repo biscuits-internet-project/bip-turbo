@@ -97,9 +97,9 @@ export const CacheKeys = {
       const filterHash = hashFilters(filters);
       const attendedUserId = filters.attended;
       if (attendedUserId) {
-        return `songs:filtered:user:${attendedUserId}:${filterHash}:v9`;
+        return `songs:filtered:user:${attendedUserId}:${filterHash}:v10`;
       }
-      return `songs:filtered:${filterHash}:v9`;
+      return `songs:filtered:${filterHash}:v10`;
     },
     /** All filtered song caches (for pattern deletion) */
     allFiltered: () => "songs:filtered:*",

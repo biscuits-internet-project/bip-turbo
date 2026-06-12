@@ -64,7 +64,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
       });
     }),
     services.cache.getOrSet(allTimersCacheKey, async () => {
-      return services.songPageComposer.buildAllTimers({ monthDay });
+      return services.songPageComposer.buildSongPerformances({ allTimer: true, monthDay });
     }),
   ]);
 
@@ -143,8 +143,8 @@ export default function OnThisDay() {
     clearFilters,
   } = usePerformancePageFilters({
     initialData: performances,
-    apiUrl: "/api/all-timers",
-    extraParams: { monthDay },
+    apiUrl: "/api/songs/performances",
+    extraParams: { filters: "allTimer", monthDay },
     searchFilter: searchPerformance,
   });
 

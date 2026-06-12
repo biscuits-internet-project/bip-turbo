@@ -60,7 +60,7 @@ function setHookReturn(overrides: HookReturnOverrides = {}) {
 }
 
 function renderComponent(
-  props: { extraParams?: Record<string, string>; hideTimeRange?: boolean; pinnedAuthorId?: string } = {},
+  props: { extraParams?: Record<string, string>; hideTimeRange?: boolean; presetFilters?: Record<string, string> } = {},
 ) {
   return render(
     <MemoryRouter>
@@ -91,7 +91,7 @@ describe("FilteredSongsTable", () => {
   });
 
   // /songs and its tabs fetch through the loader (via fetchFilteredSongs),
-  // so the hook's client fetch would be a duplicate request. Pins that
+  // so the hook's client fetch would be a duplicate request. Unpinned
   // FilteredSongsTable opts out of the hook's internal fetch path.
   test("passes skipClientFetch: true to usePerformancePageFilters", () => {
     setHookReturn();
@@ -120,37 +120,49 @@ describe("FilteredSongsTable", () => {
     expect(controls.textContent).not.toContain('"hideTimeRange":true');
   });
 
-  // Author / musician pages pin the table to one author: the fetch is pinned
-  // via extraParams.author, and (unlike /songs) they client-fetch because the
-  // page's own loader isn't filter-aware.
-  test("pinnedAuthorId pins author in extraParams and enables client fetch", () => {
+  // Author / musician pages pin the table via presetFilters: the fetch carries
+  // the preset, and (unlike /songs) they client-fetch because the page's own
+  // loader isn't filter-aware.
+  test("presetFilters pins the filter in extraParams and enables client fetch", () => {
     setHookReturn();
-    renderComponent({ pinnedAuthorId: "author-1" });
+    renderComponent({ presetFilters: { author: "author-1" } });
 
     expect(usePerformancePageFiltersMock).toHaveBeenCalledWith(
       expect.objectContaining({ extraParams: { author: "author-1" }, skipClientFetch: false }),
     );
   });
 
-  // On a pinned page the author is fixed behind the scenes, so the Author and
-  // Type filter controls are hidden (their props go through as undefined).
-  test("pinnedAuthorId hides the author and type filters", () => {
+  // An author preset hides its own control and the Type control (author is more
+  // limiting than kind) — both go through as undefined — so the pin can't be
+  // changed. The hiding is derived from the preset, not passed in.
+  test("an author preset hides the author and type controls", () => {
     setHookReturn({ selectedAuthor: "author-1", kindFilter: "cover" });
-    renderComponent({ pinnedAuthorId: "author-1" });
+    renderComponent({ presetFilters: { author: "author-1" } });
 
     const controls = screen.getByTestId("PerformanceFilterControls");
     expect(controls.textContent).not.toContain('"selectedAuthor"');
     expect(controls.textContent).not.toContain('"kindFilter"');
   });
 
-  // Without pinning, the author and type filters are passed through so they render.
-  test("without pinnedAuthorId the author and type filters are passed through", () => {
+  // Without a preset, the author and type filters are passed through so they render.
+  test("without a preset the author and type filters are passed through", () => {
     setHookReturn({ selectedAuthor: "author-1", kindFilter: "cover" });
     renderComponent();
 
     const controls = screen.getByTestId("PerformanceFilterControls");
     expect(controls.textContent).toContain('"selectedAuthor":"author-1"');
     expect(controls.textContent).toContain('"kindFilter":"cover"');
+  });
+
+  // A pinned musician IS a narrowing filter (it rides presetFilters, not the
+  // visible filter state), so the Filtered Plays column surfaces even with no
+  // URL filters active.
+  test("showFilteredPlays=true when a musician is pinned via presetFilters", () => {
+    setHookReturn();
+    renderComponent({ presetFilters: { musician: "musician-1" } });
+
+    const table = screen.getByTestId("SongsTable");
+    expect(table.textContent).toContain('"showFilteredPlays":true');
   });
 
   // When no filter scope is active (no URL filters and no extraParams),

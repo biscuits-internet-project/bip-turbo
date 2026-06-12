@@ -16,7 +16,7 @@ export type NoteworthyLoaderData = AllTimersPageView & { dehydratedState: Dehydr
  * the first frame paints with hydrated chrome.
  *
  * Kept in its own file (no JSX, no client imports) because route
- * components reference `NoteworthyPerformancePage` as a runtime value;
+ * components reference `FilteredSongPerformanceTable` as a runtime value;
  * if the loader factory and the component lived in the same module,
  * Vite would pull `~/server/*` into the client bundle through the
  * component import and break `<Link>` navigation (see PR #58 +

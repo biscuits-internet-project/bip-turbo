@@ -8,6 +8,7 @@ import {
   computeRarityStats,
   computeTagsForPerformance,
   isNarrowingFilter,
+  NeedsNarrowingFilterError,
   type PerformanceDto,
   SongPageComposer,
   transformToSongPagePerformanceView,
@@ -279,7 +280,7 @@ describe("transformToSongPagePerformanceView", () => {
   });
 
   // When the DTO includes song-level fields (from the songs table join in
-  // buildAllTimers), kind is mapped to the view.
+  // the cross-song views), kind is mapped to the view.
   test("maps song_kind to kind", () => {
     const view = transformToSongPagePerformanceView(makeDto({ song_kind: "cover" }));
     expect(view.kind).toBe("cover");
@@ -442,8 +443,26 @@ describe("buildFilterQuery", () => {
     expect(sql).toContain("shows.date LIKE");
   });
 
+  // The jamChart filter is the curated/noteworthy set: a track counts if it is
+  // flagged all_timer OR carries a non-empty curated note. The "Jam Chart"
+  // toggle chip and the /songs/jam-charts page scope are the same thing. The OR
+  // must be parenthesized so it doesn't bind loosely once AND-joined into the
+  // surrounding WHERE.
+  test("jamChart filter unions all_timer with a non-empty note, parenthesized", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], { jamChart: true });
+
+    expect(conditions).toHaveLength(1);
+    expect(extraJoins).toHaveLength(0);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toMatch(/tracks\.all_timer\s*=\s*true/);
+    expect(sql).toMatch(/tracks\.note\s+IS\s+NOT\s+NULL/);
+    expect(sql).toMatch(/tracks\.note\s*<>\s*''/);
+    expect(sql).toMatch(/all_timer.*OR.*note/s);
+    expect(sql.trim().startsWith("(")).toBe(true);
+  });
+
   // monthDay composes with base conditions (e.g., all_timer = true) via AND,
-  // so buildAllTimers({ monthDay }) produces the right two-condition WHERE.
+  // so an all-timer + monthDay query produces the right two-condition WHERE.
   test("monthDay combines with base conditions", () => {
     const base = [Prisma.sql`tracks.all_timer = true`];
     const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(base, { monthDay: "12-31" });
@@ -519,14 +538,10 @@ describe("buildSongPerformanceCounts", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildJamCharts — all-timers ∪ tracks-with-notes
+// buildSongPerformances — unified filtered performance list (single + cross song)
 // ---------------------------------------------------------------------------
 
-describe("buildJamCharts", () => {
-  // Flattens a $queryRaw mock call (TemplateStringsArray + Prisma.Sql
-  // interpolations) into a single SQL string so the test can assert the
-  // base WHERE clause is composed of the right two conditions. Prisma.Sql
-  // exposes its raw template parts under `.strings`.
+describe("buildSongPerformances", () => {
   function flattenSqlFromMockCall(call: unknown[]): string {
     const [templateStrings, ...interpolations] = call as [readonly string[], ...unknown[]];
     const interpolated = interpolations
@@ -540,94 +555,90 @@ describe("buildJamCharts", () => {
     return `${[...templateStrings].join(" ")} ${interpolated}`;
   }
 
-  function createComposer(rows: Array<Partial<PerformanceDto>>) {
+  function createComposer(rows: Array<Partial<PerformanceDto> & { song_title?: string; song_slug?: string }>) {
     const mockDb = {
       $queryRaw: vi.fn().mockResolvedValue(rows.map((r) => makeDto(r as Partial<PerformanceDto>))),
-      // enrichPerformances looks up annotations, track flags, and previous-show
-      // data per returned track. Stub them to empty so the test focuses on the
-      // base WHERE composition and the result shape.
       annotation: { findMany: vi.fn().mockResolvedValue([]) },
       trackFlagAssignment: { findMany: vi.fn().mockResolvedValue([]) },
     };
-    const mockSongService = {} as never;
-    return { composer: new SongPageComposer(mockDb as never, mockSongService), mockDb };
+    return { composer: new SongPageComposer(mockDb as never, {} as never), mockDb };
   }
 
-  // The whole point of the jam-charts page: include tracks flagged as
-  // all-timers AND tracks that carry a curated note, in a single result.
-  // The WHERE clause must OR the two conditions so neither set is
-  // dropped on the way to the UI.
-  test("base WHERE clause unions all_timer with note IS NOT NULL", async () => {
+  // The allTimer filter scopes the cross-song list to all_timer = true (the
+  // all-timers page).
+  test("allTimer filter narrows the cross-song query to all_timer = true", async () => {
     const { composer, mockDb } = createComposer([]);
-    await composer.buildJamCharts();
-    expect(mockDb.$queryRaw).toHaveBeenCalledTimes(1);
+    await composer.buildSongPerformances({ allTimer: true });
     const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
     expect(sql).toMatch(/tracks\.all_timer\s*=\s*true/);
-    expect(sql).toMatch(/tracks\.note\s+IS\s+NOT\s+NULL/);
-    // Empty-string notes must be filtered out too — the note column
-    // historically allows '' as well as NULL for "no note", and the UI
-    // treats both as absent.
-    expect(sql).toMatch(/tracks\.note\s*<>\s*''/);
-    // Both branches must be ORed together (otherwise note-only tracks
-    // get filtered out when all_timer is false).
+  });
+
+  // The jamChart filter scopes the cross-song list to all_timer unioned with
+  // curated-note tracks (the jam-charts page).
+  test("jamChart filter unions all_timer with note", async () => {
+    const { composer, mockDb } = createComposer([]);
+    await composer.buildSongPerformances({ jamChart: true });
+    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
     expect(sql).toMatch(/all_timer.*OR.*note/s);
   });
 
-  // The method returns the standard AllTimersPageView shape so the route
-  // can drop it straight into PerformanceTable without bespoke wiring.
-  test("returns AllTimersPageView shape (performances array) populated from rows", async () => {
+  // Returns the AllTimersPageView shape (performances array), with song
+  // title/slug coming from the cross-song join in both modes.
+  test("returns performances populated from the joined rows", async () => {
     const { composer } = createComposer([
-      { track_id: "t-allTimer", all_timer: true, note: null, song_id: "song-1" },
-      { track_id: "t-note", all_timer: false, note: "Big Type II Spaga." },
+      { track_id: "t-1", all_timer: true, song_title: "Helicopters", song_slug: "helicopters" },
+      { track_id: "t-2", all_timer: true, song_title: "Basis", song_slug: "basis" },
     ]);
-    const result = await composer.buildJamCharts();
-    expect(result.performances).toHaveLength(2);
-    const ids = result.performances.map((p) => p.trackId).sort();
-    expect(ids).toEqual(["t-allTimer", "t-note"]);
+    const result = await composer.buildSongPerformances({ allTimer: true });
+    expect(result.performances.map((p) => p.trackId).sort()).toEqual(["t-1", "t-2"]);
+    expect(result.performances.find((p) => p.trackId === "t-1")?.songTitle).toBe("Helicopters");
   });
 
-  // Filter options compose: jam-charts plus, say, a year range or cover
-  // filter, should AND together. Verifies the call still goes through and
-  // the additional filter shows up in the SQL.
-  test("forwards filter options through buildFilterQuery", async () => {
+  // The gate applies only to the cross-song path: with no song scope and no
+  // narrowing filter, the query would scan every track ever played, so the
+  // composer refuses rather than run it.
+  test("throws NeedsNarrowingFilterError for a cross-song list with no narrowing filter", async () => {
     const { composer, mockDb } = createComposer([]);
-    await composer.buildJamCharts({ monthDay: "07-26" });
-    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
-    expect(sql).toMatch(/shows\.date\s+LIKE/);
+    await expect(composer.buildSongPerformances({})).rejects.toBeInstanceOf(NeedsNarrowingFilterError);
+    await expect(composer.buildSongPerformances({ kind: "cover" })).rejects.toBeInstanceOf(NeedsNarrowingFilterError);
+    expect(mockDb.$queryRaw).not.toHaveBeenCalled();
   });
-});
 
-describe("buildSongPerformances populates songTitle/songSlug", () => {
-  // The single-song composer queries without a song join (the song is
-  // already known in context). The cross-song UI components that
-  // consume `SongPagePerformance` (TrackRatingOverlay's popover header,
-  // for instance) read `songTitle` / `songSlug` directly — so the
-  // composer must fill those fields from the page's song context, or
-  // the popover renders with an empty title.
-  test("propagates the page song's title and slug onto every returned performance", async () => {
-    const mockDb = {
-      $queryRaw: vi.fn().mockResolvedValue([makeDto({ track_id: "t-1" }), makeDto({ track_id: "t-2" })]),
-      annotation: { findMany: vi.fn().mockResolvedValue([]) },
-      trackFlagAssignment: { findMany: vi.fn().mockResolvedValue([]) },
-    };
-    const mockSongService = {
-      findBySlug: vi.fn().mockResolvedValue({
-        id: "song-1",
-        title: "King of the World",
-        slug: "king-of-the-world",
-        kind: "original",
-        authorId: null,
-      }),
-    };
-    const composer = new SongPageComposer(mockDb as never, mockSongService as never);
+  // A song scope is always allowed (the song-detail "all performances" tab has
+  // no other filter), and it's expressed as a subquery on the readable slug.
+  test("a songSlug scope is allowed without a narrowing filter and filters by slug", async () => {
+    const { composer, mockDb } = createComposer([
+      { track_id: "t-1", song_title: "Helicopters", song_slug: "helicopters" },
+    ]);
+    const result = await composer.buildSongPerformances({ songSlug: "helicopters" });
+    expect(result.performances).toHaveLength(1);
+    const sql = flattenSqlFromMockCall(mockDb.$queryRaw.mock.calls[0]);
+    expect(sql).toMatch(/tracks\.song_id\s*=\s*\(SELECT id FROM songs WHERE slug/);
+  });
 
-    const performances = await composer.buildSongPerformances("king-of-the-world");
+  // The single-song view computes filtered Gaps; its universe is every show
+  // matching the OTHER filters, so the song scope is stripped before resolving
+  // the matching show dates.
+  test("single-song scope with a narrowing filter computes gaps against the non-song universe", async () => {
+    const { composer } = createComposer([{ track_id: "t-1", song_slug: "helicopters" }]);
+    const spy = vi.spyOn(composer, "getFilterMatchingShowDates").mockResolvedValue([]);
 
-    expect(performances).toHaveLength(2);
-    for (const p of performances) {
-      expect(p.songTitle).toBe("King of the World");
-      expect(p.songSlug).toBe("king-of-the-world");
-    }
+    await composer.buildSongPerformances({ songSlug: "helicopters", allTimer: true });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).not.toHaveProperty("songSlug");
+    expect(spy.mock.calls[0][0]).toMatchObject({ allTimer: true });
+  });
+
+  // Without a narrowing filter there's no filtered-gap universe to compute, so
+  // the single-song path skips the extra query.
+  test("single-song scope without a narrowing filter skips the gap universe query", async () => {
+    const { composer } = createComposer([{ track_id: "t-1", song_slug: "helicopters" }]);
+    const spy = vi.spyOn(composer, "getFilterMatchingShowDates").mockResolvedValue([]);
+
+    await composer.buildSongPerformances({ songSlug: "helicopters" });
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 
@@ -679,6 +690,7 @@ describe("isNarrowingFilter", () => {
     ["dyslexic", { dyslexic: true }],
     ["unfinished", { unfinished: true }],
     ["allTimer", { allTimer: true }],
+    ["jamChart", { jamChart: true }],
     ["monthDay", { monthDay: "07-26" }],
     ["playedByMusicianId", { playedByMusicianId: "musician-1" }],
   ])("returns true when %s is set", (_label, options) => {

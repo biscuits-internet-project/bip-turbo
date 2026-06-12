@@ -39,6 +39,19 @@ describe("parsePerformanceFilters — musician", () => {
   });
 });
 
+describe("parsePerformanceFilters — jamChart scope", () => {
+  // The "jam chart" filter (the curated/noteworthy set: all_timer ∪ note) rides
+  // the `filters` param as `jamChart` and drives both the toggle chip and the
+  // /songs/jam-charts page scope.
+  test("parses ?filters=jamChart into the jamChart option", async () => {
+    const url = new URL("https://x.test/songs/performances?filters=jamChart");
+
+    const filters = await parsePerformanceFilters(url, emptyContext);
+
+    expect(filters.jamChart).toBe(true);
+  });
+});
+
 describe("buildFilteredCacheKey — musician", () => {
   // The musician slug must be part of the cache key, or two different musician
   // filters would collide on one cached payload.

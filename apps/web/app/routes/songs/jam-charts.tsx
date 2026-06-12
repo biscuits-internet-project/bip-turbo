@@ -1,11 +1,12 @@
 import { CacheKeys } from "@bip/domain";
-import { createNoteworthyLoader } from "~/lib/noteworthy-performance-loader";
-import { NoteworthyPerformancePage } from "~/lib/noteworthy-performance-page";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { FilteredSongPerformanceTable } from "~/lib/filtered-song-performance-table";
+import { createNoteworthyLoader, type NoteworthyLoaderData } from "~/lib/noteworthy-performance-loader";
 import { services } from "~/server/services";
 
 export const loader = createNoteworthyLoader({
   cacheKey: CacheKeys.songs.jamCharts(),
-  build: () => services.songPageComposer.buildJamCharts(),
+  build: () => services.songPageComposer.buildSongPerformances({ jamChart: true }),
 });
 
 export function meta() {
@@ -16,5 +17,6 @@ export function meta() {
 }
 
 export default function JamChartsPage() {
-  return <NoteworthyPerformancePage apiUrl="/api/jam-charts" hideJamChartToggle />;
+  const { performances } = useSerializedLoaderData<NoteworthyLoaderData>();
+  return <FilteredSongPerformanceTable performances={performances} presetFilters={{ filters: "jamChart" }} />;
 }

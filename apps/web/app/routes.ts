@@ -137,8 +137,6 @@ export default [
     route("musicians/:id", "routes/api/musicians/$id.tsx"),
     route("venues", "routes/api/venues.tsx"),
     route("venues/:id", "routes/api/venues/$id.tsx"),
-    route("all-timers", "routes/api/all-timers.tsx"),
-    route("jam-charts", "routes/api/jam-charts.tsx"),
     route("songs", "routes/api/songs.tsx"),
     route("songs/performances", "routes/api/songs/performances.tsx"),
     route("songs/:id", "routes/api/songs/$id.tsx"),
