@@ -186,6 +186,7 @@ export function PerformanceFilterControls({
                 onValueChange={(value) => updateFilter({ author: value === "none" ? null : value })}
                 placeholder="All Authors"
                 className="w-[150px] sm:w-[200px] h-[34px] text-sm"
+                topLimit={50}
               />
             </div>
           )}

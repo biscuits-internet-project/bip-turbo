@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+// One author of a song. `musicianSlug` is set when the author is linked to a
+// musician, so the UI can link the name to that musician's page.
+export const songAuthorSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  musicianSlug: z.string().nullable().optional(),
+});
+
+export type SongAuthor = z.infer<typeof songAuthorSchema>;
+
 export const songSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
@@ -12,7 +23,6 @@ export const songSchema = z.object({
   // The song's origin/form in one axis. null = unclassified (treated as original
   // for debut text). A mashup is neither a pure original nor a single cover.
   kind: z.enum(["original", "cover", "mashup", "improvisation"]).nullable().optional(),
-  authorId: z.string().uuid().nullable(),
   history: z.string().nullable(),
   featuredLyric: z.string().nullable(),
   timesPlayed: z.number().default(0),
@@ -64,6 +74,10 @@ export const songSchema = z.object({
   guitarTabsUrl: z.string().nullable(),
 
   // Relations
+  // Ordered list of the song's authors, with each author's musician slug when linked.
+  authors: z.array(songAuthorSchema).default([]),
+  // Comma-joined author names, derived from `authors`. Convenience for footnote /
+  // SEO / MCP text that just needs a single string.
   authorName: z.string().nullable().optional(),
 });
 

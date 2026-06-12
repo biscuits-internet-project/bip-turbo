@@ -59,6 +59,129 @@ function show(id: string, date: string, opts: { dayOrder?: number | null; countF
   };
 }
 
+// A raw song row as Prisma returns it with the songAuthors include.
+function songRow(
+  songAuthors: Array<{
+    position: number;
+    author: { id: string; name: string; slug: string; musicians: { slug: string }[] };
+  }>,
+) {
+  return {
+    id: "song-1",
+    title: "Tourists",
+    slug: "tourists",
+    kind: "original",
+    lyrics: null,
+    tabs: null,
+    notes: null,
+    history: null,
+    featuredLyric: null,
+    timesPlayed: 0,
+    guitarTabsUrl: null,
+    dateLastPlayed: null,
+    dateFirstPlayed: null,
+    mostCommonYear: null,
+    createdAt: new Date("2020-01-01"),
+    updatedAt: new Date("2020-01-01"),
+    yearlyPlayData: {},
+    longestGapsData: {},
+    songAuthors,
+  };
+}
+
+describe("SongService — multiple authors", () => {
+  // findBySlug must return authors ordered by position, derive the comma-joined
+  // authorName, and surface each author's linked-musician slug (null when none).
+  test("findBySlug maps ordered authors, joined authorName, and musician slugs", async () => {
+    const db = {
+      song: {
+        findUnique: vi.fn().mockResolvedValue(
+          // Deliberately out of position order to prove the mapper sorts.
+          songRow([
+            { position: 1, author: { id: "a-2", name: "Marc Brownstein", slug: "marc-brownstein", musicians: [] } },
+            {
+              position: 0,
+              author: {
+                id: "a-1",
+                name: "Jon Gutwillig",
+                slug: "jon-gutwillig",
+                musicians: [{ slug: "jon-gutwillig" }],
+              },
+            },
+          ]),
+        ),
+      },
+    };
+    const service = new SongService(db as never, logger);
+
+    const song = await service.findBySlug("tourists");
+
+    expect(song?.authors.map((a) => a.name)).toEqual(["Jon Gutwillig", "Marc Brownstein"]);
+    expect(song?.authors.map((a) => a.musicianSlug)).toEqual(["jon-gutwillig", null]);
+    expect(song?.authorName).toBe("Jon Gutwillig, Marc Brownstein");
+  });
+
+  // create writes one song_authors row per id, position = array index.
+  test("create writes ordered song_authors join rows", async () => {
+    let captured: { songAuthors?: { create: Array<{ authorId: string; position: number }> } } | undefined;
+    const db = {
+      song: {
+        create: vi.fn().mockImplementation(async ({ data }) => {
+          captured = data;
+          return songRow([]);
+        }),
+      },
+    };
+    const service = new SongService(db as never, logger);
+
+    await service.create({ title: "Tourists", authorIds: ["a-1", "a-2"] });
+
+    expect(captured?.songAuthors?.create).toEqual([
+      { authorId: "a-1", position: 0 },
+      { authorId: "a-2", position: 1 },
+    ]);
+  });
+
+  // update replaces the whole author set when authorIds is provided.
+  test("update replaces the author set (deleteMany + ordered create)", async () => {
+    let captured:
+      | { songAuthors?: { deleteMany: object; create: Array<{ authorId: string; position: number }> } }
+      | undefined;
+    const db = {
+      song: {
+        update: vi.fn().mockImplementation(async ({ data }) => {
+          captured = data;
+          return songRow([]);
+        }),
+      },
+    };
+    const service = new SongService(db as never, logger);
+
+    await service.update("tourists", { authorIds: ["a-3"] });
+
+    expect(captured?.songAuthors?.deleteMany).toEqual({});
+    expect(captured?.songAuthors?.create).toEqual([{ authorId: "a-3", position: 0 }]);
+  });
+
+  // Omitting authorIds leaves the existing authors untouched (no songAuthors write).
+  test("update without authorIds does not touch the author set", async () => {
+    let captured: { songAuthors?: unknown } | undefined;
+    const db = {
+      song: {
+        update: vi.fn().mockImplementation(async ({ data }) => {
+          captured = data;
+          return songRow([]);
+        }),
+      },
+    };
+    const service = new SongService(db as never, logger);
+
+    await service.update("tourists", { notes: "updated" });
+
+    expect(captured?.songAuthors).toBeUndefined();
+  });
+});
+
 describe("SongService.updateSongStatistics — gap denormalization", () => {
   // A song's first-ever performance has no prior occurrence, so gap is NULL
   // (renders as "Debut") and previousPerformanceShowId is NULL.

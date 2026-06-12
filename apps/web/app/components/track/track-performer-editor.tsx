@@ -1,11 +1,9 @@
 import type { Musician, TrackMusicianDelta } from "@bip/domain";
-import { Plus, Trash2 } from "lucide-react";
 import { useRef } from "react";
 import { InstrumentSearch } from "~/components/musician/instrument-search";
 import { MusicianSearch } from "~/components/musician/musician-search";
-import { Button } from "~/components/ui/button";
 import { GlassSelect } from "~/components/ui/glass-select";
-import { formLabelClass } from "~/lib/form-styles";
+import { MultiEntityPicker } from "~/components/ui/multi-entity-picker";
 import type { TrackPerformerDelta } from "./use-track-api";
 
 /** One editable performer row. `uid` keys the row across edits; `autoOpen`
@@ -108,72 +106,53 @@ export function TrackPerformerEditor({ rows, onChange }: TrackPerformerEditorPro
   const removeRow = (uid: string) => commit(rowsRef.current.filter((row) => row.uid !== uid));
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className={formLabelClass}>Performer changes</span>
-        <Button type="button" variant="secondary" size="sm" aria-label="Add performer" onClick={addRow}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add
-        </Button>
-      </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-content-text-tertiary">No sit-ins or sat-outs for this track.</p>
-      ) : (
-        <ul className="space-y-2 sm:space-y-1.5">
-          {rows.map((row) => (
-            <li
-              key={row.uid}
-              className="flex flex-wrap items-center gap-1.5 rounded-md border border-glass-border/30 p-2 sm:rounded-none sm:border-0 sm:p-0"
-            >
-              <MusicianSearch
-                value={row.musicianId || null}
-                onValueChange={(id) => setMusician(row.uid, id)}
-                onItemChange={(musician) => prefillInstrument(row.uid, musician)}
+    <MultiEntityPicker
+      rows={rows}
+      onAdd={addRow}
+      onRemove={removeRow}
+      label="Performer changes"
+      addAriaLabel="Add performer"
+      removeAriaLabel="Remove performer"
+      emptyText="No sit-ins or sat-outs for this track."
+      renderRow={(row) => (
+        <>
+          <MusicianSearch
+            value={row.musicianId || null}
+            onValueChange={(id) => setMusician(row.uid, id)}
+            onItemChange={(musician) => prefillInstrument(row.uid, musician)}
+            allowCreate
+            autoOpen={row.autoOpen}
+            className="h-8 w-full sm:w-48"
+          />
+          <GlassSelect
+            value={row.present ? "present" : "out"}
+            onValueChange={(value) => setPresent(row.uid, value === "present")}
+            options={STATUS_OPTIONS}
+            ariaLabel="Performer status"
+            className="h-8 w-full sm:w-32"
+          />
+          {row.present && row.musicianId && (
+            <>
+              {row.instrumentIds.map((instrumentId, instrumentIndex) => (
+                <InstrumentSearch
+                  key={instrumentId}
+                  value={instrumentId}
+                  onValueChange={(id) => replaceInstrument(row.uid, instrumentIndex, id)}
+                  allowCreate
+                  className="h-8 w-full sm:w-36"
+                />
+              ))}
+              <InstrumentSearch
+                value={null}
+                onValueChange={(id) => addInstrument(row.uid, id)}
                 allowCreate
-                autoOpen={row.autoOpen}
-                className="h-8 w-full sm:w-48"
-              />
-              <GlassSelect
-                value={row.present ? "present" : "out"}
-                onValueChange={(value) => setPresent(row.uid, value === "present")}
-                options={STATUS_OPTIONS}
-                ariaLabel="Performer status"
+                placeholder="+ instrument"
                 className="h-8 w-full sm:w-32"
               />
-              {row.present && row.musicianId && (
-                <>
-                  {row.instrumentIds.map((instrumentId, instrumentIndex) => (
-                    <InstrumentSearch
-                      key={instrumentId}
-                      value={instrumentId}
-                      onValueChange={(id) => replaceInstrument(row.uid, instrumentIndex, id)}
-                      allowCreate
-                      className="h-8 w-full sm:w-36"
-                    />
-                  ))}
-                  <InstrumentSearch
-                    value={null}
-                    onValueChange={(id) => addInstrument(row.uid, id)}
-                    allowCreate
-                    placeholder="+ instrument"
-                    className="h-8 w-full sm:w-32"
-                  />
-                </>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Remove performer"
-                onClick={() => removeRow(row.uid)}
-                className="ml-auto h-8 w-8 shrink-0 sm:ml-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
+            </>
+          )}
+        </>
       )}
-    </div>
+    />
   );
 }

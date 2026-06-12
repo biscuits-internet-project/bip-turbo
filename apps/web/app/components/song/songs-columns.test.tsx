@@ -57,7 +57,6 @@ function makeSong(overrides: Partial<SongWithShows> = {}): SongWithShows {
     tabs: null,
     notes: null,
     kind: "original",
-    authorId: null,
     history: null,
     featuredLyric: null,
     timesPlayed: 42,
@@ -81,7 +80,8 @@ function makeSong(overrides: Partial<SongWithShows> = {}): SongWithShows {
     longestGapsData: {},
     mostCommonYear: null,
     guitarTabsUrl: null,
-    authorName: null,
+    authorName: overrides.authorName ?? null,
+    authors: overrides.authors ?? [],
     firstPlayedShow: null,
     lastPlayedShow: null,
     ...overrides,
@@ -104,6 +104,46 @@ describe("getSongsColumns", () => {
     const link = screen.getByRole("link", { name: "Basis for a Day" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/songs/basis-for-a-day");
+  });
+
+  // The author column links every author: musician-linked authors go to the
+  // musician page, everyone else to their author page.
+  test("author cell links musician-linked authors to /musicians and others to /authors", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={baseColumns}
+        data={[
+          makeSong({
+            authors: [
+              { id: "a-1", name: "Jon Gutwillig", slug: "jon-gutwillig", musicianSlug: "jon-gutwillig" },
+              { id: "a-2", name: "Robert Hunter", slug: "robert-hunter", musicianSlug: null },
+            ],
+          }),
+        ]}
+        hideSearch
+        hidePagination
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Jon Gutwillig" })).toHaveAttribute("href", "/musicians/jon-gutwillig");
+    expect(screen.getByRole("link", { name: "Robert Hunter" })).toHaveAttribute("href", "/authors/robert-hunter");
+  });
+
+  // The dense filtered layout (time range / narrowing filter active) drops the
+  // Author column to make room for the filtered-plays + date columns.
+  test("author column is omitted when showFilteredPlays is true", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={filteredColumns}
+        data={[
+          makeSong({ authors: [{ id: "a-1", name: "Jon Gutwillig", slug: "jon-gutwillig", musicianSlug: null }] }),
+        ]}
+        hideSearch
+        hidePagination
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: "Jon Gutwillig" })).not.toBeInTheDocument();
   });
 
   // Songs with no performances (DB songs that exist but were never played)

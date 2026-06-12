@@ -30,7 +30,7 @@ export const action = adminAction(async ({ request, params }: ActionFunctionArgs
   const { slug } = params;
   const formData = await request.formData();
   const title = formData.get("title") as string;
-  const authorId = formData.get("authorId") as string;
+  const authorIds = formData.getAll("authorIds") as string[];
   const lyrics = formData.get("lyrics") as string;
   const tabs = formData.get("tabs") as string;
   const notes = formData.get("notes") as string;
@@ -41,7 +41,7 @@ export const action = adminAction(async ({ request, params }: ActionFunctionArgs
 
   const song = await services.songs.update(slug as string, {
     title,
-    authorId: authorId || null,
+    authorIds,
     lyrics: lyrics || null,
     tabs: tabs || null,
     notes: notes || null,
@@ -64,7 +64,7 @@ export default function EditSong() {
     if (song) {
       setDefaultValues({
         title: song.title,
-        authorId: song.authorId,
+        authorIds: song.authors.map((author) => author.id),
         lyrics: song.lyrics,
         tabs: song.tabs,
         notes: song.notes,

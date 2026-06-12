@@ -59,7 +59,9 @@ function setHookReturn(overrides: HookReturnOverrides = {}) {
   });
 }
 
-function renderComponent(props: { extraParams?: Record<string, string>; hideTimeRange?: boolean } = {}) {
+function renderComponent(
+  props: { extraParams?: Record<string, string>; hideTimeRange?: boolean; pinnedAuthorId?: string } = {},
+) {
   return render(
     <MemoryRouter>
       <FilteredSongsTable songs={[]} {...props} />
@@ -116,6 +118,39 @@ describe("FilteredSongsTable", () => {
 
     const controls = screen.getByTestId("PerformanceFilterControls");
     expect(controls.textContent).not.toContain('"hideTimeRange":true');
+  });
+
+  // Author / musician pages pin the table to one author: the fetch is pinned
+  // via extraParams.author, and (unlike /songs) they client-fetch because the
+  // page's own loader isn't filter-aware.
+  test("pinnedAuthorId pins author in extraParams and enables client fetch", () => {
+    setHookReturn();
+    renderComponent({ pinnedAuthorId: "author-1" });
+
+    expect(usePerformancePageFiltersMock).toHaveBeenCalledWith(
+      expect.objectContaining({ extraParams: { author: "author-1" }, skipClientFetch: false }),
+    );
+  });
+
+  // On a pinned page the author is fixed behind the scenes, so the Author and
+  // Type filter controls are hidden (their props go through as undefined).
+  test("pinnedAuthorId hides the author and type filters", () => {
+    setHookReturn({ selectedAuthor: "author-1", kindFilter: "cover" });
+    renderComponent({ pinnedAuthorId: "author-1" });
+
+    const controls = screen.getByTestId("PerformanceFilterControls");
+    expect(controls.textContent).not.toContain('"selectedAuthor"');
+    expect(controls.textContent).not.toContain('"kindFilter"');
+  });
+
+  // Without pinning, the author and type filters are passed through so they render.
+  test("without pinnedAuthorId the author and type filters are passed through", () => {
+    setHookReturn({ selectedAuthor: "author-1", kindFilter: "cover" });
+    renderComponent();
+
+    const controls = screen.getByTestId("PerformanceFilterControls");
+    expect(controls.textContent).toContain('"selectedAuthor":"author-1"');
+    expect(controls.textContent).toContain('"kindFilter":"cover"');
   });
 
   // When no filter scope is active (no URL filters and no extraParams),

@@ -1,10 +1,19 @@
-import type { Instrument, Musician, MusicianAppearanceShow, MusicianPerformance, MusicianSongPlay } from "@bip/domain";
+import type {
+  Instrument,
+  Musician,
+  MusicianAppearanceShow,
+  MusicianPerformance,
+  MusicianSongPlay,
+  Song,
+} from "@bip/domain";
+import { CacheKeys } from "@bip/domain/cache-keys";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { DateVenueCell } from "~/components/performance/date-venue-cell";
 import { ShowDate } from "~/components/show-date";
+import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
 import { DataTable } from "~/components/ui/data-table";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
@@ -15,6 +24,8 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { notFound } from "~/lib/errors";
 import { classifyMusician, DRUMMER_ERAS, isOutsideEra, type MusicianTier } from "~/lib/musicians-constants";
+import { getMusicianMeta } from "~/lib/seo";
+import { fetchFilteredSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
 
 export const routeParam = "slug";
@@ -45,65 +56,99 @@ interface LoaderData {
   songs: MusicianSongPlay[];
   // One row per individual performance. Empty for core members.
   performances: MusicianPerformance[];
+  // The author this musician is linked to (null when none) and the songs that
+  // author wrote, scoped through the /songs pipeline. Drives the Songs Written
+  // explorer, which is pinned to this author.
+  authorId: string | null;
+  songsWritten: Song[];
 }
 
-export const loader = publicLoader(async ({ params }): Promise<LoaderData> => {
+export const loader = publicLoader(async ({ params, context }): Promise<LoaderData> => {
   const slug = params.slug;
   if (!slug) throw notFound();
 
   const musician = await services.musicians.findBySlug(slug);
   if (!musician) throw notFound();
 
-  const defaultInstrument = musician.defaultInstrumentId
-    ? await services.instruments.findById(musician.defaultInstrumentId)
-    : null;
+  // Cache the whole profile by slug — the loader is heavy (appearances, songs
+  // played/written, performances, setlists). Nothing here is per-user.
+  return services.cache.getOrSet(
+    CacheKeys.musicians.page(slug),
+    async (): Promise<LoaderData> => {
+      const defaultInstrument = musician.defaultInstrumentId
+        ? await services.instruments.findById(musician.defaultInstrumentId)
+        : null;
 
-  const { showIds, songCount, firstShow, lastShow } = await services.musicians.findAppearances(musician.id);
-  const tier = classifyMusician(slug);
+      const { showIds, songCount, firstShow, lastShow } = await services.musicians.findAppearances(musician.id);
+      // Songs this musician wrote = songs by their linked author, via the same
+      // enriched /songs pipeline so the table renders identically. Author-only
+      // URL (no other filters) so the cached base list refines client-side.
+      let songsWritten: Song[] = [];
+      if (musician.authorId) {
+        const url = new URL(`https://bip.local/?author=${musician.authorId}`);
+        songsWritten = await fetchFilteredSongs(url, context);
+      }
+      const tier = classifyMusician(slug);
 
-  // Core members appear on essentially every show, so their tables are omitted;
-  // only counts render. Drummers and guests get both tables.
-  let shows: ShowRow[] = [];
-  let songs: MusicianSongPlay[] = [];
-  let performances: MusicianPerformance[] = [];
-  if (tier !== "core" && showIds.length > 0) {
-    const [setlists, songsPlayed, performancesPlayed] = await Promise.all([
-      services.setlists.findManyByShowIds(showIds, { sort: [{ field: "date", direction: "desc" }] }),
-      services.musicians.findSongsPlayed(musician.id),
-      services.musicians.findPerformances(musician.id),
-    ]);
-    // A drummer's everyday shows are implied by their era; only out-of-era
-    // appearances (sit-ins before or after their tenure) are notable, so every
-    // table is filtered to out-of-era for drummers and left whole otherwise.
-    const era = tier === "drummer" ? DRUMMER_ERAS[slug] : undefined;
-    const visibleSetlists = era
-      ? setlists.filter((setlist) => isOutsideEra(new Date(setlist.show.date), era))
-      : setlists;
-    performances = era
-      ? performancesPlayed.filter((performance) => isOutsideEra(new Date(performance.date), era))
-      : performancesPlayed;
-    songs = era ? aggregatePerformances(performances) : songsPlayed;
-    shows = visibleSetlists.map((setlist) => ({
-      showId: setlist.show.id,
-      slug: setlist.show.slug,
-      date: setlist.show.date,
-      venueName: setlist.venue.name,
-      venueCity: setlist.venue.city,
-      venueState: setlist.venue.state,
-    }));
-  }
+      // Core members appear on essentially every show, so their tables are omitted;
+      // only counts render. Drummers and guests get both tables.
+      let shows: ShowRow[] = [];
+      let songs: MusicianSongPlay[] = [];
+      let performances: MusicianPerformance[] = [];
+      if (tier !== "core" && showIds.length > 0) {
+        const [setlists, songsPlayed, performancesPlayed] = await Promise.all([
+          services.setlists.findManyByShowIds(showIds, { sort: [{ field: "date", direction: "desc" }] }),
+          services.musicians.findSongsPlayed(musician.id),
+          services.musicians.findPerformances(musician.id),
+        ]);
+        // A drummer's everyday shows are implied by their era; only out-of-era
+        // appearances (sit-ins before or after their tenure) are notable, so every
+        // table is filtered to out-of-era for drummers and left whole otherwise.
+        const era = tier === "drummer" ? DRUMMER_ERAS[slug] : undefined;
+        const visibleSetlists = era
+          ? setlists.filter((setlist) => isOutsideEra(new Date(setlist.show.date), era))
+          : setlists;
+        performances = era
+          ? performancesPlayed.filter((performance) => isOutsideEra(new Date(performance.date), era))
+          : performancesPlayed;
+        songs = era ? aggregatePerformances(performances) : songsPlayed;
+        shows = visibleSetlists.map((setlist) => ({
+          showId: setlist.show.id,
+          slug: setlist.show.slug,
+          date: setlist.show.date,
+          venueName: setlist.venue.name,
+          venueCity: setlist.venue.city,
+          venueState: setlist.venue.state,
+        }));
+      }
 
-  return {
-    musician: { ...musician, defaultInstrument },
-    tier,
-    stats: { showCount: showIds.length, songCount },
-    firstShow,
-    lastShow,
-    shows,
-    songs,
-    performances,
-  };
+      return {
+        musician: { ...musician, defaultInstrument },
+        tier,
+        stats: { showCount: showIds.length, songCount },
+        firstShow,
+        lastShow,
+        shows,
+        songs,
+        performances,
+        authorId: musician.authorId,
+        songsWritten,
+      };
+    },
+    { ttl: 86400 },
+  );
 });
+
+export function meta({ data }: { data?: LoaderData }) {
+  if (!data) return [];
+  return getMusicianMeta({
+    name: data.musician.name,
+    slug: data.musician.slug,
+    knownFrom: data.musician.knownFrom,
+    defaultInstrumentName: data.musician.defaultInstrument?.name ?? null,
+    showCount: data.stats.showCount,
+  });
+}
 
 /** Roll up performances into the aggregated by-song shape (used for drummers,
  *  whose tables are era-scoped so the all-time aggregate doesn't apply). */
@@ -254,7 +299,7 @@ function SongDateVenueCell({ show }: { show: MusicianAppearanceShow | null }) {
 }
 
 export default function MusicianPage() {
-  const { musician, tier, stats, firstShow, lastShow, shows, songs, performances } =
+  const { musician, tier, stats, firstShow, lastShow, shows, songs, performances, authorId, songsWritten } =
     useSerializedLoaderData<LoaderData>();
 
   const showsHeading = tier === "drummer" ? "Shows Outside Their Era" : "Shows";
@@ -291,6 +336,13 @@ export default function MusicianPage() {
           <PerformanceStatBox label="First Performance" show={firstShow} />
           <PerformanceStatBox label="Last Performance" show={lastShow} />
         </dl>
+
+        {authorId && songsWritten.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold text-content-text-primary">Songs Written</h2>
+            <FilteredSongsTable songs={songsWritten} pinnedAuthorId={authorId} />
+          </section>
+        )}
 
         {tier === "core" ? (
           <div className="glass-content rounded-lg p-6 text-content-text-secondary">

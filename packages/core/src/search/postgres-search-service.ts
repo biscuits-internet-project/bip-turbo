@@ -205,18 +205,27 @@ export class PostgresSearchService {
 
     const songs = await this.db.song.findMany({
       where: { id: { in: songIds } },
-      include: { author: true },
+      include: {
+        songAuthors: {
+          select: { position: true, author: { select: { name: true } } },
+          orderBy: { position: "asc" },
+        },
+      },
     });
 
-    // Sort by original search order and add authorName
+    // Sort by original search order and add authorName (comma-joined author names)
     const songMap = new Map(songs.map((s) => [s.id, s]));
     return songIds
       .map((id) => songMap.get(id))
       .filter((s): s is NonNullable<typeof s> => s !== undefined)
-      .map((s) => ({
-        ...s,
-        authorName: s.author?.name || null,
-      }));
+      .map((s) => {
+        const authorName =
+          s.songAuthors
+            .map((sa) => sa.author.name)
+            .filter(Boolean)
+            .join(", ") || null;
+        return { ...s, authorName };
+      });
   }
 
   async searchVenues(query: string, limit: number = 50) {

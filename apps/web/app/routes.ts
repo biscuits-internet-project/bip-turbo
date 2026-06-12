@@ -30,6 +30,8 @@ export default [
     ...prefix("musicians", [index("routes/musicians/index.tsx"), route(":slug", "routes/musicians/$slug.tsx")]),
   ]),
 
+  layout("routes/authors/_layout.tsx", [...prefix("authors", [route(":slug", "routes/authors/$slug.tsx")])]),
+
   // Resources routes with layout
   layout("routes/resources/_layout.tsx", [
     ...prefix("resources", [

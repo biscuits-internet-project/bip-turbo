@@ -29,7 +29,6 @@ export type SongPagePerformance = {
   songTitle?: string;
   songSlug?: string;
   kind?: SongKind | null;
-  authorId?: string | null;
   duration?: number | null;
   durationSource?: string | null;
   gap?: number | null;

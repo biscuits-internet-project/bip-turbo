@@ -1,4 +1,4 @@
-import { type Logger, narrowSongKind, type Song, type SongKind, type TrendingSong } from "@bip/domain";
+import { type Logger, narrowSongKind, type Song, type SongAuthor, type SongKind, type TrendingSong } from "@bip/domain";
 import type { DbClient, DbSong } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -10,6 +10,7 @@ export interface SongFilter {
   title?: string;
   startDate?: Date;
   endDate?: Date;
+  // Filter to songs that have this author among their authors.
   authorId?: string;
   kind?: SongKind;
   attendedUserId?: string;
@@ -24,14 +25,50 @@ export interface CreateSongInput {
   history?: string | null;
   featuredLyric?: string | null;
   guitarTabsUrl?: string | null;
-  authorId?: string | null;
+  // Ordered author ids; position is the array index.
+  authorIds?: string[];
 }
 
 export type UpdateSongInput = Partial<CreateSongInput>;
 
+// Include that hydrates a song's ordered authors plus, for each, the slug of any
+// musician they're linked to (so the UI can link the name to that musician page).
+const songAuthorsInclude = {
+  songAuthors: {
+    include: { author: { include: { musicians: { select: { slug: true } } } } },
+    orderBy: { position: "asc" as const },
+  },
+};
+
+type DbAuthorRow = { id: string; name: string | null; slug: string; musicians?: { slug: string }[] };
+type DbSongAuthorRow = { position: number; author: DbAuthorRow };
+type DbSongWithAuthors = DbSong & { songAuthors?: DbSongAuthorRow[] };
+
+function mapAuthors(songAuthors: DbSongAuthorRow[] | undefined): SongAuthor[] {
+  if (!songAuthors) return [];
+  return [...songAuthors]
+    .sort((a, b) => a.position - b.position)
+    .map((row) => ({
+      id: row.author.id,
+      name: row.author.name ?? "",
+      slug: row.author.slug,
+      musicianSlug: row.author.musicians?.[0]?.slug ?? null,
+    }));
+}
+
 // Mapper function
-function mapSongToDomainEntity(dbSong: DbSong): Song {
-  const { createdAt, updatedAt, dateLastPlayed, dateFirstPlayed, yearlyPlayData, longestGapsData, ...rest } = dbSong;
+function mapSongToDomainEntity(dbSong: DbSongWithAuthors): Song {
+  const {
+    createdAt,
+    updatedAt,
+    dateLastPlayed,
+    dateFirstPlayed,
+    yearlyPlayData,
+    longestGapsData,
+    songAuthors,
+    ...rest
+  } = dbSong;
+  const authors = mapAuthors(songAuthors);
 
   return {
     ...rest,
@@ -56,6 +93,8 @@ function mapSongToDomainEntity(dbSong: DbSong): Song {
     yearlyPlayData: yearlyPlayData as Record<string, unknown>,
     longestGapsData: longestGapsData as Record<string, unknown>,
     kind: narrowSongKind(dbSong.kind),
+    authors,
+    authorName: authors.length ? authors.map((a) => a.name).join(", ") : null,
   };
 }
 
@@ -68,6 +107,7 @@ export class SongService {
   async findById(id: string): Promise<Song | null> {
     const result = await this.db.song.findUnique({
       where: { id },
+      include: songAuthorsInclude,
     });
 
     if (!result) return null;
@@ -77,19 +117,12 @@ export class SongService {
   async findBySlug(slug: string): Promise<Song | null> {
     const result = await this.db.song.findUnique({
       where: { slug },
-      include: {
-        author: true,
-      },
+      include: songAuthorsInclude,
     });
 
     if (!result) return null;
 
-    const song = mapSongToDomainEntity(result);
-    if (result.author) {
-      song.authorName = result.author.name;
-    }
-
-    return song;
+    return mapSongToDomainEntity(result);
   }
 
   async findMany(filter: SongFilter): Promise<Song[]> {
@@ -98,7 +131,8 @@ export class SongService {
       return this.findManyInDateRange(filter);
     }
 
-    const { attendedUserId: _, ...dbFilter } = filter;
+    // authorId is no longer a Song scalar; it filters via the song_authors join.
+    const { attendedUserId: _, authorId, ...dbFilter } = filter;
     const queryOptions: QueryOptions<Song> = {
       filters: Object.entries(dbFilter).map(([field, value]) => ({
         field: field as keyof Song,
@@ -108,6 +142,7 @@ export class SongService {
     };
 
     const where = queryOptions.filters ? buildWhereClause(queryOptions.filters) : {};
+    if (authorId) (where as Record<string, unknown>).songAuthors = { some: { authorId } };
     const orderBy = queryOptions.sort ? buildOrderByClause(queryOptions.sort) : [{ timesPlayed: "desc" }];
     const skip =
       queryOptions.pagination?.page && queryOptions.pagination?.limit
@@ -120,13 +155,14 @@ export class SongService {
       orderBy,
       skip,
       take,
+      include: songAuthorsInclude,
     });
 
-    return results.map((result: DbSong) => mapSongToDomainEntity(result));
+    return results.map((result) => mapSongToDomainEntity(result));
   }
 
   async findManyInDateRange(filter: SongFilter): Promise<Song[]> {
-    const { startDate, endDate, attendedUserId, ...restFilter } = filter;
+    const { startDate, endDate, attendedUserId, authorId, ...restFilter } = filter;
 
     const queryOptions: QueryOptions<Song> = {
       filters: Object.entries(restFilter).map(([field, value]) => ({
@@ -137,8 +173,10 @@ export class SongService {
     };
 
     const where = queryOptions.filters ? buildWhereClause(queryOptions.filters) : {};
-    const songs: DbSong[] = await this.db.song.findMany({
+    if (authorId) (where as Record<string, unknown>).songAuthors = { some: { authorId } };
+    const songs = await this.db.song.findMany({
       where,
+      include: songAuthorsInclude,
     });
 
     // Build show filter for tracks query. The STATS_SHOWS_WHERE prefix
@@ -235,9 +273,10 @@ export class SongService {
       orderBy,
       skip,
       take,
+      include: songAuthorsInclude,
     });
 
-    return results.map((result: DbSong) => mapSongToDomainEntity(result));
+    return results.map((result) => mapSongToDomainEntity(result));
   }
 
   async findTrendingLastXShows(lastXShows: number, limit: number): Promise<TrendingSong[]> {
@@ -258,11 +297,11 @@ export class SongService {
     // Find tracks from these shows and count songs
     const tracks = await this.db.track.findMany({
       where: { showId: { in: showIds } },
-      include: { song: true },
+      include: { song: { include: songAuthorsInclude } },
     });
 
     // Count occurrences of each song
-    const songCounts = new Map<string, { song: DbSong; count: number }>();
+    const songCounts = new Map<string, { song: DbSongWithAuthors; count: number }>();
 
     for (const track of tracks) {
       if (!track.song) continue;
@@ -290,32 +329,43 @@ export class SongService {
   }
 
   async create(input: CreateSongInput): Promise<Song> {
+    const { authorIds, ...rest } = input;
     const slug = slugify(input.title);
     const now = new Date();
     const result = await this.db.song.create({
       data: {
-        ...input,
+        ...rest,
         slug,
         createdAt: now,
         updatedAt: now,
         yearlyPlayData: {},
         longestGapsData: {},
         timesPlayed: 0,
+        ...(authorIds?.length
+          ? { songAuthors: { create: authorIds.map((authorId, position) => ({ authorId, position })) } }
+          : {}),
       },
+      include: songAuthorsInclude,
     });
 
     return mapSongToDomainEntity(result);
   }
 
   async update(slug: string, input: UpdateSongInput): Promise<Song> {
+    const { authorIds, ...rest } = input;
     const now = new Date();
     const result = await this.db.song.update({
       where: { slug },
       data: {
-        ...input,
+        ...rest,
         updatedAt: now,
         ...(input.title ? { slug: slugify(input.title) } : {}),
+        // Replace the full author set when authorIds is provided (ordered by index).
+        ...(authorIds !== undefined
+          ? { songAuthors: { deleteMany: {}, create: authorIds.map((authorId, position) => ({ authorId, position })) } }
+          : {}),
       },
+      include: songAuthorsInclude,
     });
 
     return mapSongToDomainEntity(result);

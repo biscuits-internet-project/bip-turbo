@@ -1,5 +1,5 @@
 import type { Musician, ShowLineupMember } from "@bip/domain";
-import { Edit2, Plus, Trash2 } from "lucide-react";
+import { Edit2, Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { InstrumentSearch } from "~/components/musician/instrument-search";
@@ -7,6 +7,7 @@ import { MusicianSearch } from "~/components/musician/musician-search";
 import { ShowLineupSection } from "~/components/show/show-lineup-section";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { MultiEntityPicker } from "~/components/ui/multi-entity-picker";
 import { sortLineup } from "~/lib/musicians-constants";
 
 interface LineupRow {
@@ -152,14 +153,14 @@ export function ShowLineupManager({ showId, initialLineup }: ShowLineupManagerPr
         </div>
       </CardHeader>
       <CardContent className="space-y-1.5 pb-3">
-        <ul className="space-y-2 sm:space-y-1.5">
-          {rows.map((row) => (
-            // Bordered block on mobile so each member's stacked pickers read as a
-            // group; collapses to a single inline row on sm+.
-            <li
-              key={row.uid}
-              className="flex flex-wrap items-center gap-1.5 rounded-md border border-glass-border/30 p-2 sm:rounded-none sm:border-0 sm:p-0"
-            >
+        <MultiEntityPicker
+          rows={rows}
+          onAdd={addRow}
+          onRemove={removeRow}
+          addAriaLabel="Add musician"
+          removeAriaLabel="Remove musician"
+          renderRow={(row) => (
+            <>
               <MusicianSearch
                 value={row.musicianId || null}
                 onValueChange={(id) => setMusician(row.uid, id)}
@@ -187,19 +188,9 @@ export function ShowLineupManager({ showId, initialLineup }: ShowLineupManagerPr
                   className="h-8 w-full sm:w-32"
                 />
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Remove musician"
-                onClick={() => removeRow(row.uid)}
-                className="ml-auto h-8 w-8 shrink-0 sm:ml-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
+            </>
+          )}
+        />
       </CardContent>
     </Card>
   );

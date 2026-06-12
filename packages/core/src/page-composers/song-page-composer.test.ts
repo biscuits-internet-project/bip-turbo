@@ -279,19 +279,17 @@ describe("transformToSongPagePerformanceView", () => {
   });
 
   // When the DTO includes song-level fields (from the songs table join in
-  // buildAllTimers), kind and authorId are mapped to the view.
-  test("maps song_kind and song_author_id to kind and authorId", () => {
-    const view = transformToSongPagePerformanceView(makeDto({ song_kind: "cover", song_author_id: "author-1" }));
+  // buildAllTimers), kind is mapped to the view.
+  test("maps song_kind to kind", () => {
+    const view = transformToSongPagePerformanceView(makeDto({ song_kind: "cover" }));
     expect(view.kind).toBe("cover");
-    expect(view.authorId).toBe("author-1");
   });
 
   // When song-level fields are absent (build() path where songs isn't
-  // joined), kind and authorId default to null.
-  test("kind is null and authorId is null when song fields are absent", () => {
+  // joined), kind defaults to null.
+  test("kind is null when song fields are absent", () => {
     const view = transformToSongPagePerformanceView(makeDto());
     expect(view.kind).toBeNull();
-    expect(view.authorId).toBeNull();
   });
 
   // Null optional scalars map to `undefined` (via `|| undefined` in the
@@ -637,7 +635,7 @@ describe("CacheKeys.songs.jamCharts", () => {
   // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
   // bumped together with the rest of the songs cache family.
   test("returns a stable, versioned key string", () => {
-    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v7");
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v8");
   });
 });
 
@@ -1006,7 +1004,7 @@ describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v6");
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v7");
   });
 
   // The on-this-day counts cache key is used by the home page to cache

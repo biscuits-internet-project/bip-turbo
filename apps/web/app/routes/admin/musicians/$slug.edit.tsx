@@ -50,6 +50,7 @@ export default function EditMusician() {
         name: musician.name,
         knownFrom: musician.knownFrom ?? "",
         defaultInstrumentId: musician.defaultInstrumentId,
+        authorId: musician.authorId,
       });
       setIsLoading(false);
     }

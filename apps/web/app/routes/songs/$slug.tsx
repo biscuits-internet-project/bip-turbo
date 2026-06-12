@@ -5,6 +5,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
+import { AuthorLinks } from "~/components/author/author-link";
 import { PerformanceTable } from "~/components/performance";
 import { PerformanceFilterControls } from "~/components/performance/performance-filter-controls";
 import { RatingComponent } from "~/components/rating";
@@ -264,14 +265,14 @@ export default function SongPage() {
             </AdminOnly>
           }
         />
-        {(song.authorName || song.kind) && (
-          <div className="flex flex-wrap items-baseline justify-center gap-x-3 text-content-text-secondary text-lg">
-            {song.authorName && (
+        {(song.authors.length > 0 || song.kind) && (
+          <div className="flex flex-col items-center gap-1 text-content-text-secondary text-lg">
+            {song.kind && <span className="text-content-text-tertiary">{song.kind}</span>}
+            {song.authors.length > 0 && (
               <span>
-                by <span className="text-brand-primary">{song.authorName}</span>
+                by <AuthorLinks authors={song.authors} className="text-brand-primary hover:underline" />
               </span>
             )}
-            {song.kind && <span className="text-content-text-tertiary">{song.kind}</span>}
           </div>
         )}
       </div>
