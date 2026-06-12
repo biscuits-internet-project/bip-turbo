@@ -93,6 +93,10 @@ export class CacheInvalidationService {
       // changes, neighbors' annotations (rank/prev/next) shift — wipe
       // every show.data so the next request rebuilds with fresh data.
       this.cache.delPattern(CacheKeys.show.allData()),
+      // Musician profile pages aggregate appearances/songs across shows; a show
+      // mutation can change their stats and tables. (Author pages key off song
+      // data, refreshed via invalidateSongCaches.)
+      this.cache.delPattern(CacheKeys.musicians.allPages()),
       dedupedYears.length > 0 ? this.cloudflareCache?.purgeYearListings(dedupedYears) : Promise.resolve(),
     ]);
   }
@@ -115,7 +119,14 @@ export class CacheInvalidationService {
    */
   async invalidateSongCaches(): Promise<void> {
     this.logger.info("Invalidating all song caches");
-    await Promise.all([this.cache.del(CacheKeys.songs.index()), this.cache.delPattern(CacheKeys.songs.allFiltered())]);
+    await Promise.all([
+      this.cache.del(CacheKeys.songs.index()),
+      this.cache.delPattern(CacheKeys.songs.allFiltered()),
+      // Musician/author profile pages embed song lists (Songs Written / the
+      // author's songs), so a song or authorship change can stale them.
+      this.cache.delPattern(CacheKeys.musicians.allPages()),
+      this.cache.delPattern(CacheKeys.authors.allPages()),
+    ]);
   }
 
   /**

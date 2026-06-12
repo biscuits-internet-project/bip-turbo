@@ -97,17 +97,17 @@ export class AuthorService {
     const results = await this.db.author.findMany({
       include: {
         _count: {
-          select: { songs: true },
+          select: { songAuthors: true },
         },
       },
       orderBy: {
-        songs: { _count: "desc" },
+        songAuthors: { _count: "desc" },
       },
     });
 
     return results.map((result) => ({
       ...mapAuthorToDomainEntity(result),
-      songCount: result._count.songs,
+      songCount: result._count.songAuthors,
     }));
   }
 
@@ -214,7 +214,7 @@ export class AuthorService {
   // Number of songs attributed to an author — drives the delete guard and the
   // UI's decision to hide the delete affordance.
   async countSongs(id: string): Promise<number> {
-    return this.db.song.count({ where: { authorId: id } });
+    return this.db.songAuthor.count({ where: { authorId: id } });
   }
 
   async delete(id: string): Promise<boolean> {

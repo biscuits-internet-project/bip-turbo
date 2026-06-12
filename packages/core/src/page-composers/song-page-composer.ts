@@ -171,7 +171,6 @@ export class SongPageComposer {
     const performances = result.map((row) => ({
       ...this.transformToSongPagePerformanceView(row),
       kind: song.kind ?? undefined,
-      authorId: song.authorId ?? null,
       // Single-song rows skip the song join; fill in title/slug from the
       // page's song context so cross-song renderers (e.g. the
       // noteworthy-track popover header) see a populated title.
@@ -303,7 +302,6 @@ export class SongPageComposer {
     const performances = result.map((row) => ({
       ...this.transformToSongPagePerformanceView(row),
       kind: song.kind ?? undefined,
-      authorId: song.authorId ?? null,
       // The per-song composer queries without a song join (the song is
       // already known), so the raw rows don't carry song_title/song_slug.
       // Fill them in from the page's song context so downstream renderers
@@ -481,7 +479,12 @@ export class SongPageComposer {
     endDate: (o) =>
       o.endDate ? { condition: Prisma.sql`shows.date <= ${o.endDate.toISOString().slice(0, 10)}` } : null,
     kind: (o) => (o.kind ? { condition: Prisma.sql`songs.kind = ${o.kind}` } : null),
-    authorId: (o) => (o.authorId ? { condition: Prisma.sql`songs.author_id = ${o.authorId}::uuid` } : null),
+    authorId: (o) =>
+      o.authorId
+        ? {
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM song_authors sa WHERE sa.song_id = tracks.song_id AND sa.author_id = ${o.authorId}::uuid)`,
+          }
+        : null,
     attendedUserId: (o) =>
       o.attendedUserId
         ? {
@@ -577,7 +580,7 @@ export class SongPageComposer {
     extraJoins?: Prisma.Sql[];
   }): Promise<PerformanceDto[]> {
     const songColumns = options.includeSongInfo
-      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug, songs.kind as song_kind, songs.author_id as song_author_id`
+      ? Prisma.sql`, songs.title as song_title, songs.slug as song_slug, songs.kind as song_kind`
       : Prisma.empty;
     const songJoin = options.includeSongInfo ? Prisma.sql`JOIN songs ON tracks.song_id = songs.id` : Prisma.empty;
     const extraJoinsSql =
@@ -897,7 +900,6 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     set: row.set,
     position: row.position,
     kind: narrowSongKind(row.song_kind),
-    authorId: row.song_author_id ?? null,
     duration: row.duration ?? null,
     durationSource: row.duration_source ?? null,
     gap: row.gap,
@@ -1002,12 +1004,10 @@ export type PerformanceDto = {
 
   // Song fields (present when songs table is joined)
   song_kind?: string | null;
-  song_author_id?: string | null;
 };
 
 type AllTimerPerformanceDto = PerformanceDto & {
   song_title: string;
   song_slug: string;
   song_kind: string | null;
-  song_author_id: string | null;
 };

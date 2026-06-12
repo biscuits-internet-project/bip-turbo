@@ -3,6 +3,7 @@ import type { ControllerRenderProps } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { EntityForm } from "~/components/admin/entity-form";
+import { AuthorSearch } from "~/components/author/author-search";
 import { InstrumentSearch } from "~/components/musician/instrument-search";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
@@ -12,6 +13,8 @@ export const musicianFormSchema = z.object({
   name: z.string().min(1, "Musician name is required"),
   knownFrom: z.string().optional(),
   defaultInstrumentId: z.string().nullable().optional(),
+  // Links this musician to their author row so their page can list songs they wrote.
+  authorId: z.string().nullable().optional(),
 });
 
 export type MusicianFormValues = z.infer<typeof musicianFormSchema>;
@@ -29,6 +32,7 @@ export function MusicianForm({ defaultValues, submitLabel, cancelHref }: Musicia
       name: "",
       knownFrom: "",
       defaultInstrumentId: null,
+      authorId: null,
     },
   });
 
@@ -75,6 +79,24 @@ export function MusicianForm({ defaultValues, submitLabel, cancelHref }: Musicia
             <FormLabel className="text-content-text-secondary">Default Instrument</FormLabel>
             <FormControl>
               <InstrumentSearch value={field.value} onValueChange={field.onChange} allowCreate />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="authorId"
+        render={({ field }: { field: ControllerRenderProps<MusicianFormValues, "authorId"> }) => (
+          <FormItem>
+            <FormLabel className="text-content-text-secondary">Linked Author</FormLabel>
+            <FormControl>
+              <AuthorSearch
+                value={field.value}
+                onValueChange={field.onChange}
+                placeholder="Link to an author (for songs written)..."
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

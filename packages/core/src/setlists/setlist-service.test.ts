@@ -652,8 +652,8 @@ describe("SetlistService.findByShowSlug", () => {
   });
 
   // A cover-debut footnote names the original artist, so authorName must flow
-  // from the joined Author relation onto the track's song.
-  test("flattens authorName from the joined author onto the track", async () => {
+  // from the joined authors onto the track's song, comma-joined in position order.
+  test("flattens authorName from the joined authors onto the track", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
     db.show.findUnique.mockResolvedValue({
@@ -704,7 +704,10 @@ describe("SetlistService.findByShowSlug", () => {
             guitarTabsUrl: null,
             dateLastPlayed: null,
             dateFirstPlayed: null,
-            author: { name: "Chris Lorenzo" },
+            songAuthors: [
+              { position: 0, author: { id: "a-1", name: "Chris Lorenzo", slug: "chris-lorenzo" } },
+              { position: 1, author: { id: "a-2", name: "Eats Everything", slug: "eats-everything" } },
+            ],
           },
           annotations: [],
         },
@@ -722,7 +725,8 @@ describe("SetlistService.findByShowSlug", () => {
 
     const setlist = await service.findByShowSlug("2026-03-20");
     const track = setlist?.sets.flatMap((s) => s.tracks).find((t) => t.id === "t-1");
-    expect(track?.song?.authorName).toBe("Chris Lorenzo");
+    expect(track?.song?.authorName).toBe("Chris Lorenzo, Eats Everything");
+    expect(track?.song?.authors.map((a) => a.name)).toEqual(["Chris Lorenzo", "Eats Everything"]);
   });
 });
 
@@ -784,7 +788,14 @@ describe("SetlistService.findMany stub filtering", () => {
 
     const call = db.show.findMany.mock.calls[0][0];
     const trackInclude = call.include.tracks.include;
-    expect(trackInclude.song).toEqual({ include: { author: { select: { name: true } } } });
+    expect(trackInclude.song).toEqual({
+      include: {
+        songAuthors: {
+          select: { position: true, author: { select: { id: true, name: true, slug: true } } },
+          orderBy: { position: "asc" },
+        },
+      },
+    });
     expect(trackInclude.trackFlags).toBeDefined();
     expect(trackInclude.segueRecurrences).toBeDefined();
     expect(trackInclude.completionsAsLater).toBeDefined();

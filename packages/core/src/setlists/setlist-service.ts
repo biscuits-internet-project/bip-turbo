@@ -15,6 +15,7 @@ import {
   type SetlistLight,
   type Show,
   type ShowLineupMember,
+  type SongAuthor,
   type Track,
   type TrackFlag,
   type TrackLight,
@@ -110,7 +111,7 @@ type DbTrackLight = {
     title: string;
     slug: string;
     kind: string | null;
-    author: { name: string | null } | null;
+    songAuthors?: SongAuthorRow[];
   } | null;
   annotations: DbAnnotation[];
 };
@@ -323,9 +324,36 @@ export function gateSegueRecurrences(
   return out;
 }
 
+// One song-author row as included for setlist queries (ordered by position).
+type SongAuthorRow = { position: number; author: { id: string; name: string | null; slug: string } };
+
+// Hydrate a song's ordered authors for setlist track mapping.
+function mapSongAuthors(songAuthors: SongAuthorRow[] | undefined): SongAuthor[] {
+  if (!songAuthors) return [];
+  return [...songAuthors]
+    .sort((a, b) => a.position - b.position)
+    .map((row) => ({ id: row.author.id, name: row.author.name ?? "", slug: row.author.slug }));
+}
+
+// Comma-joined author names for footnote / debut text, or null when none.
+function joinAuthorNames(songAuthors: SongAuthorRow[] | undefined): string | null {
+  const names = mapSongAuthors(songAuthors)
+    .map((a) => a.name)
+    .filter(Boolean);
+  return names.length ? names.join(", ") : null;
+}
+
+// Ordered song authors for setlist song shapes. Includes each author's id/name/slug.
+const SONG_AUTHORS_SETLIST_INCLUDE = {
+  songAuthors: {
+    select: { position: true, author: { select: { id: true, name: true, slug: true } } },
+    orderBy: { position: "asc" as const },
+  },
+} as const;
+
 export function mapTrackToDomainEntity(
   dbTrack: DbTrack & {
-    song: (DbSong & { author?: { name: string | null } | null }) | null;
+    song: (DbSong & { songAuthors?: SongAuthorRow[] }) | null;
     previousPerformanceShow?: { date: string; slug: string | null } | null;
     trackFlags?: {
       flag: TrackFlag;
@@ -431,8 +459,8 @@ export function mapTrackToDomainEntity(
           longestGapShows: null,
           createdAt: new Date(dbTrack.song.createdAt),
           updatedAt: new Date(dbTrack.song.updatedAt),
-          authorId: dbTrack.song.authorId,
-          authorName: dbTrack.song.author?.name ?? null,
+          authors: mapSongAuthors(dbTrack.song.songAuthors),
+          authorName: joinAuthorNames(dbTrack.song.songAuthors),
         }
       : undefined,
   };
@@ -623,7 +651,7 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
           title: track.song.title,
           slug: track.song.slug,
           kind: narrowSongKind(track.song.kind),
-          authorName: track.song.author?.name ?? null,
+          authorName: joinAuthorNames(track.song.songAuthors),
         }
       : undefined,
   };
@@ -746,7 +774,7 @@ const TRACK_FLAGS_AND_COMPLETIONS_INCLUDE = {
 // Used by the track editor's post-save readers so a flag / completion change
 // can refresh its read-only footnotes without a full setlist reload.
 export const TRACK_FOOTNOTE_INCLUDE = {
-  song: { include: { author: { select: { name: true } } } },
+  song: { include: { ...SONG_AUTHORS_SETLIST_INCLUDE } },
   previousPerformanceShow: { select: { date: true, slug: true } },
   ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
 } as const;
@@ -760,7 +788,7 @@ export const TRACK_FOOTNOTE_INCLUDE = {
 const HEAVY_SETLIST_INCLUDE = {
   tracks: {
     include: {
-      song: { include: { author: { select: { name: true } } } },
+      song: { include: { ...SONG_AUTHORS_SETLIST_INCLUDE } },
       annotations: true,
       previousPerformanceShow: { select: { date: true, slug: true } },
       ...TRACK_PERFORMER_INCLUDE,
@@ -1011,7 +1039,7 @@ export class SetlistService {
                 title: true,
                 slug: true,
                 kind: true,
-                author: { select: { name: true } },
+                ...SONG_AUTHORS_SETLIST_INCLUDE,
               },
             },
             annotations: true,

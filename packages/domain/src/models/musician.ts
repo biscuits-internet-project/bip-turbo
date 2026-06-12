@@ -16,6 +16,8 @@ export const musicianSchema = z.object({
   slug: z.string(),
   knownFrom: z.string().nullable(),
   defaultInstrumentId: z.string().uuid().nullable(),
+  // The author row this musician corresponds to, for listing songs they wrote.
+  authorId: z.string().uuid().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

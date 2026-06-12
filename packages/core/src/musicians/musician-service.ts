@@ -23,6 +23,7 @@ export interface CreateMusicianInput {
   name: string;
   knownFrom?: string | null;
   defaultInstrumentId?: string | null;
+  authorId?: string | null;
 }
 
 export type UpdateMusicianInput = Partial<CreateMusicianInput>;
@@ -44,6 +45,7 @@ function mapMusicianToDomainEntity(db: DbMusician): Musician {
     slug: db.slug,
     knownFrom: db.knownFrom ?? null,
     defaultInstrumentId: db.defaultInstrumentId ?? null,
+    authorId: db.authorId ?? null,
     createdAt: new Date(db.createdAt),
     updatedAt: new Date(db.updatedAt),
   };
@@ -218,6 +220,13 @@ export class MusicianService {
 
   async findBySlug(slug: string): Promise<Musician | null> {
     const result = await this.db.musician.findUnique({ where: { slug } });
+    return result ? mapMusicianToDomainEntity(result) : null;
+  }
+
+  /** The musician linked to an author, if any — lets the author page redirect to
+   *  the canonical musician page when one exists. */
+  async findByAuthorId(authorId: string): Promise<Musician | null> {
+    const result = await this.db.musician.findFirst({ where: { authorId } });
     return result ? mapMusicianToDomainEntity(result) : null;
   }
 
@@ -624,6 +633,7 @@ export class MusicianService {
       slug?: string;
       knownFrom?: string | null;
       defaultInstrumentId?: string | null;
+      authorId?: string | null;
       updatedAt: Date;
     } = { updatedAt: new Date() };
 
@@ -641,6 +651,9 @@ export class MusicianService {
     }
     if (data.defaultInstrumentId !== undefined) {
       updateData.defaultInstrumentId = data.defaultInstrumentId ?? null;
+    }
+    if (data.authorId !== undefined) {
+      updateData.authorId = data.authorId ?? null;
     }
 
     const result = await this.db.musician.update({

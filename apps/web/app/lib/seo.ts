@@ -257,6 +257,75 @@ export function getVenueMeta(venue: Venue & { showCount?: number; firstShowYear?
   ];
 }
 
+// Generate meta tags for an author detail page (songs written by this author)
+export function getAuthorMeta(author: { name: string; slug: string; songCount?: number }) {
+  const title = `${author.name} | ${SEO_CONFIG.siteName}`;
+  const songLine =
+    author.songCount && author.songCount > 0 ? `${author.songCount} song${author.songCount === 1 ? "" : "s"} ` : "";
+  const description =
+    `Songs credited to ${author.name} in the ${SEO_CONFIG.bandName} catalog. ${songLine}with play counts and performance history.`.replace(
+      /\s+/g,
+      " ",
+    );
+  const url = `${SEO_CONFIG.url}/authors/${author.slug}`;
+  const keywords = [...SEO_CONFIG.keywords, author.name, "songwriter", "author"].filter(Boolean);
+
+  return [
+    { title },
+    { name: "description", content: description },
+    { name: "keywords", content: keywords.join(", ") },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { property: "og:url", content: url },
+    { name: "twitter:title", content: title },
+    { name: "twitter:description", content: description },
+    { link: { rel: "canonical", href: url } },
+  ];
+}
+
+// Generate meta tags for a musician detail page
+export function getMusicianMeta(musician: {
+  name: string;
+  slug: string;
+  knownFrom?: string | null;
+  defaultInstrumentName?: string | null;
+  showCount?: number;
+}) {
+  const title = `${musician.name} | ${SEO_CONFIG.siteName}`;
+  const instrument = musician.defaultInstrumentName ? ` (${musician.defaultInstrumentName})` : "";
+  const knownFrom = musician.knownFrom ? `, of ${musician.knownFrom},` : "";
+  const showLine =
+    musician.showCount && musician.showCount > 0
+      ? `${musician.showCount} appearance${musician.showCount === 1 ? "" : "s"} `
+      : "";
+  const description =
+    `${musician.name}${instrument}${knownFrom} with ${SEO_CONFIG.bandName}. ${showLine}plus the songs they played and wrote, with performance history.`.replace(
+      /\s+/g,
+      " ",
+    );
+  const url = `${SEO_CONFIG.url}/musicians/${musician.slug}`;
+  const keywords = [
+    ...SEO_CONFIG.keywords,
+    musician.name,
+    "musician",
+    "guest",
+    "sit-in",
+    musician.knownFrom || "",
+  ].filter(Boolean);
+
+  return [
+    { title },
+    { name: "description", content: description },
+    { name: "keywords", content: keywords.join(", ") },
+    { property: "og:title", content: title },
+    { property: "og:description", content: description },
+    { property: "og:url", content: url },
+    { name: "twitter:title", content: title },
+    { name: "twitter:description", content: description },
+    { link: { rel: "canonical", href: url } },
+  ];
+}
+
 // Generate meta tags for blog listing page
 export function getBlogsMeta() {
   const title = `Blog | ${SEO_CONFIG.siteName}`;

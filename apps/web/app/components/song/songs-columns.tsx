@@ -3,6 +3,7 @@ import type { ColumnDef, SortingFn } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown, Filter } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { AuthorLink } from "~/components/author/author-link";
 import { ShowDate } from "~/components/show-date";
 import { Button } from "~/components/ui/button";
 import { NumberCell } from "~/components/ui/number-cell";
@@ -230,6 +231,27 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         {song.title}
       </Link>
     ),
+  });
+
+  const authorColumn = makeSortableColumn({
+    reservesIconRow: showFilteredPlays,
+    // Sorts on the derived comma-joined names; the cell stacks the individual
+    // authors one per line, each linked to their musician or author page.
+    // A flex column like the title/date columns (not fixed).
+    accessorKey: "authorName",
+    weight: 0.7,
+    hideOnMobile: true,
+    label: <HeaderLabel reserveIconRow={showFilteredPlays}>Author</HeaderLabel>,
+    cell: (song) =>
+      song.authors.length > 0 ? (
+        <div className="flex flex-col text-sm">
+          {song.authors.map((author) => (
+            <AuthorLink key={author.id} author={author} className="text-brand-primary hover:text-brand-secondary" />
+          ))}
+        </div>
+      ) : (
+        <span className="text-content-text-tertiary text-sm">—</span>
+      ),
   });
 
   const playsColumn = makeSortableColumn({
@@ -478,7 +500,11 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
     cell: (song) => <DateVenueCell date={song.dateFirstFilteredPlayed ?? null} show={song.firstFilteredPlayedShow} />,
   });
 
-  const columns: ColumnDef<SongWithShows>[] = [titleColumn, playsColumn];
+  // Drop the Author column in the dense filtered layout (a time range or other
+  // narrowing filter is active) so the filtered-plays + date columns get the room.
+  const columns: ColumnDef<SongWithShows>[] = showFilteredPlays
+    ? [titleColumn, playsColumn]
+    : [titleColumn, authorColumn, playsColumn];
   if (showFilteredPlays) columns.push(filteredPlaysColumn);
   columns.push(percentSinceDebutColumn);
   if (showFilteredPlays) columns.push(filteredPercentSinceDebutColumn);

@@ -97,15 +97,33 @@ model Audit {
 }
 
 model Author {
-  name      String?  @db.VarChar
-  slug      String   @db.VarChar
-  createdAt DateTime @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  songs     Song[]
+  name        String?      @db.VarChar
+  slug        String       @db.VarChar
+  createdAt   DateTime     @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime     @map("updated_at") @db.Timestamp(6)
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  songAuthors SongAuthor[]
+  musicians   Musician[]
 
   @@index([slug])
   @@map("authors")
+}
+
+model SongAuthor {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  songId    String   @map("song_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  song   Song   @relation(fields: [songId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_song_authors_song_id")
+  author Author @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_song_authors_author_id")
+
+  @@unique([songId, authorId], map: "song_authors_song_author_unique")
+  @@index([songId])
+  @@index([authorId])
+  @@map("song_authors")
 }
 
 model Band {
@@ -398,14 +416,17 @@ model Musician {
   slug                String   @unique(map: "musicians_slug_unique") @db.VarChar
   knownFrom           String?  @map("known_from") @db.VarChar
   defaultInstrumentId String?  @map("default_instrument_id") @db.Uuid
+  authorId            String?  @map("author_id") @db.Uuid
   createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 
   defaultInstrument Instrument?     @relation(fields: [defaultInstrumentId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_musicians_default_instrument_id")
+  author            Author?         @relation(fields: [authorId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_musicians_author_id")
   showMusicians     ShowMusician[]
   trackMusicians    TrackMusician[]
 
   @@index([slug])
+  @@index([authorId])
   @@map("musicians")
 }
 
@@ -521,7 +542,6 @@ model Song {
   tabs            String?
   notes           String?
   kind            String?
-  authorId        String?                  @map("author_id") @db.Uuid
   history         String?
   featuredLyric   String?                  @map("featured_lyric")
   timesPlayed     Int                      @default(0) @map("times_played")
@@ -533,7 +553,7 @@ model Song {
   guitarTabsUrl   String?                  @map("guitar_tabs_url")
   searchText      String?                  @map("search_text") @db.Text
   searchVector    Unsupported("tsvector")? @map("search_vector")
-  author          Author?                  @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_songs_authors_author_id")
+  songAuthors     SongAuthor[]
   tracks          Track[]
 
   @@index([longestGapsData], type: Gin)

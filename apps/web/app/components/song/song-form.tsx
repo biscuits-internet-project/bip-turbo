@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRef, useState } from "react";
 import type { ControllerRenderProps } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { useNavigate, useSubmit } from "react-router-dom";
@@ -8,6 +9,7 @@ import { Button } from "~/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { GlassSelect } from "~/components/ui/glass-select";
 import { Input } from "~/components/ui/input";
+import { MultiEntityPicker, type MultiEntityRow } from "~/components/ui/multi-entity-picker";
 import { Textarea } from "~/components/ui/textarea";
 import { formInputClass } from "~/lib/form-styles";
 import { cn } from "~/lib/utils";
@@ -15,7 +17,7 @@ import { cn } from "~/lib/utils";
 // Create a schema for song form (omitting auto-generated fields)
 export const songFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  authorId: z.string().uuid().nullable(),
+  authorIds: z.array(z.string().uuid()),
   lyrics: z.string().nullable(),
   tabs: z.string().nullable(),
   notes: z.string().nullable(),
@@ -26,6 +28,53 @@ export const songFormSchema = z.object({
 });
 
 export type SongFormValues = z.infer<typeof songFormSchema>;
+
+interface AuthorRow extends MultiEntityRow {
+  authorId: string;
+  autoOpen?: boolean;
+}
+
+/**
+ * Multiple-author editor: one AuthorSearch per author, ordered (position is the
+ * row order). Reports the ordered, non-empty ids up to the form.
+ */
+function AuthorsPicker({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
+  const nextUid = useRef(0);
+  const [rows, setRows] = useState<AuthorRow[]>(() =>
+    value.map((id, index) => ({ uid: `seed-${index}`, authorId: id })),
+  );
+
+  const commit = (next: AuthorRow[]) => {
+    setRows(next);
+    onChange(next.map((row) => row.authorId).filter(Boolean));
+  };
+  const addRow = () => commit([...rows, { uid: `new-${nextUid.current++}`, authorId: "", autoOpen: true }]);
+  const removeRow = (uid: string) => commit(rows.filter((row) => row.uid !== uid));
+  const setAuthor = (uid: string, id: string | null) =>
+    commit(rows.map((row) => (row.uid === uid ? { ...row, authorId: id ?? "" } : row)));
+
+  return (
+    <MultiEntityPicker
+      rows={rows}
+      onAdd={addRow}
+      onRemove={removeRow}
+      label="Authors"
+      addAriaLabel="Add author"
+      removeAriaLabel="Remove author"
+      emptyText="No authors yet."
+      renderRow={(row) => (
+        <AuthorSearch
+          value={row.authorId || null}
+          onValueChange={(id) => setAuthor(row.uid, id)}
+          placeholder="Select or create author..."
+          className="h-8 w-full sm:w-72"
+          allowCreate
+          autoOpen={row.autoOpen}
+        />
+      )}
+    />
+  );
+}
 
 interface SongFormProps {
   defaultValues?: SongFormValues;
@@ -41,7 +90,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
     resolver: zodResolver(songFormSchema),
     defaultValues: defaultValues || {
       title: "",
-      authorId: null,
+      authorIds: [],
       lyrics: null,
       tabs: null,
       notes: null,
@@ -55,7 +104,11 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
   const onSubmit = (data: SongFormValues) => {
     const formData = new FormData();
     for (const [key, value] of Object.entries(data)) {
-      if (value !== null) {
+      if (value === null) continue;
+      if (Array.isArray(value)) {
+        // Repeated fields (authorIds) preserve order; read via formData.getAll.
+        for (const item of value) formData.append(key, item);
+      } else {
         formData.append(key, value.toString());
       }
     }
@@ -81,18 +134,35 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
 
         <FormField
           control={form.control}
-          name="authorId"
-          render={({ field }: { field: ControllerRenderProps<SongFormValues, "authorId"> }) => (
+          name="kind"
+          render={({ field }: { field: ControllerRenderProps<SongFormValues, "kind"> }) => (
             <FormItem>
-              <FormLabel className="text-content-text-secondary">Author</FormLabel>
+              <FormLabel className="text-content-text-secondary">Type</FormLabel>
               <FormControl>
-                <AuthorSearch
-                  value={field.value}
+                <GlassSelect
+                  value={field.value || "original"}
                   onValueChange={field.onChange}
-                  placeholder="Select or create author..."
-                  className="w-full"
-                  allowCreate
+                  options={[
+                    { value: "original", label: "Original" },
+                    { value: "cover", label: "Cover" },
+                    { value: "mashup", label: "Mashup" },
+                    { value: "improvisation", label: "Improvisation" },
+                  ]}
+                  className="w-[200px]"
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="authorIds"
+          render={({ field }: { field: ControllerRenderProps<SongFormValues, "authorIds"> }) => (
+            <FormItem>
+              <FormControl>
+                <AuthorsPicker value={field.value} onChange={field.onChange} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -212,30 +282,6 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
                   className={formInputClass}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="kind"
-          render={({ field }: { field: ControllerRenderProps<SongFormValues, "kind"> }) => (
-            <FormItem>
-              <FormLabel className="text-content-text-secondary">Type</FormLabel>
-              <FormControl>
-                <GlassSelect
-                  value={field.value || "original"}
-                  onValueChange={field.onChange}
-                  options={[
-                    { value: "original", label: "Original" },
-                    { value: "cover", label: "Cover" },
-                    { value: "mashup", label: "Mashup" },
-                    { value: "improvisation", label: "Improvisation" },
-                  ]}
-                  className="w-[200px]"
                 />
               </FormControl>
               <FormMessage />

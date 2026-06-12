@@ -37,7 +37,12 @@ describe("MusicianForm", () => {
       <MusicianForm
         submitLabel="Save"
         cancelHref="/musicians"
-        defaultValues={{ name: "Aron Magner", knownFrom: "Conspirator", defaultInstrumentId: "keys-id" }}
+        defaultValues={{
+          name: "Aron Magner",
+          knownFrom: "Conspirator",
+          defaultInstrumentId: "keys-id",
+          authorId: null,
+        }}
       />,
     );
 
@@ -49,6 +54,7 @@ describe("MusicianForm", () => {
       name: "Aron Magner",
       knownFrom: "Conspirator",
       defaultInstrumentId: "keys-id",
+      authorId: "",
     });
   });
 });
