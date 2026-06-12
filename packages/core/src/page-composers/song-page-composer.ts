@@ -18,9 +18,9 @@ import type { SongService } from "../songs/song-service";
 import type { StatsService } from "../stats/stats-service";
 
 /**
- * Filters for querying performances. All fields are optional — only
- * active filters produce SQL conditions. Used by buildAllTimers and
- * buildSongPerformances to construct dynamic WHERE clauses.
+ * Filters for querying performances. All fields are optional — only active
+ * filters produce SQL conditions, composed into dynamic WHERE clauses by
+ * `buildFilterQuery`.
  */
 /** Per-song aggregates returned by `buildFilteredSongRarity`. */
 export interface FilteredSongRarity {
@@ -46,7 +46,11 @@ export interface PerformanceFilterOptions {
   inverted?: boolean;
   dyslexic?: boolean;
   unfinished?: boolean;
-  /** Narrow to tracks carrying a curated jam-chart note (non-empty). */
+  /**
+   * Narrow to "jam chart" tracks: the curated/noteworthy set — tracks flagged
+   * all-timer OR carrying a non-empty curated note. Drives both the "Jam Chart"
+   * toggle chip and the /songs/jam-charts page scope (they're the same thing).
+   */
   jamChart?: boolean;
   allTimer?: boolean;
   monthDay?: string;
@@ -55,6 +59,13 @@ export interface PerformanceFilterOptions {
    * sat-out delta, OR carrying a present=true sit-in delta on the track.
    */
   playedByMusicianId?: string;
+  /**
+   * Scope the list to a single song by slug. Present → single-song view (the
+   * song-detail performances tab), which also gets per-row filtered Gaps;
+   * absent → cross-song list. Not a "narrowing" filter for the gate/gap checks
+   * (a song scope alone is always allowed).
+   */
+  songSlug?: string;
 }
 
 export class SongPageComposer {
@@ -239,30 +250,41 @@ export class SongPageComposer {
     return Number.parseInt(result[0].count, 10);
   }
 
-  /** Build the all-timers page view, optionally filtered by date range, cover, author, attendance, and performance tags. */
-  async buildAllTimers(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
-    return this.buildCrossSongPerformanceView(Prisma.sql`tracks.all_timer = true`, options);
-  }
-
   /**
-   * Build the Jam Charts page view. Includes any track that is either an
-   * all-timer OR carries a curated note — the union of the two
-   * noteworthy categories surfaced throughout the app. The note column
-   * historically allows empty strings as well as NULL for "no note", so
-   * both are filtered out to match what the UI treats as a real note.
+   * Build a filtered list of song performances — the single backend for the
+   * song-detail tab, all-timers, jam-charts, and the musician page. The shape
+   * is identical; only `options` differs:
+   *  - `songSlug` set → single-song view. Also attaches each row's filtered Gap
+   *    (shows since this song's previous performance within the active filter
+   *    universe), the column the song-detail table renders.
+   *  - no `songSlug` → cross-song list (each row a possibly different song),
+   *    which omits the per-song gap walk and requires a narrowing filter — an
+   *    unscoped, unfiltered query would scan every track ever played, so it
+   *    throws `NeedsNarrowingFilterError` (the API layer maps it to a 400).
    */
-  async buildJamCharts(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
-    return this.buildCrossSongPerformanceView(
-      Prisma.sql`(tracks.all_timer = true OR (tracks.note IS NOT NULL AND tracks.note <> ''))`,
-      options,
-    );
+  async buildSongPerformances(options?: PerformanceFilterOptions): Promise<AllTimersPageView> {
+    const isSingleSong = !!options?.songSlug;
+    if (!isSingleSong && !isNarrowingFilter(options)) throw new NeedsNarrowingFilterError();
+
+    const view = await this.buildCrossSongPerformanceView(Prisma.sql`TRUE`, options);
+
+    // The filtered Gap is per-song, so only the single-song view computes it.
+    // Its universe is every show matching the OTHER (non-song) filters, so the
+    // song scope is stripped before resolving the matching show dates.
+    if (isSingleSong && isNarrowingFilter(options)) {
+      const { songSlug: _songSlug, ...universeFilters } = options ?? {};
+      const matchingShowDates = await this.getFilterMatchingShowDates(universeFilters);
+      assignFilteredGaps(view.performances, matchingShowDates);
+    }
+
+    return view;
   }
 
   /**
-   * Shared body of the cross-song page views (all-timers, jam-charts).
-   * The two endpoints differ only in their base WHERE condition; this
-   * helper composes the rest of the pipeline — filter merging, the
-   * cross-song SELECT with song title/slug, and per-track enrichment.
+   * Shared body of the cross-song performance views. Callers pass a base WHERE
+   * condition (`TRUE` for the fully filter-driven `buildSongPerformances`); this
+   * helper composes the rest of the pipeline — filter merging, the cross-song
+   * SELECT with song title/slug, and per-track enrichment.
    */
   private async buildCrossSongPerformanceView(
     baseCondition: Prisma.Sql,
@@ -284,40 +306,6 @@ export class SongPageComposer {
     await this.enrichPerformances(performances);
 
     return { performances };
-  }
-
-  /** Build a filtered list of performances for a single song. */
-  async buildSongPerformances(songSlug: string, options?: PerformanceFilterOptions): Promise<SongPagePerformance[]> {
-    const song = await this.songService.findBySlug(songSlug);
-    if (!song) throw new Error("Song not found");
-
-    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery(
-      [Prisma.sql`tracks.song_id = ${song.id}::uuid`],
-      options,
-    );
-
-    const whereClause = Prisma.join(conditions, " AND ");
-    const result = await this.queryPerformances({ whereClause, extraJoins });
-
-    const performances = result.map((row) => ({
-      ...this.transformToSongPagePerformanceView(row),
-      kind: song.kind ?? undefined,
-      // The per-song composer queries without a song join (the song is
-      // already known), so the raw rows don't carry song_title/song_slug.
-      // Fill them in from the page's song context so downstream renderers
-      // (e.g. the noteworthy-track popover header) don't see an empty
-      // title when this projection lands in a cross-song UI component.
-      songTitle: song.title,
-      songSlug: song.slug,
-    }));
-    await this.enrichPerformances(performances);
-
-    if (isNarrowingFilter(options)) {
-      const matchingShowDates = await this.getFilterMatchingShowDates(options ?? {});
-      assignFilteredGaps(performances, matchingShowDates);
-    }
-
-    return performances;
   }
 
   /**
@@ -514,7 +502,17 @@ export class SongPageComposer {
           }
         : null,
     allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
-    jamChart: (o) => (o.jamChart ? { condition: Prisma.sql`tracks.note IS NOT NULL AND tracks.note <> ''` } : null),
+    // Scope to one song by slug via a subquery so callers pass the readable
+    // slug (not a resolved id). An unknown slug yields no rows.
+    songSlug: (o) =>
+      o.songSlug ? { condition: Prisma.sql`tracks.song_id = (SELECT id FROM songs WHERE slug = ${o.songSlug})` } : null,
+    // "Jam chart" = the curated/noteworthy set: all-timer OR a non-empty note.
+    // Parenthesized because it carries a top-level OR and gets AND-joined into
+    // the surrounding WHERE.
+    jamChart: (o) =>
+      o.jamChart
+        ? { condition: Prisma.sql`(tracks.all_timer = true OR (tracks.note IS NOT NULL AND tracks.note <> ''))` }
+        : null,
     monthDay: (o) => (o.monthDay ? { condition: Prisma.sql`shows.date LIKE ${`%-${o.monthDay}`}` } : null),
     inverted: (o) =>
       o.inverted
@@ -762,6 +760,19 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.monthDay ||
       options.playedByMusicianId,
   );
+}
+
+/**
+ * Thrown by `buildFilteredSongPerformances` when no narrowing filter is
+ * active. The cross-song performance query is unbounded without one, so the
+ * composer refuses; the API layer maps this to a "needs a filter" response
+ * rather than a 500.
+ */
+export class NeedsNarrowingFilterError extends Error {
+  constructor() {
+    super("A narrowing filter is required to list cross-song performances.");
+    this.name = "NeedsNarrowingFilterError";
+  }
 }
 
 /**

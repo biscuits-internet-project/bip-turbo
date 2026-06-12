@@ -46,7 +46,7 @@ export async function resolveAttendedUserId(
 
 /**
  * Parse URL search params into PerformanceFilterOptions.
- * Shared by /api/all-timers and /api/songs/performances.
+ * Shared by the filtered-performance endpoints (/api/songs/performances, /api/songs).
  */
 /**
  * Resolve "last10shows" to a date range by querying the 10th most recent show date.
@@ -69,8 +69,12 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
   const attendedParam = url.searchParams.get("attended");
   const monthDayParam = url.searchParams.get("monthDay");
   const musicianParam = url.searchParams.get("musician");
+  const slugParam = url.searchParams.get("slug");
 
   const filters: PerformanceFilterOptions = {};
+
+  // A `slug` scopes the list to one song (the song-detail performances tab).
+  if (slugParam) filters.songSlug = slugParam;
 
   if (timeRangeParam === "last10shows") {
     const dateRange = await resolveLast10ShowsDateRange();

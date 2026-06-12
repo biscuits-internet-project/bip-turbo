@@ -1,11 +1,9 @@
-import { mockShallowComponent } from "@test/test-utils";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test, vi } from "vitest";
 
-// Mock server-side modules
+const tableProps = vi.fn();
 vi.mock("~/server/services", () => ({ services: {} }));
-vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
 vi.mock("@bip/domain", () => ({
   // Loader imports CacheKeys.songs.allTimers() at module top level.
   CacheKeys: { songs: { allTimers: () => "test-key" } },
@@ -13,38 +11,14 @@ vi.mock("@bip/domain", () => ({
 vi.mock("~/lib/noteworthy-performance-loader", () => ({
   createNoteworthyLoader: vi.fn(),
 }));
-vi.mock("~/lib/noteworthy-performance-page", () => ({
-  NoteworthyPerformancePage: (props: object) => mockShallowComponent("NoteworthyPerformancePage", props),
+vi.mock("~/lib/filtered-song-performance-table", () => ({
+  FilteredSongPerformanceTable: (props: object) => {
+    tableProps(props);
+    return <div data-testid="FilteredSongPerformanceTable" />;
+  },
 }));
-
-// Mock hooks
 vi.mock("~/hooks/use-serialized-loader-data", () => ({
   useSerializedLoaderData: vi.fn(() => ({ performances: [] })),
-}));
-vi.mock("~/hooks/use-performance-page-filters", () => ({
-  usePerformancePageFilters: vi.fn(() => ({
-    filteredData: [],
-    isLoading: false,
-    selectedTimeRange: "all",
-    kindFilter: "all",
-    selectedAuthor: null,
-    activeToggleSet: new Set(),
-    hasActiveFilters: false,
-    searchText: "",
-    setSearchText: vi.fn(),
-    updateFilter: vi.fn(),
-    toggleFilter: vi.fn(),
-    clearFilters: vi.fn(),
-  })),
-  searchPerformance: vi.fn(),
-}));
-
-// Stub child components
-vi.mock("~/components/performance", () => ({
-  PerformanceTable: (props: object) => mockShallowComponent("PerformanceTable", props),
-}));
-vi.mock("~/components/performance/performance-filter-controls", () => ({
-  PerformanceFilterControls: (props: object) => mockShallowComponent("PerformanceFilterControls", props),
 }));
 
 import AllTimersPage from "./all-timers";
@@ -73,17 +47,12 @@ describe("AllTimersPage", () => {
     expect(screen.queryByRole("link", { name: /back to songs/i })).not.toBeInTheDocument();
   });
 
-  // The page delegates to NoteworthyPerformancePage with the
-  // all-timers-specific endpoint and both noteworthy toggle chips
-  // hidden (All-Timer because the whole page is all-timers, Jam Chart
-  // for the same scope-redundancy reason).
-  test("renders NoteworthyPerformancePage with the all-timers API url and both toggles hidden", () => {
+  // Delegates to the shared FilteredSongPerformanceTable, scoping to all-timers
+  // via the preset (the component derives which chips to hide).
+  test("renders FilteredSongPerformanceTable scoped to all-timers", () => {
     renderAllTimers();
 
-    const page = screen.getByTestId("NoteworthyPerformancePage");
-    expect(page).toBeInTheDocument();
-    expect(page.textContent).toContain('"apiUrl":"/api/all-timers"');
-    expect(page.textContent).toContain('"hideAllTimerToggle":true');
-    expect(page.textContent).toContain('"hideJamChartToggle":true');
+    expect(screen.getByTestId("FilteredSongPerformanceTable")).toBeInTheDocument();
+    expect(tableProps).toHaveBeenCalledWith(expect.objectContaining({ presetFilters: { filters: "allTimer" } }));
   });
 });

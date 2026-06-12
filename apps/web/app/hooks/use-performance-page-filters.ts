@@ -96,7 +96,16 @@ export function usePerformancePageFilters<T>({
 
     if (extraParams) {
       for (const [key, value] of Object.entries(extraParams)) {
-        params.set(key, value);
+        if (key === "filters") {
+          // A preset toggle-filter (e.g. all-timers pinning `allTimer`) must
+          // UNION with the user's active toggles, not clobber them.
+          const merged = new Set(
+            [...(filtersParam ? filtersParam.split(",") : []), ...value.split(",")].filter(Boolean),
+          );
+          params.set("filters", [...merged].join(","));
+        } else {
+          params.set(key, value);
+        }
       }
     }
 

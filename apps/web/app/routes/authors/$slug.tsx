@@ -1,5 +1,6 @@
 import type { Song } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
+import { useMemo } from "react";
 import { redirect } from "react-router-dom";
 import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
 import { PageHeader } from "~/components/ui/page-header";
@@ -49,13 +50,14 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
 
 export default function AuthorPage() {
   const { author, songs } = useSerializedLoaderData<LoaderData>();
+  const presetFilters = useMemo(() => ({ author: author.id }), [author.id]);
 
   return (
     <div>
       <div className="space-y-2 mb-6">
         <PageHeader title={author.name} backLink={{ to: "/songs", label: "All Songs" }} />
       </div>
-      <FilteredSongsTable songs={songs} pinnedAuthorId={author.id} />
+      <FilteredSongsTable songs={songs} presetFilters={presetFilters} />
     </div>
   );
 }

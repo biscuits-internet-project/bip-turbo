@@ -9,6 +9,7 @@ import type {
 import { CacheKeys } from "@bip/domain/cache-keys";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Pencil } from "lucide-react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { DateVenueCell } from "~/components/performance/date-venue-cell";
@@ -303,6 +304,7 @@ export default function MusicianPage() {
     useSerializedLoaderData<LoaderData>();
 
   const showsHeading = tier === "drummer" ? "Shows Outside Their Era" : "Shows";
+  const songsWrittenPreset = useMemo(() => (authorId ? { author: authorId } : undefined), [authorId]);
 
   return (
     <div>
@@ -340,7 +342,7 @@ export default function MusicianPage() {
         {authorId && songsWritten.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-xl font-semibold text-content-text-primary">Songs Written</h2>
-            <FilteredSongsTable songs={songsWritten} pinnedAuthorId={authorId} />
+            <FilteredSongsTable songs={songsWritten} presetFilters={songsWrittenPreset} />
           </section>
         )}
 
