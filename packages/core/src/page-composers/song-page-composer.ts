@@ -34,6 +34,15 @@ export interface FilteredSongRarity {
 export interface PerformanceFilterOptions {
   startDate?: Date;
   endDate?: Date;
+  /**
+   * Exclude performances INSIDE a date window — the SQL mirror of
+   * `isOutsideEra`. Keeps only shows strictly before `excludeRangeStart` or
+   * strictly after `excludeRangeEnd` (each bound optional). Drives the drummer
+   * profile's "shows outside their era" view. Distinct from `startDate`/
+   * `endDate`, which keep performances inside a window.
+   */
+  excludeRangeStart?: Date;
+  excludeRangeEnd?: Date;
   kind?: SongKind;
   authorId?: string;
   attendedUserId?: string;
@@ -466,6 +475,17 @@ export class SongPageComposer {
       o.startDate ? { condition: Prisma.sql`shows.date >= ${o.startDate.toISOString().slice(0, 10)}` } : null,
     endDate: (o) =>
       o.endDate ? { condition: Prisma.sql`shows.date <= ${o.endDate.toISOString().slice(0, 10)}` } : null,
+    // Inverse of startDate/endDate: exclude the window, keep the outside. Each
+    // bound is a strict comparison (the boundary dates — a drummer's first/last
+    // show — are IN era), ORed and parenthesized so the OR doesn't bind loosely
+    // once AND-joined into the surrounding WHERE.
+    excludeRange: (o) => {
+      const parts: Prisma.Sql[] = [];
+      if (o.excludeRangeStart) parts.push(Prisma.sql`shows.date < ${o.excludeRangeStart.toISOString().slice(0, 10)}`);
+      if (o.excludeRangeEnd) parts.push(Prisma.sql`shows.date > ${o.excludeRangeEnd.toISOString().slice(0, 10)}`);
+      if (parts.length === 0) return null;
+      return { condition: Prisma.sql`(${Prisma.join(parts, " OR ")})` };
+    },
     kind: (o) => (o.kind ? { condition: Prisma.sql`songs.kind = ${o.kind}` } : null),
     authorId: (o) =>
       o.authorId
@@ -745,6 +765,8 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
   return Boolean(
     options.startDate ||
       options.endDate ||
+      options.excludeRangeStart ||
+      options.excludeRangeEnd ||
       options.attendedUserId ||
       options.encore ||
       options.setOpener ||

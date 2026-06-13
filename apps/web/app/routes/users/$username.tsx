@@ -435,50 +435,30 @@ export default function UserProfile() {
             {blogPosts.length > 0 && <option value="blog">Blog Posts ({blogPosts.length})</option>}
           </select>
         </div>
-        <TabsList className="glass mb-6 hidden sm:flex">
+        <TabsList className="mb-6 hidden sm:flex">
           <TabsTrigger value="shows" asChild>
-            <Link
-              to="?tab=shows"
-              preventScrollReset
-              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-            >
+            <Link to="?tab=shows" preventScrollReset>
               Shows Attended ({attendanceCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="reviews" asChild>
-            <Link
-              to="?tab=reviews"
-              preventScrollReset
-              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-            >
+            <Link to="?tab=reviews" preventScrollReset>
               Reviews ({reviewCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="show-ratings" asChild>
-            <Link
-              to="?tab=show-ratings"
-              preventScrollReset
-              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-            >
+            <Link to="?tab=show-ratings" preventScrollReset>
               Show Ratings ({showRatingsCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="track-ratings" asChild>
-            <Link
-              to="?tab=track-ratings"
-              preventScrollReset
-              className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-            >
+            <Link to="?tab=track-ratings" preventScrollReset>
               Song Version Ratings ({trackRatingsCount})
             </Link>
           </TabsTrigger>
           {blogPosts.length > 0 && (
             <TabsTrigger value="blog" asChild>
-              <Link
-                to="?tab=blog"
-                preventScrollReset
-                className="data-[state=active]:bg-brand-primary data-[state=active]:text-white"
-              >
+              <Link to="?tab=blog" preventScrollReset>
                 Blog Posts ({blogPosts.length})
               </Link>
             </TabsTrigger>

@@ -103,6 +103,21 @@ export function drummerMilestonesForDate(date: string): DrummerMilestone[] {
 export type MusicianTier = "core" | "drummer" | "guest";
 
 /**
+ * The pinned (preset) filter params for a musician profile's song tables — the
+ * By Song and All Performances tables both ride these. Always pins the musician
+ * slug; a drummer additionally pins their era as an exclude window so only
+ * out-of-era plays surface (the SQL mirror of `isOutsideEra`). Bounds are ISO
+ * `YYYY-MM-DD` strings, each present only when the era defines that side.
+ */
+export function musicianTablePreset(slug: string, tier: MusicianTier): Record<string, string> {
+  const preset: Record<string, string> = { musician: slug };
+  const era = tier === "drummer" ? DRUMMER_ERAS[slug] : undefined;
+  if (era?.startDate) preset.excludeStart = era.startDate.toISOString().slice(0, 10);
+  if (era?.endDate) preset.excludeEnd = era.endDate.toISOString().slice(0, 10);
+  return preset;
+}
+
+/**
  * Classify a musician for the profile page's table strategy:
  * - "drummer": a current or former drummer. Their everyday shows are implied;
  *   the profile lists only appearances outside their drummer era.

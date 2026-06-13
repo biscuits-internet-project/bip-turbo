@@ -101,33 +101,6 @@ export type MusicianAppearances = {
 };
 
 /**
- * One song a musician has played, with their play count and date span, for the
- * songs table on a musician profile. Dates are ISO `YYYY-MM-DD` strings.
- */
-export type MusicianSongPlay = {
-  songId: string;
-  title: string;
-  slug: string;
-  playCount: number;
-  firstShow: MusicianAppearanceShow | null;
-  lastShow: MusicianAppearanceShow | null;
-};
-
-/**
- * One performance (a single show) of a song by a musician, for the
- * per-performance ("All Performances") list view on a profile. `date` is an
- * ISO `YYYY-MM-DD` string.
- */
-export type MusicianPerformance = {
-  trackId: string;
-  date: string;
-  showSlug: string | null;
-  songTitle: string;
-  songSlug: string;
-  venue: { name: string | null; city: string | null; state: string | null } | null;
-};
-
-/**
  * A musician as referenced from a lineup or footnote: identity plus the
  * resolved default instrument, enough to render a linked name and "known from"
  * blurb without a second lookup.

@@ -60,7 +60,12 @@ function setHookReturn(overrides: HookReturnOverrides = {}) {
 }
 
 function renderComponent(
-  props: { extraParams?: Record<string, string>; hideTimeRange?: boolean; presetFilters?: Record<string, string> } = {},
+  props: {
+    extraParams?: Record<string, string>;
+    hideTimeRange?: boolean;
+    presetFilters?: Record<string, string>;
+    filteredAsPrimary?: boolean;
+  } = {},
 ) {
   return render(
     <MemoryRouter>
@@ -152,6 +157,17 @@ describe("FilteredSongsTable", () => {
     const controls = screen.getByTestId("PerformanceFilterControls");
     expect(controls.textContent).toContain('"selectedAuthor":"author-1"');
     expect(controls.textContent).toContain('"kindFilter":"cover"');
+  });
+
+  // The musician profile's By Song tab wants the single standard column set
+  // sourced from the musician's scoped stats, not the paired layout — so it
+  // passes filteredAsPrimary straight through to SongsTable.
+  test("forwards filteredAsPrimary to SongsTable", () => {
+    setHookReturn();
+    renderComponent({ presetFilters: { musician: "musician-1" }, filteredAsPrimary: true });
+
+    const table = screen.getByTestId("SongsTable");
+    expect(table.textContent).toContain('"filteredAsPrimary":true');
   });
 
   // A pinned musician IS a narrowing filter (it rides presetFilters, not the

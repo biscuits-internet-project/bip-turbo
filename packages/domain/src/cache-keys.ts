@@ -112,7 +112,7 @@ export const CacheKeys = {
    */
   musicians: {
     /** Full musician profile payload (appearances, songs played/written, performances). */
-    page: (slug: string) => `musician:${slug}:data:v1`,
+    page: (slug: string) => `musician:${slug}:data:v2`,
     /** Every musician profile cache (for pattern deletion on broad mutations). */
     allPages: () => "musician:*:data:*",
   },

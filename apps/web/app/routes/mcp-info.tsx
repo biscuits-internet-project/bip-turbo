@@ -125,31 +125,11 @@ export default function McpInfo() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="claude-code" className="w-full">
-            <TabsList className="flex flex-wrap gap-2 h-auto bg-transparent p-0 mb-6">
-              <TabsTrigger
-                value="claude-code"
-                className="rounded-full px-4 py-2 text-sm font-medium bg-white/5 border border-white/10 data-[state=active]:bg-brand-secondary data-[state=active]:text-white data-[state=active]:border-brand-secondary hover:bg-white/10 transition-colors"
-              >
-                Claude Code
-              </TabsTrigger>
-              <TabsTrigger
-                value="claude-desktop"
-                className="rounded-full px-4 py-2 text-sm font-medium bg-white/5 border border-white/10 data-[state=active]:bg-brand-secondary data-[state=active]:text-white data-[state=active]:border-brand-secondary hover:bg-white/10 transition-colors"
-              >
-                Claude Desktop
-              </TabsTrigger>
-              <TabsTrigger
-                value="cursor"
-                className="rounded-full px-4 py-2 text-sm font-medium bg-white/5 border border-white/10 data-[state=active]:bg-brand-secondary data-[state=active]:text-white data-[state=active]:border-brand-secondary hover:bg-white/10 transition-colors"
-              >
-                Cursor
-              </TabsTrigger>
-              <TabsTrigger
-                value="other"
-                className="rounded-full px-4 py-2 text-sm font-medium bg-white/5 border border-white/10 data-[state=active]:bg-brand-secondary data-[state=active]:text-white data-[state=active]:border-brand-secondary hover:bg-white/10 transition-colors"
-              >
-                Other Clients
-              </TabsTrigger>
+            <TabsList className="flex overflow-x-auto mb-6">
+              <TabsTrigger value="claude-code">Claude Code</TabsTrigger>
+              <TabsTrigger value="claude-desktop">Claude Desktop</TabsTrigger>
+              <TabsTrigger value="cursor">Cursor</TabsTrigger>
+              <TabsTrigger value="other">Other Clients</TabsTrigger>
             </TabsList>
 
             <TabsContent value="claude-code" className="space-y-4">

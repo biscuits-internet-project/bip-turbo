@@ -1,6 +1,7 @@
 import type { SongPagePerformance } from "@bip/domain";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
+import { Card } from "~/components/ui/card";
 import { DataTable } from "~/components/ui/data-table";
 import { useAttendanceRowHighlight } from "~/hooks/use-attendance-row-highlight";
 import { useSession } from "~/hooks/use-session";
@@ -93,16 +94,18 @@ export function PerformanceTable({
   );
 
   return (
-    <DataTable
-      columns={columns}
-      data={performances}
-      getRowId={(performance) => performance.trackId}
-      hideSearch
-      isLoading={isLoading}
-      filterComponent={headerContent}
-      rowClassName={rowClassName}
-      initialSorting={[{ id: "date", desc: true }]}
-      pageSize={pageSize}
-    />
+    <Card className="card-premium py-4 px-1">
+      <DataTable
+        columns={columns}
+        data={performances}
+        getRowId={(performance) => performance.trackId}
+        hideSearch
+        isLoading={isLoading}
+        filterComponent={headerContent}
+        rowClassName={rowClassName}
+        initialSorting={[{ id: "date", desc: true }]}
+        pageSize={pageSize}
+      />
+    </Card>
   );
 }

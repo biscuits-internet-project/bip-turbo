@@ -470,6 +470,60 @@ describe("buildFilterQuery", () => {
     expect(conditions).toHaveLength(2);
     expect(extraJoins).toHaveLength(0);
   });
+
+  // The excludeRange filter is the SQL mirror of `isOutsideEra`: it keeps only
+  // performances OUTSIDE a window (date strictly before the start OR strictly
+  // after the end). Drives the drummer profile's "shows outside their era" view.
+  // Both bounds present → a parenthesized OR of the two strict comparisons; the
+  // parens are mandatory so the OR doesn't bind loosely once AND-joined.
+  test("excludeRange with both bounds produces a parenthesized OR of strict date comparisons", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], {
+      excludeRangeStart: new Date("2005-12-28"),
+      excludeRangeEnd: new Date("2025-09-07"),
+    });
+
+    expect(conditions).toHaveLength(1);
+    expect(extraJoins).toHaveLength(0);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toMatch(/shows\.date\s*<\s*/);
+    expect(sql).toMatch(/shows\.date\s*>\s*/);
+    expect(sql).toMatch(/<.*OR.*>/s);
+    expect(sql.trim().startsWith("(")).toBe(true);
+    expect(sql.trim().endsWith(")")).toBe(true);
+  });
+
+  // One open-ended bound (e.g. a drummer whose era has no start, so only the
+  // end matters) yields just that side — no dangling OR — still parenthesized.
+  test("excludeRange with only an end bound produces a single after-end comparison", () => {
+    const { conditions } = SongPageComposer.buildFilterQuery([], {
+      excludeRangeEnd: new Date("2005-08-27"),
+    });
+
+    expect(conditions).toHaveLength(1);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toMatch(/shows\.date\s*>\s*/);
+    expect(sql).not.toMatch(/shows\.date\s*<\s*/);
+    expect(sql).not.toMatch(/\bOR\b/);
+  });
+
+  test("excludeRange with only a start bound produces a single before-start comparison", () => {
+    const { conditions } = SongPageComposer.buildFilterQuery([], {
+      excludeRangeStart: new Date("2025-10-31"),
+    });
+
+    expect(conditions).toHaveLength(1);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toMatch(/shows\.date\s*<\s*/);
+    expect(sql).not.toMatch(/shows\.date\s*>\s*/);
+    expect(sql).not.toMatch(/\bOR\b/);
+  });
+
+  // With neither bound set the filter is inert — no condition emitted (an
+  // unbounded era window excludes nothing).
+  test("excludeRange with no bounds emits no condition", () => {
+    const { conditions } = SongPageComposer.buildFilterQuery([], { excludeRangeStart: undefined });
+    expect(conditions).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -693,6 +747,8 @@ describe("isNarrowingFilter", () => {
     ["jamChart", { jamChart: true }],
     ["monthDay", { monthDay: "07-26" }],
     ["playedByMusicianId", { playedByMusicianId: "musician-1" }],
+    ["excludeRangeStart", { excludeRangeStart: new Date("2025-10-31") }],
+    ["excludeRangeEnd", { excludeRangeEnd: new Date("2005-08-27") }],
   ])("returns true when %s is set", (_label, options) => {
     expect(isNarrowingFilter(options)).toBe(true);
   });

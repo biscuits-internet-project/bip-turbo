@@ -52,6 +52,52 @@ describe("parsePerformanceFilters — jamChart scope", () => {
   });
 });
 
+describe("parsePerformanceFilters — excludeRange", () => {
+  // The drummer profile passes its era window as excludeStart/excludeEnd ISO
+  // params; parse turns them into the Date-typed excludeRangeStart/End the
+  // composer's excludeRange builder consumes.
+  test("parses excludeStart and excludeEnd ISO params into Date bounds", async () => {
+    const url = new URL("https://x.test/api/songs/performances?excludeStart=2005-12-28&excludeEnd=2025-09-07");
+
+    const filters = await parsePerformanceFilters(url, emptyContext);
+
+    expect(filters.excludeRangeStart).toEqual(new Date("2005-12-28"));
+    expect(filters.excludeRangeEnd).toEqual(new Date("2025-09-07"));
+  });
+
+  // An open-ended era (only one bound) parses just that side.
+  test("parses a single bound when only one of excludeStart/excludeEnd is present", async () => {
+    const url = new URL("https://x.test/api/songs/performances?excludeEnd=2005-08-27");
+
+    const filters = await parsePerformanceFilters(url, emptyContext);
+
+    expect(filters.excludeRangeStart).toBeUndefined();
+    expect(filters.excludeRangeEnd).toEqual(new Date("2005-08-27"));
+  });
+});
+
+describe("buildFilteredCacheKey — excludeRange", () => {
+  // Two drummers with different eras must not collide on one cached payload,
+  // so the exclude window has to be part of the key.
+  test("an exclude window changes the cache key", () => {
+    const base = buildFilteredCacheKey(new URL("https://x.test/songs"), "performances");
+    const withExclude = buildFilteredCacheKey(
+      new URL("https://x.test/songs?excludeStart=2005-12-28&excludeEnd=2025-09-07"),
+      "performances",
+    );
+    expect(withExclude).not.toBe(base);
+  });
+
+  test("different exclude windows produce different cache keys", () => {
+    const a = buildFilteredCacheKey(new URL("https://x.test/songs?excludeEnd=2005-08-27"), "performances");
+    const b = buildFilteredCacheKey(
+      new URL("https://x.test/songs?excludeStart=2005-12-28&excludeEnd=2025-09-07"),
+      "performances",
+    );
+    expect(a).not.toBe(b);
+  });
+});
+
 describe("buildFilteredCacheKey — musician", () => {
   // The musician slug must be part of the cache key, or two different musician
   // filters would collide on one cached payload.

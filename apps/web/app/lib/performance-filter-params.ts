@@ -15,7 +15,6 @@ const VALID_FILTER_KEYS = new Set([
   "standalone",
   "inverted",
   "dyslexic",
-  "unfinished",
   "jamChart",
   "allTimer",
 ]);
@@ -70,11 +69,18 @@ export async function parsePerformanceFilters(url: URL, context: PublicContext):
   const monthDayParam = url.searchParams.get("monthDay");
   const musicianParam = url.searchParams.get("musician");
   const slugParam = url.searchParams.get("slug");
+  const excludeStartParam = url.searchParams.get("excludeStart");
+  const excludeEndParam = url.searchParams.get("excludeEnd");
 
   const filters: PerformanceFilterOptions = {};
 
   // A `slug` scopes the list to one song (the song-detail performances tab).
   if (slugParam) filters.songSlug = slugParam;
+
+  // An exclude window (the drummer profile's era) keeps only out-of-window
+  // performances. Carried as ISO `YYYY-MM-DD` params.
+  if (excludeStartParam) filters.excludeRangeStart = new Date(excludeStartParam);
+  if (excludeEndParam) filters.excludeRangeEnd = new Date(excludeEndParam);
 
   if (timeRangeParam === "last10shows") {
     const dateRange = await resolveLast10ShowsDateRange();
@@ -122,6 +128,8 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
   const musicianParam = url.searchParams.get("musician");
   const filtersParam = url.searchParams.get("filters");
   const monthDay = url.searchParams.get("monthDay");
+  const excludeStart = url.searchParams.get("excludeStart");
+  const excludeEnd = url.searchParams.get("excludeEnd");
 
   return CacheKeys.songs.filtered({
     scope,
@@ -132,5 +140,7 @@ export function buildFilteredCacheKey(url: URL, scope: string, attendedUserId?: 
     filters: filtersParam || null,
     attended: attendedUserId || null,
     monthDay: monthDay || null,
+    excludeStart: excludeStart || null,
+    excludeEnd: excludeEnd || null,
   });
 }

@@ -21,11 +21,22 @@ interface FilteredSongsTableProps {
    * fetch doesn't re-run every render.
    */
   presetFilters?: Record<string, string>;
+  /**
+   * Musician profile: show the standard single column set sourced from this
+   * musician's scoped stats, instead of pairing all-time and filtered columns.
+   */
+  filteredAsPrimary?: boolean;
 }
 
 const searchFilter = (song: Song, query: string) => song.title.toLowerCase().includes(query);
 
-export function FilteredSongsTable({ songs, extraParams, hideTimeRange, presetFilters }: FilteredSongsTableProps) {
+export function FilteredSongsTable({
+  songs,
+  extraParams,
+  hideTimeRange,
+  presetFilters,
+  filteredAsPrimary,
+}: FilteredSongsTableProps) {
   const effectiveExtraParams = useMemo(
     () => (presetFilters ? { ...extraParams, ...presetFilters } : extraParams),
     [presetFilters, extraParams],
@@ -98,6 +109,7 @@ export function FilteredSongsTable({ songs, extraParams, hideTimeRange, presetFi
       filterComponent={filterControls}
       isLoading={isLoading}
       showFilteredPlays={showFilteredPlays}
+      filteredAsPrimary={filteredAsPrimary}
     />
   );
 }
