@@ -25,7 +25,6 @@ import { pickGapTier } from "~/lib/gap-tier";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
-import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowUserData } from "~/server/show-user-data";
 import { computeTrackUserRatings } from "~/server/track-user-ratings";
@@ -359,90 +358,41 @@ export default function SongPage() {
             </SelectContent>
           </Select>
         </div>
-        <TabsList className="w-full hidden sm:flex justify-start border-b border-glass-border/30 rounded-none bg-transparent p-0">
-          <TabsTrigger
-            value="performances"
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-              "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-            )}
-          >
+        <TabsList className="w-full hidden sm:flex justify-start">
+          <TabsTrigger value="performances">
             <ListMusic className="h-4 w-4" />
             All Performances
           </TabsTrigger>
           {hasJamCharts && (
-            <TabsTrigger
-              value="jam-charts"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-              )}
-            >
+            <TabsTrigger value="jam-charts">
               <Flame className="h-4 w-4" />
               Jam Charts
             </TabsTrigger>
           )}
           {hasAllTimers && (
-            <TabsTrigger
-              value="all-timers"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-              )}
-            >
+            <TabsTrigger value="all-timers">
               <Flame className="h-4 w-4 text-orange-500" />
               All-Timers
             </TabsTrigger>
           )}
-          <TabsTrigger
-            value="stats"
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-              "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-              "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-            )}
-          >
+          <TabsTrigger value="stats">
             <BarChart3 className="h-4 w-4" />
             Graphs
           </TabsTrigger>
           {song.history && (
-            <TabsTrigger
-              value="history"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-              )}
-            >
+            <TabsTrigger value="history">
               <History className="h-4 w-4" />
               History
             </TabsTrigger>
           )}
           {song.lyrics && (
-            <TabsTrigger
-              value="lyrics"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-              )}
-            >
+            <TabsTrigger value="lyrics">
               <FileTextIcon className="h-4 w-4" />
               Lyrics
             </TabsTrigger>
           )}
           {(song.tabs || song.guitarTabsUrl) && (
-            <TabsTrigger
-              value="guitar-tabs"
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-none data-[state=active]:shadow-none",
-                "data-[state=active]:border-b-2 data-[state=active]:border-brand-primary data-[state=active]:bg-transparent",
-                "data-[state=inactive]:bg-transparent data-[state=inactive]:text-content-text-tertiary",
-              )}
-            >
+            <TabsTrigger value="guitar-tabs">
               <GuitarIcon className="h-4 w-4" />
               Guitar Tabs
             </TabsTrigger>

@@ -205,15 +205,26 @@ function dashOrSpan(content: ReactNode | null | undefined, className = "text-con
 
 interface GetSongsColumnsOptions {
   showFilteredPlays: boolean;
+  /**
+   * Musician profile mode: render the standard single column set (no all-time
+   * vs filtered pairing) but source every stat cell from the musician-scoped
+   * filtered fields, so "Plays", "Avg Gap", "Last Played", etc. show this
+   * musician's numbers. Callers pass `showFilteredPlays: false` alongside it.
+   */
+  filteredAsPrimary?: boolean;
 }
 
 /**
  * Produces the column definitions for the /songs table. The "Filtered Plays"
  * column is inserted only when a filter scope is active (time range, toggles,
  * tab-level extraParams, etc.); when absent, "Plays" alone represents all-time
- * counts.
+ * counts. With `filteredAsPrimary` the single column set reads the
+ * musician-scoped filtered fields instead (the musician profile's By Song tab).
  */
-export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): ColumnDef<SongWithShows>[] {
+export function getSongsColumns({
+  showFilteredPlays,
+  filteredAsPrimary = false,
+}: GetSongsColumnsOptions): ColumnDef<SongWithShows>[] {
   const titleColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
     accessorKey: "title",
@@ -256,20 +267,28 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const playsColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
-    accessorKey: "timesPlayed",
+    accessorKey: filteredAsPrimary ? "filteredTimesPlayed" : "timesPlayed",
     fixedWidth: "4rem",
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Plays</HeaderLabel>,
     // When Filtered Plays is also visible the all-time count is paired
     // beside it; mobile-hide on the dense layout keeps both legible.
     hideOnMobile: showFilteredPlays,
-    cell: (song) =>
-      song.timesPlayed > 0 ? (
-        <NumberCell width="3ch" className="text-content-text-primary font-semibold">
-          {song.timesPlayed}
-        </NumberCell>
+    cell: (song) => {
+      const plays = filteredAsPrimary ? (song.filteredTimesPlayed ?? 0) : song.timesPlayed;
+      if (plays > 0) {
+        return (
+          <NumberCell width="3ch" className="text-content-text-primary font-semibold">
+            {plays}
+          </NumberCell>
+        );
+      }
+      return filteredAsPrimary ? (
+        <span className="text-content-text-tertiary text-sm">—</span>
       ) : (
         <span className="text-content-text-tertiary text-sm italic">Never performed</span>
-      ),
+      );
+    },
+    sortingFn: filteredAsPrimary ? nullsLastNumericSort("filteredTimesPlayed") : undefined,
   });
 
   const filteredPlaysColumn = makeSortableColumn({
@@ -314,7 +333,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const percentSinceDebutColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
-    accessorKey: "percentSinceDebut",
+    accessorKey: filteredAsPrimary ? "filteredPercentSinceDebut" : "percentSinceDebut",
     fixedWidth: "4rem",
     label: (
       <HeaderLabel reserveIconRow={showFilteredPlays}>
@@ -322,15 +341,15 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         <span>Debut</span>
       </HeaderLabel>
     ),
-    title: "% Since Debut",
+    title: filteredAsPrimary ? "Share of shows since this musician first played it" : "% Since Debut",
     hideOnMobile: true,
-    cell: (song) =>
-      dashOrSpan(
-        song.percentSinceDebut !== null ? (
-          <NumberCell width="6ch">{sinceDebutFormatter.format(song.percentSinceDebut)}</NumberCell>
-        ) : null,
-      ),
-    sortingFn: nullsLastNumericSort("percentSinceDebut"),
+    cell: (song) => {
+      const value = filteredAsPrimary ? song.filteredPercentSinceDebut : song.percentSinceDebut;
+      return dashOrSpan(
+        value != null ? <NumberCell width="6ch">{sinceDebutFormatter.format(value)}</NumberCell> : null,
+      );
+    },
+    sortingFn: nullsLastNumericSort(filteredAsPrimary ? "filteredPercentSinceDebut" : "percentSinceDebut"),
   });
 
   const filteredPercentSinceDebutColumn = makeSortableColumn({
@@ -359,7 +378,7 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const avgGapColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
-    accessorKey: "averageGapShows",
+    accessorKey: filteredAsPrimary ? "filteredAverageGapShows" : "averageGapShows",
     fixedWidth: "4rem",
     label: (
       <HeaderLabel reserveIconRow={showFilteredPlays}>
@@ -367,12 +386,13 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
         <span>Gap</span>
       </HeaderLabel>
     ),
+    title: filteredAsPrimary ? "Average shows between this musician's plays of it" : undefined,
     hideOnMobile: true,
-    cell: (song) =>
-      dashOrSpan(
-        song.averageGapShows !== null ? <NumberCell width="4ch">{song.averageGapShows.toFixed(1)}</NumberCell> : null,
-      ),
-    sortingFn: nullsLastNumericSort("averageGapShows"),
+    cell: (song) => {
+      const value = filteredAsPrimary ? song.filteredAverageGapShows : song.averageGapShows;
+      return dashOrSpan(value != null ? <NumberCell width="4ch">{value.toFixed(1)}</NumberCell> : null);
+    },
+    sortingFn: nullsLastNumericSort(filteredAsPrimary ? "filteredAverageGapShows" : "averageGapShows"),
   });
 
   const filteredAvgGapColumn = makeSortableColumn({
@@ -398,20 +418,20 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const currentGapColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
-    accessorKey: "showsSinceLastPlayed",
+    accessorKey: filteredAsPrimary ? "filteredShowsSinceLastPlayed" : "showsSinceLastPlayed",
     fixedWidth: "4rem",
     // Spelled out vs. plain "Gap" so users can't confuse it with "Avg Gap"
     // on a quick scan. "to Now" anchors that this is the count up to today
     // (the filtered variant uses "to End" because its denominator stops
     // at the filter boundary).
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Gap to Now</HeaderLabel>,
-    title: "Gap to Now",
+    title: filteredAsPrimary ? "Shows since this musician last played it" : "Gap to Now",
     hideOnMobile: true,
-    cell: (song) =>
-      dashOrSpan(
-        song.showsSinceLastPlayed != null ? <NumberCell width="4ch">{song.showsSinceLastPlayed}</NumberCell> : null,
-      ),
-    sortingFn: nullsLastNumericSort("showsSinceLastPlayed"),
+    cell: (song) => {
+      const value = filteredAsPrimary ? song.filteredShowsSinceLastPlayed : song.showsSinceLastPlayed;
+      return dashOrSpan(value != null ? <NumberCell width="4ch">{value}</NumberCell> : null);
+    },
+    sortingFn: nullsLastNumericSort(filteredAsPrimary ? "filteredShowsSinceLastPlayed" : "showsSinceLastPlayed"),
   });
 
   const filteredCurrentGapColumn = makeSortableColumn({
@@ -453,13 +473,18 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const lastPlayedColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
-    accessorKey: "dateLastPlayed",
+    accessorKey: filteredAsPrimary ? "dateLastFilteredPlayed" : "dateLastPlayed",
     weight: dateColumnWeight,
     mobileFixedWidth: allTimeDateMobileWidth,
     // Hidden on mobile in dense view so the filtered date pair has room.
     hideOnMobile: showFilteredPlays,
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>Last Played</HeaderLabel>,
-    cell: (song) => <DateVenueCell date={song.dateLastPlayed} show={song.lastPlayedShow} />,
+    cell: (song) =>
+      filteredAsPrimary ? (
+        <DateVenueCell date={song.dateLastFilteredPlayed ?? null} show={song.lastFilteredPlayedShow} />
+      ) : (
+        <DateVenueCell date={song.dateLastPlayed} show={song.lastPlayedShow} />
+      ),
   });
 
   const filteredLastPlayedColumn = makeSortableColumn({
@@ -478,12 +503,17 @@ export function getSongsColumns({ showFilteredPlays }: GetSongsColumnsOptions): 
 
   const firstPlayedColumn = makeSortableColumn({
     reservesIconRow: showFilteredPlays,
-    accessorKey: "dateFirstPlayed",
+    accessorKey: filteredAsPrimary ? "dateFirstFilteredPlayed" : "dateFirstPlayed",
     weight: dateColumnWeight,
     mobileFixedWidth: allTimeDateMobileWidth,
     hideOnMobile: showFilteredPlays,
     label: <HeaderLabel reserveIconRow={showFilteredPlays}>First Played</HeaderLabel>,
-    cell: (song) => <DateVenueCell date={song.dateFirstPlayed} show={song.firstPlayedShow} />,
+    cell: (song) =>
+      filteredAsPrimary ? (
+        <DateVenueCell date={song.dateFirstFilteredPlayed ?? null} show={song.firstFilteredPlayedShow} />
+      ) : (
+        <DateVenueCell date={song.dateFirstPlayed} show={song.firstPlayedShow} />
+      ),
   });
 
   const filteredFirstPlayedColumn = makeSortableColumn({

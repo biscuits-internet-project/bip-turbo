@@ -12,6 +12,7 @@ interface SongWithShows extends Song {
 
 const baseColumns = getSongsColumns({ showFilteredPlays: false });
 const filteredColumns = getSongsColumns({ showFilteredPlays: true });
+const filteredPrimaryColumns = getSongsColumns({ showFilteredPlays: false, filteredAsPrimary: true });
 
 function makeShow(overrides: Partial<Show> = {}): Show {
   return {
@@ -815,5 +816,63 @@ describe("getSongsColumns", () => {
     const playsButton = screen.getByRole("button", { name: /^Plays/i });
     // The descending ArrowDown icon should be present (has class "lucide-arrow-down")
     expect(playsButton.querySelector(".lucide-arrow-down")).not.toBeNull();
+  });
+
+  // The musician profile's By Song tab renders the standard single column set
+  // but every stat cell reads the musician-scoped filtered field. The Plays
+  // column accessor flips to `filteredTimesPlayed` and there's no separate
+  // all-time `timesPlayed` column — one clean set, not a paired comparison.
+  test("filteredAsPrimary: Plays sources filteredTimesPlayed and the all-time pair is gone", () => {
+    const keys = filteredPrimaryColumns
+      .map((c) => ("accessorKey" in c ? (c.accessorKey as string) : null))
+      .filter((k): k is string => k !== null);
+    expect(keys).toContain("filteredTimesPlayed");
+    expect(keys).not.toContain("timesPlayed");
+    // No funnel-marked duplicate (the paired layout's "Filtered ___" columns).
+    expect(keys).not.toContain("percentSinceDebut");
+    expect(keys).toContain("filteredPercentSinceDebut");
+  });
+
+  // The cells show this musician's numbers, not the song's all-time numbers:
+  // a song played 200 times overall but 7 times by the musician reads "7".
+  test("filteredAsPrimary: stat cells render the musician-scoped values, not all-time", async () => {
+    await setupWithRouter(
+      <DataTable
+        columns={filteredPrimaryColumns}
+        data={[
+          makeSong({
+            timesPlayed: 200,
+            filteredTimesPlayed: 7,
+            filteredPercentSinceDebut: 0.5,
+            filteredAverageGapShows: 3.2,
+            filteredShowsSinceLastPlayed: 4,
+          }),
+        ]}
+        hideSearch
+        hidePagination
+      />,
+    );
+
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("3.2")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    // The all-time count is not what the Plays column shows here.
+    expect(screen.queryByText("200")).not.toBeInTheDocument();
+  });
+
+  // The single set keeps the standard labels, not the funnel-marked "Filtered"
+  // headers — the values are filtered, the framing reads as the musician's own.
+  test("filteredAsPrimary: headers use the standard labels (no funnel-marked duplicates)", () => {
+    const last = filteredPrimaryColumns.find((c) => "accessorKey" in c && c.accessorKey === "dateLastFilteredPlayed");
+    const first = filteredPrimaryColumns.find((c) => "accessorKey" in c && c.accessorKey === "dateFirstFilteredPlayed");
+    expect(last).toBeDefined();
+    expect(first).toBeDefined();
+    // Neither the all-time nor the funnel-paired date columns are present.
+    const keys = filteredPrimaryColumns
+      .map((c) => ("accessorKey" in c ? (c.accessorKey as string) : null))
+      .filter((k): k is string => k !== null);
+    expect(keys).not.toContain("dateLastPlayed");
+    expect(keys).not.toContain("dateFirstPlayed");
   });
 });

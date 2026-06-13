@@ -41,6 +41,8 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
   const attendedParam = params.get("attended");
   const filtersParam = params.get("filters");
   const musicianParam = params.get("musician");
+  const excludeStartParam = params.get("excludeStart");
+  const excludeEndParam = params.get("excludeEnd");
 
   const kindFilter =
     kindParam === "original" || kindParam === "cover" || kindParam === "mashup" || kindParam === "improvisation"
@@ -73,6 +75,8 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
     musician: musicianParam || null,
     attended: attendedUserId || null,
     filters: filtersParam || null,
+    excludeStart: excludeStartParam || null,
+    excludeEnd: excludeEndParam || null,
   });
 
   return await services.cache.getOrSet(
