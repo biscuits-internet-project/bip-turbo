@@ -8,12 +8,19 @@ import {
   type SongKind,
   type SongPagePerformance,
   type SongPageView,
-  type TrackFlag,
+  type Track,
+  type TrackMusicianDelta,
 } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
 import { showOrderBySql, statsShowsSql } from "../_shared/show-ordering";
 import { computeTrackGaps, sortTracksForGapWalk, type TrackForGapWalk } from "../_shared/track-gap";
+import {
+  mapTrackMusicianToDelta,
+  mapTrackToDomainEntity,
+  TRACK_FOOTNOTE_INCLUDE,
+  TRACK_PERFORMER_INCLUDE,
+} from "../setlists/setlist-service";
 import type { SongService } from "../songs/song-service";
 import type { StatsService } from "../stats/stats-service";
 
@@ -682,22 +689,28 @@ export class SongPageComposer {
       trackAnnotations.push(annotation);
       annotationsByTrackId.set(annotation.trackId, trackAnnotations);
     }
-
-    const flagRows = await this.db.trackFlagAssignment.findMany({
-      where: { trackId: { in: trackIds } },
-      select: { trackId: true, flag: true },
-    });
-    const flagsByTrackId = new Map<string, TrackFlag[]>();
-    for (const row of flagRows) {
-      const trackFlags = flagsByTrackId.get(row.trackId) || [];
-      trackFlags.push(row.flag);
-      flagsByTrackId.set(row.trackId, trackFlags);
-    }
-
     for (const performance of performances) {
       performance.annotations = annotationsByTrackId.get(performance.trackId) || [];
-      performance.flags = flagsByTrackId.get(performance.trackId) || [];
     }
+
+    // Reuse the setlist's footnote include + mappers so the Notes column's
+    // data-driven footnotes derive from identical gating (flags, recurrence
+    // clauses, completion links, performer deltas) — the wording can't drift.
+    const footnoteTracks = await this.db.track.findMany({
+      where: { id: { in: trackIds } },
+      relationLoadStrategy: "join",
+      include: { ...TRACK_FOOTNOTE_INCLUDE, ...TRACK_PERFORMER_INCLUDE },
+    });
+    const tracksById = new Map<string, Track>();
+    const deltasByTrackId = new Map<string, TrackMusicianDelta[]>();
+    for (const track of footnoteTracks) {
+      tracksById.set(track.id, mapTrackToDomainEntity(track));
+      deltasByTrackId.set(
+        track.id,
+        (track.trackMusicians ?? []).map((tm) => mapTrackMusicianToDelta(tm, track.id)),
+      );
+    }
+    attachTrackFootnoteData(performances, tracksById, deltasByTrackId);
 
     await this.computePerformanceTags(performances);
   }
@@ -839,6 +852,28 @@ export function assignFilteredGaps(performances: SongPagePerformance[], matching
 
   for (const performance of performances) {
     performance.filteredGap = gapByTrackId.get(performance.trackId) ?? null;
+  }
+}
+
+/**
+ * Copy the footnote-bearing fields from each mapped domain Track onto its
+ * matching performance row, so the Notes column can render the same data-driven
+ * footnotes the setlist shows. Pure: no DB. Tracks absent from the maps (none in
+ * practice) default to empty, leaving the row footnote-free.
+ */
+export function attachTrackFootnoteData(
+  performances: SongPagePerformance[],
+  tracksById: Map<string, Track>,
+  deltasByTrackId: Map<string, TrackMusicianDelta[]>,
+): void {
+  for (const performance of performances) {
+    const track = tracksById.get(performance.trackId);
+    performance.flags = track?.flags ?? [];
+    performance.flagRecurrences = track?.flagRecurrences ?? [];
+    performance.segueRecurrences = track?.segueRecurrences ?? [];
+    performance.completes = track?.completes ?? [];
+    performance.completedBy = track?.completedBy ?? [];
+    performance.trackMusicianDeltas = deltasByTrackId.get(performance.trackId) ?? [];
   }
 }
 

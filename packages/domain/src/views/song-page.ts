@@ -1,7 +1,8 @@
 import type { Annotation } from "../models/annotation";
+import type { TrackMusicianDelta } from "../models/musician";
 import type { ShowMinimal } from "../models/show";
 import type { Song, SongKind } from "../models/song";
-import type { TrackFlag, TrackMinimal } from "../models/track";
+import type { FlagRecurrence, SegueRecurrence, Track, TrackFlag, TrackMinimal } from "../models/track";
 import type { VenueMinimal } from "../models/venue";
 
 export type SongPageView = {
@@ -24,6 +25,15 @@ export type SongPagePerformance = {
   annotations?: Annotation[];
   // Structured performance markers backing the inverted/dyslexic/unfinished tags.
   flags?: TrackFlag[];
+  // Data-driven footnote inputs, mirroring the setlist's per-track footnotes so
+  // the Notes column can render them. Populated by the composer from the same
+  // gating the setlist uses; absent (defaulted empty) when not enriched.
+  flagRecurrences?: FlagRecurrence[];
+  segueRecurrences?: SegueRecurrence[];
+  completes?: Track["completes"];
+  completedBy?: Track["completedBy"];
+  // Per-track sit-in / sat-out performer deltas, for the "with X on Y" footnotes.
+  trackMusicianDeltas?: TrackMusicianDelta[];
   set?: string;
   position?: number;
   songTitle?: string;

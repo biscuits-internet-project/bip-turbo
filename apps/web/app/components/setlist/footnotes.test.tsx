@@ -1,10 +1,11 @@
-import type { Annotation, Instrument, Setlist, TrackMusicianDelta } from "@bip/domain";
+import type { Annotation, Instrument, Setlist, SongPagePerformance, TrackMusicianDelta } from "@bip/domain";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test } from "vitest";
 import {
   annotationFootnoteSources,
   buildDebutText,
+  buildPerformanceFootnotes,
   buildShowFootnotes,
   dataDrivenFootnoteSources,
   debutFootnoteSources,
@@ -835,6 +836,22 @@ describe("buildShowFootnotes", () => {
     expect(performerContent.container).toHaveTextContent("with Mike Greenfield on guitar");
   });
 
+  test("numbers a track's performer footnote before its flag footnote (guests on top)", () => {
+    // t2 keeps the guest below the whole-show elevation threshold so the sit-in
+    // stays a per-track footnote on t1 (rather than a show-level note).
+    const setlist = makeSetlist({
+      tracks: [{ id: "t1", flags: ["DYSLEXIC"] }, { id: "t2" }],
+      deltas: [makeDelta({ trackId: "t1", present: true, instruments: [makeInstrument("guitar")] })],
+    });
+
+    const { trackFootnoteIndices, orderedFootnotes } = buildShowFootnotes(setlist);
+
+    // Both footnotes hang off t1; the performer one takes the lower number.
+    expect(trackFootnoteIndices.get("t1")).toEqual([1, 2]);
+    expect(renderContent(orderedFootnotes[0].content).container).toHaveTextContent("with Mike Greenfield on guitar");
+    expect(renderContent(orderedFootnotes[1].content).container).toHaveTextContent("dyslexic");
+  });
+
   // The early-era show date predates both the debut and gap trustworthy-data
   // start dates, so debut + last-time-played + recurrence footnotes are
   // suppressed — but observed facts (flags) still render. This is the whole
@@ -886,5 +903,70 @@ describe("footnotesByTrack", () => {
     expect(byTrack.get("t2")).toHaveLength(1);
     expect(renderContent(byTrack.get("t2")?.[0]).container).toHaveTextContent("with Mike Greenfield on guitar");
     expect(byTrack.has("t3")).toBe(false);
+  });
+});
+
+// A minimal performance row carrying only the fields buildPerformanceFootnotes
+// reads. A recent show date keeps recurrence clauses out of the early-era
+// suppression window; a small non-null gap avoids the debut/last-played paths.
+function makePerformance(overrides: Partial<SongPagePerformance> & { trackId: string }): SongPagePerformance {
+  return {
+    show: { id: "show-1", slug: "2025-11-15", date: "2025-11-15", venueId: "v", dayOrder: null, countForStats: true },
+    encoresInSet: 0,
+    songSlug: "song",
+    kind: "original",
+    gap: 5,
+    flags: [],
+    flagRecurrences: [],
+    segueRecurrences: [],
+    completes: [],
+    completedBy: [],
+    trackMusicianDeltas: [],
+    ...overrides,
+  } as SongPagePerformance;
+}
+
+describe("buildPerformanceFootnotes", () => {
+  test("leads with the performer footnote, then the flag, on one row", () => {
+    const footnotes = buildPerformanceFootnotes(
+      makePerformance({
+        trackId: "t1",
+        flags: ["INVERTED"],
+        trackMusicianDeltas: [makeDelta({ trackId: "t1", present: true, instruments: [makeInstrument("guitar")] })],
+      }),
+    );
+
+    expect(footnotes).toHaveLength(2);
+    expect(renderContent(footnotes[0]).container).toHaveTextContent("with Mike Greenfield on guitar");
+    expect(renderContent(footnotes[1]).container).toHaveTextContent("inverted");
+  });
+
+  test("renders the completion clause", () => {
+    const footnotes = buildPerformanceFootnotes(
+      makePerformance({ trackId: "t1", completes: [{ date: "2021-12-30", slug: "2021-12-30-show" }] }),
+    );
+
+    expect(footnotes).toHaveLength(1);
+    expect(renderContent(footnotes[0]).container).toHaveTextContent("completes 12/30/2021 version");
+  });
+
+  test("omits the debut footnote even on a first-ever performance", () => {
+    // gap === null is a debut on the setlist; the table shows it via the Gap
+    // column, so no debut footnote here.
+    expect(buildPerformanceFootnotes(makePerformance({ trackId: "t1", gap: null }))).toEqual([]);
+  });
+
+  test("omits the last-time-played footnote for a long-gap return", () => {
+    // A gap past the threshold reads "last played …" on the setlist; the table
+    // shows it via the Last Played column, so no footnote here.
+    const footnotes = buildPerformanceFootnotes(
+      makePerformance({
+        trackId: "t1",
+        gap: 200,
+        previousShow: { slug: "2010-01-01-show", date: "2010-01-01" },
+      }),
+    );
+
+    expect(footnotes).toEqual([]);
   });
 });
