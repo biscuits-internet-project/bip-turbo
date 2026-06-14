@@ -162,7 +162,7 @@ export class CacheInvalidationService {
     await Promise.all([
       this.cache.del(CacheKeys.songs.allTimers()),
       this.cache.del(CacheKeys.songs.jamCharts()),
-      this.cache.delPattern(CacheKeys.songs.allTimersOnThisDayAll()),
+      this.cache.delPattern(CacheKeys.songs.jamChartsOnThisDayAll()),
     ]);
   }
 

@@ -88,10 +88,10 @@ export const CacheKeys = {
     jamCharts: () => "songs:jam-charts:v10",
     /** Songs with history content */
     histories: () => "songs:histories:v6",
-    /** All-timers for a specific calendar day (On This Day page) */
-    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v9`,
-    /** Every On-This-Day all-timer cache across all calendar days (for pattern deletion). */
-    allTimersOnThisDayAll: () => "songs:all-timers:on-this-day:*",
+    /** Jam charts (all-timers OR curated note) for a specific calendar day (On This Day page) */
+    jamChartsOnThisDay: (monthDay: string) => `songs:jam-charts:on-this-day:${monthDay}:v1`,
+    /** Every On-This-Day jam-chart cache across all calendar days (for pattern deletion). */
+    jamChartsOnThisDayAll: () => "songs:jam-charts:on-this-day:*",
     /** Filtered song results by era/author/kind/musician/tags/attended */
     filtered: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);

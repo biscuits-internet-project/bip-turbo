@@ -1113,10 +1113,10 @@ describe("countAllTimersByMonthDay", () => {
 // ---------------------------------------------------------------------------
 
 describe("CacheKeys", () => {
-  // The on-this-day all-timers cache key must embed the monthDay so each
+  // The on-this-day jam-charts cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
-  test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v9");
+  test("jamChartsOnThisDay includes the monthDay in the key", () => {
+    expect(CacheKeys.songs.jamChartsOnThisDay("04-08")).toBe("songs:jam-charts:on-this-day:04-08:v1");
   });
 
   // The on-this-day counts cache key is used by the home page to cache
