@@ -15,9 +15,9 @@ vi.mock("~/hooks/use-serialized-loader-data", () => ({
   useSerializedLoaderData: vi.fn(() => ({ songs: [] })),
 }));
 
-// Stub the shared FilteredSongsTable to inspect props
-vi.mock("~/components/song/filtered-songs-table", () => ({
-  FilteredSongsTable: (props: object) => mockShallowComponent("FilteredSongsTable", props),
+// Stub the shared FilteredSongsStatsTable to inspect props
+vi.mock("~/components/song/filtered-songs-stats-table", () => ({
+  FilteredSongsStatsTable: (props: object) => mockShallowComponent("FilteredSongsStatsTable", props),
 }));
 
 import ThisYearPage from "./this-year";
@@ -31,11 +31,11 @@ function renderThisYear() {
 }
 
 describe("ThisYearPage", () => {
-  // The This Year tab renders a FilteredSongsTable with the thisYear time range.
-  test("renders FilteredSongsTable with thisYear extraParams and hideTimeRange", () => {
+  // The This Year tab renders a FilteredSongsStatsTable with the thisYear time range.
+  test("renders FilteredSongsStatsTable with thisYear extraParams and hideTimeRange", () => {
     renderThisYear();
 
-    const table = screen.getByTestId("FilteredSongsTable");
+    const table = screen.getByTestId("FilteredSongsStatsTable");
     expect(table.textContent).toContain('"hideTimeRange":true');
   });
 });

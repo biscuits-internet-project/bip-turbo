@@ -6,7 +6,7 @@ import { hasNarrowingFilter } from "~/lib/played-filter";
 import { controlsHiddenByPreset } from "~/lib/preset-filters";
 import { SongsTable } from "./songs-table";
 
-interface FilteredSongsTableProps {
+interface FilteredSongsStatsTableProps {
   songs: Song[];
   extraParams?: Record<string, string>;
   hideTimeRange?: boolean;
@@ -32,14 +32,14 @@ interface FilteredSongsTableProps {
 
 const searchFilter = (song: Song, query: string) => song.title.toLowerCase().includes(query);
 
-export function FilteredSongsTable({
+export function FilteredSongsStatsTable({
   songs,
   extraParams,
   hideTimeRange,
   presetFilters,
   filteredAsPrimary,
   collapsibleOnDesktop,
-}: FilteredSongsTableProps) {
+}: FilteredSongsStatsTableProps) {
   const effectiveExtraParams = useMemo(
     () => (presetFilters ? { ...extraParams, ...presetFilters } : extraParams),
     [presetFilters, extraParams],

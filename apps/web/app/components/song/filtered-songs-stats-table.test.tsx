@@ -22,7 +22,7 @@ vi.mock("./songs-table", () => ({
   ),
 }));
 
-import { FilteredSongsTable } from "./filtered-songs-table";
+import { FilteredSongsStatsTable } from "./filtered-songs-stats-table";
 
 interface HookReturnOverrides {
   selectedTimeRange?: string;
@@ -69,12 +69,12 @@ function renderComponent(
 ) {
   return render(
     <MemoryRouter>
-      <FilteredSongsTable songs={[]} {...props} />
+      <FilteredSongsStatsTable songs={[]} {...props} />
     </MemoryRouter>,
   );
 }
 
-describe("FilteredSongsTable", () => {
+describe("FilteredSongsStatsTable", () => {
   // The component wires up usePerformancePageFilters, PerformanceFilterControls,
   // and SongsTable together — verify SongsTable renders.
   test("renders SongsTable", () => {
@@ -97,7 +97,7 @@ describe("FilteredSongsTable", () => {
 
   // /songs and its tabs fetch through the loader (via fetchFilteredSongs),
   // so the hook's client fetch would be a duplicate request. Unpinned
-  // FilteredSongsTable opts out of the hook's internal fetch path.
+  // FilteredSongsStatsTable opts out of the hook's internal fetch path.
   test("passes skipClientFetch: true to usePerformancePageFilters", () => {
     setHookReturn();
     renderComponent();
