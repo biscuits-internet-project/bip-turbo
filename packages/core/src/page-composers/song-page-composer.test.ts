@@ -1,9 +1,10 @@
-import type { SongPagePerformance } from "@bip/domain";
+import type { SongPagePerformance, Track, TrackMusicianDelta } from "@bip/domain";
 import { CacheKeys } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import { describe, expect, test, vi } from "vitest";
 import {
   assignFilteredGaps,
+  attachTrackFootnoteData,
   buildSetPositionKey,
   computeRarityStats,
   computeTagsForPerformance,
@@ -216,6 +217,46 @@ describe("computeTagsForPerformance", () => {
     expect(noFlagsTags.inverted).toBe(false);
     expect(noFlagsTags.dyslexic).toBe(false);
     expect(noFlagsTags.unfinished).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// attachTrackFootnoteData — copy footnote inputs onto performance rows
+// ---------------------------------------------------------------------------
+
+describe("attachTrackFootnoteData", () => {
+  test("copies flags, recurrences, completions, and deltas onto matching performances", () => {
+    const performances = [makePerformance({ trackId: "track-1" }), makePerformance({ trackId: "track-2" })];
+    const track1 = {
+      flags: ["INVERTED"],
+      flagRecurrences: [
+        { flag: "DYSLEXIC", versionGap: 3, gap: 10, lastPlayed: { date: "2020-01-01", slug: "2020-01-01" } },
+      ],
+      segueRecurrences: [],
+      completes: [{ date: "2019-05-05", slug: "2019-05-05" }],
+      completedBy: [],
+    } as unknown as Track;
+    const deltas = [{} as TrackMusicianDelta];
+
+    attachTrackFootnoteData(performances, new Map([["track-1", track1]]), new Map([["track-1", deltas]]));
+
+    expect(performances[0].flags).toEqual(["INVERTED"]);
+    expect(performances[0].flagRecurrences).toHaveLength(1);
+    expect(performances[0].completes).toEqual([{ date: "2019-05-05", slug: "2019-05-05" }]);
+    expect(performances[0].trackMusicianDeltas).toBe(deltas);
+  });
+
+  test("defaults rows with no matching track to empty footnote fields", () => {
+    const performances = [makePerformance({ trackId: "unmapped" })];
+
+    attachTrackFootnoteData(performances, new Map(), new Map());
+
+    expect(performances[0].flags).toEqual([]);
+    expect(performances[0].flagRecurrences).toEqual([]);
+    expect(performances[0].segueRecurrences).toEqual([]);
+    expect(performances[0].completes).toEqual([]);
+    expect(performances[0].completedBy).toEqual([]);
+    expect(performances[0].trackMusicianDeltas).toEqual([]);
   });
 });
 
@@ -615,7 +656,7 @@ describe("buildSongPerformances", () => {
     const mockDb = {
       $queryRaw: vi.fn().mockResolvedValue(rows.map((r) => makeDto(r as Partial<PerformanceDto>))),
       annotation: { findMany: vi.fn().mockResolvedValue([]) },
-      trackFlagAssignment: { findMany: vi.fn().mockResolvedValue([]) },
+      track: { findMany: vi.fn().mockResolvedValue([]) },
     };
     return { composer: new SongPageComposer(mockDb as never, {} as never), mockDb };
   }
@@ -702,7 +743,7 @@ describe("CacheKeys.songs.jamCharts", () => {
   // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
   // bumped together with the rest of the songs cache family.
   test("returns a stable, versioned key string", () => {
-    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v9");
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v10");
   });
 });
 
@@ -1075,7 +1116,7 @@ describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v8");
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v9");
   });
 
   // The on-this-day counts cache key is used by the home page to cache

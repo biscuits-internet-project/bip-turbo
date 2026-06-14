@@ -1,4 +1,11 @@
-import type { Annotation, SegueRecurrenceKind, Setlist, SetlistLight, TrackMusicianDelta } from "@bip/domain";
+import type {
+  Annotation,
+  SegueRecurrenceKind,
+  Setlist,
+  SetlistLight,
+  SongPagePerformance,
+  TrackMusicianDelta,
+} from "@bip/domain";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -724,16 +731,17 @@ export function buildShowFootnotes(setlist: Setlist | SetlistLight): DerivedFoot
   const suppressDebuts = debutFootnoteSuppressed(setlist.show.date);
   const suppressGaps = gapFootnoteSuppressed(setlist.show.date);
   const footnoteSources = [
-    // DB annotations are numbered before synthesized performer footnotes on any
-    // given track, so the existing annotation indices stay stable.
-    ...annotationFootnoteSources(setlist.annotations),
-    // All of a track's structured flags + completion links read on one line,
-    // right after annotations so the setlist reads like its annotation era.
-    ...dataDrivenFootnoteSources(allTracks, { suppressRecurrences: suppressGaps }),
+    // Performer / guest footnotes lead the list everywhere — the table Notes
+    // column, the public setlist, and the edit page all surface "who played"
+    // first, before the song-level markers.
     ...synthesizePerformerFootnotes(setlist.trackMusicianDeltas, elevatedGuestIds(lineupNotes)),
     ...guestExclusionFootnotes(lineupNotes.guests, setlist.trackMusicianDeltas),
-    // Auto last-time-played / debut footnotes append after the above so the
-    // existing annotation and performer footnote numbers stay stable.
+    // Then the DB annotations, ahead of the structured markers on any shared
+    // track so the original annotation wording reads first.
+    ...annotationFootnoteSources(setlist.annotations),
+    // All of a track's structured flags + completion links read on one line.
+    ...dataDrivenFootnoteSources(allTracks, { suppressRecurrences: suppressGaps }),
+    // Auto last-time-played / debut footnotes append last.
     ...(!suppressGaps ? lastTimePlayedFootnoteSources(allTracks, LAST_TIME_PLAYED_GAP_THRESHOLD) : []),
     ...(!suppressDebuts ? debutFootnoteSources(allTracks) : []),
   ];
@@ -756,4 +764,42 @@ export function footnotesByTrack(derived: DerivedFootnotes): Map<string, ReactNo
     );
   }
   return byTrack;
+}
+
+/** Derive then slice a single isolated track's footnote contents (dedup + order
+ *  via the same engine the setlist uses), with no show-wide numbering context. */
+function perTrackFootnoteContents(trackId: string, sources: FootnoteSource[]): ReactNode[] {
+  return footnotesByTrack(deriveFootnotes([{ id: trackId }], sources)).get(trackId) ?? [];
+}
+
+/**
+ * The data-driven footnotes for ONE performance row in a cross-show table's
+ * Notes column. Mirrors the setlist's per-track wording (guests first, then
+ * flags / completions / recurrence clauses) by reusing the same source builders,
+ * but deliberately omits the debut and last-time-played footnotes — the table
+ * already carries those as its Gap and Last Played columns — and the
+ * guest-exclusion "without" notes, which only make sense beside a show-level
+ * "with X, except where noted" claim the table doesn't render. Whole-show guests
+ * are not suppressed here (there is no show-level note to defer them to).
+ */
+export function buildPerformanceFootnotes(performance: SongPagePerformance): ReactNode[] {
+  const track: FootnoteTrack = {
+    id: performance.trackId,
+    // Single-track derivation: songId only keys within-call recurrence sharing,
+    // so the song slug is a stable stand-in (the row carries no songId).
+    songId: performance.songSlug ?? performance.trackId,
+    gap: performance.gap ?? null,
+    previousPerformanceShow: performance.previousShow ?? null,
+    completes: performance.completes,
+    completedBy: performance.completedBy,
+    flags: performance.flags,
+    flagRecurrences: performance.flagRecurrences,
+    segueRecurrences: performance.segueRecurrences,
+    song: { slug: performance.songSlug ?? "", kind: performance.kind ?? null },
+  };
+  const sources = [
+    ...synthesizePerformerFootnotes(performance.trackMusicianDeltas ?? []),
+    ...dataDrivenFootnoteSources([track], { suppressRecurrences: gapFootnoteSuppressed(performance.show.date) }),
+  ];
+  return perTrackFootnoteContents(performance.trackId, sources);
 }

@@ -1,6 +1,7 @@
 import type { SongPagePerformance } from "@bip/domain";
 import { mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { DataTable } from "~/components/ui/data-table";
 import { createPerformanceColumns } from "./performance-columns";
@@ -8,8 +9,19 @@ import { createPerformanceColumns } from "./performance-columns";
 vi.mock("./track-rating-cell", () => ({
   TrackRatingCell: (props: object) => mockShallowComponent("TrackRatingCell", props),
 }));
+// Render the real `items` (footnote ReactNodes + free-text) so their text and
+// order are assertable, without CombinedNotes' line-clamp/measurement effects.
 vi.mock("./combined-notes", () => ({
-  CombinedNotes: (props: object) => mockShallowComponent("CombinedNotes", props),
+  CombinedNotes: ({ items }: { items: ReactNode[] }) => (
+    <div data-testid="CombinedNotes">
+      {items.map((item, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: positional note items in a test stub
+        <div key={index} data-testid="note-item">
+          {item}
+        </div>
+      ))}
+    </div>
+  ),
 }));
 
 function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPagePerformance {
@@ -83,6 +95,39 @@ describe("createPerformanceColumns", () => {
     const columns = createPerformanceColumns(defaultOptions);
     const notesColumn = columns.find((column) => "id" in column && column.id === "notes");
     expect(notesColumn?.meta?.hideOnMobile).toBe(true);
+  });
+
+  // The Notes cell restores the data-driven footnotes (guests, then flags /
+  // completions) ahead of any free-text annotation, mirroring the setlist.
+  test("Notes cell leads with the guest footnote, then the flag, then free-text annotations", async () => {
+    const performances = [
+      makePerformance({
+        trackId: "t1",
+        flags: ["INVERTED"],
+        annotations: [
+          { id: "a1", trackId: "t1", desc: "Tease of Munchkin Invasion", createdAt: new Date(), updatedAt: new Date() },
+        ],
+        trackMusicianDeltas: [
+          {
+            trackId: "t1",
+            present: true,
+            musician: { id: "m1", name: "Skerik", slug: "skerik", knownFrom: null, defaultInstrument: null },
+            instruments: [
+              { id: "i1", name: "saxophone", slug: "saxophone", createdAt: new Date(), updatedAt: new Date() },
+            ],
+          },
+        ],
+      }),
+    ];
+    const columns = createPerformanceColumns(defaultOptions);
+    await setupWithRouter(<DataTable columns={columns} data={performances} hideSearch hidePagination />);
+
+    const items = screen.getAllByTestId("note-item");
+    expect(items[0]).toHaveTextContent("with Skerik on saxophone");
+    expect(items[1]).toHaveTextContent("inverted");
+    expect(items[2]).toHaveTextContent("Tease of Munchkin Invasion");
+    // The Gap/Last Played columns already cover these, so no debut footnote here.
+    expect(screen.queryByText(/debut/)).not.toBeInTheDocument();
   });
 
   // Song Before / Song After visibility depends on the surface:

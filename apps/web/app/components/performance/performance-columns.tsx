@@ -1,7 +1,9 @@
 import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, RotateCcw, Star } from "lucide-react";
+import type { ReactNode } from "react";
 import { GapIcon } from "~/components/gap-icon";
+import { buildPerformanceFootnotes } from "~/components/setlist/footnotes";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
 import { ShowDateLink } from "~/components/show-date-link";
@@ -472,7 +474,10 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         meta: { weight: 2.8, hideOnMobile: true },
         cell: (info) => {
           const { annotations, notes } = info.getValue();
-          const items = [];
+          // Data-driven footnotes (guests, flags, completions, recurrence
+          // clauses) lead, mirroring the setlist; then any free-text annotation
+          // descriptions, then the curated note.
+          const items: ReactNode[] = [...buildPerformanceFootnotes(info.row.original)];
 
           if (annotations && annotations.length > 0) {
             for (const annotation of annotations) {

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { cn } from "~/lib/utils";
 
-export function CombinedNotes({ items }: { items: string[] }) {
+export function CombinedNotes({ items }: { items: ReactNode[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -17,8 +17,9 @@ export function CombinedNotes({ items }: { items: string[] }) {
   return (
     <div className="text-sm text-content-text-secondary">
       <div ref={contentRef} className={cn("leading-relaxed", !isExpanded && "line-clamp-2")}>
-        {items.map((item) => (
-          <div key={item} className={showBullets ? "flex" : ""}>
+        {items.map((item, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: items are positional ReactNodes (footnotes + notes), stable per render
+          <div key={index} className={showBullets ? "flex" : ""}>
             {showBullets && <span className="mr-1">•</span>}
             <span>{item}</span>
           </div>
