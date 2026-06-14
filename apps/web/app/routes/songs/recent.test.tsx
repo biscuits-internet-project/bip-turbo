@@ -15,9 +15,9 @@ vi.mock("~/hooks/use-serialized-loader-data", () => ({
   useSerializedLoaderData: vi.fn(() => ({ songs: [] })),
 }));
 
-// Stub the shared FilteredSongsTable to inspect props
-vi.mock("~/components/song/filtered-songs-table", () => ({
-  FilteredSongsTable: (props: object) => mockShallowComponent("FilteredSongsTable", props),
+// Stub the shared FilteredSongsStatsTable to inspect props
+vi.mock("~/components/song/filtered-songs-stats-table", () => ({
+  FilteredSongsStatsTable: (props: object) => mockShallowComponent("FilteredSongsStatsTable", props),
 }));
 
 import RecentPage from "./recent";
@@ -31,11 +31,11 @@ function renderRecent() {
 }
 
 describe("RecentPage", () => {
-  // The Recent tab renders a FilteredSongsTable with the last10shows time range.
-  test("renders FilteredSongsTable with last10shows extraParams and hideTimeRange", () => {
+  // The Recent tab renders a FilteredSongsStatsTable with the last10shows time range.
+  test("renders FilteredSongsStatsTable with last10shows extraParams and hideTimeRange", () => {
     renderRecent();
 
-    const table = screen.getByTestId("FilteredSongsTable");
+    const table = screen.getByTestId("FilteredSongsStatsTable");
     expect(table.textContent).toContain('"hideTimeRange":true');
   });
 });

@@ -1,5 +1,5 @@
 import type { Song } from "@bip/domain";
-import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
+import { FilteredSongsStatsTable } from "~/components/song/filtered-songs-stats-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { fetchFilteredSongs } from "~/lib/song-utilities";
@@ -20,5 +20,5 @@ export function meta() {
 export default function RecentPage() {
   const { songs } = useSerializedLoaderData<{ songs: Song[] }>();
 
-  return <FilteredSongsTable songs={songs} extraParams={{ timeRange: "last10shows" }} hideTimeRange />;
+  return <FilteredSongsStatsTable songs={songs} extraParams={{ timeRange: "last10shows" }} hideTimeRange />;
 }

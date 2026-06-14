@@ -2,7 +2,7 @@ import type { Song } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import { useMemo } from "react";
 import { redirect } from "react-router-dom";
-import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
+import { FilteredSongsStatsTable } from "~/components/song/filtered-songs-stats-table";
 import { PageHeader } from "~/components/ui/page-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -57,7 +57,7 @@ export default function AuthorPage() {
       <div className="space-y-2 mb-6">
         <PageHeader title={author.name} backLink={{ to: "/songs", label: "All Songs" }} />
       </div>
-      <FilteredSongsTable songs={songs} presetFilters={presetFilters} />
+      <FilteredSongsStatsTable songs={songs} presetFilters={presetFilters} />
     </div>
   );
 }

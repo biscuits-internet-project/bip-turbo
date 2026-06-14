@@ -6,8 +6,8 @@ import type { MusicianTier } from "~/lib/musicians-constants";
 // The two shared tables client-fetch and pull in React Query; stub them to
 // markers that echo their presetFilters so the page's wiring is assertable
 // without the fetch machinery.
-vi.mock("~/components/song/filtered-songs-table", () => ({
-  FilteredSongsTable: ({ presetFilters }: { presetFilters?: Record<string, string> }) => (
+vi.mock("~/components/song/filtered-songs-stats-table", () => ({
+  FilteredSongsStatsTable: ({ presetFilters }: { presetFilters?: Record<string, string> }) => (
     <div data-testid="songs-table" data-preset={JSON.stringify(presetFilters ?? null)} />
   ),
 }));

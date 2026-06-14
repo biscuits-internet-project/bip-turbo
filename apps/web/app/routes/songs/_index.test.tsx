@@ -16,9 +16,9 @@ vi.mock("~/hooks/use-serialized-loader-data", () => ({
   useSerializedLoaderData: vi.fn(() => ({ songs: [] })),
 }));
 
-// Stub the shared FilteredSongsTable component
-vi.mock("~/components/song/filtered-songs-table", () => ({
-  FilteredSongsTable: (props: object) => mockShallowComponent("FilteredSongsTable", props),
+// Stub the shared FilteredSongsStatsTable component
+vi.mock("~/components/song/filtered-songs-stats-table", () => ({
+  FilteredSongsStatsTable: (props: object) => mockShallowComponent("FilteredSongsStatsTable", props),
 }));
 
 import Songs from "./_index";
@@ -53,11 +53,11 @@ describe("Songs index page", () => {
     expect(screen.queryByRole("link", { name: /create song/i })).not.toBeInTheDocument();
   });
 
-  // The FilteredSongsTable renders the songs table with filter controls.
-  test("renders the FilteredSongsTable", () => {
+  // The FilteredSongsStatsTable renders the songs table with filter controls.
+  test("renders the FilteredSongsStatsTable", () => {
     renderSongsIndex();
 
-    expect(screen.getByTestId("FilteredSongsTable")).toBeInTheDocument();
+    expect(screen.getByTestId("FilteredSongsStatsTable")).toBeInTheDocument();
   });
 
   // Trending data is accessible via the "Last 10 Shows" and "This Year" tabs,

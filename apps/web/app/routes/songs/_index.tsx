@@ -1,5 +1,5 @@
 import type { Song } from "@bip/domain";
-import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
+import { FilteredSongsStatsTable } from "~/components/song/filtered-songs-stats-table";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getSongsMeta } from "~/lib/seo";
@@ -17,5 +17,5 @@ export function meta() {
 export default function Songs() {
   const { songs } = useSerializedLoaderData<{ songs: Song[] }>();
 
-  return <FilteredSongsTable songs={songs} />;
+  return <FilteredSongsStatsTable songs={songs} />;
 }

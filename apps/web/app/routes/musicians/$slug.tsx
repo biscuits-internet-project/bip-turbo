@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { DateVenueCell } from "~/components/performance/date-venue-cell";
 import { ShowDate } from "~/components/show-date";
-import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
+import { FilteredSongsStatsTable } from "~/components/song/filtered-songs-stats-table";
 import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { DataTable } from "~/components/ui/data-table";
 import { LinkButton } from "~/components/ui/link-button";
@@ -286,7 +286,7 @@ export default function MusicianPage() {
             titleClassName={sectionTitleClass}
             contentClassName="pt-4"
           >
-            <FilteredSongsTable songs={songsWritten} presetFilters={songsWrittenPreset} collapsibleOnDesktop />
+            <FilteredSongsStatsTable songs={songsWritten} presetFilters={songsWrittenPreset} collapsibleOnDesktop />
           </CollapsibleSection>
         )}
 
@@ -310,7 +310,7 @@ export default function MusicianPage() {
                     <TabsTrigger value="all-performances">All Song Performances</TabsTrigger>
                   </TabsList>
                   <TabsContent value="by-song" className="mt-4">
-                    <FilteredSongsTable
+                    <FilteredSongsStatsTable
                       songs={songs}
                       presetFilters={musicianPreset}
                       filteredAsPrimary
