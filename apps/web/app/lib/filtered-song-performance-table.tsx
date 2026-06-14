@@ -29,6 +29,8 @@ interface FilteredSongPerformanceTableProps {
    */
   requiresFilter?: boolean;
   emptyPrompt?: ReactNode;
+  /** Collapse the filter chrome on desktop too (dense pages like the musician profile). */
+  collapsibleOnDesktop?: boolean;
 }
 
 export function FilteredSongPerformanceTable({
@@ -37,6 +39,7 @@ export function FilteredSongPerformanceTable({
   presetFilters,
   requiresFilter = false,
   emptyPrompt = null,
+  collapsibleOnDesktop,
 }: FilteredSongPerformanceTableProps) {
   const {
     filteredData: filteredPerformances,
@@ -76,6 +79,7 @@ export function FilteredSongPerformanceTable({
       searchValue={searchText}
       onSearchChange={setSearchText}
       hasActiveFilters={hasActiveFilters}
+      collapsibleOnDesktop={collapsibleOnDesktop}
     />
   );
 

@@ -78,7 +78,8 @@ function CollapsiblePlayer({ identifier }: { identifier: string }) {
         className="w-full flex items-center justify-between text-sm font-medium text-content-text-secondary hover:text-content-text-primary transition-colors"
       >
         <span>{open ? "Hide player" : "Play recording"}</span>
-        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+        {/* Matches the app's disclosure convention: ▶ when closed, ▼ when open. */}
+        <ChevronDown className={cn("h-4 w-4 transition-transform", !open && "-rotate-90")} />
       </button>
       {open && (
         <div className="mt-3">

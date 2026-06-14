@@ -194,10 +194,13 @@ describe("SetlistCard", () => {
     expect(screen.getByText("Basis for a Day")).toBeInTheDocument();
   });
 
-  // On top-rated, each card opts into collapsed mode. The body stays mounted
-  // (so the grid-rows transition can animate it), but is marked aria-hidden
-  // and clipped to zero height via the 0fr grid row.
-  test("hides body initially when collapsible is true", async () => {
+  // On top-rated, each card opts into collapsed mode. The body wrapper stays in
+  // the DOM (so the grid-rows transition has something to animate), marked
+  // aria-hidden and clipped to zero height via the 0fr grid row — but its heavy
+  // contents (the full setlist) are lazy-mounted, so they aren't rendered until
+  // the card is first opened. This keeps 100 collapsed cards from mounting 100
+  // full setlists up front.
+  test("hides body initially and does not mount its contents when collapsible is true", async () => {
     await setupWithRouter(
       <SetlistCard setlist={makeSetlist()} collapsible userAttendance={null} userRating={null} showRating={null} />,
     );
@@ -207,24 +210,28 @@ describe("SetlistCard", () => {
     // Header content (date + venue) must still be visible.
     expect(screen.getByText("4/14/2021")).toBeInTheDocument();
     expect(screen.getByText(/The Fillmore/)).toBeInTheDocument();
+    // …but the setlist body is not mounted until first open.
+    expect(screen.queryByText("Basis for a Day")).not.toBeInTheDocument();
   });
 
-  // Clicking an empty part of the header toggles the body open. The body
-  // stays mounted throughout; opening flips aria-hidden to false and swaps
-  // the grid-rows class from 0fr to 1fr so the transition runs.
-  test("clicking the header toggles the body open when collapsible", async () => {
+  // Clicking an empty part of the header opens the card: aria-hidden flips to
+  // false, the grid-rows class swaps to 1fr for the transition, and the
+  // lazy-mounted setlist body now renders.
+  test("clicking the header opens and mounts the body when collapsible", async () => {
     const user = userEvent.setup();
     await setupWithRouter(
       <SetlistCard setlist={makeSetlist()} collapsible userAttendance={null} userRating={null} showRating={null} />,
     );
     const body = screen.getByTestId("setlist-card-body");
     expect(body).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByText("Basis for a Day")).not.toBeInTheDocument();
 
     const header = screen.getByTestId("setlist-card-header");
     await user.click(header);
 
     expect(body).toHaveAttribute("aria-hidden", "false");
     expect(body.className).toMatch(/grid-rows-\[1fr\]/);
+    expect(screen.getByText("Basis for a Day")).toBeInTheDocument();
   });
 
   // The venue link lives inside the header. Clicking it should navigate, not

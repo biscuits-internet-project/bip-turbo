@@ -9,6 +9,7 @@ import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ShowFiltersNav } from "~/components/show-filters-nav";
 import { Button } from "~/components/ui/button";
+import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { LinkButton } from "~/components/ui/link-button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -195,10 +196,6 @@ export default function ShowsByYear() {
   // Months with at least one show — drives the Jump-to-Month nav active state.
   const monthsWithShows = useMemo(() => Object.keys(monthCounts).map(Number), [monthCounts]);
 
-  // Jump-to-Month collapses by default on mobile so the long month grid
-  // doesn't push the show list far below the fold; CSS forces it open at sm+.
-  const [jumpToMonthOpen, setJumpToMonthOpen] = useState(false);
-
   // Handle scroll event to show/hide back to top button
   useEffect(() => {
     const handleScroll = () => {
@@ -257,70 +254,42 @@ export default function ShowsByYear() {
               currentURLParameters={currentURLParameters}
               counts={showCountsByYear}
             />
-            <div className="card-premium rounded-lg overflow-hidden">
-              {/* Month navigation */}
-              <div className="px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => setJumpToMonthOpen((open) => !open)}
-                  aria-expanded={jumpToMonthOpen}
-                  className={cn(
-                    // Mobile-style toggle re-shows on phone-landscape
-                    // viewports so the month grid doesn't eat most of a
-                    // rotated phone's visible rows.
-                    "sm:hidden short:!flex w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none",
-                    jumpToMonthOpen ? "mb-3" : "mb-0",
-                  )}
-                >
-                  Jump to Month
-                  <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
-                    {monthsWithShows.length} months
-                  </span>
-                  <span
-                    className={cn("transition-transform duration-300 ml-2", jumpToMonthOpen ? "rotate-90" : "rotate-0")}
-                    aria-hidden
-                  >
-                    ▶
-                  </span>
-                </button>
-                <h2 className="hidden sm:flex short:hidden text-sm font-semibold text-white mb-3 items-center gap-2">
-                  Jump to Month
-                  <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
-                    {monthsWithShows.length} months
-                  </span>
-                </h2>
-                <div
-                  className={cn(
-                    "overflow-hidden transition-all duration-300 grid grid-cols-3 sm:grid-cols-12 gap-1.5 sm:!max-h-[1000px] sm:!opacity-100",
-                    jumpToMonthOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0",
-                    // Re-collapse on phone-landscape viewports unless the
-                    // user has explicitly expanded — same density rationale
-                    // as the FilterNav short: override.
-                    !jumpToMonthOpen && "short:!max-h-0 short:!opacity-0",
-                  )}
-                >
-                  {months.map((month, index) => {
-                    const active = monthsWithShows.includes(index);
-                    const count = monthCounts[index] ?? 0;
-                    return (
-                      <a
-                        key={month}
-                        href={active ? `#month-${index}` : undefined}
-                        className={cn(
-                          "px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
-                          active
-                            ? "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white cursor-pointer"
-                            : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
-                        )}
-                      >
-                        {month}
-                        {active && count > 0 && <span className="ml-1 opacity-70 hidden sm:inline">({count})</span>}
-                      </a>
-                    );
-                  })}
-                </div>
+            <CollapsibleSection
+              className="card-premium rounded-lg overflow-hidden"
+              title="Jump to Month"
+              titleClassName="text-sm font-semibold text-white"
+              headerExtra={
+                <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
+                  {monthsWithShows.length} months
+                </span>
+              }
+              headerClassName="px-4 py-3"
+              contentClassName="px-4 pb-3"
+              breakpoint="sm"
+              collapseOnLandscape
+            >
+              <div className="grid grid-cols-3 sm:grid-cols-12 gap-1.5">
+                {months.map((month, index) => {
+                  const active = monthsWithShows.includes(index);
+                  const count = monthCounts[index] ?? 0;
+                  return (
+                    <a
+                      key={month}
+                      href={active ? `#month-${index}` : undefined}
+                      className={cn(
+                        "px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
+                        active
+                          ? "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white cursor-pointer"
+                          : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
+                      )}
+                    >
+                      {month}
+                      {active && count > 0 && <span className="ml-1 opacity-70 hidden sm:inline">({count})</span>}
+                    </a>
+                  );
+                })}
               </div>
-            </div>
+            </CollapsibleSection>
           </>
         )}
 

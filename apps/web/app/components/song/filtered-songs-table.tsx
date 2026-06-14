@@ -26,6 +26,8 @@ interface FilteredSongsTableProps {
    * musician's scoped stats, instead of pairing all-time and filtered columns.
    */
   filteredAsPrimary?: boolean;
+  /** Collapse the filter chrome on desktop too (dense pages like the musician profile). */
+  collapsibleOnDesktop?: boolean;
 }
 
 const searchFilter = (song: Song, query: string) => song.title.toLowerCase().includes(query);
@@ -36,6 +38,7 @@ export function FilteredSongsTable({
   hideTimeRange,
   presetFilters,
   filteredAsPrimary,
+  collapsibleOnDesktop,
 }: FilteredSongsTableProps) {
   const effectiveExtraParams = useMemo(
     () => (presetFilters ? { ...extraParams, ...presetFilters } : extraParams),
@@ -100,6 +103,7 @@ export function FilteredSongsTable({
       onSearchChange={setSearchText}
       hasActiveFilters={hasActiveFilters}
       hideTimeRange={hideTimeRange}
+      collapsibleOnDesktop={collapsibleOnDesktop}
     />
   );
 
