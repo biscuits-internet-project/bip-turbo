@@ -55,7 +55,7 @@ describe("CacheInvalidationService.invalidatePerformanceListings", () => {
 
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.songs.allTimers());
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.songs.jamCharts());
-    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.songs.allTimersOnThisDayAll());
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.songs.jamChartsOnThisDayAll());
   });
 });
 

@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 /**
  * Whether to show performance filter controls on the On This Day page.
- * Filters are only useful when there are enough all-timers to paginate.
+ * Filters are only useful when there are enough jam charts to paginate.
  */
 function shouldShowFilters(performanceCount: number, pageSize: number): boolean {
   return performanceCount > pageSize;

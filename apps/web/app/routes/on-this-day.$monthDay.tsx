@@ -34,7 +34,7 @@ export function headers(): Headers {
   const headers = new Headers();
   // max-age only, no `s-maxage`. This route has no Cache-Tag mapping any
   // subset of shows, so the edge has no purge path for show mutations.
-  // Origin work is covered by Redis (setlists + all-timers caches).
+  // Origin work is covered by Redis (setlists + jam-charts caches).
   headers.set("Cache-Control", "public, max-age=300");
   return headers;
 }
@@ -54,17 +54,17 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
   }
 
   const setlistsCacheKey = CacheKeys.shows.list({ monthDay, sort: "desc" });
-  const allTimersCacheKey = CacheKeys.songs.allTimersOnThisDay(monthDay);
+  const jamChartsCacheKey = CacheKeys.songs.jamChartsOnThisDay(monthDay);
 
-  const [setlists, allTimersResult] = await Promise.all([
+  const [setlists, jamChartsResult] = await Promise.all([
     services.cache.getOrSet(setlistsCacheKey, async () => {
       return services.setlists.findManyLight({
         filters: { monthDay },
         sort: [{ field: "date", direction: "desc" }],
       });
     }),
-    services.cache.getOrSet(allTimersCacheKey, async () => {
-      return services.songPageComposer.buildSongPerformances({ allTimer: true, monthDay });
+    services.cache.getOrSet(jamChartsCacheKey, async () => {
+      return services.songPageComposer.buildSongPerformances({ jamChart: true, monthDay });
     }),
   ]);
 
@@ -77,8 +77,8 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
   // so they cover a different (and usually larger) id set than the setlists.
   // PerformanceTable's useAttendanceRowHighlight calls useShowUserData with
   // those ids, so we must prefetch that key in addition to the setlist key.
-  const performanceShowIds = [...new Set(allTimersResult.performances.map((p) => p.show.id))];
-  const trackIds = allTimersResult.performances.map((p) => p.trackId);
+  const performanceShowIds = [...new Set(jamChartsResult.performances.map((p) => p.show.id))];
+  const trackIds = jamChartsResult.performances.map((p) => p.trackId);
 
   const queryClient = createPrefetchClient();
   await Promise.all([
@@ -98,7 +98,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
 
   return {
     setlists,
-    performances: allTimersResult.performances,
+    performances: jamChartsResult.performances,
     monthDay,
     displayLabel,
     previousMonthDay,
@@ -112,7 +112,7 @@ export function meta({ data }: { data: LoaderData }) {
   if (!data) return [{ title: "On This Day | Biscuits Internet Project" }];
   return [
     { title: `On This Day: ${data.displayLabel} | Biscuits Internet Project` },
-    { name: "description", content: `Disco Biscuits shows and all-time performances on ${data.displayLabel}` },
+    { name: "description", content: `Disco Biscuits shows and jam-chart performances on ${data.displayLabel}` },
   ];
 }
 
@@ -121,7 +121,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 };
 clientLoader.hydrate = true;
 
-const ALL_TIMERS_PAGE_SIZE = 10;
+const JAM_CHARTS_PAGE_SIZE = 10;
 
 export default function OnThisDay() {
   const { setlists, performances, displayLabel, monthDay, previousMonthDay, nextMonthDay, externalSources } =
@@ -144,7 +144,7 @@ export default function OnThisDay() {
   } = usePerformancePageFilters({
     initialData: performances,
     apiUrl: "/api/songs/performances",
-    extraParams: { filters: "allTimer", monthDay },
+    extraParams: { filters: "jamChart", monthDay },
     searchFilter: searchPerformance,
   });
 
@@ -179,11 +179,11 @@ export default function OnThisDay() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Flame className="h-6 w-6 text-orange-500" />
-              <h2 className="text-2xl font-bold text-content-text-primary">All-Timers</h2>
+              <Flame className="h-6 w-6 text-content-text-secondary" />
+              <h2 className="text-2xl font-bold text-content-text-primary">Jam Charts</h2>
             </div>
             <Link
-              to="/songs/all-timers"
+              to="/songs/jam-charts"
               className="text-content-text-tertiary hover:text-content-text-secondary text-sm transition-colors"
             >
               View all →
@@ -198,10 +198,12 @@ export default function OnThisDay() {
               performances={filteredPerformances}
               isLoading={isLoading}
               showSongColumn
+              showAllTimerColumn
+              mobileFlamePriority
               showGapColumns={false}
-              pageSize={ALL_TIMERS_PAGE_SIZE}
+              pageSize={JAM_CHARTS_PAGE_SIZE}
               headerContent={
-                performances.length > ALL_TIMERS_PAGE_SIZE ? (
+                performances.length > JAM_CHARTS_PAGE_SIZE ? (
                   <PerformanceFilterControls
                     selectedTimeRange={selectedTimeRange}
                     activeToggleSet={activeToggleSet}
@@ -211,7 +213,7 @@ export default function OnThisDay() {
                     kindFilter={kindFilter}
                     selectedAuthor={selectedAuthor}
                     selectedMusician={selectedMusician}
-                    showAllTimerToggle={false}
+                    showJamChartToggle={false}
                     searchValue={searchText}
                     onSearchChange={setSearchText}
                     hasActiveFilters={hasActiveFilters}
