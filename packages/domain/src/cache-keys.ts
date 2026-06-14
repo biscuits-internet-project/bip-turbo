@@ -83,13 +83,13 @@ export const CacheKeys = {
     /** Full songs index page data */
     index: () => "songs:index:full:v6",
     /** All-timers page data */
-    allTimers: () => "songs:all-timers:v7",
+    allTimers: () => "songs:all-timers:v8",
     /** Jam Charts page data (tracks that are all-timers OR carry a curated note) */
-    jamCharts: () => "songs:jam-charts:v8",
+    jamCharts: () => "songs:jam-charts:v9",
     /** Songs with history content */
     histories: () => "songs:histories:v6",
     /** All-timers for a specific calendar day (On This Day page) */
-    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v7`,
+    allTimersOnThisDay: (monthDay: string) => `songs:all-timers:on-this-day:${monthDay}:v8`,
     /** Every On-This-Day all-timer cache across all calendar days (for pattern deletion). */
     allTimersOnThisDayAll: () => "songs:all-timers:on-this-day:*",
     /** Filtered song results by era/author/kind/musician/tags/attended */
@@ -97,9 +97,9 @@ export const CacheKeys = {
       const filterHash = hashFilters(filters);
       const attendedUserId = filters.attended;
       if (attendedUserId) {
-        return `songs:filtered:user:${attendedUserId}:${filterHash}:v10`;
+        return `songs:filtered:user:${attendedUserId}:${filterHash}:v11`;
       }
-      return `songs:filtered:${filterHash}:v10`;
+      return `songs:filtered:${filterHash}:v11`;
     },
     /** All filtered song caches (for pattern deletion) */
     allFiltered: () => "songs:filtered:*",
@@ -112,7 +112,7 @@ export const CacheKeys = {
    */
   musicians: {
     /** Full musician profile payload (appearances, songs played/written, performances). */
-    page: (slug: string) => `musician:${slug}:data:v2`,
+    page: (slug: string) => `musician:${slug}:data:v3`,
     /** Every musician profile cache (for pattern deletion on broad mutations). */
     allPages: () => "musician:*:data:*",
   },

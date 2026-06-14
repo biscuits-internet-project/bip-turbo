@@ -32,6 +32,11 @@ export type SongPagePerformance = {
   duration?: number | null;
   durationSource?: string | null;
   gap?: number | null;
+  // Distinct encore count for this performance's show. Required so any code
+  // building a performance row must supply it, which keeps the Set column's
+  // "E1" → "E" collapse (single-encore shows) working on every cross-show
+  // table without a silent fallback. Mirrors the single-show setlist views.
+  encoresInSet: number;
   // Gap measured against the previous performance of this song within the
   // currently-applied filter scope. Populated server-side only when a
   // narrowing filter is active.

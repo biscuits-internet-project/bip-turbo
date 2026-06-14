@@ -335,6 +335,7 @@ function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPage
     segue: null,
     annotations: [],
     set: "S1",
+    encoresInSet: 0,
     position: 3,
     gap: 5,
     previousPerformanceShowId: "prev-show",

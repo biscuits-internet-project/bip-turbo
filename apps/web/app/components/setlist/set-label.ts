@@ -1,15 +1,15 @@
 /**
  * Compact display of a track's `set` value across any table that shows a
  * Set column. Drops the "S" prefix on regular sets ("S1" → "1") because the
- * column header already says "Set". Encores keep their letter; if the
- * caller knows the surrounding setlist has only one encore (single-show
- * tables), pass `encoresInSet: 1` to collapse "E1" → "E". Anything else
+ * column header already says "Set". Encores keep their numeral unless the
+ * caller passes `encoresInSet: 1`, which collapses "E1" → "E". Anything else
  * (e.g. "Soundcheck") renders verbatim.
  *
  * @param raw The raw set label as stored on the Track row.
- * @param opts.encoresInSet Optional count of distinct encores that share
- *   the same setlist as this track. Only meaningful when the caller knows
- *   the full setlist (e.g. SetlistTable); cross-show tables omit it.
+ * @param opts.encoresInSet Count of distinct encores in this track's show.
+ *   Single-show tables derive it from the setlist in scope; cross-show
+ *   tables carry it per-row on the performance DTO. Omit it only when the
+ *   show's encore count is genuinely unknown.
  */
 export function formatSetLabel(raw: string, opts?: { encoresInSet?: number }): string {
   const upper = raw.toUpperCase();
