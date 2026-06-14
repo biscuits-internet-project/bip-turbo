@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { cn } from "~/lib/utils";
 
 function getLink(filter: string, basePath: string, currentURLParameters: URLSearchParams) {
@@ -45,11 +45,6 @@ export function FilterNav({
   filterCounts,
   allCount,
 }: FilterNavProps) {
-  // The panel always collapses on mobile (`<sm`); on desktop it stays
-  // expanded unless the caller opts in with `defaultExpanded={false}`.
-  const [expanded, setExpanded] = useState(false);
-  const desktopCollapsible = !defaultExpanded;
-
   const subtitleCSS = cn(
     "text-xs font-normal text-content-text-tertiary",
     "bg-content-bg-secondary px-2 py-0.5 rounded-full",
@@ -77,157 +72,105 @@ export function FilterNav({
   const allSelected = currentFilter === null || currentFilter === undefined;
   const actualAllURL = allURL || basePath;
 
-  const headingContent = (
-    <>
-      {title}
-      {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
-      {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
-    </>
-  );
-
-  // The mobile toggle button is always rendered (`sm:hidden`). On desktop
-  // we render either a static h2 (always expanded) or the same toggle
-  // button (collapsible) depending on `defaultExpanded`. On phone-landscape
-  // viewports we re-show the toggle so the filter chrome doesn't eat the
-  // already-shallow row count.
-  const ToggleButton = (
-    <button
-      type="button"
-      className={cn(
-        "w-full flex items-center gap-2 text-sm font-semibold text-white cursor-pointer select-none transition-colors",
-        expanded ? "mb-3" : "mb-0",
-        !desktopCollapsible && "sm:hidden short:!flex",
-        {
-          "hover:text-brand-primary": expanded,
-          "hover:text-brand-secondary": !expanded,
-        },
-      )}
-      onClick={() => setExpanded((v) => !v)}
-      aria-expanded={expanded}
-    >
-      {headingContent}
-      <span
-        className={cn("transition-transform duration-300 ml-2", {
-          "rotate-90": expanded,
-          "rotate-0": !expanded,
-        })}
-        aria-hidden
-      >
-        ▶
-      </span>
-    </button>
-  );
-
+  // The filter chrome only needs collapsing on phones, so it force-opens from
+  // `sm` (not the `md` content default) and re-collapses on landscape phones.
+  // `defaultExpanded={false}` makes it collapsible on desktop too.
   return (
-    <div className="card-premium rounded-lg overflow-hidden">
-      <div className="px-4 py-3">
-        {ToggleButton}
-        {!desktopCollapsible && (
-          <h2 className="hidden sm:flex short:hidden text-sm font-semibold text-white mb-3 items-center gap-2">
-            {headingContent}
-          </h2>
-        )}
-        <div
-          className={cn(
-            "overflow-hidden transition-all duration-300",
-            expanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0 pointer-events-none",
-            // Desktop is always visible unless the caller opted into a
-            // desktop-collapsible variant via `defaultExpanded={false}`.
-            !desktopCollapsible && "sm:!max-h-[1000px] sm:!opacity-100 sm:!pointer-events-auto",
-            // …but on phone-landscape viewports we follow the user's
-            // toggle state instead of force-open: filter chrome eats too
-            // much vertical space on a rotated phone. The user can still
-            // click to expand; this just changes the default.
-            !desktopCollapsible &&
-              !expanded &&
-              "short:!max-h-0 short:!opacity-0 short:!pointer-events-none short:transition-none",
-          )}
-        >
-          <div className={cn("grid gap-1.5", columnCSS)}>
-            {filters.map((filter) => {
-              const count = filterCounts?.[filter];
-              const disabled = count === 0;
-              const label = filterCounts ? (
-                <>
-                  {filter}
-                  <span className="ml-1 text-xs opacity-70 hidden sm:inline">({count ?? 0})</span>
-                </>
-              ) : (
-                filter
-              );
+    <CollapsibleSection
+      className="card-premium rounded-lg overflow-hidden"
+      title={title}
+      titleClassName="text-sm font-semibold text-white"
+      headerExtra={
+        subtitle || additionalText ? (
+          <>
+            {subtitle && <span className={subtitleCSS}>{subtitle}</span>}
+            {additionalText && <span className={subtitleCSS}>{additionalText}</span>}
+          </>
+        ) : undefined
+      }
+      headerClassName="px-4 py-3"
+      contentClassName="px-4 pb-3"
+      breakpoint="sm"
+      collapseOnLandscape
+      collapsibleOnDesktop={!defaultExpanded}
+    >
+      <div className={cn("grid gap-1.5", columnCSS)}>
+        {filters.map((filter) => {
+          const count = filterCounts?.[filter];
+          const disabled = count === 0;
+          const label = filterCounts ? (
+            <>
+              {filter}
+              <span className="ml-1 text-xs opacity-70 hidden sm:inline">({count ?? 0})</span>
+            </>
+          ) : (
+            filter
+          );
 
-              if (disabled) {
-                return (
-                  <span
-                    key={filter}
-                    className={cn(itemCSS, "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40")}
-                  >
-                    {label}
-                  </span>
-                );
-              }
-
-              const link = getLink(filter, basePath, currentURLParameters);
-              return (
-                <Link
-                  key={filter}
-                  to={link}
-                  className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
-                >
-                  {label}
-                </Link>
-              );
-            })}
-            {showAllButton && (
-              <Link
-                to={actualAllURL}
-                className={cn(itemCSS, {
-                  [highlightedItemCSS]: allSelected,
-                  [nonHighlightedItemCSS]: !allSelected,
-                })}
+          if (disabled) {
+            return (
+              <span
+                key={filter}
+                className={cn(itemCSS, "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40")}
               >
-                All
-                {allCount !== undefined && (
-                  <span className="ml-1 text-xs opacity-70 hidden sm:inline">({allCount})</span>
-                )}
-              </Link>
-            )}
-          </div>
-          {/* Parameter toggles rendered separately below the grid */}
-          {!allSelected && parameters.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-content-bg-secondary">
-              <span className="text-xs text-content-text-tertiary self-center">Filters:</span>
-              {parameters.map((parameter) => {
-                const newParams = new URLSearchParams(currentURLParameters.toString());
-                const hasParam = currentURLParameters.has(parameter);
-                if (hasParam) {
-                  newParams.delete(parameter);
-                } else {
-                  newParams.append(parameter, "true");
-                }
-                const link = getLink(currentFilter || "", basePath, newParams);
-                return (
-                  <Link
-                    key={parameter}
-                    to={link}
-                    className={cn(toggleCSS, hasParam ? toggleActiveCSS : toggleInactiveCSS)}
-                  >
-                    <span
-                      className={cn(
-                        "w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[10px]",
-                        hasParam ? "bg-brand-primary border-brand-primary text-white" : "border-content-text-tertiary",
-                      )}
-                    >
-                      {hasParam && "✓"}
-                    </span>
-                    {parameter}
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                {label}
+              </span>
+            );
+          }
+
+          const link = getLink(filter, basePath, currentURLParameters);
+          return (
+            <Link
+              key={filter}
+              to={link}
+              className={cn(itemCSS, filter === currentFilter ? highlightedItemCSS : nonHighlightedItemCSS)}
+            >
+              {label}
+            </Link>
+          );
+        })}
+        {showAllButton && (
+          <Link
+            to={actualAllURL}
+            className={cn(itemCSS, {
+              [highlightedItemCSS]: allSelected,
+              [nonHighlightedItemCSS]: !allSelected,
+            })}
+          >
+            All
+            {allCount !== undefined && <span className="ml-1 text-xs opacity-70 hidden sm:inline">({allCount})</span>}
+          </Link>
+        )}
       </div>
-    </div>
+      {/* Parameter toggles rendered separately below the grid */}
+      {!allSelected && parameters.length > 0 && (
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-content-bg-secondary">
+          <span className="text-xs text-content-text-tertiary self-center">Filters:</span>
+          {parameters.map((parameter) => {
+            const newParams = new URLSearchParams(currentURLParameters.toString());
+            const hasParam = currentURLParameters.has(parameter);
+            if (hasParam) {
+              newParams.delete(parameter);
+            } else {
+              newParams.append(parameter, "true");
+            }
+            const link = getLink(currentFilter || "", basePath, newParams);
+            return (
+              <Link key={parameter} to={link} className={cn(toggleCSS, hasParam ? toggleActiveCSS : toggleInactiveCSS)}>
+                <span
+                  className={cn(
+                    "w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[10px]",
+                    hasParam ? "bg-brand-primary border-brand-primary text-white" : "border-content-text-tertiary",
+                  )}
+                >
+                  {hasParam && "✓"}
+                </span>
+                {parameter}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </CollapsibleSection>
   );
 }

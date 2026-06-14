@@ -97,11 +97,13 @@ describe("MusicianPage body", () => {
     // The "All Song Performances" tab is wired even though Radix only mounts
     // the active tab's content.
     expect(screen.getByRole("tab", { name: /all song performances/i })).toBeInTheDocument();
+    // No out-of-era note for a guest — that framing is drummer-only.
+    expect(screen.queryByText("(outside their era)")).not.toBeInTheDocument();
   });
 
   // A drummer's tables exclude their era so only out-of-era plays surface; the
   // exclude window must thread through to the table preset.
-  test("a drummer pins the era exclude window and labels the shows section accordingly", async () => {
+  test("a drummer pins the era exclude window", async () => {
     loaderData.mockReturnValue(makeData({ slug: "allen-aucoin", tier: "drummer" }));
 
     await setupWithRouter(<MusicianPage />);
@@ -112,9 +114,12 @@ describe("MusicianPage body", () => {
       excludeStart: "2005-12-28",
       excludeEnd: "2025-09-07",
     });
-    // Both sections carry the out-of-era framing for drummers.
-    expect(screen.getByRole("heading", { name: "Songs Outside Their Era" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Shows Outside Their Era" })).toBeInTheDocument();
+    // The titles read the same for every tier ("…with the band"); a drummer's
+    // two era-scoped sections append an "(outside their era)" note (which rides
+    // into the heading's accessible name, hence the substring match).
+    expect(screen.getByRole("heading", { name: /Songs played with the band/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Shows played with the band/ })).toBeInTheDocument();
+    expect(screen.getAllByText("(outside their era)")).toHaveLength(2);
   });
 
   // Core members appear on essentially every show, so the tables are omitted —
@@ -129,6 +134,18 @@ describe("MusicianPage body", () => {
     expect(screen.getByText(/core member/i)).toBeInTheDocument();
   });
 
+  // Each profile section is collapsible (tappable header) and carries a count
+  // badge so a dense profile collapses cleanly on mobile.
+  test("wraps the Songs and Shows sections in collapsible chrome with count badges", async () => {
+    loaderData.mockReturnValue(makeData({ slug: "mike-greenfield", tier: "guest" }));
+
+    await setupWithRouter(<MusicianPage />);
+
+    expect(screen.getAllByTestId("collapsible-section-toggle")).toHaveLength(2);
+    // One song and one show in the fixture → a "1" badge beside each heading.
+    expect(screen.getAllByText("1").length).toBeGreaterThanOrEqual(2);
+  });
+
   // Shows moved below songs: the Songs section heading precedes the Shows
   // heading in document order.
   test("the Shows section sits below the Songs section", async () => {
@@ -136,8 +153,8 @@ describe("MusicianPage body", () => {
 
     await setupWithRouter(<MusicianPage />);
 
-    const songsHeading = screen.getByRole("heading", { name: "Songs" });
-    const showsHeading = screen.getByRole("heading", { name: "Shows" });
+    const songsHeading = screen.getByRole("heading", { name: "Songs played with the band" });
+    const showsHeading = screen.getByRole("heading", { name: "Shows played with the band" });
     expect(songsHeading.compareDocumentPosition(showsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -151,7 +168,7 @@ describe("MusicianPage body", () => {
     await setupWithRouter(<MusicianPage />);
 
     expect(screen.queryByTestId("songs-table")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Songs" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Shows Outside Their Era")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Songs played with the band" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Shows played with the band")).not.toBeInTheDocument();
   });
 });

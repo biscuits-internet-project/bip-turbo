@@ -88,6 +88,13 @@ function SetlistCardComponent({
   const [isAttendanceAnimating, setIsAttendanceAnimating] = useState(false);
   const [localAttendance, setLocalAttendance] = useState<Attendance | null>(userAttendance);
   const [isOpen, setIsOpen] = useState(!collapsible);
+  // Lazy-mount the heavy body (the full setlist is ~20+ track links plus lineup
+  // notes and the view control). On list pages like /shows/top-rated, 100
+  // collapsible cards would otherwise mount 100 full setlists up front (~16k DOM
+  // nodes), which makes the page sluggish to click. Non-collapsible cards (the
+  // show page) render immediately. Once opened it stays mounted, so re-collapsing
+  // still animates and re-opening is instant.
+  const [hasMountedBody, setHasMountedBody] = useState(!collapsible);
 
   const attendanceMutation = useAttendanceMutation();
   const attendanceAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -162,6 +169,7 @@ function SetlistCardComponent({
                 // navigate and buttons fire without collapsing the card.
                 if ((e.target as HTMLElement).closest("a, button")) return;
                 setIsOpen((v) => !v);
+                setHasMountedBody(true);
               }
             : undefined
         }
@@ -273,61 +281,63 @@ function SetlistCardComponent({
         )}
       >
         <div className={cn(collapsible && "overflow-hidden")}>
-          <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
-            <RockOperaAnnotations performances={setlist.rockOperaPerformances} />
-            <ShowLineupNote
-              notes={deriveShowLineupNotes(
-                setlist.show.date,
-                setlist.lineup,
-                setlist.trackMusicianDeltas,
-                setlist.sets.flatMap((set) => set.tracks).map((track) => track.id),
-              )}
-            />
-            {setlist.show.notes && (
-              <div
-                className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"
-                dangerouslySetInnerHTML={{ __html: setlist.show.notes }}
+          {hasMountedBody && (
+            <CardContent className="relative z-10 px-3 py-3 md:px-6 md:py-5">
+              <RockOperaAnnotations performances={setlist.rockOperaPerformances} />
+              <ShowLineupNote
+                notes={deriveShowLineupNotes(
+                  setlist.show.date,
+                  setlist.lineup,
+                  setlist.trackMusicianDeltas,
+                  setlist.sets.flatMap((set) => set.tracks).map((track) => track.id),
+                )}
               />
-            )}
+              {setlist.show.notes && (
+                <div
+                  className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"
+                  dangerouslySetInnerHTML={{ __html: setlist.show.notes }}
+                />
+              )}
 
-            {view === "gap-chart" ? (
-              <div className="space-y-2">
-                <SetlistViewControl
-                  view={view}
-                  onChange={changeView}
-                  summary={catalogSummary}
-                  showPersonal={Boolean(user)}
-                />
-                <SetlistTable
-                  showSlug={setlist.show.slug ?? ""}
-                  showDate={setlist.show.date}
-                  tracks={setlist.sets.flatMap((s) => s.tracks)}
-                />
-              </div>
-            ) : view === "personal" && user ? (
-              <div className="space-y-2">
-                <SetlistViewControl view={view} onChange={changeView} summary={personalSummaryView} showPersonal />
-                <SetlistTablePersonal
-                  tracks={setlist.sets.flatMap((s) => s.tracks)}
-                  showSlug={setlist.show.slug ?? ""}
-                  showDate={setlist.show.date}
-                  onSummaryChange={setPersonalSummary}
-                />
-              </div>
-            ) : (
-              <>
-                <SetlistFlow setlist={setlist} />
-                <div className="mt-4">
+              {view === "gap-chart" ? (
+                <div className="space-y-2">
                   <SetlistViewControl
                     view={view}
                     onChange={changeView}
                     summary={catalogSummary}
                     showPersonal={Boolean(user)}
                   />
+                  <SetlistTable
+                    showSlug={setlist.show.slug ?? ""}
+                    showDate={setlist.show.date}
+                    tracks={setlist.sets.flatMap((s) => s.tracks)}
+                  />
                 </div>
-              </>
-            )}
-          </CardContent>
+              ) : view === "personal" && user ? (
+                <div className="space-y-2">
+                  <SetlistViewControl view={view} onChange={changeView} summary={personalSummaryView} showPersonal />
+                  <SetlistTablePersonal
+                    tracks={setlist.sets.flatMap((s) => s.tracks)}
+                    showSlug={setlist.show.slug ?? ""}
+                    showDate={setlist.show.date}
+                    onSummaryChange={setPersonalSummary}
+                  />
+                </div>
+              ) : (
+                <>
+                  <SetlistFlow setlist={setlist} />
+                  <div className="mt-4">
+                    <SetlistViewControl
+                      view={view}
+                      onChange={changeView}
+                      summary={catalogSummary}
+                      showPersonal={Boolean(user)}
+                    />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          )}
         </div>
       </div>
     </Card>

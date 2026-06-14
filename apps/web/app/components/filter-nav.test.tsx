@@ -23,29 +23,6 @@ describe("FilterNav", () => {
     expect(countSpan.className).toContain("sm:inline");
   });
 
-  // The panel always collapses on mobile (so the long year list doesn't
-  // push the rest of the page out of the viewport) but stays expanded at
-  // sm+ by default. The mobile toggle button is `sm:hidden`; desktop gets
-  // a static heading.
-  test("renders a mobile toggle button (sm:hidden)", async () => {
-    await setupWithRouter(<FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />);
-
-    const trigger = screen.getByRole("button", { name: /Filter by Year/ });
-    expect(trigger.className).toContain("sm:hidden");
-  });
-
-  // On desktop the panel renders a non-button heading so the panel is
-  // always expanded and there is no functional toggle visible.
-  test("renders a static heading at sm+ (hidden sm:flex)", async () => {
-    const { container } = await setupWithRouter(
-      <FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />,
-    );
-
-    const desktopHeading = container.querySelector("h2");
-    expect(desktopHeading?.className).toContain("hidden");
-    expect(desktopHeading?.className).toContain("sm:flex");
-  });
-
   // The "All" button's count should follow the same hide-on-mobile rule
   // so it does not overlap the "All" label on phones.
   test("allCount span uses 'hidden sm:inline' so it hides on mobile", async () => {
@@ -58,42 +35,39 @@ describe("FilterNav", () => {
     expect(countSpan.className).toContain("sm:inline");
   });
 
-  // Phone-landscape collapse: a rotated phone has the same vertical-space
-  // crunch as a narrow portrait phone, so we re-show the mobile toggle
-  // button and re-hide the desktop heading when `short:` (max-height:
-  // 640px) matches. Without this, the filter chrome eats most of the
-  // landscape viewport.
-  test("mobile toggle re-shows on short viewports via short:!flex", async () => {
+  // The title is the collapsible toggle (a heading wrapping a button), so it's
+  // reachable both as a heading and as a clickable control.
+  test("renders the title as a collapsible toggle heading", async () => {
     await setupWithRouter(<FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />);
 
-    const trigger = screen.getByRole("button", { name: /Filter by Year/ });
-    expect(trigger.className).toContain("short:!flex");
+    expect(screen.getByRole("heading", { name: /Filter by Year/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Filter by Year/ })).toBeInTheDocument();
   });
 
-  test("desktop heading re-hides on short viewports via short:hidden", async () => {
-    const { container } = await setupWithRouter(
-      <FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />,
-    );
+  // Each filter is a link to its year route, preserving any active URL params.
+  test("renders each filter as a link to its route", async () => {
+    await setupWithRouter(<FilterNav title="Filter by Year" filters={["2024", "2025"]} basePath="/shows/year/" />);
 
-    const desktopHeading = container.querySelector("h2");
-    expect(desktopHeading?.className).toContain("short:hidden");
+    expect(screen.getByRole("link", { name: "2024" })).toHaveAttribute("href", "/shows/year/2024");
+    expect(screen.getByRole("link", { name: "2025" })).toHaveAttribute("href", "/shows/year/2025");
   });
 
-  // Collapsed body carries the short:! overrides so a desktop-style force-
-  // open (sm:!max-h-[1000px]) doesn't keep the panel expanded on a phone
-  // in landscape. When the user has already expanded the panel, the
-  // overrides drop out so the panel stays open at any viewport size.
-  test("collapsed body re-collapses on short viewports via short:!max-h-0", async () => {
-    const { container } = await setupWithRouter(
-      <FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />,
-    );
+  // The panel collapses on phones but force-opens from sm+ (it's filter chrome,
+  // which only crowds small screens — hence sm, not the md content default).
+  test("force-opens from sm+ via sm:grid-rows-[1fr]", async () => {
+    await setupWithRouter(<FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />);
 
-    // Body is the inner overflow-hidden + transition-all wrapper around the
-    // filter grid — distinct from the outer card-premium wrapper which also
-    // has overflow-hidden.
-    const body = container.querySelector("div.transition-all");
-    expect(body?.className).toContain("short:!max-h-0");
-    expect(body?.className).toContain("short:!opacity-0");
-    expect(body?.className).toContain("short:!pointer-events-none");
+    const body = screen.getByTestId("collapsible-section-body");
+    expect(body.className).toContain("sm:grid-rows-[1fr]");
+    expect(body.className).not.toContain("md:grid-rows-[1fr]");
+  });
+
+  // Phone-landscape collapse: a rotated phone has the same vertical-space crunch
+  // as portrait, so the panel re-collapses on short viewports even above sm.
+  test("re-collapses on short (landscape) viewports via short:!grid-rows-[0fr]", async () => {
+    await setupWithRouter(<FilterNav title="Filter by Year" filters={["2024"]} basePath="/shows/year/" />);
+
+    const body = screen.getByTestId("collapsible-section-body");
+    expect(body.className).toContain("short:!grid-rows-[0fr]");
   });
 });

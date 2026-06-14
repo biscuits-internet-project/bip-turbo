@@ -1,12 +1,11 @@
 import type { ShowLineupMember } from "@bip/domain";
-import { ChevronDown, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader } from "~/components/ui/card";
+import { Card } from "~/components/ui/card";
+import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { formatInstrumentNames } from "~/lib/instruments";
 import type { ShowLineupNotes } from "~/lib/lineup-notes";
 import { sortLineup } from "~/lib/musicians-constants";
-import { cn } from "~/lib/utils";
 
 /** Slugs of lineup members who deviate from the expected core lineup — a
  *  whole-show guest/sit-in, or a core member on a non-default instrument.
@@ -44,7 +43,6 @@ export function ShowLineupSection({
   notes?: ShowLineupNotes;
   bare?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   if (lineup.length === 0) return null;
 
   const deviating = !bare && notes ? deviatingMemberSlugs(notes) : null;
@@ -77,31 +75,20 @@ export function ShowLineupSection({
 
   return (
     <Card className="card-premium relative overflow-hidden mt-4">
-      <CardHeader
-        onClick={() => setOpen((value) => !value)}
-        className="flex flex-row items-center justify-between gap-2 px-3 py-2 md:px-6 md:py-3 cursor-pointer md:cursor-default"
-      >
-        <h3 className="flex items-center gap-1.5 text-base font-medium text-content-text-tertiary">
-          Lineup
-          {notes && hasDeviation(notes) && (
+      <CollapsibleSection
+        title="Lineup"
+        titleAs="h3"
+        titleClassName="text-base font-medium text-content-text-tertiary"
+        headerExtra={
+          notes && hasDeviation(notes) ? (
             <Sparkles data-testid="lineup-deviation-indicator" className="h-4 w-4 text-brand-primary" />
-          )}
-        </h3>
-        <ChevronDown
-          aria-hidden
-          className={cn("h-4 w-4 shrink-0 transition-transform md:hidden", open && "rotate-180")}
-        />
-      </CardHeader>
-      <div
-        className={cn(
-          "grid transition-[grid-template-rows] duration-300 ease-out md:grid-rows-[1fr]",
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-        )}
+          ) : undefined
+        }
+        headerClassName="px-3 py-2 md:px-6 md:py-3"
+        contentClassName="px-3 pb-3 pt-0 md:px-6 md:pb-5"
       >
-        <div className="overflow-hidden md:overflow-visible">
-          <CardContent className="px-3 pb-3 pt-0 md:px-6 md:pb-5">{list}</CardContent>
-        </div>
-      </div>
+        {list}
+      </CollapsibleSection>
     </Card>
   );
 }

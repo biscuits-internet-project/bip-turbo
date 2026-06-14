@@ -9,6 +9,7 @@ import { AdminOnly } from "~/components/admin/admin-only";
 import { DateVenueCell } from "~/components/performance/date-venue-cell";
 import { ShowDate } from "~/components/show-date";
 import { FilteredSongsTable } from "~/components/song/filtered-songs-table";
+import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { DataTable } from "~/components/ui/data-table";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
@@ -35,6 +36,9 @@ import { computeShowUserData } from "~/server/show-user-data";
 import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
 export const routeParam = "slug";
+
+/** Shared heading style for the collapsible profile sections. */
+const sectionTitleClass = "text-xl font-semibold text-content-text-primary";
 
 interface MusicianWithInstrument extends Musician {
   defaultInstrument: Instrument | null;
@@ -228,10 +232,15 @@ export default function MusicianPage() {
   const { musician, tier, stats, firstShow, lastShow, shows, songs, performances, authorId, songsWritten } =
     useSerializedLoaderData<LoaderData>();
 
-  // Drummers' tables are scoped to out-of-era plays, so both section titles
-  // carry that framing.
-  const songsHeading = tier === "drummer" ? "Songs Outside Their Era" : "Songs";
-  const showsHeading = tier === "drummer" ? "Shows Outside Their Era" : "Shows";
+  // Framed by the musician's relationship to the band. Drummers' tables are
+  // scoped to out-of-era plays (their everyday in-era shows are implied), so a
+  // small note flags that the listed plays are the notable sit-ins.
+  const songsHeading = "Songs played with the band";
+  const showsHeading = "Shows played with the band";
+  const eraNote =
+    tier === "drummer" ? (
+      <span className="text-sm font-normal text-content-text-tertiary">(outside their era)</span>
+    ) : undefined;
   const songsWrittenPreset = useMemo(() => (authorId ? { author: authorId } : undefined), [authorId]);
   // Both song tables pin to this musician; drummers also exclude their era.
   const musicianPreset = useMemo(() => musicianTablePreset(musician.slug, tier), [musician.slug, tier]);
@@ -256,7 +265,7 @@ export default function MusicianPage() {
             </AdminOnly>
           }
         />
-        <div className="flex flex-wrap items-center justify-center gap-x-3 text-content-text-secondary">
+        <div className="flex flex-col items-center gap-1 text-content-text-secondary">
           {musician.defaultInstrument && <span className="lowercase">{musician.defaultInstrument.name}</span>}
           {musician.knownFrom && <span className="text-content-text-tertiary">Known from {musician.knownFrom}</span>}
         </div>
@@ -271,10 +280,14 @@ export default function MusicianPage() {
         </dl>
 
         {authorId && songsWritten.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-content-text-primary">Songs Written</h2>
-            <FilteredSongsTable songs={songsWritten} presetFilters={songsWrittenPreset} />
-          </section>
+          <CollapsibleSection
+            title="Songs with writing credit & performed by the band"
+            count={songsWritten.length}
+            titleClassName={sectionTitleClass}
+            contentClassName="pt-4"
+          >
+            <FilteredSongsTable songs={songsWritten} presetFilters={songsWrittenPreset} collapsibleOnDesktop />
+          </CollapsibleSection>
         )}
 
         {tier === "core" ? (
@@ -284,26 +297,45 @@ export default function MusicianPage() {
         ) : (
           <>
             {hasSongs && (
-              <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-content-text-primary">{songsHeading}</h2>
+              <CollapsibleSection
+                title={songsHeading}
+                count={songs.length}
+                headerExtra={eraNote}
+                titleClassName={sectionTitleClass}
+                contentClassName="pt-4"
+              >
                 <Tabs defaultValue="by-song">
                   <TabsList>
                     <TabsTrigger value="by-song">Song Statistics</TabsTrigger>
                     <TabsTrigger value="all-performances">All Song Performances</TabsTrigger>
                   </TabsList>
                   <TabsContent value="by-song" className="mt-4">
-                    <FilteredSongsTable songs={songs} presetFilters={musicianPreset} filteredAsPrimary />
+                    <FilteredSongsTable
+                      songs={songs}
+                      presetFilters={musicianPreset}
+                      filteredAsPrimary
+                      collapsibleOnDesktop
+                    />
                   </TabsContent>
                   <TabsContent value="all-performances" className="mt-4">
-                    <FilteredSongPerformanceTable performances={performances} presetFilters={musicianPreset} />
+                    <FilteredSongPerformanceTable
+                      performances={performances}
+                      presetFilters={musicianPreset}
+                      collapsibleOnDesktop
+                    />
                   </TabsContent>
                 </Tabs>
-              </section>
+              </CollapsibleSection>
             )}
 
             {shows.length > 0 && (
-              <section className="space-y-4">
-                <h2 className="text-xl font-semibold text-content-text-primary">{showsHeading}</h2>
+              <CollapsibleSection
+                title={showsHeading}
+                count={shows.length}
+                headerExtra={eraNote}
+                titleClassName={sectionTitleClass}
+                contentClassName="pt-4"
+              >
                 <DataTable
                   columns={showColumns}
                   data={shows}
@@ -311,7 +343,7 @@ export default function MusicianPage() {
                   initialSorting={[{ id: "date", desc: true }]}
                   hideSearch
                 />
-              </section>
+              </CollapsibleSection>
             )}
           </>
         )}
