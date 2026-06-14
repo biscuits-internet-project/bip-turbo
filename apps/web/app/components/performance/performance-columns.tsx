@@ -409,7 +409,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
           const set = info.getValue();
           return (
             <NumberCell width="2ch" className={set ? "text-content-text-secondary" : "text-content-text-tertiary"}>
-              {set ? formatSetLabel(set) : "—"}
+              {set ? formatSetLabel(set, { encoresInSet: info.row.original.encoresInSet }) : "—"}
             </NumberCell>
           );
         },

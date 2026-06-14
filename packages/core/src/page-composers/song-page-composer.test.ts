@@ -28,6 +28,7 @@ function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPage
       countForStats: true,
     },
     set: "S1",
+    encoresInSet: 0,
     position: 3,
     segue: null,
     allTimer: false,
@@ -75,6 +76,7 @@ function makeDto(overrides: Partial<PerformanceDto> = {}): PerformanceDto {
     duration: null,
     duration_source: null,
     previous_performance_show_id: null,
+    encores_in_set: 0,
     previous_show_slug: null,
     previous_show_date: null,
     // Next/Prev track segues
@@ -700,7 +702,7 @@ describe("CacheKeys.songs.jamCharts", () => {
   // Mirrors the cache-key shape of `allTimers`. Versioned suffix is
   // bumped together with the rest of the songs cache family.
   test("returns a stable, versioned key string", () => {
-    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v8");
+    expect(CacheKeys.songs.jamCharts()).toBe("songs:jam-charts:v9");
   });
 });
 
@@ -781,6 +783,7 @@ describe("assignFilteredGaps", () => {
       },
       position: overrides.position ?? 1,
       set: "S1",
+      encoresInSet: 0,
       segue: null,
       allTimer: false,
       annotations: [],
@@ -1072,7 +1075,7 @@ describe("CacheKeys", () => {
   // The on-this-day all-timers cache key must embed the monthDay so each
   // calendar day gets its own cache entry.
   test("allTimersOnThisDay includes the monthDay in the key", () => {
-    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v7");
+    expect(CacheKeys.songs.allTimersOnThisDay("04-08")).toBe("songs:all-timers:on-this-day:04-08:v8");
   });
 
   // The on-this-day counts cache key is used by the home page to cache

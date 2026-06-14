@@ -633,6 +633,12 @@ export class SongPageComposer {
         tracks.duration,
         tracks.duration_source,
         tracks.previous_performance_show_id,
+        (
+          SELECT COUNT(DISTINCT encoreTracks.set)
+          FROM tracks encoreTracks
+          WHERE encoreTracks.show_id = tracks.show_id
+            AND encoreTracks.set ~* '^E[0-9]+$'
+        ) as encores_in_set,
         prevShows.slug as previous_show_slug,
         prevShows.date as previous_show_date
         ${songColumns},
@@ -936,6 +942,7 @@ export function transformToSongPagePerformanceView(row: PerformanceDto): SongPag
     duration: row.duration ?? null,
     durationSource: row.duration_source ?? null,
     gap: row.gap,
+    encoresInSet: Number(row.encores_in_set),
     previousPerformanceShowId: row.previous_performance_show_id,
     previousShow:
       row.previous_show_slug && row.previous_show_date
@@ -1020,6 +1027,9 @@ export type PerformanceDto = {
   duration: number | null;
   duration_source: string | null;
   previous_performance_show_id: string | null;
+  // Distinct encore count for this track's show, so cross-show tables can
+  // collapse "E1" → "E" when the show had a single encore.
+  encores_in_set: bigint | number;
   previous_show_slug: string | null;
   previous_show_date: string | null;
 

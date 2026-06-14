@@ -33,6 +33,7 @@ function makePerformance(overrides: Partial<SongPagePerformance> = {}): SongPage
     segue: null,
     annotations: [],
     set: "S1",
+    encoresInSet: 0,
     position: 3,
     gap: 5,
     previousPerformanceShowId: "prev-show",
@@ -317,6 +318,23 @@ describe("createPerformanceColumns", () => {
     const withoutSong = createPerformanceColumns(defaultOptions);
     await setupWithRouter(<DataTable columns={withoutSong} data={performances} hideSearch hidePagination />);
     expect(screen.queryByText("Song")).not.toBeInTheDocument();
+  });
+
+  // The Set column collapses "E1" → "E" when the row's show had a single
+  // encore (encoresInSet === 1), matching the single-show setlist views, but
+  // keeps the numeral when the show had multiple encores.
+  test("Set column collapses E1 to E for single-encore shows, keeps numeral otherwise", async () => {
+    const columns = createPerformanceColumns({ ...defaultOptions, showSongColumn: true });
+
+    const single = [makePerformance({ set: "E1", encoresInSet: 1 })];
+    const { unmount } = await setupWithRouter(<DataTable columns={columns} data={single} hideSearch hidePagination />);
+    expect(screen.getByText("E")).toBeInTheDocument();
+    expect(screen.queryByText("E1")).not.toBeInTheDocument();
+    unmount();
+
+    const multi = [makePerformance({ set: "E1", encoresInSet: 2 })];
+    await setupWithRouter(<DataTable columns={columns} data={multi} hideSearch hidePagination />);
+    expect(screen.getByText("E1")).toBeInTheDocument();
   });
 
   // The AllTimer flame marks standout performances. Renders twice in the
