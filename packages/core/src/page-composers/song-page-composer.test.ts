@@ -443,6 +443,21 @@ describe("buildFilterQuery", () => {
     expect(sql).toMatch(/EXISTS.*OR.*EXISTS/s);
   });
 
+  // "Split" = the same song played 2+ times in one show (broken into pieces
+  // around other songs). Detected via a correlated COUNT over sibling tracks
+  // of the same song in the same show, with no extra JOIN.
+  test("split filters on songs played more than once in the same show", () => {
+    const { conditions, extraJoins } = SongPageComposer.buildFilterQuery([], { split: true });
+
+    expect(conditions).toHaveLength(1);
+    expect(extraJoins).toHaveLength(0);
+    const sql = conditions[0].strings.join("");
+    expect(sql).toContain("COUNT(*)");
+    expect(sql).toContain("t2.show_id = tracks.show_id");
+    expect(sql).toContain("t2.song_id = tracks.song_id");
+    expect(sql).toContain("> 1");
+  });
+
   // The attended filter is special: it produces a JOIN (on the attendances
   // table) rather than a WHERE condition. Important because JOINs and
   // conditions are injected at different points in the SQL template.
@@ -783,6 +798,7 @@ describe("isNarrowingFilter", () => {
     ["segueIn", { segueIn: true }],
     ["segueOut", { segueOut: true }],
     ["standalone", { standalone: true }],
+    ["split", { split: true }],
     ["inverted", { inverted: true }],
     ["dyslexic", { dyslexic: true }],
     ["unfinished", { unfinished: true }],

@@ -66,8 +66,8 @@ describe("isWithinShowRepeat", () => {
   // not a repeat.
   test("returns false when no earlier same-song row exists", () => {
     const rows = [
-      { id: "t1", songId: "tractorbeam", position: 1 },
-      { id: "t2", songId: "spaga", position: 2 },
+      { id: "t1", songId: "tractorbeam", set: "S1", position: 1 },
+      { id: "t2", songId: "spaga", set: "S1", position: 2 },
     ];
     expect(isWithinShowRepeat(rows, rows[0])).toBe(false);
     expect(isWithinShowRepeat(rows, rows[1])).toBe(false);
@@ -76,9 +76,9 @@ describe("isWithinShowRepeat", () => {
   // Same songId at an earlier position → repeat.
   test("returns true when the same song appears at an earlier position", () => {
     const rows = [
-      { id: "t1", songId: "tractorbeam", position: 1 },
-      { id: "t2", songId: "spaga", position: 2 },
-      { id: "t3", songId: "tractorbeam", position: 5 }, // reprise
+      { id: "t1", songId: "tractorbeam", set: "S1", position: 1 },
+      { id: "t2", songId: "spaga", set: "S1", position: 2 },
+      { id: "t3", songId: "tractorbeam", set: "S1", position: 5 }, // reprise
     ];
     expect(isWithinShowRepeat(rows, rows[2])).toBe(true);
   });
@@ -87,8 +87,21 @@ describe("isWithinShowRepeat", () => {
   // occurrence (not a repeat); the later one is.
   test("only the second-and-later occurrences are repeats", () => {
     const rows = [
-      { id: "t1", songId: "helicopters", position: 2 },
-      { id: "t2", songId: "helicopters", position: 7 },
+      { id: "t1", songId: "helicopters", set: "S1", position: 2 },
+      { id: "t2", songId: "helicopters", set: "S1", position: 7 },
+    ];
+    expect(isWithinShowRepeat(rows, rows[0])).toBe(false);
+    expect(isWithinShowRepeat(rows, rows[1])).toBe(true);
+  });
+
+  // Cross-set repeat where the later set carries a LOWER position number.
+  // Positions reset per set, so the encore's I-Man (E1 #2) follows the
+  // second-set I-Man (S2 #2) in the show even though the raw position is
+  // equal — set order must break the tie or the encore loses its ↺.
+  test("detects a repeat across sets when the later set has an equal-or-lower position", () => {
+    const rows = [
+      { id: "t1", songId: "i-man", set: "S2", position: 2 },
+      { id: "t2", songId: "i-man", set: "E1", position: 2 },
     ];
     expect(isWithinShowRepeat(rows, rows[0])).toBe(false);
     expect(isWithinShowRepeat(rows, rows[1])).toBe(true);

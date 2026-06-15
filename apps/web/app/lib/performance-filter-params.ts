@@ -13,6 +13,7 @@ const VALID_FILTER_KEYS = new Set([
   "segueIn",
   "segueOut",
   "standalone",
+  "split",
   "inverted",
   "dyslexic",
   "jamChart",

@@ -1,6 +1,7 @@
 import { RotateCcw, Star } from "lucide-react";
 import { GapIcon } from "~/components/gap-icon";
 import { NumberCell } from "~/components/ui/number-cell";
+import { compareBySetThenPosition } from "./set-label";
 
 /**
  * Discriminated union for the three possible states of a Gap or Your-Gap
@@ -24,16 +25,19 @@ export function buildGapCellState(args: { isRepeat: boolean; gap: number | null 
 }
 
 /**
- * True when this row's `songId` already appears at an earlier `position`
- * in the supplied list — i.e., the row is a within-show repeat. Generic
- * over the row shape; both column factories and the personal pure helpers
- * use this to drive the ↺ marker.
+ * True when this row's `songId` already appears earlier in the show within
+ * the supplied list — i.e., the row is a within-show repeat. "Earlier" is
+ * canonical set-then-position order, not raw `position`: positions reset per
+ * set, so an encore reprise (E1 #2) can carry the same or a lower position
+ * number than its earlier second-set play (S2 #2). Comparing on `position`
+ * alone would miss that and drop the ↺ marker. Generic over the row shape;
+ * both column factories and the personal pure helpers use this.
  */
-export function isWithinShowRepeat<T extends { id: string; songId: string; position: number }>(
+export function isWithinShowRepeat<T extends { id: string; songId: string; set: string; position: number }>(
   rows: ReadonlyArray<T>,
   current: T,
 ): boolean {
-  return rows.some((r) => r.songId === current.songId && r.position < current.position);
+  return rows.some((r) => r.songId === current.songId && compareBySetThenPosition(r, current) < 0);
 }
 
 /**

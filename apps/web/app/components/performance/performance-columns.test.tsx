@@ -556,6 +556,45 @@ describe("createPerformanceColumns", () => {
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
+  // Positions reset per set, so an encore reprise (E1 #2) can carry the same
+  // or a lower position number than its earlier second-set play (S2 #2).
+  // Set order must break the tie or the encore loses its ↺ and renders a
+  // duplicate gap number.
+  test("Gap column flags a cross-set repeat where the later set has an equal-or-lower position", async () => {
+    const columns = createPerformanceColumns(defaultOptions);
+    const sharedShow = {
+      id: "show-cross-set",
+      slug: "2025-07-02-xl-live-harrisburg-pa",
+      date: "2025-07-02",
+      venueId: "v",
+      countForStats: true,
+    };
+    const performances = [
+      makePerformance({
+        trackId: "t-s2",
+        show: sharedShow,
+        set: "S2",
+        position: 2,
+        gap: 5,
+        previousPerformanceShowId: "p",
+      }),
+      makePerformance({
+        trackId: "t-e1",
+        show: sharedShow,
+        set: "E1",
+        position: 2,
+        gap: 5,
+        previousPerformanceShowId: "p",
+      }),
+    ];
+    const { container } = await setupWithRouter(
+      <DataTable columns={columns} data={performances} hideSearch hidePagination />,
+    );
+
+    expect(container.querySelectorAll(".lucide-rotate-ccw").length).toBe(1);
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
   // The Last Played column shows the date of the song's prior performance
   // (sourced from the Track.previousPerformanceShowId join) and links to
   // that show. When sorted by Gap (or any non-date order), this column

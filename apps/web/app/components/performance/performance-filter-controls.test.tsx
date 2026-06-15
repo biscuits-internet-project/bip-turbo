@@ -54,6 +54,24 @@ describe("PerformanceFilterControls", () => {
     expect(screen.queryByRole("button", { name: "Clear All" })).not.toBeInTheDocument();
   });
 
+  // The toggle filters render as a compact strip of group popover buttons
+  // (Quality / Position / Attributes) instead of a flat chip wall.
+  test("renders the toggle group popover buttons", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} />);
+
+    expect(screen.getByRole("button", { name: "Quality" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Position" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Attributes" })).toBeInTheDocument();
+  });
+
+  // Attended is a personal on/off, so it renders as a standalone chip rather
+  // than inside a group popover.
+  test("renders the Attended toggle as a standalone chip", async () => {
+    await setup(<PerformanceFilterControls {...defaultProps} />);
+
+    expect(screen.getByRole("button", { name: "Attended" })).toBeInTheDocument();
+  });
+
   // The Time Range dropdown renders with grouped options (Recent, Eras, Years).
   test("renders a single Time Range dropdown", async () => {
     await setup(<PerformanceFilterControls {...defaultProps} />);

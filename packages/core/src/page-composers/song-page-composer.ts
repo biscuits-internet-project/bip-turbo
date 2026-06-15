@@ -59,6 +59,8 @@ export interface PerformanceFilterOptions {
   segueIn?: boolean;
   segueOut?: boolean;
   standalone?: boolean;
+  /** Narrow to performances where the song was played 2+ times in the same show. */
+  split?: boolean;
   inverted?: boolean;
   dyslexic?: boolean;
   unfinished?: boolean;
@@ -528,6 +530,15 @@ export class SongPageComposer {
             condition: Prisma.sql`(tracks.segue IS NULL OR tracks.segue = '') AND (prevTracks.segue IS NULL OR prevTracks.segue = '')`,
           }
         : null,
+    // "Split" = the same song appears 2+ times in one show. A correlated count
+    // over sibling tracks of the same song in the same show; > 1 means it was
+    // broken into multiple performances.
+    split: (o) =>
+      o.split
+        ? {
+            condition: Prisma.sql`(SELECT COUNT(*) FROM tracks t2 WHERE t2.show_id = tracks.show_id AND t2.song_id = tracks.song_id) > 1`,
+          }
+        : null,
     allTimer: (o) => (o.allTimer ? { condition: Prisma.sql`tracks.all_timer = true` } : null),
     // Scope to one song by slug via a subquery so callers pass the readable
     // slug (not a resolved id). An unknown slug yields no rows.
@@ -793,6 +804,7 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.segueIn ||
       options.segueOut ||
       options.standalone ||
+      options.split ||
       options.inverted ||
       options.dyslexic ||
       options.unfinished ||
