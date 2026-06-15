@@ -4,7 +4,7 @@ import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, RotateCcw, Star } from
 import type { ReactNode } from "react";
 import { GapIcon } from "~/components/gap-icon";
 import { buildPerformanceFootnotes } from "~/components/setlist/footnotes";
-import { formatSetLabel } from "~/components/setlist/set-label";
+import { compareBySetThenPosition, formatSetLabel } from "~/components/setlist/set-label";
 import { ShowDate } from "~/components/show-date";
 import { ShowDateLink } from "~/components/show-date-link";
 import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
@@ -154,11 +154,20 @@ function renderGapCell({ value, isRepeat }: { value: number | null | undefined; 
  * Detects whether `row` is the second-or-later occurrence of its song
  * within the same show. The gap and filtered-gap values themselves are
  * shared across within-show repeats, so the icon — not the number —
- * distinguishes the repeat from its first occurrence.
+ * distinguishes the repeat from its first occurrence. "Earlier" is
+ * canonical set-then-position order, not raw `position`: positions reset per
+ * set, so an encore reprise (E1 #2) can carry the same or a lower position
+ * number than its earlier second-set play (S2 #2). Comparing on `position`
+ * alone would miss that and drop the ↺ marker.
  */
 function isWithinShowRepeat(row: SongPagePerformance, allRows: Array<{ original: SongPagePerformance }>): boolean {
   return allRows.some(
-    (other) => other.original.show.id === row.show.id && (other.original.position ?? 0) < (row.position ?? 0),
+    (other) =>
+      other.original.show.id === row.show.id &&
+      compareBySetThenPosition(
+        { set: other.original.set ?? "", position: other.original.position ?? 0 },
+        { set: row.set ?? "", position: row.position ?? 0 },
+      ) < 0,
   );
 }
 

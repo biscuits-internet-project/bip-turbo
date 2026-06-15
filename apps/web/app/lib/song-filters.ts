@@ -82,9 +82,27 @@ export const TOGGLE_FILTER_DEFINITIONS = [
   { key: "segueIn", label: "Segue In" },
   { key: "segueOut", label: "Segue Out" },
   { key: "standalone", label: "Standalone" },
+  { key: "split", label: "Split" },
   { key: "inverted", label: "Inverted" },
   { key: "dyslexic", label: "Dyslexic" },
   { key: "jamChart", label: "Jam Chart" },
   { key: "allTimer", label: "All-Timer" },
   { key: "attended", label: "Attended" },
 ] as const;
+
+/**
+ * Groups the toggle chips into labeled popovers so the filter row stays a
+ * single compact strip of buttons as filters accumulate. Each group renders as
+ * one popover button (with an active-count badge) holding its chips; labels
+ * come from TOGGLE_FILTER_DEFINITIONS (the canonical key→label source). Every
+ * toggle key except `attended` belongs to exactly one group — `attended` is a
+ * personal on/off, so it renders as a standalone chip rather than in a group.
+ */
+export const TOGGLE_FILTER_GROUPS = [
+  { label: "Quality", keys: ["jamChart", "allTimer"] },
+  { label: "Position", keys: ["setOpener", "setCloser", "encore"] },
+  { label: "Attributes", keys: ["split", "standalone", "segueIn", "segueOut", "inverted", "dyslexic"] },
+] as const;
+
+/** The personal toggle rendered on its own (not in a group popover). */
+export const STANDALONE_TOGGLE_KEY = "attended";

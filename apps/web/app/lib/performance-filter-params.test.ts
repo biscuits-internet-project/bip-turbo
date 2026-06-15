@@ -50,6 +50,16 @@ describe("parsePerformanceFilters — jamChart scope", () => {
 
     expect(filters.jamChart).toBe(true);
   });
+
+  // "Split" (song played 2+ times in one show) rides the `filters` param like
+  // the other toggle chips and parses into its boolean option.
+  test("parses ?filters=split into the split option", async () => {
+    const url = new URL("https://x.test/songs?filters=split");
+
+    const filters = await parsePerformanceFilters(url, emptyContext);
+
+    expect(filters.split).toBe(true);
+  });
 });
 
 describe("parsePerformanceFilters — excludeRange", () => {

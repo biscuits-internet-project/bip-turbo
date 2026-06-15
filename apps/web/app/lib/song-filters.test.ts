@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { getTimeRangeParam, SONG_FILTERS, TIME_RANGE_GROUPS } from "./song-filters";
+import {
+  getTimeRangeParam,
+  SONG_FILTERS,
+  TIME_RANGE_GROUPS,
+  TOGGLE_FILTER_DEFINITIONS,
+  TOGGLE_FILTER_GROUPS,
+} from "./song-filters";
 
 describe("TIME_RANGE_GROUPS", () => {
   // The groups should be ordered: Recent, Eras, Years — matching the
@@ -60,6 +66,32 @@ describe("SONG_FILTERS", () => {
   test("existing era keys still resolve to date ranges", () => {
     expect(SONG_FILTERS.sammy).toBeDefined();
     expect(SONG_FILTERS.sammy.endDate).toEqual(new Date("2005-08-27"));
+  });
+});
+
+describe("TOGGLE_FILTER_GROUPS", () => {
+  // The Split chip is a defined toggle (song played 2+ times in one show).
+  test("Split is a defined toggle filter", () => {
+    const split = TOGGLE_FILTER_DEFINITIONS.find((filter) => filter.key === "split");
+    expect(split).toEqual({ key: "split", label: "Split" });
+  });
+
+  // Every toggle chip except `attended` must belong to exactly one group, or it
+  // would be unreachable (no group) or rendered twice (two groups). `attended`
+  // is the personal toggle, rendered as a standalone chip outside the groups.
+  test("every toggle key except attended belongs to exactly one group", () => {
+    const grouped = TOGGLE_FILTER_GROUPS.flatMap((group) => group.keys);
+    const defined = TOGGLE_FILTER_DEFINITIONS.map((filter) => filter.key).filter((key) => key !== "attended");
+
+    expect([...grouped].sort()).toEqual([...defined].sort());
+    expect(grouped).toHaveLength(new Set(grouped).size);
+    expect(grouped).not.toContain("attended");
+  });
+
+  // Split lives in the Attributes group (how the song was played / connects).
+  test("Split is in the Attributes group", () => {
+    const attributes = TOGGLE_FILTER_GROUPS.find((group) => group.label === "Attributes");
+    expect(attributes?.keys).toContain("split");
   });
 });
 

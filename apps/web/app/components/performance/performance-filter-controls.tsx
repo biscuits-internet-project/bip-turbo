@@ -4,9 +4,10 @@ import { AuthorSearch } from "~/components/author/author-search";
 import { MusicianSearch } from "~/components/musician/musician-search";
 import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { SelectFilter } from "~/components/ui/filters";
+import { GroupedToggleFilters } from "~/components/ui/filters/grouped-toggle-filters";
 import { ToggleFilterGroup } from "~/components/ui/filters/toggle-filter-group";
 import { Input } from "~/components/ui/input";
-import { TIME_RANGE_GROUPS, TOGGLE_FILTER_DEFINITIONS } from "~/lib/song-filters";
+import { STANDALONE_TOGGLE_KEY, TIME_RANGE_GROUPS, TOGGLE_FILTER_DEFINITIONS } from "~/lib/song-filters";
 
 const ALL_TOGGLE_FILTERS = TOGGLE_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
 
@@ -70,6 +71,8 @@ export function PerformanceFilterControls({
     if (!showJamChartToggle && filter.key === "jamChart") return false;
     return true;
   });
+  const groupedToggleFilters = toggleFilters.filter((filter) => filter.key !== STANDALONE_TOGGLE_KEY);
+  const standaloneToggleFilters = toggleFilters.filter((filter) => filter.key === STANDALONE_TOGGLE_KEY);
   const showPlayedFilter =
     playedFilter !== undefined &&
     (hideTimeRange ||
@@ -208,14 +211,16 @@ export function PerformanceFilterControls({
           />
         )}
         {extraSelectFilters}
-      </div>
-      <div className="flex flex-wrap gap-2 items-center">
-        <ToggleFilterGroup filters={toggleFilters} activeFilters={activeToggleSet} onToggle={toggleFilter} />
+        {/* Toggle filters live in the same row as the selects: a compact strip
+            of group popovers (Quality / Position / Attributes) plus the
+            standalone Attended chip (a personal on/off, not a curation group). */}
+        <GroupedToggleFilters filters={groupedToggleFilters} activeFilters={activeToggleSet} onToggle={toggleFilter} />
+        <ToggleFilterGroup filters={standaloneToggleFilters} activeFilters={activeToggleSet} onToggle={toggleFilter} />
         {hasActiveFilters && (
           <button
             type="button"
             onClick={clearFilters}
-            className="px-3 py-1.5 text-sm rounded-md bg-transparent border border-glass-border text-content-text-tertiary hover:text-content-text-secondary transition-colors"
+            className="h-[34px] px-3 text-sm rounded-md bg-transparent border border-glass-border text-content-text-tertiary hover:text-content-text-secondary transition-colors"
           >
             Clear All
           </button>
