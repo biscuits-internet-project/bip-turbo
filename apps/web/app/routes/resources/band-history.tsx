@@ -7,7 +7,10 @@ import { publicLoader } from "~/lib/base-loaders";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 
 const Link = (props: React.ComponentProps<typeof RouterLink>) => (
-  <RouterLink {...props} className={`text-brand hover:text-hover-accent ${props.className || ""}`} />
+  <RouterLink
+    {...props}
+    className={`text-brand-primary hover:text-brand-secondary hover:underline ${props.className || ""}`}
+  />
 );
 
 // Define types for our data
@@ -90,12 +93,8 @@ const BandHistory: React.FC = () => {
               Day &gt; Help On the Way &gt; Slipknot &gt; Basis For a Day" or "Antelope &gt; Morning Dew &gt; Antelope"
             </p>
             <p>
-              In{" "}
-              <Link to="/shows/year/1995" className="text-brand hover:text-hover-accent">
-                1995
-              </Link>
-              , Aron Magner replaced Hayflick on keys and the band changed their name to The Disco Biscuits. In an
-              interview with Spin, Marc says:
+              In <Link to="/shows/year/1995">1995</Link>, Aron Magner replaced Hayflick on keys and the band changed
+              their name to The Disco Biscuits. In an interview with Spin, Marc says:
             </p>
             <p>
               <blockquote className="italic px-10">
@@ -109,15 +108,9 @@ const BandHistory: React.FC = () => {
               </blockquote>
             </p>
             <p>
-              <Link to="/shows/year/1995" className="text-brand hover:text-hover-accent">
-                1995
-              </Link>{" "}
-              into{" "}
-              <Link to="/shows/year/1996" className="text-brand hover:text-hover-accent">
-                1996
-              </Link>{" "}
-              saw them move away from house parties and into the Philadelphia bar/club scene with shows at Sam Adam's
-              Brewhouse, The Middle East, J.C. Dobb's, and the Blarney Stone, among others.
+              <Link to="/shows/year/1995">1995</Link> into <Link to="/shows/year/1996">1996</Link> saw them move away
+              from house parties and into the Philadelphia bar/club scene with shows at Sam Adam's Brewhouse, The Middle
+              East, J.C. Dobb's, and the Blarney Stone, among others.
             </p>
           </CardContent>
         </Card>
@@ -150,7 +143,7 @@ const BandHistory: React.FC = () => {
               <Link to="/shows/1998-12-30-wetlands-preserve-new-york-ny">12/30/98</Link> the band played two legendary
               Phish afterparties at the Wetlands Preserve, and on{" "}
               <Link to="/shows/1998-12-31-silk-city-diner-philadelphia-pa">12/31/98</Link> the band debuted Barber's{" "}
-              <Link to="/resources/hot-air-ballooon">Hot Air Balloon</Link> rock opera at Silk City.
+              <Link to="/resources/hot-air-balloon">Hot Air Balloon</Link> rock opera at Silk City.
             </p>
             <p>
               The Biscuits saw a huge expansion in popularity and skill in <Link to="/shows/year/1999">1999</Link>. They
@@ -185,7 +178,7 @@ const BandHistory: React.FC = () => {
             <p>
               Meanwhile, Marc channeled his energy into writing a ton of new songs, and formed his own band, The Maui
               Project, which played one show on his birthday - <span> </span>
-              <Link to="https://archive.org/details/maui2000-04-08.flac16" target="blank">
+              <Link to="https://archive.org/details/maui2000-04-08.flac16" target="_blank" rel="noopener noreferrer">
                 4/8/2000
               </Link>{" "}
               - at the Wetlands in New York City. The Maui Project featured Marc on bass, Jamie Shields on keys, Max
@@ -203,11 +196,11 @@ const BandHistory: React.FC = () => {
           <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
               Coming soon!. Follow us at on{" "}
-              <Link to="https://twitter.com/tdbdotnet" target="blank">
+              <Link to="https://twitter.com/tdbdotnet" target="_blank" rel="noopener noreferrer">
                 twitter
               </Link>{" "}
               and{" "}
-              <Link to="https://instagram.com/tdbdotnet" target="blank">
+              <Link to="https://instagram.com/tdbdotnet" target="_blank" rel="noopener noreferrer">
                 instagram
               </Link>{" "}
               for content updates!
@@ -221,7 +214,7 @@ const BandHistory: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4 text-content-text-primary leading-relaxed">
             <p>
-              In <Link to="/shows/years/2005">2005</Link>, after more than 10 years, Sam Altman left the band to pursue
+              In <Link to="/shows/year/2005">2005</Link>, after more than 10 years, Sam Altman left the band to pursue
               his dream of becoming a doctor. His last official shows were{" "}
               <Link to="/shows/2005-08-26-skye-top-festival-grounds-van-etten-ny">8/26/05</Link> and{" "}
               <Link to="/shows/2005-08-27-skye-top-festival-grounds-van-etten-ny">8/27/05</Link> at Camp Bisco IV. To
@@ -276,7 +269,7 @@ const BandHistory: React.FC = () => {
               By May, things were starting to sound more cohesive by the night as they made stops in Milwaukee/Madison,
               WI, Chicago, IL, Memphis, TN, Washington D.C. Wilkes-Barre, PA and Albany. At the end of the month they
               played two nights at Summer Camp in Chillicothe, IL and then came home to Philadelphia for shows at Jam on
-              the RIver and the Electric Factory. (Recommended listening:
+              the River and the Electric Factory. (Recommended listening:
               <Link to="/shows/2006-05-28-electric-factory-philadelphia-pa">05/28</Link> Astronaut and 42).
             </p>
             <p>
@@ -290,9 +283,9 @@ const BandHistory: React.FC = () => {
               Shows in July consisted of two nights at High Sierra Music Festival and one set at All Good Music
               Festival. (Recommended listening:
               <Link to="/shows/2006-07-02-plumas-country-fairgrounds-quincy-ca">7/2</Link> I-Man/Helicopters mashup).
-              August another light month of shows with only three tour dates. The first was
-              <Link to="/shows/2006-08-05-hutchinson-field-in-grant-park-chicago-il">8/5</Link> 8/5 at Lollapalooza and
-              the second and third were
+              August was another light month of shows with only three tour dates. The first was{" "}
+              <Link to="/shows/2006-08-05-hutchinson-field-in-grant-park-chicago-il">8/5</Link> at Lollapalooza and the
+              second and third were
               <Link to="/shows/2006-08-25-hunter-mountain-ski-lodge-hunter-ny">8/25</Link> and
               <Link to="/shows/2006-08-26-hunter-mountain-ski-lodge-hunter-ny">8/26</Link> Camp Bisco V at Hunter
               Mountain in Hunter, NY. This was Allen's first Camp and proved to be an important weekend. At the time,
@@ -603,7 +596,7 @@ const BandHistory: React.FC = () => {
               <Link to="/shows/2009-09-18-palladium-ballroom-dallas-tx">9/18</Link> at the Palladium Ballroom in Dallas
               was another highly regarded show with standout segments Sound One &gt; Tempest &gt; Sound One and Shem-Rah
               &gt; HAB, the latter producing one of the most beautiful, blissful jams of the year.{" "}
-              <Link to="/shows/2009-09-19-stubb-s-bar-b-q-austin-tx">9/19</Link> at Stubbs in Dallas, TX electrified the
+              <Link to="/shows/2009-09-19-stubb-s-bar-b-q-austin-tx">9/19</Link> at Stubbs in Austin, TX electrified the
               band and fans alike prompting Jon to say "It was like we were throwing touchdown passes the whole show."
               (Recommended listening: Mirrors &gt; Basis)
             </p>
@@ -627,10 +620,10 @@ const BandHistory: React.FC = () => {
               San Francisco, and Santa Cruz. <Link to="/shows/2009-11-20-the-fillmore-san-francisco-ca">11/20</Link>{" "}
               Grass is Green &gt; Minions &gt; Grass is Green is one of the hidden gems of the year. It was during the
               fall that more new songs like Flash Mob, Widgets, Loose Change, and Fish out of Water started appearing in
-              setlists, eliciting mixed reviews from fans. Catalyst, first apearing as an instrumental, received
+              setlists, eliciting mixed reviews from fans. Catalyst, first appearing as an instrumental, received
               slightly higher praise. Two highly anticipated post-thanksgiving shows at the Electric Factory wrapped up
               fall tour, but fell slightly short of the high level playing fans had come to expect in this exceptional
-              year. Carribean Holidaze in mid-December again provided fans an opportunity to relax in Jamaica and see
+              year. Caribbean Holidaze in mid-December again provided fans an opportunity to relax in Jamaica and see
               their favorite band in paradise.
             </p>
             <p>

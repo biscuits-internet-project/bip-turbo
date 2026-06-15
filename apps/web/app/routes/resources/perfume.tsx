@@ -40,17 +40,17 @@ const Perfume: React.FC = () => {
         <p className="mb-6 text-content-text-secondary leading-relaxed">
           The Disco Biscuits first performed under the moniker "The Perfume" on{" "}
           <ShowLink to="/shows/2001-04-16-wetlands-preserve-new-york-ny">April 16, 2001</ShowLink> at the Wetlands in
-          New York City. Having played the Roseland Ballroom two nights earlier they used this alternate band name as to
-          not break contractual obligations with the venue. The set was sandwiched between two sets of Electron.
+          New York City. Having played the Roseland Ballroom two nights earlier they used this alternate band name so as
+          not to break contractual obligations with the venue. The set was sandwiched between two sets of Electron.
         </p>
 
         <p className="mb-6 text-content-text-secondary leading-relaxed">
           On <ShowLink to="/shows/2003-05-28-the-conduit-trenton-nj">May 28, 2003</ShowLink> at The Conduit in Trenton,
           NJ they again performed under this alternate band name, but with a new twist. All of the songs played at this
           show were played in alternate styles. Mindless Dribble and Sister Judy's Soul Shack were played in a dub
-          style, I-man and 7-11 (affectionately referred to as WaWa) were played in a techno style, Sound One was played
-          Honkey Tonk, and more. This was also the first performance of Pilin it High in a breakbeat style. While many
-          of these alternate versions were one-offs, Pilin it High(er) as it is sometimes referred to by fans, has stuck
+          style, I-Man and 7-11 (affectionately referred to as WaWa) were played in a techno style, Sound One was played
+          Honky Tonk, and more. This was also the first performance of Pilin it High in a breakbeat style. While many of
+          these alternate versions were one-offs, Pilin it High(er) as it is sometimes referred to by fans, has stuck
           around and has been performed predominantly in this style since.
         </p>
 
@@ -76,7 +76,7 @@ const Perfume: React.FC = () => {
           <ShowLink to="/resources/tractorbeam">Tractorbeam</ShowLink> vs. The Perfume. This day set featured
           Tractorbeam versions of Rock Candy and Run Like Hell, as well as Perfume debuts of M.E.M.P.H.I.S.&gt;Little
           Lai&gt;M.E.M.P.H.I.S. (hip-hop), Once the Fiddler Paid (calypso) and News From Nowhere (techno). The set also
-          included the return of Frog Legs (Devo) and Sound One (Honkey Tonk) featuring Sam Altman on drums.
+          included the return of Frog Legs (Devo) and Sound One (Honky Tonk) featuring Sam Altman on drums.
         </p>
 
         <p className="mb-6 text-content-text-secondary leading-relaxed">

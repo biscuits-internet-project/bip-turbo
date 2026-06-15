@@ -55,8 +55,8 @@ const MovieScores: React.FC = () => {
         <p>
           For the 2nd set on New Year's Eve, 1999, The Disco Biscuits played along to Katsuhiro Otomo's anime
           masterpiece, Akira. Starting with just the setbreak DJ spinning, the band members slowly came out one by one
-          onto stage dressed entirely in black robes. Behind them a on a projection screen, the movie played. This
-          "Akira Jam" eventually falls into Basis For a Day to end the set.
+          onto stage dressed entirely in black robes. Behind them on a projection screen, the movie played. This "Akira
+          Jam" eventually falls into Basis For a Day to end the set.
         </p>
         <p>
           As for syncing up the taped set to the movie itself, this is a topic under heavy debate among Biscuits fans.
@@ -89,10 +89,10 @@ const MovieScores: React.FC = () => {
       >
         <p>
           For the 3rd set of their New Year's Eve 2015 show, the Disco Biscuits again played an improvised score to a
-          movie, this time the original Tron. However, instead of projecting the movie behind behind them, they
-          projected it onto a scrim that hung in front of them, covering the entire stage area, top to bottom, left to
-          right. The result was that you were primarily watching the movie, while seeing hints of movement and shadows
-          from the band behind.
+          movie, this time the original Tron. However, instead of projecting the movie behind them, they projected it
+          onto a scrim that hung in front of them, covering the entire stage area, top to bottom, left to right. The
+          result was that you were primarily watching the movie, while seeing hints of movement and shadows from the
+          band behind.
         </p>
       </MovieCard>
 

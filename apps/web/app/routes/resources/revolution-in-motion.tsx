@@ -496,7 +496,7 @@ const RevolutionInMotion: React.FC = () => {
           </p>
           <p>
             Produced by Cloudchord and released on March 29, 2024, the story takes place in an alternate timeline and
-            follows a blacksheep alien prince and his crew as they stumble through the universe, collide with humanity,
+            follows a black sheep alien prince and his crew as they stumble through the universe, collide with humanity,
             and fall for a band and a music powerful enough to rewrite their future and alter the course of the
             universe.
           </p>
