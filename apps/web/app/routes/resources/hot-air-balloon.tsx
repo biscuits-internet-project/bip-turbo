@@ -37,7 +37,7 @@ const characters = [
       "An unemployed wayward inventor who bounced aimlessly from idea to idea, until he invented the world's first aircraft, the hot air balloon. He was convinced by Morris Mulberry that the idea could be profitable and that the two of them should start a service shuttling people across the sea in hot air balloons. The business, called Hot Air Balloon Traveling, became successful and attracted the attention of Manilla Trane, the entrepreneur whose capital ran much of the town. Corrinado refused to sell Hot Air Balloon Traveling, and even worse, kindles a romance with Manilla's beautiful wife, Leora of the Sequoias. Manilla forcibly overtook the business and had Corrinado arrested and sentenced for building \"the devil's flying machine.\"",
   },
   {
-    name: "Leora of the Sequioas",
+    name: "Leora of the Sequoias",
     initial: "L",
     gradient: "from-pink-400 to-purple-400",
     description:
@@ -55,14 +55,14 @@ const characters = [
     initial: "MM",
     gradient: "from-emerald-400 to-cyan-400",
     description:
-      "A somewhat conniving, albeit benevolent, street hustler. He convinced Corrinado that the two of them could start a highly successful business by using Corrinado's hot air balloon invention to shuttle people across the sea. He mysteriously vanished one month after Hot Air Balloon Travelling was destroyed and Corrinado was arrested.",
+      "A somewhat conniving, albeit benevolent, street hustler. He convinced Corrinado that the two of them could start a highly successful business by using Corrinado's hot air balloon invention to shuttle people across the sea. He mysteriously vanished one month after Hot Air Balloon Traveling was destroyed and Corrinado was arrested.",
   },
   {
     name: "Diamond Rigg",
     initial: "DR",
     gradient: "from-amber-400 to-orange-500",
     description:
-      "A well known loan-shark and old street friend of Morris Mulberry. He put up the initial capital to start Hot Air Ballon Traveling. A very aloof individual who, according to town rumor, possessed the prototype hot air balloon, which he was given as collateral for his initial investment.",
+      "A well known loan-shark and old street friend of Morris Mulberry. He put up the initial capital to start Hot Air Balloon Traveling. A very aloof individual who, according to town rumor, possessed the prototype hot air balloon, which he was given as collateral for his initial investment.",
   },
 ];
 
@@ -122,11 +122,11 @@ nor can I forget the man who sent me down below`,
   {
     name: "The Very Moon",
     setting:
-      "The scene moves to Manilla's estate, before the arrest of Corrinado. We catch a glimpse of the relationship between Manilla and Leora. Manilla has reaped the rewards of many succesfull buisness enterprises. He works too hard to pay attention to his wife Leora, needing her only as a chef. Manilla invites Corrinado and Mulberry over for dinner in order to discuss the propositon of buying Hot Air Balloon Traveling. Corrinado and Mulberry are not willing to part with the business. As the scene ends, it becomes clear that Corrinado and Leora are enamored with one another, leaving Leora wondering whether Corrinado is the man to fly her far, far away.",
+      "The scene moves to Manilla's estate, before the arrest of Corrinado. We catch a glimpse of the relationship between Manilla and Leora. Manilla has reaped the rewards of many successful business enterprises. He works too hard to pay attention to his wife Leora, needing her only as a chef. Manilla invites Corrinado and Mulberry over for dinner in order to discuss the proposition of buying Hot Air Balloon Traveling. Corrinado and Mulberry are not willing to part with the business. As the scene ends, it becomes clear that Corrinado and Leora are enamored with one another, leaving Leora wondering whether Corrinado is the man to fly her far, far away.",
     lyrics: `Manilla, a crude machine, had taken his fair share
 He gobbled up the world he owned as petals paved his stairs
 Manilla thanked the very moon for money and his life
-He triffled nothing miniscule including one, his wife
+He trifled nothing minuscule including one, his wife
 Leora, his arranged wife, did not need his greed
 She asked that stars, the very moon, to one day cross the sea
 Manilla gazed an empty stare nothing there could grow
@@ -135,7 +135,7 @@ She cherished dreams of flying high and leaving him below
 Leora stands on her head
 Doin' the two step on her hands
 As her eyes move round the room
-To catch somone watching
+To catch someone watching
 Leora stands on her head
 Doin' the two step on her hands
 Underneath the very moon each one was watching
@@ -152,7 +152,7 @@ At lunch she met the flying man whose airships crossed the sea
 Leora stands on her head
 Doin' the two step on her hands
 As her eyes move round the room
-To catch somone watching
+To catch someone watching
 Leora stands on her head
 Doin' the two step on her hands
 Underneath the very moon each one was watching`,
@@ -169,7 +169,7 @@ I never accepted my relocation
 I've dreamed of this day since they locked away the key
 A prisoner in chains will not make a madman of me
 These voices insane are telling me tales from the stars
-So I call on the reigns of forces drawn in from afar
+So I call on the reins of forces drawn in from afar
 
 The walls have deceived me
 I imagined this all on my own
@@ -181,13 +181,13 @@ Cause on this day they will eat all their words
 I've dreamed of this day since they locked away the key
 A prisoner in chains will not make a madman of me
 These voices insane are telling me tales from the stars
-So I call on the reigns of forces drawn in from afar
+So I call on the reins of forces drawn in from afar
 
 I can stop all the voices
 and bang on the walls with my fists
 But my only chance left
-is the one I'd never dimiss
-I hear the world through the echos
+is the one I'd never dismiss
+I hear the world through the echoes
 A song of life through the noise in the crowd
 In this cell I've known plainly
 That what I want is what is not allowed.
@@ -195,7 +195,7 @@ That what I want is what is not allowed.
 I've dreamed of this day since they locked away the key
 A prisoner in chains will not make a madman of me
 These voices insane are telling me tales from the stars
-So I call on the reigns of forces drawn in from afar`,
+So I call on the reins of forces drawn in from afar`,
   },
   {
     name: "Eulogy",
@@ -231,7 +231,7 @@ all that is left is my feet on the ground
 Now I remember that life was a ball
 When I was the person in search of it all
 
-There's one in a million I'd be hear today
+There's one in a million I'd be here today
 There's one in a million that I get to stay
 And if I ask my maker to see me through
 When it seems there's nothing more that I can do`,
@@ -249,7 +249,7 @@ He bolted swiftly through the crowd
 The women yelled & screamed aloud
 Manilla's words rang through the air
 "Kill that man or all Beware!"
-Corrinado tookoff all for bust
+Corrinado took off all for bust
 Gone behind a cloud of dust
 
 Passed on tragedy Corrinado moves with ease
@@ -264,7 +264,7 @@ and slips out of his prison pajamas
 
 The Matador, the bull can run
 Corrinado sidestepped everyone
-Takesoff towards the end of town
+Takes off towards the end of town
 Drawing troops from all around
 He knows he's got but one way out
 His only route without a doubt
@@ -276,9 +276,9 @@ Eluding all authority with his own agility
 Ducks down an alley to the center square bazaar
 Soldiers yell, soldiers scream, don't let him get too far.
 
-Carooning down the mountain top
+Careening down the mountain top
 A bouncing rock no will can stop
-Their chasing our strong hero down
+They're chasing our strong hero down
 Who dodges trees with swift abounds
 He spins the air like a carousel
 While dodging shots adeptly till
@@ -291,7 +291,7 @@ His feet are well above the ground`,
       "Corrinado swims through the sea, his only chance of survival is to make it to the island; hoping that Morris Mulberry will be waiting with the prototype hot air balloon, the only one left undestroyed by Manilla. As he swims, he gets delirious from pure physical exhaustion. He thinks back to his friend Mulberry and the beginning of Hot Air Balloon Traveling when Mulberry persuaded him to use his invention to start a successful business.",
     lyrics: `I first caught the sun at noon today
 To get another 24 hours
-I lept & broke my bedframe
+I leapt & broke my bedframe
 Which the termites have devoured
 I lived a life in shambles
 With one idea left to scheme
@@ -310,7 +310,7 @@ and I believed him
 I walked down to the corner
 To fetch myself some dollars
 I left later that afternoon
-When the streets began to hollar
+When the streets began to holler
 and there I saw O'Farrell
 The old street corner pantomime
 and I simply could not shake him
@@ -366,7 +366,7 @@ To reunite them once again`,
       "Corrinado embraces Mulberry. He stares in awe at the hot air balloon. The fantastic pipe dream that had become his greatest joy had also led to his persecution. He starts up the engine and takes off, flying over the sea to rescue his beloved Leora. Leora waits lying by the sea on the beach. She frets about whether or not Corrinado has survived As dawn approaches, she sees a speck on the horizon. Corrinado has arrived. He sets his balloon down on the shore. Leora climbs in with him. They take off together, never to be seen by anyone again, flying off into the sunrise.",
     lyrics: `In the light of the moon, too soon
 In a hot air balloon, he crossed the sea
-Once an airship tycoon, turned bafoon
+Once an airship tycoon, turned buffoon
 Leaving his home marooned, attempted to flee
 the life he's begun
 
@@ -384,7 +384,7 @@ not anyone
 
 In the blink of an eye, she spies
 The spot in the foggy skies, she's been longing to see
-Camoflaged by the tides, she hides
+Camouflaged by the tides, she hides
 Where the water and wind collide, she's soon to be free
 from what she's begun
 

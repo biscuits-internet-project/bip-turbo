@@ -20,17 +20,14 @@ export default function Tractorbeam() {
     <div>
       <div className="space-y-6 md:space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="page-heading">TRACTOR BEAM</h1>
+          <h1 className="page-heading">TRACTORBEAM</h1>
         </div>
 
         <div className="card-premium rounded-lg p-6 mb-6">
           <div className="space-y-4 text-content-text-secondary">
             <p className="leading-relaxed">
               Tractorbeam, like{" "}
-              <Link
-                to="/resources/the-perfume"
-                className="text-brand-primary hover:text-brand-secondary hover:underline"
-              >
+              <Link to="/resources/perfume" className="text-brand-primary hover:text-brand-secondary hover:underline">
                 The Perfume
               </Link>
               , is a pseudonym the Disco Biscuits perform under. Debuted on{" "}
@@ -79,7 +76,7 @@ export default function Tractorbeam() {
                     to="/shows/2008-10-25-state-theater-falls-church-va"
                     className="text-brand-primary hover:text-brand-secondary hover:underline"
                   >
-                    10/25/08 State Theater Falls - Church, VA
+                    10/25/08 State Theater - Falls Church, VA
                   </Link>
                 </li>
                 <li>
@@ -152,7 +149,7 @@ export default function Tractorbeam() {
                     to="/shows/2014-12-29-b-b-king-s-blues-club-new-york-ny"
                     className="text-brand-primary hover:text-brand-secondary hover:underline"
                   >
-                    12/29/14 B.B. King Blue Club - New York, NY
+                    12/29/14 B.B. King Blues Club - New York, NY
                   </Link>
                 </li>
                 <li>
