@@ -1,5 +1,7 @@
+import type { RatingValueBucket } from "@bip/core";
 import { useEffect, useRef, useState } from "react";
 import { RatingComponent } from "~/components/rating";
+import { RatingDistributionChart } from "~/components/rating/rating-distribution-chart";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "~/components/ui/hover-card";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -54,6 +56,7 @@ interface TrackDataResponse {
     note: string | null;
   };
   userRating: number | null;
+  distribution: RatingValueBucket[];
 }
 
 export function TrackRatingOverlay({ track, children, showRating = true, trigger = "hover" }: TrackRatingOverlayProps) {
@@ -125,6 +128,8 @@ export function TrackRatingOverlay({ track, children, showRating = true, trigger
           {(data?.track.likesCount ?? track.likesCount) === 1 ? "like" : "likes"}
         </div>
       )}
+
+      {showRating && data?.distribution && <RatingDistributionChart compact buckets={data.distribution} />}
 
       {(data?.track.note ?? track.note) && (
         <div className="text-xs text-content-text-secondary border-t border-glass-border pt-2 mt-2">

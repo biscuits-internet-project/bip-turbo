@@ -33,6 +33,11 @@ export const loader = publicLoader(async ({ params, context }) => {
   const averageRating = track.averageRating || 0;
   const ratingsCount = track.ratingsCount || 0;
 
+  // Rating distribution for the per-track histogram in the hover overlay.
+  // Computed here (not denormalized) so it loads only when a user opens a
+  // track's overlay, which is the only caller of this loader.
+  const distribution = await services.ratings.getRatingDistribution(trackId, "Track");
+
   return new Response(
     JSON.stringify({
       track: {
@@ -44,6 +49,7 @@ export const loader = publicLoader(async ({ params, context }) => {
         note: track.note,
       },
       userRating: userRating?.value || null,
+      distribution,
     }),
     {
       status: 200,

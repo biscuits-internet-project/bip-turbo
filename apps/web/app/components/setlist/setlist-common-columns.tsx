@@ -8,6 +8,7 @@ import { NumberCell } from "~/components/ui/number-cell";
 import { SortableHeader } from "~/components/ui/sortable-header";
 import { GapCell, type GapCellState } from "./gap-cell";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
+import { TrackRatingOverlay } from "./track-rating-overlay";
 
 /**
  * Wraps a value-compare with the canonical set/track tiebreaker so two
@@ -438,9 +439,11 @@ export function createSetlistCommonColumns<T extends TrackLight>(options?: {
         );
         // Preserve the flow view's segue marker so "Tractorbeam > Above
         // the Waves" still reads as a continuous run inside the table.
+        // Wrap the title in TrackRatingOverlay so the table view gets the
+        // same per-track rating + histogram hover panel the flow view has.
         return (
           <>
-            {titleNode}
+            <TrackRatingOverlay track={info.row.original}>{titleNode}</TrackRatingOverlay>
             {segue && <span className="text-content-text-secondary ml-1 font-medium">&gt;</span>}
           </>
         );

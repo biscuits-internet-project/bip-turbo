@@ -1,11 +1,23 @@
 import { setup } from "@test/test-utils";
 import { screen } from "@testing-library/react";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 // Stub the session hook so the overlay can render without a data router.
 vi.mock("~/hooks/use-session", () => ({
   useSession: () => ({ user: null, supabase: null }),
 }));
+
+// Recharts ResponsiveContainer needs ResizeObserver (absent in jsdom); stub
+// it so the histogram mounts when the overlay renders it.
+vi.mock("recharts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("recharts")>();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+      <div style={{ width: 600, height: 240 }}>{children}</div>
+    ),
+  };
+});
 
 import { TrackRatingOverlay, type TrackRatingOverlayTrack } from "./track-rating-overlay";
 
@@ -57,6 +69,48 @@ describe('TrackRatingOverlay trigger="click"', () => {
     expect(await screen.findByText("Big jam.")).toBeInTheDocument();
     // …but the rating number does not.
     expect(screen.queryByText("4.75")).not.toBeInTheDocument();
+  });
+});
+
+describe("TrackRatingOverlay histogram", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Opening the overlay fetches fresh track data; when that response carries
+  // a rating distribution, the mini histogram renders in the panel.
+  test("renders the histogram from the fetched distribution", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          track: {
+            id: "track-1",
+            songTitle: "Aceetobee",
+            averageRating: 4.5,
+            ratingsCount: 4,
+            likesCount: 0,
+            note: null,
+          },
+          userRating: null,
+          distribution: [
+            { value: 5, count: 3 },
+            { value: 4, count: 1 },
+          ],
+        }),
+      }),
+    );
+
+    const { user } = await setup(
+      <TrackRatingOverlay track={makeTrack({ ratingsCount: 4 })} trigger="click">
+        <button type="button">title</button>
+      </TrackRatingOverlay>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "title" }));
+    expect(await screen.findByText("Rating distribution")).toBeInTheDocument();
+    expect(screen.getByText("4 ratings")).toBeInTheDocument();
   });
 });
 
