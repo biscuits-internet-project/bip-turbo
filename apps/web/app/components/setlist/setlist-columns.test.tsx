@@ -13,6 +13,14 @@ vi.mock("~/components/performance/track-rating-cell", () => ({
   TrackRatingCell: (props: object) => mockShallowComponent("TrackRatingCell", props),
 }));
 
+// The song-title cell wraps its link in TrackRatingOverlay (the per-track
+// rating + histogram hover panel), which calls useSession and needs a data
+// router. Stub it to render its children so these column-wiring tests stay
+// router-free, mirroring setlist-flow.test.tsx.
+vi.mock("./track-rating-overlay", () => ({
+  TrackRatingOverlay: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const { createSetlistColumns } = await import("./setlist-columns");
 type SetlistTableRow = TrackLight & { priorPerformanceCount: number | null };
 

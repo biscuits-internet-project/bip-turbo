@@ -134,9 +134,9 @@ export function DebutYearChart({ setlist }: DebutYearChartProps) {
       {view === "chart" ? (
         <div className="h-28">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={distribution} margin={{ top: 4, right: 4, left: -16, bottom: 4 }} barCategoryGap="10%">
+            <BarChart data={distribution} margin={{ top: 4, right: 4, left: 0, bottom: 4 }} barCategoryGap="10%">
               <XAxis dataKey="year" stroke={CHART_COLORS.axis} fontSize={10} interval={labelInterval} />
-              <YAxis stroke={CHART_COLORS.axis} fontSize={10} allowDecimals={false} width={28} />
+              <YAxis stroke={CHART_COLORS.axis} fontSize={10} allowDecimals={false} width={30} />
               <Tooltip content={<DebutYearTooltip />} cursor={CHART_BAR_CURSOR} isAnimationActive={false} />
               <Bar dataKey="count" fill={CHART_COLORS.accent} />
             </BarChart>

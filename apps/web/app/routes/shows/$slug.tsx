@@ -1,4 +1,4 @@
-import type { ShowNavItem } from "@bip/core";
+import type { RatingValueBucket, ShowNavItem } from "@bip/core";
 import { type ArchiveDotOrgRecording, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Edit } from "lucide-react";
@@ -15,6 +15,7 @@ import { DebutYearChart } from "~/components/show/debut-year-chart";
 import { type ExternalLink, ExternalLinkCard } from "~/components/show/external-link-card";
 import { ShowLineupSection } from "~/components/show/show-lineup-section";
 import { ShowPhotos } from "~/components/show/show-photos";
+import { ShowRatingHistogram } from "~/components/show/show-rating-histogram";
 import { ShowDate } from "~/components/show-date";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
@@ -45,6 +46,7 @@ interface ShowLoaderData {
   externalSources: ShowExternalSources;
   photos: ShowFile[];
   adjacentShows: { previous: ShowNavItem | null; next: ShowNavItem | null };
+  ratingDistribution: RatingValueBucket[];
   dehydratedState: DehydratedState;
 }
 
@@ -75,11 +77,14 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     return setlist;
   });
 
-  // Load reviews, photos, and adjacent shows fresh (not cached - simple queries)
-  const [reviews, photos, adjacentShows] = await Promise.all([
+  // Load reviews, photos, adjacent shows, and the rating distribution fresh
+  // (not cached - simple indexed queries). The distribution feeds the
+  // right-rail histogram; one groupBy over the ratings index is cheap.
+  const [reviews, photos, adjacentShows, ratingDistribution] = await Promise.all([
     services.reviews.findByShowId(setlist.show.id),
     services.files.findByShowId(setlist.show.id),
     services.shows.findAdjacentShows(setlist.show.date, setlist.show.slug),
+    services.ratings.getRatingDistribution(setlist.show.id, "Show"),
   ]);
 
   logger.info(`Show data loaded for ${slug} - setlist cached, reviews fresh`);
@@ -122,6 +127,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     externalSources: externalSourcesMap[setlist.show.id] ?? {},
     photos,
     adjacentShows,
+    ratingDistribution,
     dehydratedState: dehydrate(queryClient),
   };
 });
@@ -141,6 +147,7 @@ export default function Show() {
     externalSources,
     photos,
     adjacentShows,
+    ratingDistribution,
   } = useSerializedLoaderData<ShowLoaderData>();
   const { user } = useSession();
   const revalidator = useRevalidator();
@@ -343,6 +350,8 @@ export default function Show() {
             <SetlistHighlights setlist={setlist} />
 
             <DebutYearChart setlist={setlist} />
+
+            <ShowRatingHistogram buckets={ratingDistribution} />
           </div>
         </div>
 

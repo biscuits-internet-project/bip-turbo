@@ -116,6 +116,17 @@ export interface RatingYearBucket {
   count: number;
 }
 
+/**
+ * One bar of a single rateable's rating distribution: how many ratings
+ * landed on a given star value. Drives the per-show and per-track
+ * histograms, which (unlike the profile charts) need no year axis since a
+ * show or track is a single date.
+ */
+export interface RatingValueBucket {
+  value: number;
+  count: number;
+}
+
 // Mapper functions
 function mapRatingToDomainEntity(dbRating: DbRating): Rating {
   return {
@@ -550,6 +561,21 @@ export class RatingService {
       GROUP BY LEFT(s.date, 4)::int, r.value
     `;
     return rows.map((row) => ({ year: row.year, value: row.value, count: Number(row.count) }));
+  }
+
+  /**
+   * Distribution of a single rateable's ratings by star value, for the
+   * per-show / per-track histograms. Groups by value over the
+   * (rateable_type, rateable_id) index and includes 0.5 ratings so the
+   * chart reflects every vote.
+   */
+  async getRatingDistribution(rateableId: string, rateableType: string): Promise<RatingValueBucket[]> {
+    const rows = await this.db.rating.groupBy({
+      by: ["value"],
+      where: { rateableId, rateableType, value: { gte: 0.5 } },
+      _count: { id: true },
+    });
+    return rows.map((row) => ({ value: row.value, count: row._count.id }));
   }
 
   async deleteByRateableId(rateableId: string, rateableType: string): Promise<void> {
