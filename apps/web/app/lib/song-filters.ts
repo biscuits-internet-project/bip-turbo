@@ -85,6 +85,7 @@ export const TOGGLE_FILTER_DEFINITIONS = [
   { key: "split", label: "Split" },
   { key: "inverted", label: "Inverted" },
   { key: "dyslexic", label: "Dyslexic" },
+  { key: "unfinished", label: "Unfinished" },
   { key: "jamChart", label: "Jam Chart" },
   { key: "allTimer", label: "All-Timer" },
   { key: "attended", label: "Attended" },
@@ -101,7 +102,7 @@ export const TOGGLE_FILTER_DEFINITIONS = [
 export const TOGGLE_FILTER_GROUPS = [
   { label: "Quality", keys: ["jamChart", "allTimer"] },
   { label: "Position", keys: ["setOpener", "setCloser", "encore"] },
-  { label: "Attributes", keys: ["split", "standalone", "segueIn", "segueOut", "inverted", "dyslexic"] },
+  { label: "Attributes", keys: ["split", "standalone", "segueIn", "segueOut", "inverted", "dyslexic", "unfinished"] },
 ] as const;
 
 /** The personal toggle rendered on its own (not in a group popover). */

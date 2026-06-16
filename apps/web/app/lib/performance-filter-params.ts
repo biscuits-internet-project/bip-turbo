@@ -16,6 +16,7 @@ const VALID_FILTER_KEYS = new Set([
   "split",
   "inverted",
   "dyslexic",
+  "unfinished",
   "jamChart",
   "allTimer",
 ]);
