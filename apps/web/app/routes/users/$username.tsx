@@ -306,7 +306,7 @@ export default function UserProfile() {
   return (
     <div className="w-full space-y-6">
       {/* Profile Header */}
-      <Card className="card-premium">
+      <Card>
         <CardContent className="pt-6">
           {/* Top row: Avatar, Name/Score, Badges, Edit Button.
               Mobile stacks (avatar+info on top, badges+edit below); sm+ goes
@@ -470,7 +470,7 @@ export default function UserProfile() {
           {reviews.length > 0 ? (
             <div className="space-y-4">
               {reviews.map((review) => (
-                <Card key={review.id} className="card-premium">
+                <Card key={review.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">
@@ -506,7 +506,7 @@ export default function UserProfile() {
               ))}
             </div>
           ) : (
-            <Card className="card-premium">
+            <Card>
               <CardContent className="py-12 text-center">
                 <MessageSquare className="w-12 h-12 text-content-text-tertiary mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-content-text-primary mb-2">No Reviews Yet</h3>
@@ -559,7 +559,7 @@ export default function UserProfile() {
               )}
             </>
           ) : (
-            <Card className="card-premium">
+            <Card>
               <CardContent className="py-12 text-center">
                 <Star className="w-12 h-12 text-content-text-tertiary mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-content-text-primary mb-2">No Show Ratings Yet</h3>
@@ -612,7 +612,7 @@ export default function UserProfile() {
               )}
             </>
           ) : (
-            <Card className="card-premium">
+            <Card>
               <CardContent className="py-12 text-center">
                 <Star className="w-12 h-12 text-content-text-tertiary mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-content-text-primary mb-2">No Song Version Ratings Yet</h3>
@@ -631,7 +631,7 @@ export default function UserProfile() {
           {blogPosts.length > 0 ? (
             <div className="space-y-4">
               {blogPosts.map((post) => (
-                <Card key={post.id} className="card-premium">
+                <Card key={post.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-xl">
@@ -664,7 +664,7 @@ export default function UserProfile() {
               ))}
             </div>
           ) : (
-            <Card className="card-premium">
+            <Card>
               <CardContent className="py-12 text-center">
                 <Edit className="w-12 h-12 text-content-text-tertiary mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-content-text-primary mb-2">No Blog Posts Yet</h3>
@@ -694,7 +694,7 @@ export default function UserProfile() {
             externalSources={attendedExternalSources}
             collapsible
             empty={
-              <Card className="card-premium">
+              <Card>
                 <CardContent className="py-12 text-center">
                   <CalendarDays className="w-12 h-12 text-content-text-tertiary mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-content-text-primary mb-2">No Shows Attended</h3>

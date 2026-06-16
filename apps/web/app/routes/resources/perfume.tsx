@@ -1,5 +1,6 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { cardVariants } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 // Add a loader function
@@ -36,7 +37,7 @@ const Perfume: React.FC = () => {
     <div>
       <h1 className="page-heading">THE PERFUME</h1>
 
-      <div className="glass-content rounded-lg shadow-md overflow-hidden mb-8 p-6">
+      <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md overflow-hidden mb-8 p-6" })}>
         <p className="mb-6 text-content-text-secondary leading-relaxed">
           The Disco Biscuits first performed under the moniker "The Perfume" on{" "}
           <ShowLink to="/shows/2001-04-16-wetlands-preserve-new-york-ny">April 16, 2001</ShowLink> at the Wetlands in

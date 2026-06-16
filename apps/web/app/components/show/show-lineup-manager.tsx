@@ -110,7 +110,7 @@ export function ShowLineupManager({ showId, initialLineup }: ShowLineupManagerPr
 
   if (!editing) {
     return (
-      <Card className="card-premium">
+      <Card>
         <CardContent className="p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-base font-medium text-content-text-primary">Lineup</h3>
@@ -136,7 +136,7 @@ export function ShowLineupManager({ showId, initialLineup }: ShowLineupManagerPr
   }
 
   return (
-    <Card className="card-premium">
+    <Card>
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0 py-3">
         <CardTitle className="text-base text-content-text-primary">Edit lineup</CardTitle>
         <div className="flex items-center gap-2">

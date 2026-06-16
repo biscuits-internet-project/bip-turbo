@@ -5,6 +5,8 @@ import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Textarea } from "~/components/ui/textarea";
+import { formInputClass } from "~/lib/form-styles";
+import { cn } from "~/lib/utils";
 
 const reviewFormSchema = z.object({
   content: z.string().min(1, "Review content is required"),
@@ -37,7 +39,7 @@ export function ReviewForm({ onSubmit }: ReviewFormProps) {
                 <Textarea
                   placeholder="Share your thoughts about this show..."
                   {...field}
-                  className="glass-content border-glass-border text-content-text-primary min-h-[120px]"
+                  className={cn(formInputClass, "min-h-[120px]")}
                 />
               </FormControl>
               <FormMessage />

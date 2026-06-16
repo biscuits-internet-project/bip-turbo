@@ -7,7 +7,8 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog";
 import { Textarea } from "~/components/ui/textarea";
-import { formatDateLong } from "~/lib/utils";
+import { formInputClass } from "~/lib/form-styles";
+import { cn, formatDateLong } from "~/lib/utils";
 
 interface ReviewCardProps {
   review: ReviewMinimal;
@@ -57,7 +58,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
 
   return (
     <>
-      <Card className="card-premium overflow-hidden transition-all duration-300 hover:border-brand-primary/60">
+      <Card className="overflow-hidden transition-all duration-300 hover:border-brand-primary/60">
         <CardHeader className="border-b border-glass-border/50 px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -99,7 +100,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
               <Textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="min-h-[100px] glass-content border-glass-border text-content-text-primary"
+                className={cn(formInputClass, "min-h-[100px]")}
               />
               <div className="flex justify-end gap-2">
                 <Button

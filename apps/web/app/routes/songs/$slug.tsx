@@ -12,6 +12,7 @@ import { RatingComponent } from "~/components/rating";
 import { ShowDate } from "~/components/show-date";
 import { YearlyPlayChart } from "~/components/song/yearly-play-chart";
 import { isNoteworthy } from "~/components/track/noteworthy-marker";
+import { cardVariants } from "~/components/ui/card";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
@@ -330,7 +331,7 @@ export default function SongPage() {
       </dl>
 
       {song.notes && (
-        <div className="glass-content rounded-lg p-4">
+        <div className={cardVariants({ variant: "panel", className: "rounded-lg p-4" })}>
           <div
             className="text-md text-content-text-tertiary leading-relaxed"
             dangerouslySetInnerHTML={{ __html: song.notes }}
@@ -424,7 +425,10 @@ export default function SongPage() {
                       <a
                         href={`/shows/${p.show.slug}`}
                         key={p.trackId}
-                        className="glass-content block rounded-lg hover:border-brand-primary/60 transition-all duration-200 p-4"
+                        className={cardVariants({
+                          variant: "panel",
+                          className: "block rounded-lg hover:border-brand-primary/60 transition-all duration-200 p-4",
+                        })}
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="text-lg font-medium text-content-text-primary">{p.show.date}</div>
@@ -474,7 +478,7 @@ export default function SongPage() {
 
         {song.history && (
           <TabsContent value="history" className="mt-4">
-            <div className="glass-content rounded-lg p-6">
+            <div className={cardVariants({ variant: "panel", className: "rounded-lg p-6" })}>
               <div
                 className="text-base text-content-text-tertiary leading-relaxed [&>p]:mb-4 [&>p:last-child]:mb-0"
                 dangerouslySetInnerHTML={{
@@ -494,7 +498,7 @@ export default function SongPage() {
 
         {song.lyrics && (
           <TabsContent value="lyrics" className="mt-4">
-            <div className="glass-content rounded-lg p-4">
+            <div className={cardVariants({ variant: "panel", className: "rounded-lg p-4" })}>
               <div className="overflow-x-auto">
                 <div
                   className="text-md text-content-text-tertiary leading-relaxed"
@@ -507,7 +511,7 @@ export default function SongPage() {
 
         {(song.tabs || song.guitarTabsUrl) && (
           <TabsContent value="guitar-tabs" className="mt-4">
-            <div className="glass-content rounded-lg p-4">
+            <div className={cardVariants({ variant: "panel", className: "rounded-lg p-4" })}>
               <div className="overflow-x-auto">
                 <div className="text-md text-content-text-tertiary leading-relaxed">
                   {song.tabs ? (

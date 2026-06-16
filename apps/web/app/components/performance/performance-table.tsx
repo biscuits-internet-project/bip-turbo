@@ -94,7 +94,7 @@ export function PerformanceTable({
   );
 
   return (
-    <Card className="card-premium py-4 px-1">
+    <Card className="py-4 px-1">
       <DataTable
         columns={columns}
         data={performances}

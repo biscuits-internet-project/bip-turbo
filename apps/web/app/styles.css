@@ -483,21 +483,19 @@ html body[data-scroll-locked] {
     -webkit-backdrop-filter: var(--backdrop-blur) !important;
   }
 
-  .glass-heavy {
-    background-color: var(--glass-bg) !important;
-    border: 1px solid var(--glass-border) !important;
-    backdrop-filter: var(--backdrop-blur-heavy) !important;
-    -webkit-backdrop-filter: var(--backdrop-blur-heavy) !important;
-  }
-
-  .glass-accent {
-    background-color: var(--glass-bg) !important;
-    border: 1px solid var(--glass-border-accent) !important;
+  .glass-content {
+    background-color: var(--content-glass) !important;
+    border: 1px solid var(--content-glass-border) !important;
     backdrop-filter: var(--backdrop-blur) !important;
     -webkit-backdrop-filter: var(--backdrop-blur) !important;
   }
 
-  .glass-content {
+  /* The auth form field surface (login / register / password reset). A frosted
+     purple glass that matches the translucent auth card — kept separate from
+     the card/panel `glass-content` token so restyling content surfaces never
+     touches auth inputs. `!important` overrides the shadcn Input base
+     (`bg-background` / `border-input`). */
+  .auth-input {
     background-color: var(--content-glass) !important;
     border: 1px solid var(--content-glass-border) !important;
     backdrop-filter: var(--backdrop-blur) !important;
@@ -535,18 +533,6 @@ html body[data-scroll-locked] {
       0 20px 25px -5px rgb(0 0 0 / 0.05),
       0 8px 10px -6px rgb(0 0 0 / 0.05),
       0 8px 32px hsla(263, 50%, 60%, 0.1);
-  }
-
-  .card-premium-accent {
-    background-color: var(--glass-bg) !important;
-    border: 1px solid var(--glass-border-accent) !important;
-    backdrop-filter: var(--backdrop-blur) !important;
-    -webkit-backdrop-filter: var(--backdrop-blur) !important;
-    border-radius: 0.75rem;
-    box-shadow:
-      0 20px 25px -5px rgb(0 0 0 / 0.1),
-      0 8px 10px -6px rgb(0 0 0 / 0.1),
-      0 8px 32px var(--glass-shadow);
   }
 
   /* Gradient Utilities */

@@ -1,4 +1,5 @@
 import type React from "react";
+import { cardVariants } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 export const loader = publicLoader<void>(async () => {});
@@ -79,7 +80,7 @@ export default function ThinkTank() {
     <div>
       <h1 className="page-heading">THINK TANK DUBS</h1>
 
-      <div className="glass-content rounded-lg shadow-md p-6 mb-8">
+      <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md p-6 mb-8" })}>
         <h2 className="text-2xl font-semibold text-brand-secondary mb-4">The Basement Sessions</h2>
 
         <p className="text-content-text-secondary mb-6">

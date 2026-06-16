@@ -21,7 +21,7 @@ export default function About() {
       </div>
 
       <div className="grid gap-6 md:gap-8">
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardContent className="p-6">
             <h2 className="text-2xl font-semibold text-content-text-primary mb-4">The Biscuits Internet Project</h2>
             <div className="prose prose-invert max-w-none space-y-4">
@@ -39,7 +39,7 @@ export default function About() {
           </CardContent>
         </Card>
 
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardContent className="p-6">
             <h2 className="text-2xl font-semibold text-content-text-primary mb-4">What We Offer</h2>
             <div className="grid md:grid-cols-2 gap-6">
@@ -73,7 +73,7 @@ export default function About() {
           </CardContent>
         </Card>
 
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardContent className="p-6">
             <h2 className="text-2xl font-semibold text-content-text-primary mb-4">Community Driven</h2>
             <p className="text-content-text-secondary mb-4">
@@ -89,7 +89,7 @@ export default function About() {
           </CardContent>
         </Card>
 
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardContent className="p-6">
             <h2 className="text-2xl font-semibold text-content-text-primary mb-4">Disclaimer</h2>
             <p className="text-content-text-secondary text-sm">

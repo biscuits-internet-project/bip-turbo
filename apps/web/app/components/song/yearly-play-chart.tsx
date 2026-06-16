@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { cardVariants } from "~/components/ui/card";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
 import { CHART_COLORS } from "~/lib/chart-colors";
@@ -35,7 +36,7 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
   const isPercent = mode === "percent";
 
   return (
-    <div className="glass-content rounded-lg p-6">
+    <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-6" })}>
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h3 className="text-lg font-semibold text-content-text-primary">Played by Year</h3>
         <div className="flex items-center flex-wrap gap-y-2">

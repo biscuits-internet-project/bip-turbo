@@ -150,7 +150,7 @@ export default function ProfileEdit() {
       </div>
 
       {/* Profile Form */}
-      <Card className="card-premium">
+      <Card>
         <CardHeader>
           <CardTitle className="text-content-text-primary">Profile Information</CardTitle>
         </CardHeader>

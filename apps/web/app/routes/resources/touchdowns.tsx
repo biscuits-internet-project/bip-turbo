@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BackLink } from "~/components/ui/back-link";
+import { cardVariants } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 import { formatDateLong } from "~/lib/utils";
 
@@ -64,7 +65,13 @@ export default function Touchdowns() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {episodes?.map((episode) => (
-            <div key={episode.id} className="card-premium rounded-lg overflow-hidden h-full flex flex-col">
+            <div
+              key={episode.id}
+              className={cardVariants({
+                variant: "elevated",
+                className: "rounded-lg overflow-hidden h-full flex flex-col",
+              })}
+            >
               {episode.image && (
                 <div className="relative">
                   <img src={episode.image} alt={episode.title} className="w-full h-48 object-cover" />

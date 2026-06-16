@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { cardVariants } from "~/components/ui/card";
 import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { cn } from "~/lib/utils";
 
@@ -77,7 +78,7 @@ export function FilterNav({
   // `defaultExpanded={false}` makes it collapsible on desktop too.
   return (
     <CollapsibleSection
-      className="card-premium rounded-lg overflow-hidden"
+      className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}
       title={title}
       titleClassName="text-sm font-semibold text-white"
       headerExtra={

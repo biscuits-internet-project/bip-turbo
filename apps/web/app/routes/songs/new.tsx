@@ -47,7 +47,7 @@ export default function NewSong() {
       </div>
 
       <AdminOnly>
-        <Card className="card-premium">
+        <Card>
           <CardContent className="p-6">
             <SongForm submitLabel="Create Song" cancelHref="/songs" />
           </CardContent>

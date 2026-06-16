@@ -1,5 +1,6 @@
 import { Camera } from "lucide-react";
 import { TriStateFilterButton } from "~/components/tri-state-filter-button";
+import { cardVariants } from "~/components/ui/card";
 import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
 
@@ -41,7 +42,7 @@ interface ShowFiltersNavProps {
  */
 export function ShowFiltersNav({ basePath, currentURLParameters }: ShowFiltersNavProps) {
   return (
-    <div className="card-premium rounded-lg px-2 py-2">
+    <div className={cardVariants({ variant: "elevated", className: "rounded-lg px-2 py-2" })}>
       <h2 className="text-[10px] font-semibold text-content-text-tertiary uppercase tracking-wide mb-1.5 text-center">
         Filter by Media
       </h2>

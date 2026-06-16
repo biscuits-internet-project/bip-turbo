@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
-import { Card } from "~/components/ui/card";
+import { Card, cardVariants } from "~/components/ui/card";
 import { DonationBanner } from "~/components/ui/donation-banner";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
@@ -201,7 +201,7 @@ export default function Index() {
         {/* Next Show Banner - Mobile only */}
         {nextTourDate && (
           <div className="mb-6">
-            <Card className="card-premium">
+            <Card>
               <div className="p-4 text-center">
                 <div className="flex items-center justify-center mb-1">
                   <Calendar className="h-4 w-4 mr-2 text-brand-primary" />
@@ -270,7 +270,7 @@ export default function Index() {
                   </Link>
                 </div>
 
-                <div className="card-premium rounded-lg overflow-hidden">
+                <div className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}>
                   {latestEpisode.image && (
                     <div className="relative">
                       <img src={latestEpisode.image} alt={latestEpisode.title} className="w-full h-32 object-cover" />
@@ -324,7 +324,7 @@ export default function Index() {
               </div>
 
               {tourDates.length > 0 ? (
-                <Card className="card-premium">
+                <Card>
                   <div className="relative overflow-x-auto">
                     <table className="w-full">
                       <tbody>
@@ -358,7 +358,7 @@ export default function Index() {
             {/* Revolution in Motion */}
             <div>
               <Link to={rockOperaPath(ROCK_OPERA_SLUG.REVOLUTION_IN_MOTION)} className="block group">
-                <div className="card-premium rounded-lg overflow-hidden">
+                <div className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}>
                   <div className="relative">
                     <img
                       src="https://pub-6aa5e67069a14fc286677addbdd10c65.r2.dev/public/revolution-in-motion.png"
@@ -423,7 +423,7 @@ export default function Index() {
               </Link>
             </div>
 
-            <div className="card-premium rounded-lg overflow-hidden">
+            <div className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}>
               {latestEpisode.image && (
                 <div className="relative">
                   <img src={latestEpisode.image} alt={latestEpisode.title} className="w-full h-32 object-cover" />
@@ -512,7 +512,7 @@ export default function Index() {
           </div>
 
           {tourDates.length > 0 ? (
-            <Card className="card-premium">
+            <Card>
               <div className="relative overflow-x-auto">
                 <table className="w-full text-md">
                   <thead>

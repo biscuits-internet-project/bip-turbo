@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Textarea } from "~/components/ui/textarea";
+import { formInputClass } from "~/lib/form-styles";
 import { cn } from "~/lib/utils";
 
 const BlogPostState = {
@@ -139,7 +140,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
             <FormItem>
               <FormLabel className="text-content-text-primary">Title</FormLabel>
               <FormControl>
-                <Input placeholder="Enter title" {...field} className="glass-content text-content-text-primary" />
+                <Input placeholder="Enter title" {...field} className={formInputClass} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -158,7 +159,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
                   {...field}
                   value={field.value || ""}
                   onChange={(e) => field.onChange(e.target.value || null)}
-                  className="glass-content text-content-text-primary min-h-[100px]"
+                  className={cn(formInputClass, "min-h-[100px]")}
                 />
               </FormControl>
               <FormMessage />
@@ -183,7 +184,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
                     e.target.style.height = "auto";
                     e.target.style.height = `${e.target.scrollHeight}px`;
                   }}
-                  className="glass-content text-content-text-primary min-h-[300px] font-mono resize-none overflow-hidden"
+                  className={cn(formInputClass, "min-h-[300px] font-mono resize-none overflow-hidden")}
                 />
               </FormControl>
               <FormMessage />
@@ -199,11 +200,11 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
               <FormLabel className="text-content-text-primary">State</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <SelectTrigger className="glass-content text-content-text-primary">
+                  <SelectTrigger className={formInputClass}>
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent className="glass-content">
+                <SelectContent className="glass">
                   <SelectItem value={BlogPostState.DRAFT} className="text-content-text-primary">
                     Draft
                   </SelectItem>

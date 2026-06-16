@@ -112,7 +112,7 @@ export function ShowDayOrderManager({ currentShowId, date, initialShows }: ShowD
   };
 
   return (
-    <Card className="border-content-bg-secondary bg-content-bg/50">
+    <Card variant="plain" className="border-content-bg-secondary bg-content-bg/50">
       <CardHeader>
         <CardTitle className="text-content-text-primary">Same-date show order</CardTitle>
         <p className="text-sm text-content-text-secondary">

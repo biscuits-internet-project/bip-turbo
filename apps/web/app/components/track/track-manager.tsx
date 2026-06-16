@@ -352,7 +352,7 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
   );
 
   return (
-    <Card className="card-premium">
+    <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-content-text-primary">Track List</CardTitle>

@@ -25,7 +25,7 @@ export function BlogCard({ blogPost, compact = false }: BlogCardProps) {
 
   return (
     <Link to={`/blog/${blogPost.slug}`} className="block h-full no-underline">
-      <Card className="h-full card-premium hover:border-brand-primary/60 transition-all duration-300 overflow-hidden">
+      <Card className="h-full hover:border-brand-primary/60 transition-all duration-300 overflow-hidden">
         <div className={`relative ${compact ? "h-[300px]" : "h-[400px]"} overflow-hidden`}>
           {coverImage ? (
             <img

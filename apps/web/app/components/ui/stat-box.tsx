@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cardVariants } from "~/components/ui/card";
 
 interface StatBoxProps {
   label: string;
@@ -17,7 +18,12 @@ interface StatBoxProps {
  */
 export function StatBox({ label, value, icon, sublabel, sublabel2 }: StatBoxProps) {
   return (
-    <div className="glass-content p-2 sm:p-3 short:!py-1 short:!px-2.5 rounded-lg h-full">
+    <div
+      className={cardVariants({
+        variant: "panel",
+        className: "p-2 sm:p-3 short:!py-1 short:!px-2.5 rounded-lg h-full",
+      })}
+    >
       <dt className="flex items-center gap-2 text-sm short:!text-[11px] short:!leading-tight font-medium text-content-text-secondary">
         {icon}
         {label}

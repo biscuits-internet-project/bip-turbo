@@ -17,7 +17,7 @@ export default function Privacy() {
         <h1 className="page-heading">PRIVACY POLICY</h1>
       </div>
 
-      <Card className="glass-content">
+      <Card variant="panel">
         <CardContent className="p-6">
           <div className="prose prose-invert max-w-none space-y-6">
             <p className="text-content-text-secondary text-sm">Last updated: {new Date().toLocaleDateString()}</p>

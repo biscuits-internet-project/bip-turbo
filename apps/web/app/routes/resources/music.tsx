@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { cardVariants } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 // Add a loader function
@@ -27,7 +28,7 @@ export default function Music() {
           <h1 className="page-heading">MUSIC TERMINOLOGY</h1>
         </div>
 
-        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
+        <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md p-6 mb-8" })}>
           <h2 id="inverted" className="text-2xl font-semibold text-brand-secondary mb-4 scroll-mt-24">
             Inverted
           </h2>
@@ -75,7 +76,7 @@ export default function Music() {
           </ul>
         </div>
 
-        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
+        <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md p-6 mb-8" })}>
           <h2 id="dyslexic" className="text-2xl font-semibold text-brand-secondary mb-4 scroll-mt-24">
             Dyslexic
           </h2>
@@ -112,7 +113,7 @@ export default function Music() {
           </ul>
         </div>
 
-        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
+        <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md p-6 mb-8" })}>
           <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Palindrome</h2>
           <p className="text-content-text-secondary mb-4">
             Palindrome versions are played with the sections in a mirror-like structure. For example, if a song normally
@@ -143,7 +144,7 @@ export default function Music() {
           </ul>
         </div>
 
-        <div className="glass-content rounded-lg shadow-md p-6 mb-8">
+        <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md p-6 mb-8" })}>
           <h2 className="text-2xl font-semibold text-brand-secondary mb-4">Techno</h2>
           <p className="text-content-text-secondary mb-4">
             In 2003 and 2004, the band experimented with techno versions of their songs, particularly during shows where

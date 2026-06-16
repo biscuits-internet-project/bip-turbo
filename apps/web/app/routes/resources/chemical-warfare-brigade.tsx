@@ -755,7 +755,7 @@ const ChemicalWarfareBrigade: React.FC = () => {
               >
                 {index + 1}
               </div>
-              <Card className="card-premium relative overflow-hidden flex-1 min-w-0">
+              <Card className="relative overflow-hidden flex-1 min-w-0">
                 <CardHeader className="relative z-10 px-3 md:px-6 py-1 md:py-1">
                   <div className="flex flex-col gap-1">
                     <div className="text-lg md:text-2xl font-medium text-content-text-primary">{perf.date}</div>

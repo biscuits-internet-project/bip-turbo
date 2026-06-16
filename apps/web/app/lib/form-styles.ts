@@ -1,13 +1,23 @@
 /**
- * Dark-theme styling for form Input / Textarea controls used in admin
- * and edit forms across the app. Centralized here so a token change
- * (e.g. swapping `--content-bg-secondary` for a different surface)
- * propagates to every form at once instead of needing 17+ edits.
- *
- * Auth forms (login / register / forgot-password) and search inputs use
- * a different visual treatment and should NOT use this constant.
+ * The single dark-theme surface for form fields (`Input` / `Textarea` /
+ * `SelectTrigger`) everywhere a value is entered: admin/edit forms, auth,
+ * contact, review, and blog. One surface so a field looks the same in every
+ * form and a token change propagates in one edit, instead of the old
+ * three-way split (this constant vs. raw `glass-content` vs. the glass-select
+ * tokens). The only inputs that stay off it are the compact filter-bar
+ * controls (`glassSelectTriggerClass`), which sit on glass chrome rather than
+ * inside a content form.
  */
 export const formInputClass = "bg-content-bg-secondary border-content-bg-secondary text-content-text-primary";
+
+/**
+ * The auth form field surface — login, register, and password reset. Auth has
+ * its own visual identity (a translucent gradient card with brand borders), so
+ * its inputs use the matching frosted-glass `.auth-input` treatment rather than
+ * the opaque `formInputClass` used by admin/content forms. One constant so the
+ * four auth forms stay identical.
+ */
+export const authInputClass = "auth-input text-content-text-primary";
 
 /**
  * Block-level label style for native `<label>` elements in forms that

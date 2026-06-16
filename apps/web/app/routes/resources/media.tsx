@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
+import { cardVariants } from "~/components/ui/card";
 
 interface Media {
   date: Date;
@@ -33,7 +34,12 @@ export default function MediaResources(): ReactElement {
           <h1 className="page-heading">NEWS FROM NOWHERE</h1>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-content-bg-secondary glass-content">
+        <div
+          className={cardVariants({
+            variant: "panel",
+            className: "overflow-x-auto rounded-lg border border-content-bg-secondary",
+          })}
+        >
           <table className="min-w-full divide-y divide-divider">
             <thead className="bg-table-header">
               <tr>

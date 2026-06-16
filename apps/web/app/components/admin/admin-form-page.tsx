@@ -27,7 +27,7 @@ export function AdminFormPage({ title, backHref, backLabel, children, footer }: 
           <PageHeader title={title} backLink={{ to: backHref, label: backLabel }} />
         </div>
 
-        <Card className="card-premium">
+        <Card>
           <CardContent className="p-6 space-y-6">
             {children}
             {footer ? <div className="border-t border-glass-border pt-6">{footer}</div> : null}

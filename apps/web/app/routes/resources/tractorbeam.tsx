@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { cardVariants } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 export const loader = publicLoader<void>(async () => {});
@@ -23,7 +24,7 @@ export default function Tractorbeam() {
           <h1 className="page-heading">TRACTORBEAM</h1>
         </div>
 
-        <div className="card-premium rounded-lg p-6 mb-6">
+        <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-6 mb-6" })}>
           <div className="space-y-4 text-content-text-secondary">
             <p className="leading-relaxed">
               Tractorbeam, like{" "}

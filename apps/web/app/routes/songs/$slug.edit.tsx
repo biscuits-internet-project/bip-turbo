@@ -88,7 +88,7 @@ export default function EditSong() {
       </div>
 
       <AdminOnly>
-        <Card className="card-premium">
+        <Card>
           <CardContent className="p-6">
             <SongForm defaultValues={defaultValues} submitLabel="Save Changes" cancelHref={`/songs/${song.slug}`} />
           </CardContent>
