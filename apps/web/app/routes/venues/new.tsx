@@ -46,7 +46,7 @@ export default function NewVenue() {
         <PageHeader title="Create Venue" backLink={{ to: "/venues", label: "Back to Venues" }} />
       </div>
 
-      <Card className="card-premium">
+      <Card>
         <CardContent className="p-6">
           <VenueForm onSubmit={handleSubmit} submitLabel="Create Venue" cancelHref="/venues" />
         </CardContent>

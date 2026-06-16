@@ -98,7 +98,7 @@ export default function EditVenue() {
         <PageHeader title="Edit Venue" backLink={{ to: `/venues/${venue.slug}`, label: "Back to Venue" }} />
       </div>
 
-      <Card className="card-premium">
+      <Card>
         <CardContent className="p-6">
           <VenueForm
             defaultValues={defaultValues}

@@ -38,6 +38,17 @@ Before writing markup, grep the className you're about to type. If it's already 
 - **DO extract a shared component for a repeated multi-element affordance.** A composite that's *more than a className* — e.g. a `Button asChild` + `Link` + icon nav button repeated across pages — belongs in one component so its styling AND verbiage stay consistent app-wide and change in one place. Use [LinkButton](app/components/ui/link-button.tsx) for prominent action/nav buttons ("Create X", "Back to X") and [BackLink](app/components/ui/back-link.tsx) for the subtle content-page back link ("All X"). The "no `<MyButton>`" rule above targets pure single-className hiding, not multi-element composites. Navigation should look identical across pages; settle on one pattern unless there's a real reason for two (e.g. prominent form/list actions vs. low-emphasis content-page nav). Verbiage convention: create buttons say **"Create X"** (not "New X").
 - **Don't bake project styling into shadcn defaults.** Auth/search/etc. use the upstream primitive. Project looks → constant or variant.
 
+## Surfaces: pick by intent, never by raw class
+
+A surface's background is chosen by a named role, not by pasting a CSS class. The whole menu is small on purpose; enforced by [app/lib/surface-system.test.ts](app/lib/surface-system.test.ts).
+
+- **Content blocks → `<Card variant>`** ([components/ui/card.tsx](app/components/ui/card.tsx)). `elevated` (default — gradient/border/shadow, the dominant content card and any prominent standalone card, including data/chart cards), `panel` (flat frosted, low-emphasis: small tiles in a grid like stat boxes, and inline secondary text such as notes/lyrics), `plain` (bare shadcn `bg-card`; also the escape hatch for a card with its own custom `bg-*`, e.g. the auth cards). A bare `<Card>` is `elevated`. For a block that must stay a `<div>`/`<a>` (grid item, `asChild`), use `cardVariants({ variant, className })` — never the raw `card-premium`/`glass-content` class. Rule of thumb: if it sits next to elevated cards, it's elevated.
+- **Form fields → `formInputClass`** ([lib/form-styles.ts](app/lib/form-styles.ts)) on every `Input`/`Textarea`/`SelectTrigger` in a content form (admin, contact, review, blog). Two deliberate exceptions: **auth** forms (login/register/password reset) use `authInputClass` (frosted `.auth-input`, matching the translucent auth card), and compact **filter-bar** controls use the glass-select tokens (`glassSelectTriggerClass`) because they sit on glass chrome.
+- **Chrome / overlays → `glass`** (dialogs, popovers, command palette, drawers, header). `glass-secondary` is the dashed "unrated / incomplete" affordance surface.
+- **Composable tokens** (`bg-glass-bg`, `border-glass-border`, `hover:bg-hover-glass`) are fine inline for borders/rows/hover states — they're tokens, not whole surfaces.
+
+Don't reintroduce `card-premium` or `glass-content` in markup (they only back the Card variants now), and don't add a new whole-surface class when a variant/constant covers the intent.
+
 ## Package-Specific Commands
 
 ```bash

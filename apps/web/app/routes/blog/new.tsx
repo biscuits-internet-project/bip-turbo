@@ -70,7 +70,7 @@ export default function NewBlogPost() {
       </div>
 
       <AdminOnly>
-        <Card className="card-premium">
+        <Card>
           <CardContent className="p-6">
             <BlogPostForm submitLabel="Create Post" cancelHref="/blog" />
           </CardContent>

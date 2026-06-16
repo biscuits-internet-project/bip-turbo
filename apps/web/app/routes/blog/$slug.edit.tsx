@@ -142,7 +142,7 @@ export default function EditBlogPost() {
       </div>
 
       <AdminOnly>
-        <Card className="card-premium">
+        <Card>
           <CardContent className="p-6">
             <BlogPostForm
               defaultValues={defaultValues}

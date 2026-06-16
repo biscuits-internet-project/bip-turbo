@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
+import { cardVariants } from "~/components/ui/card";
 
 interface SideProject {
   notes?: string;
@@ -35,7 +36,7 @@ export default function SideProjects(): ReactElement {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sideProjects.map((project) => (
             <div key={project.id || project.name} className="h-full">
-              <div className="card-premium rounded-lg p-6 h-full">
+              <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-6 h-full" })}>
                 <h3 className="text-xl font-bold text-content-text-primary mb-2">{project.name}</h3>
                 <div className="text-content-text-tertiary mb-4">
                   {project.dates.split(",").map((item) => (

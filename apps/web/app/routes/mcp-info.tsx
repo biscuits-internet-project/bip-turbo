@@ -74,7 +74,7 @@ export default function McpInfo() {
 
       {/* Features */}
       <div className="grid md:grid-cols-3 gap-5 mb-10">
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardHeader className="pb-2">
             <Terminal className="h-6 w-6 text-brand-primary mb-2" />
             <CardTitle className="text-lg">Search Shows</CardTitle>
@@ -83,7 +83,7 @@ export default function McpInfo() {
             <CardDescription>Find shows by date, venue, city, or songs played.</CardDescription>
           </CardContent>
         </Card>
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardHeader className="pb-2">
             <Code2 className="h-6 w-6 text-brand-primary mb-2" />
             <CardTitle className="text-lg">Get Setlists</CardTitle>
@@ -92,7 +92,7 @@ export default function McpInfo() {
             <CardDescription>Retrieve complete setlists with song transitions and notes.</CardDescription>
           </CardContent>
         </Card>
-        <Card className="glass-content">
+        <Card variant="panel">
           <CardHeader className="pb-2">
             <Zap className="h-6 w-6 text-brand-primary mb-2" />
             <CardTitle className="text-lg">Song History</CardTitle>
@@ -104,7 +104,7 @@ export default function McpInfo() {
       </div>
 
       {/* Server URL */}
-      <Card className="mb-8 glass-content">
+      <Card variant="panel" className="mb-8">
         <CardHeader className="space-y-1">
           <CardTitle>Server URL</CardTitle>
           <CardDescription>Use this URL to connect your MCP client</CardDescription>
@@ -118,7 +118,7 @@ export default function McpInfo() {
       </Card>
 
       {/* Setup Instructions */}
-      <Card className="glass-content">
+      <Card variant="panel">
         <CardHeader className="space-y-1">
           <CardTitle>Setup Instructions</CardTitle>
           <CardDescription>Choose your AI client to get started</CardDescription>
@@ -295,7 +295,7 @@ export default function McpInfo() {
       </Card>
 
       {/* Available Tools */}
-      <Card className="mt-8 glass-content">
+      <Card variant="panel" className="mt-8">
         <CardHeader className="space-y-1">
           <CardTitle>Available Tools</CardTitle>
           <CardDescription>16 tools exposed by the MCP server</CardDescription>
@@ -411,7 +411,7 @@ export default function McpInfo() {
       </Card>
 
       {/* Example Usage */}
-      <Card className="mt-8 mb-8 glass-content">
+      <Card variant="panel" className="mt-8 mb-8">
         <CardHeader className="space-y-1">
           <CardTitle>Example Queries</CardTitle>
           <CardDescription>Try asking your AI assistant these questions</CardDescription>

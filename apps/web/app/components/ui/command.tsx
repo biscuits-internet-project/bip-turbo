@@ -27,7 +27,7 @@ interface CommandDialogProps extends DialogProps {
 const CommandDialog = ({ children, shouldFilter = true, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent className="glass-content max-w-3xl w-[90vw] h-[90vh] max-h-[90vh] overflow-hidden p-0 shadow-2xl">
+      <DialogContent className="glass max-w-3xl w-[90vw] h-[90vh] max-h-[90vh] overflow-hidden p-0 shadow-2xl">
         <DialogTitle className="sr-only">Search</DialogTitle>
         <Command
           shouldFilter={shouldFilter}

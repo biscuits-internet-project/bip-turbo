@@ -38,7 +38,7 @@ export function SongsTable({
   const initialSorting = useMemo(() => [{ id: sortColumnId, desc: true }], [sortColumnId]);
 
   return (
-    <Card className="card-premium py-4 px-1">
+    <Card className="py-4 px-1">
       <DataTable
         // Remount when the sort column changes so the default sort actually
         // flips. DataTable's `initialSorting` only runs once per mount, so a

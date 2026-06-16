@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cardVariants } from "~/components/ui/card";
 import { faviconSrc } from "~/lib/favicon";
 
 /**
@@ -21,7 +22,7 @@ interface ExternalSourceCardProps {
  */
 export function ExternalSourceCard({ faviconDomain, title, children }: ExternalSourceCardProps) {
   return (
-    <div className="card-premium rounded-lg px-3 py-2">
+    <div className={cardVariants({ variant: "elevated", className: "rounded-lg px-3 py-2" })}>
       <div className="flex items-center gap-2 mb-1.5">
         <img src={faviconSrc(faviconDomain)} alt="" className="h-4 w-4 shrink-0" />
         <h4 className="text-sm font-medium text-content-text-secondary">{title}</h4>

@@ -9,6 +9,7 @@ import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ShowFiltersNav } from "~/components/show-filters-nav";
 import { Button } from "~/components/ui/button";
+import { cardVariants } from "~/components/ui/card";
 import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { LinkButton } from "~/components/ui/link-button";
 import { YearFilterNav } from "~/components/year-filter-nav";
@@ -255,7 +256,7 @@ export default function ShowsByYear() {
               counts={showCountsByYear}
             />
             <CollapsibleSection
-              className="card-premium rounded-lg overflow-hidden"
+              className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}
               title="Jump to Month"
               titleClassName="text-sm font-semibold text-white"
               headerExtra={

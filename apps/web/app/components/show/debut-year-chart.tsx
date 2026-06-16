@@ -2,6 +2,7 @@ import { average, median } from "@bip/domain";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { cardVariants } from "~/components/ui/card";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
 import { CHART_BAR_CURSOR, CHART_COLORS } from "~/lib/chart-colors";
@@ -113,7 +114,7 @@ export function DebutYearChart({ setlist }: DebutYearChartProps) {
   const labelInterval = labelStride - 1;
 
   return (
-    <div className="glass-content rounded-lg p-3">
+    <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-3" })}>
       <h3 className="text-sm font-semibold text-content-text-primary mb-2">Songs by debut year</h3>
       <div className="flex items-center justify-between gap-2 mb-2 text-xs">
         <div className="inline-flex items-center">

@@ -195,7 +195,7 @@ export default function EditShow() {
       </div>
 
       <div className="space-y-6">
-        <Card className="card-premium">
+        <Card>
           <CardContent className="p-6">
             <ShowForm
               defaultValues={defaultValues}

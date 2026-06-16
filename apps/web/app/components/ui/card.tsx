@@ -1,9 +1,36 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "~/lib/utils";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)} {...props} />
+// The app's surface system. A card's background is picked by intent, not by
+// pasting a raw CSS class:
+//   elevated — the dominant content block (gradient, brand border, drop shadow).
+//   panel    — flat frosted surface for things nested inside an elevated card
+//              (stat tiles, chart containers, small info cards).
+//   plain    — opaque shadcn bg-card; the rare escape hatch.
+// `elevated` is the default so a bare <Card> is the common content block.
+// Exported for the handful of div/`asChild` sites that can't be a <Card>.
+const cardVariants = cva("rounded-lg text-card-foreground", {
+  variants: {
+    variant: {
+      // Gradient, brand border, drop shadow — all supplied by the class.
+      elevated: "card-premium",
+      // Flat frosted surface: its own bg/border, intentionally no shadow.
+      panel: "glass-content",
+      // The bare shadcn card defaults.
+      plain: "border bg-card shadow-sm",
+    },
+  },
+  defaultVariants: {
+    variant: "elevated",
+  },
+});
+
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardVariants> {}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className, variant, ...props }, ref) => (
+  <div ref={ref} className={cn(cardVariants({ variant, className }))} {...props} />
 ));
 Card.displayName = "Card";
 
@@ -40,4 +67,4 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent, cardVariants };

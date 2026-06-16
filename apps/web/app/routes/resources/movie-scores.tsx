@@ -23,7 +23,7 @@ export function meta() {
 
 const MovieScores: React.FC = () => {
   const MovieCard = ({ title, children }: { title: React.ReactNode; children: React.ReactNode }) => (
-    <Card className="card-premium mb-6">
+    <Card className="mb-6">
       <CardHeader>
         <h2 className="text-2xl font-semibold text-content-text-primary">{title}</h2>
       </CardHeader>

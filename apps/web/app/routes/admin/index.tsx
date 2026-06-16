@@ -24,7 +24,7 @@ interface AdminCardProps {
 function AdminCard({ title, description, href, icon }: AdminCardProps) {
   return (
     <Link to={href}>
-      <Card className="card-premium hover:border-brand-primary/50 transition-all duration-300 group h-full">
+      <Card className="hover:border-brand-primary/50 transition-all duration-300 group h-full">
         <CardHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 rounded-lg bg-brand-primary/20 text-brand-primary group-hover:bg-brand-primary/30 transition-colors">
@@ -99,7 +99,7 @@ export default function AdminIndex() {
           />
         </div>
 
-        <Card className="card-premium">
+        <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-brand-primary/20 text-brand-primary">

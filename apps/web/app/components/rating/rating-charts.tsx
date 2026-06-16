@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { cardVariants } from "~/components/ui/card";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
 import { CHART_BAR_CURSOR, CHART_COLORS, chartSeriesColor } from "~/lib/chart-colors";
@@ -66,7 +67,7 @@ export function RatingCharts({ buckets, kind }: RatingChartsProps) {
 
   return (
     <div className="space-y-4">
-      <div className="glass-content rounded-lg p-6">
+      <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-6" })}>
         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h3 className="text-lg font-semibold text-content-text-primary">{noun} Rating Distribution</h3>
           <fieldset className="flex border-0 p-0 m-0">
@@ -121,7 +122,7 @@ export function RatingCharts({ buckets, kind }: RatingChartsProps) {
         </div>
       </div>
 
-      <div className="glass-content rounded-lg p-6">
+      <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-6" })}>
         <h3 className="text-lg font-semibold text-content-text-primary mb-4">Average &amp; Median by Year</h3>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">

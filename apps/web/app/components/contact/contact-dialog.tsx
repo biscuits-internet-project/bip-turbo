@@ -17,6 +17,8 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
+import { formInputClass } from "~/lib/form-styles";
+import { cn } from "~/lib/utils";
 
 const contactFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -95,7 +97,7 @@ export function ContactDialog({ children }: ContactDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-content border-glass-border max-w-md">
+      <DialogContent className="glass border-glass-border max-w-md">
         <DialogHeader>
           <DialogTitle className="text-content-text-primary text-xl">Get in Touch</DialogTitle>
           <DialogDescription className="text-content-text-secondary">
@@ -124,7 +126,10 @@ export function ContactDialog({ children }: ContactDialogProps) {
                         <Input
                           placeholder="Your name"
                           {...field}
-                          className="glass-content pl-9 text-content-text-primary focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50"
+                          className={cn(
+                            formInputClass,
+                            "pl-9 focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50",
+                          )}
                         />
                       </FormControl>
                     </div>
@@ -146,7 +151,10 @@ export function ContactDialog({ children }: ContactDialogProps) {
                           type="email"
                           placeholder="your@email.com"
                           {...field}
-                          className="glass-content pl-9 text-content-text-primary focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50"
+                          className={cn(
+                            formInputClass,
+                            "pl-9 focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50",
+                          )}
                         />
                       </FormControl>
                     </div>
@@ -165,7 +173,10 @@ export function ContactDialog({ children }: ContactDialogProps) {
                       <Input
                         placeholder="What's this about?"
                         {...field}
-                        className="glass-content text-content-text-primary focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50"
+                        className={cn(
+                          formInputClass,
+                          "focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50",
+                        )}
                       />
                     </FormControl>
                     <FormMessage />
@@ -183,7 +194,10 @@ export function ContactDialog({ children }: ContactDialogProps) {
                       <Textarea
                         placeholder="Tell us more..."
                         {...field}
-                        className="glass-content text-content-text-primary min-h-[100px] focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50"
+                        className={cn(
+                          formInputClass,
+                          "min-h-[100px] focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50",
+                        )}
                       />
                     </FormControl>
                     <FormMessage />

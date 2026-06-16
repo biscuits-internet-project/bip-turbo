@@ -5,6 +5,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { authInputClass } from "~/lib/form-styles";
 
 type ForgotPasswordFormProps = {
   className?: string;
@@ -15,7 +16,10 @@ type ForgotPasswordFormProps = {
 export function ForgotPasswordForm({ className, onSubmit, isLoading = false, ...props }: ForgotPasswordFormProps) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300 hover:border-brand/30">
+      <Card
+        variant="plain"
+        className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300 hover:border-brand/30"
+      >
         <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
         <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
         <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />
@@ -40,7 +44,7 @@ export function ForgotPasswordForm({ className, onSubmit, isLoading = false, ...
                     type="email"
                     placeholder="m@example.com"
                     required
-                    className="glass-content pl-9 text-content-text-primary placeholder:text-content-text-tertiary"
+                    className={cn(authInputClass, "pl-9 placeholder:text-content-text-tertiary")}
                   />
                 </div>
               </div>

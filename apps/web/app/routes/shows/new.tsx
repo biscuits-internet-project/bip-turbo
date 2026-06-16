@@ -49,7 +49,7 @@ export default function NewShow() {
         <PageHeader title="Create Show" backLink={{ to: "/shows", label: "Back to Shows" }} />
       </div>
 
-      <Card className="card-premium">
+      <Card>
         <CardContent className="p-6">
           <ShowForm onSubmit={handleSubmit} submitLabel="Create Show" cancelHref="/shows" requireVenue />
         </CardContent>

@@ -159,7 +159,7 @@ function SetlistCardComponent({
   };
 
   return (
-    <Card className="card-premium relative overflow-hidden">
+    <Card className="relative overflow-hidden">
       <CardHeader
         data-testid="setlist-card-header"
         onClick={

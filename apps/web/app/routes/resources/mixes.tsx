@@ -1,4 +1,5 @@
 import type React from "react";
+import { cardVariants } from "~/components/ui/card";
 import { publicLoader } from "~/lib/base-loaders";
 
 // Define types for our data
@@ -107,7 +108,7 @@ const Mixes: React.FC = () => {
   ];
 
   const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="glass-content rounded-lg shadow-md overflow-hidden mb-8">
+    <div className={cardVariants({ variant: "panel", className: "rounded-lg shadow-md overflow-hidden mb-8" })}>
       <div className="p-6">
         <h2 className="text-2xl font-semibold text-brand-primary mb-4">{title}</h2>
         {children}

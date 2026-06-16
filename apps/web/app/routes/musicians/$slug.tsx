@@ -9,6 +9,7 @@ import { AdminOnly } from "~/components/admin/admin-only";
 import { DateVenueCell } from "~/components/performance/date-venue-cell";
 import { ShowDate } from "~/components/show-date";
 import { FilteredSongsStatsTable } from "~/components/song/filtered-songs-stats-table";
+import { cardVariants } from "~/components/ui/card";
 import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { DataTable } from "~/components/ui/data-table";
 import { LinkButton } from "~/components/ui/link-button";
@@ -291,7 +292,7 @@ export default function MusicianPage() {
         )}
 
         {tier === "core" ? (
-          <div className="glass-content rounded-lg p-6 text-content-text-secondary">
+          <div className={cardVariants({ variant: "panel", className: "rounded-lg p-6 text-content-text-secondary" })}>
             Core member: appears on essentially every show. The full shows and songs tables are omitted.
           </div>
         ) : (

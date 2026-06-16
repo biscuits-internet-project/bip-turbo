@@ -103,7 +103,7 @@ function UserCard({ userStats }: { userStats: UserStats }) {
   const displayBadges = badges?.slice(0, 3) || [];
 
   return (
-    <Card className="glass-content hover:glass-content-hover transition-all duration-300">
+    <Card variant="panel" className="hover:glass-content-hover transition-all duration-300">
       <CardContent className="p-4">
         {/* Header with avatar, username, and score */}
         <div className="flex items-center gap-3 mb-3">
@@ -189,7 +189,7 @@ function LeaderboardSection({
   metric: keyof Pick<UserStats, "reviewCount" | "attendanceCount" | "ratingCount" | "blogPostCount">;
 }) {
   return (
-    <Card className="card-premium">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-xl">
           <Icon className="h-5 w-5 text-brand-primary" />
@@ -296,19 +296,19 @@ export default function Community() {
 
         {/* Community Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="glass-content">
+          <Card variant="panel">
             <CardContent className="p-4 text-center">
               <div className="text-3xl font-bold text-brand-primary">{communityTotals.totalUsers}</div>
               <div className="text-sm text-content-text-secondary">Community Members</div>
             </CardContent>
           </Card>
-          <Card className="glass-content">
+          <Card variant="panel">
             <CardContent className="p-4 text-center">
               <div className="text-3xl font-bold text-brand-secondary">{communityTotals.totalReviews}</div>
               <div className="text-sm text-content-text-secondary">Total Reviews</div>
             </CardContent>
           </Card>
-          <Card className="glass-content">
+          <Card variant="panel">
             <CardContent className="p-4 text-center">
               <div className="text-3xl font-bold text-brand-tertiary">{communityTotals.totalRatings}</div>
               <div className="text-sm text-content-text-secondary">Ratings Given</div>
@@ -319,7 +319,7 @@ export default function Community() {
 
       {/* Top Community Scores */}
       <div className="mb-8">
-        <Card className="card-premium">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Trophy className="h-5 w-5 text-brand-primary" />

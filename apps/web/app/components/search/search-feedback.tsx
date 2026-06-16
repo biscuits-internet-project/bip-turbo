@@ -2,6 +2,8 @@ import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
+import { formInputClass } from "~/lib/form-styles";
+import { cn } from "~/lib/utils";
 
 interface SearchFeedbackProps {
   searchId: string;
@@ -94,7 +96,10 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
           value={feedback}
           onChange={(e) => setFeedback(e.target.value)}
           placeholder="What could be better about these search results?"
-          className="glass-content text-content-text-primary min-h-[80px] text-sm focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50"
+          className={cn(
+            formInputClass,
+            "min-h-[80px] text-sm focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary/50",
+          )}
         />
         <div className="flex gap-2">
           <Button

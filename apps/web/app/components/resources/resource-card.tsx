@@ -11,7 +11,7 @@ interface ResourceCardProps {
 export default function ResourceCard({ title, content, image, url }: ResourceCardProps) {
   return (
     <Link to={url} className="block h-full no-underline">
-      <Card className="h-full card-premium hover:border-brand-primary/60 transition-all duration-300 overflow-hidden">
+      <Card className="h-full hover:border-brand-primary/60 transition-all duration-300 overflow-hidden">
         <div className="relative h-[400px] overflow-hidden">
           <img
             className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"

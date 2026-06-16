@@ -5,6 +5,7 @@ import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { ShowDate } from "~/components/show-date";
+import { cardVariants } from "~/components/ui/card";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
 import { StatBox } from "~/components/ui/stat-box";
@@ -137,7 +138,12 @@ export default function VenuePage() {
             setlists={setlists}
             externalSources={externalSources}
             empty={
-              <div className="glass-content rounded-lg p-6 text-center text-content-text-secondary">
+              <div
+                className={cardVariants({
+                  variant: "panel",
+                  className: "rounded-lg p-6 text-center text-content-text-secondary",
+                })}
+              >
                 No shows found for this venue.
               </div>
             }

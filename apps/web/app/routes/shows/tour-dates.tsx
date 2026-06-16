@@ -40,7 +40,7 @@ export default function TourDates() {
           <h1 className="page-heading">TOUR DATES</h1>
         </div>
 
-        <Card className="card-premium">
+        <Card>
           <div className="relative overflow-x-auto">
             <table className="w-full text-md">
               <thead>

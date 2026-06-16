@@ -74,7 +74,7 @@ export function ShowLineupSection({
   if (bare) return list;
 
   return (
-    <Card className="card-premium relative overflow-hidden mt-4">
+    <Card className="relative overflow-hidden mt-4">
       <CollapsibleSection
         title="Lineup"
         titleAs="h3"

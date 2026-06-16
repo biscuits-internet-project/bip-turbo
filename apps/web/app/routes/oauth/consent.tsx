@@ -76,7 +76,10 @@ export default function OAuthConsent() {
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="w-full max-w-md">
-        <Card className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300">
+        <Card
+          variant="plain"
+          className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300"
+        >
           <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
           <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
           <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />

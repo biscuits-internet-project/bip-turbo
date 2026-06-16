@@ -1,6 +1,7 @@
 import type { Setlist, TrackLight } from "@bip/domain";
 import { Link } from "react-router-dom";
 import { TrackIcon } from "~/components/track/track-icon";
+import { cardVariants } from "~/components/ui/card";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
 
 interface SetlistHighlightsProps {
@@ -23,7 +24,7 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
   const ordered = [...highlights].sort(compareBySetThenPosition);
 
   return (
-    <div className="card-premium rounded-lg px-3 py-2 space-y-3">
+    <div className={cardVariants({ variant: "elevated", className: "rounded-lg px-3 py-2 space-y-3" })}>
       <h3 className="text-sm font-medium text-content-text-secondary">Show Highlights</h3>
       <ul className="space-y-2">
         {ordered.map((track, idx) => {
