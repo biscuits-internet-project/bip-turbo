@@ -191,4 +191,47 @@ export class ReviewService {
       return false;
     }
   }
+
+  /**
+   * Sync export: page through reviews for the local sync script. PII-free —
+   * `content` is the public review prose shown on the show page, `userId`
+   * resolves to a stub user locally; no email/name/secret is on the Review
+   * model. Cursor and ordering match RatingService.listForSync so the sync
+   * pages identically: (updatedAt ASC, id ASC), exclusive on the boundary tuple.
+   */
+  async listForSync(opts: {
+    since: Date;
+    cursorId?: string;
+    cursorUpdatedAt?: Date;
+    limit: number;
+  }): Promise<Array<Pick<Review, "id" | "userId" | "showId" | "content" | "status" | "createdAt" | "updatedAt">>> {
+    const { since, cursorId, cursorUpdatedAt, limit } = opts;
+    const where = cursorUpdatedAt
+      ? {
+          OR: [
+            { updatedAt: { gt: cursorUpdatedAt } },
+            { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: cursorId ?? "" } }] },
+          ],
+        }
+      : { updatedAt: { gt: since } };
+    return this.db.review.findMany({
+      where,
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: {
+        id: true,
+        userId: true,
+        showId: true,
+        content: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async listAllIdsForSync(): Promise<string[]> {
+    const rows = await this.db.review.findMany({ select: { id: true } });
+    return rows.map((r) => r.id);
+  }
 }

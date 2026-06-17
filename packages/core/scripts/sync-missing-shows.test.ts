@@ -13,6 +13,8 @@ import {
   collectVenueKeys,
   diffCompletions,
   diffShowMusicians,
+  diffShowYoutubes,
+  diffSongAuthors,
   diffTrackAnnotations,
   diffTrackFlags,
   diffTrackMusicians,
@@ -216,6 +218,9 @@ describe("buildShowCreateInput", () => {
       relistenUrl: "https://relisten.example/xyz",
       countForStats: true,
       dayOrder: null,
+      showYoutubesCount: 0,
+      showPhotosCount: 0,
+      likesCount: 0,
       venueId: null,
       bandId: null,
       createdAt: now,
@@ -313,6 +318,55 @@ describe("buildShowCreateInput", () => {
     );
     expect(input.countForStats).toBe(true);
     expect(input.dayOrder).toBeNull();
+  });
+
+  // Display counts (showYoutubesCount / showPhotosCount / likesCount) drive the
+  // listing-page badges, the hasYoutube/hasPhotos calendar filters, and the
+  // like count. They're mirrored as columns because the underlying rows (likes,
+  // show_photos) aren't synced, so the column is the only local source.
+  test("mirrors display counts from MCP into the insert", () => {
+    const now = new Date("2026-04-23T12:00:00Z");
+    const input = buildShowCreateInput(
+      {
+        slug: "2026-02-06-miami-beach-bandshell-miami-beach-fl",
+        date: "2026-02-06",
+        venueName: "Miami Beach Bandshell",
+        venueCity: "Miami Beach",
+        averageRating: null,
+        ratingsCount: 0,
+        notes: null,
+        relistenUrl: null,
+        showYoutubesCount: 3,
+        showPhotosCount: 5,
+        likesCount: 8,
+      },
+      now,
+    );
+    expect(input.showYoutubesCount).toBe(3);
+    expect(input.showPhotosCount).toBe(5);
+    expect(input.likesCount).toBe(8);
+  });
+
+  // Pre-deploy MCP omits the counts; the builder falls back to the schema
+  // default (0) so a sparse upstream never inserts undefined.
+  test("defaults display counts to 0 when MCP omits them", () => {
+    const now = new Date("2026-04-23T12:00:00Z");
+    const input = buildShowCreateInput(
+      {
+        slug: "2026-04-18-the-uc-theatre-berkeley-ca",
+        date: "2026-04-18",
+        venueName: "The UC Theatre",
+        venueCity: "Berkeley",
+        averageRating: null,
+        ratingsCount: 0,
+        notes: null,
+        relistenUrl: null,
+      },
+      now,
+    );
+    expect(input.showYoutubesCount).toBe(0);
+    expect(input.showPhotosCount).toBe(0);
+    expect(input.likesCount).toBe(0);
   });
 });
 
@@ -499,6 +553,45 @@ describe("showNeedsUpdate", () => {
           relistenUrl: "https://relisten.example/rr",
           countForStats: false,
           dayOrder: 3,
+        },
+        remote,
+      ),
+    ).toBe(false);
+  });
+
+  // A YouTube link added on prod bumps showYoutubesCount; local must mirror it
+  // so the hasYoutube filter and the per-row badge light up.
+  test("returns true when a display count drifts", () => {
+    const remoteWithCount: McpShow = { ...remote, showYoutubesCount: 2 };
+    expect(
+      showNeedsUpdate(
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+          showYoutubesCount: 1,
+        },
+        remoteWithCount,
+      ),
+    ).toBe(true);
+  });
+
+  // Pre-deploy MCP omits the counts; a missing remote field must not claim
+  // drift against the local default of 0.
+  test("ignores display counts when remote omits them", () => {
+    expect(
+      showNeedsUpdate(
+        {
+          date: "2025-07-04",
+          averageRating: 4.2,
+          ratingsCount: 19,
+          notes: "Fourth of July run opener",
+          relistenUrl: "https://relisten.example/rr",
+          showYoutubesCount: 4,
+          showPhotosCount: 2,
+          likesCount: 9,
         },
         remote,
       ),
@@ -827,6 +920,21 @@ describe("buildShowDriftUpdate", () => {
       countForStats: false,
       dayOrder: 2,
     });
+  });
+
+  // Display-count drift in isolation: a YouTube link was added on prod. Patch
+  // carries only the changed count, doesn't churn the aggregate block.
+  test("emits a display count when it drifts", () => {
+    const remoteWithCount: McpShow = { ...remote, showYoutubesCount: 2 };
+    const localWithCount = { ...localInSync, showYoutubesCount: 1 };
+    const patch = buildShowDriftUpdate(localWithCount, remoteWithCount, "venue-brooklyn-steel-uuid");
+    expect(patch).toEqual({ showYoutubesCount: 2 });
+  });
+
+  // Pre-deploy MCP omits the counts; a local row whose counts default to 0 must
+  // not be patched (and re-runs stay idempotent) when remote is silent.
+  test("returns null when remote omits display counts and nothing else drifts", () => {
+    expect(buildShowDriftUpdate(localInSync, remote, "venue-brooklyn-steel-uuid")).toBeNull();
   });
 
   // Date drift in isolation: the row got dump-frozen with a date column that
@@ -2003,6 +2111,114 @@ describe("diffTrackFlags", () => {
   });
 });
 
+// diffShowYoutubes is the same replace-not-merge contract over a show's curated
+// video ids. The reconcile inserts toAdd in remote order so the detail-page
+// "first video" stays deterministic.
+describe("diffShowYoutubes", () => {
+  test("returns the add/remove delta to reach the remote video set", () => {
+    expect(diffShowYoutubes(["abc123"], ["abc123", "def456"])).toEqual({ toAdd: ["def456"], toRemove: [] });
+    expect(diffShowYoutubes(["abc123", "stale99"], ["abc123"])).toEqual({ toAdd: [], toRemove: ["stale99"] });
+  });
+
+  // Pre-deploy MCP omits `youtubes`; no-opinion must not wipe local rows.
+  test("returns empty deltas when remote is undefined (pre-deploy MCP)", () => {
+    expect(diffShowYoutubes(["abc123"], undefined)).toEqual({ toAdd: [], toRemove: [] });
+  });
+
+  // An explicit empty array means prod cleared the show's videos — remove all.
+  test("removes all videos when remote is explicitly empty", () => {
+    expect(diffShowYoutubes(["abc123", "def456"], [])).toEqual({ toAdd: [], toRemove: ["abc123", "def456"] });
+  });
+
+  // Idempotent re-run: identical sets produce no writes.
+  test("returns empty deltas when local already matches remote", () => {
+    expect(diffShowYoutubes(["abc123", "def456"], ["abc123", "def456"])).toEqual({ toAdd: [], toRemove: [] });
+  });
+
+  // Additions preserve remote order so the staggered-createdAt insert keeps the
+  // first-video badge deterministic.
+  test("preserves remote order in the additions", () => {
+    expect(diffShowYoutubes([], ["first0", "second1", "third2"])).toEqual({
+      toAdd: ["first0", "second1", "third2"],
+      toRemove: [],
+    });
+  });
+});
+
+// diffSongAuthors mirrors a song's song_authors join, keyed by authorId. A
+// reorder patches position in place; an added/removed author creates/deletes.
+describe("diffSongAuthors", () => {
+  test("creates authors present only on the remote side", () => {
+    expect(
+      diffSongAuthors(
+        [{ authorId: "marc", position: 0 }],
+        [
+          { authorId: "marc", position: 0 },
+          { authorId: "aron", position: 1 },
+        ],
+      ),
+    ).toEqual({ toCreate: [{ authorId: "aron", position: 1 }], toDeleteAuthorIds: [], toUpdatePositions: [] });
+  });
+
+  test("deletes authors present only on the local side", () => {
+    expect(
+      diffSongAuthors(
+        [
+          { authorId: "marc", position: 0 },
+          { authorId: "stale", position: 1 },
+        ],
+        [{ authorId: "marc", position: 0 }],
+      ),
+    ).toEqual({ toCreate: [], toDeleteAuthorIds: ["stale"], toUpdatePositions: [] });
+  });
+
+  // A reorder (same authors, different positions) patches position rather than
+  // churning a delete + re-insert.
+  test("updates position when an author is reordered", () => {
+    expect(
+      diffSongAuthors(
+        [
+          { authorId: "marc", position: 0 },
+          { authorId: "aron", position: 1 },
+        ],
+        [
+          { authorId: "marc", position: 1 },
+          { authorId: "aron", position: 0 },
+        ],
+      ),
+    ).toEqual({
+      toCreate: [],
+      toDeleteAuthorIds: [],
+      toUpdatePositions: [
+        { authorId: "marc", position: 1 },
+        { authorId: "aron", position: 0 },
+      ],
+    });
+  });
+
+  // Pre-deploy MCP omits `authors`; no-opinion must not wipe local rows.
+  test("returns empty deltas when remote is undefined (pre-deploy MCP)", () => {
+    expect(diffSongAuthors([{ authorId: "marc", position: 0 }], undefined)).toEqual({
+      toCreate: [],
+      toDeleteAuthorIds: [],
+      toUpdatePositions: [],
+    });
+  });
+
+  // Idempotent re-run: identical sets produce no writes.
+  test("returns empty deltas when local already matches remote", () => {
+    const same = [
+      { authorId: "marc", position: 0 },
+      { authorId: "aron", position: 1 },
+    ];
+    expect(diffSongAuthors(same, [...same])).toEqual({
+      toCreate: [],
+      toDeleteAuthorIds: [],
+      toUpdatePositions: [],
+    });
+  });
+});
+
 // Completions cross shows and reference tracks by natural key. resolveCompletionLinks
 // turns the (slug,set,position) endpoints into local track ids, dropping links
 // whose other end isn't in the synced scope; diffCompletions then computes the
@@ -2231,19 +2447,49 @@ type StubAttendanceRow = {
   createdAt: Date;
   updatedAt: Date;
 };
+type StubReviewRow = {
+  id: string;
+  userId: string;
+  showId: string | null;
+  content: string;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+type StubBlogPostRow = {
+  id: string;
+  slug: string;
+  title: string;
+  state: string;
+  userId: string;
+  updatedAt: Date;
+  [key: string]: unknown;
+};
+type StubFileRow = { id: string; cloudflareId: string | null; variants?: unknown; [key: string]: unknown };
+type StubBlogPostToFileRow = { id: string; blogPostId: string; fileId: string; isCover: boolean };
 
 function makeStubDb(seed: {
   users?: StubUserRow[];
   ratings?: StubRatingRow[];
   attendances?: StubAttendanceRow[];
+  reviews?: StubReviewRow[];
+  blogPosts?: StubBlogPostRow[];
+  files?: StubFileRow[];
+  blogPostToFiles?: StubBlogPostToFileRow[];
   shows?: Array<{ id: string; slug: string }>;
   tracks?: Array<{ id: string; showId: string }>;
 }) {
   const users = seed.users ?? [];
   const ratings = seed.ratings ?? [];
   const attendances = seed.attendances ?? [];
+  const reviews = seed.reviews ?? [];
+  const blogPosts = seed.blogPosts ?? [];
+  const files = seed.files ?? [];
+  const blogPostToFiles = seed.blogPostToFiles ?? [];
   const shows = seed.shows ?? [];
   const tracks = seed.tracks ?? [];
+  let stubIdSeq = 0;
+  const nextStubId = (prefix: string) => `${prefix}-${++stubIdSeq}`;
 
   const findFirstByMaxUpdatedAt = <T extends { updatedAt: Date }>(rows: T[]) => {
     if (rows.length === 0) return null;
@@ -2252,7 +2498,13 @@ function makeStubDb(seed: {
 
   const db = {
     user: {
-      findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(users)),
+      findFirst: vi.fn(async (args?: { where?: { id?: string } }) => {
+        if (args?.where?.id) {
+          const u = users.find((row) => row.id === args.where?.id);
+          return u ? { id: u.id } : null;
+        }
+        return findFirstByMaxUpdatedAt(users);
+      }),
       findMany: vi.fn(
         async (args?: {
           where?: { id?: { in?: string[] }; username?: { in?: string[] } };
@@ -2387,6 +2639,114 @@ function makeStubDb(seed: {
         return { count: ids.size };
       }),
     },
+    review: {
+      findFirst: vi.fn(async () => findFirstByMaxUpdatedAt(reviews)),
+      findMany: vi.fn(async () => reviews.map((r) => ({ id: r.id, userId: r.userId, showId: r.showId }))),
+      upsert: vi.fn(
+        async (args: {
+          where: { id?: string; showId_userId?: { showId: string; userId: string } };
+          create: StubReviewRow;
+          update: Partial<StubReviewRow>;
+        }) => {
+          const existing = args.where.id
+            ? reviews.find((r) => r.id === args.where.id)
+            : args.where.showId_userId
+              ? reviews.find(
+                  (r) => r.showId === args.where.showId_userId?.showId && r.userId === args.where.showId_userId.userId,
+                )
+              : undefined;
+          if (existing) {
+            Object.assign(existing, args.update);
+            return existing;
+          }
+          if (reviews.some((r) => r.id === args.create.id)) throw prismaUniqueIdError();
+          reviews.push(args.create);
+          return args.create;
+        },
+      ),
+      deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        for (let i = reviews.length - 1; i >= 0; i--) {
+          if (ids.has(reviews[i].id)) reviews.splice(i, 1);
+        }
+        return { count: ids.size };
+      }),
+    },
+    blogPost: {
+      // Two call shapes: the cursor lookup (orderBy updatedAt, select updatedAt)
+      // and the slug existence lookup (where: { slug }, select: { id }).
+      findFirst: vi.fn(async (args?: { where?: { slug?: string } }) => {
+        if (args?.where?.slug) {
+          const p = blogPosts.find((row) => row.slug === args.where?.slug);
+          return p ? { id: p.id } : null;
+        }
+        return findFirstByMaxUpdatedAt(blogPosts);
+      }),
+      findMany: vi.fn(async () => blogPosts.filter((p) => p.state === "published").map((p) => ({ id: p.id }))),
+      create: vi.fn(async (args: { data: StubBlogPostRow }) => {
+        blogPosts.push(args.data);
+        return { id: args.data.id };
+      }),
+      update: vi.fn(async (args: { where: { id: string }; data: Partial<StubBlogPostRow> }) => {
+        const p = blogPosts.find((row) => row.id === args.where.id);
+        if (p) Object.assign(p, args.data);
+        return p ?? null;
+      }),
+      deleteMany: vi.fn(async (args: { where: { id: { in: string[] } } }) => {
+        const ids = new Set(args.where.id.in);
+        for (let i = blogPosts.length - 1; i >= 0; i--) {
+          if (ids.has(blogPosts[i].id)) blogPosts.splice(i, 1);
+        }
+        return { count: ids.size };
+      }),
+    },
+    file: {
+      findFirst: vi.fn(async (args: { where: { cloudflareId: string } }) => {
+        const f = files.find((row) => row.cloudflareId === args.where.cloudflareId);
+        return f ? { id: f.id } : null;
+      }),
+      create: vi.fn(async (args: { data: Record<string, unknown> }) => {
+        const row = { id: nextStubId("file"), ...args.data } as StubFileRow;
+        files.push(row);
+        return { id: row.id };
+      }),
+      update: vi.fn(async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+        const f = files.find((row) => row.id === args.where.id);
+        if (f) Object.assign(f, args.data);
+        return f ?? null;
+      }),
+    },
+    blogPostToFile: {
+      findFirst: vi.fn(async (args: { where: { blogPostId: string; fileId: string } }) => {
+        const link = blogPostToFiles.find(
+          (row) => row.blogPostId === args.where.blogPostId && row.fileId === args.where.fileId,
+        );
+        return link ? { id: link.id } : null;
+      }),
+      create: vi.fn(async (args: { data: { blogPostId: string; fileId: string; isCover: boolean } }) => {
+        const row = { id: nextStubId("bptf"), ...args.data };
+        blogPostToFiles.push(row);
+        return row;
+      }),
+      deleteMany: vi.fn(async (args: { where: { blogPostId: string | { in: string[] }; isCover?: boolean } }) => {
+        const matchBlogPost = (id: string) =>
+          typeof args.where.blogPostId === "string"
+            ? id === args.where.blogPostId
+            : args.where.blogPostId.in.includes(id);
+        let count = 0;
+        for (let i = blogPostToFiles.length - 1; i >= 0; i--) {
+          const row = blogPostToFiles[i];
+          if (
+            matchBlogPost(row.blogPostId) &&
+            (args.where.isCover === undefined || row.isCover === args.where.isCover)
+          ) {
+            blogPostToFiles.splice(i, 1);
+            count++;
+          }
+        }
+        return { count };
+      }),
+    },
     show: {
       findUnique: vi.fn(async (args: { where: { id: string } }) => {
         const s = shows.find((row) => row.id === args.where.id);
@@ -2416,7 +2776,7 @@ function makeStubDb(seed: {
     },
   };
 
-  return { db, state: { users, ratings, attendances } };
+  return { db, state: { users, ratings, attendances, reviews, blogPosts, files, blogPostToFiles } };
 }
 
 /**
@@ -3433,5 +3793,247 @@ describe("syncUserActivity — pull-from-epoch (full reconcile)", () => {
 
     const ratingsCall = calls.find((c) => c.tool === "list_ratings_since");
     expect(ratingsCall?.args.since).toBe("1970-01-01T00:00:00.000Z");
+  });
+});
+
+describe("syncUserActivity — reviews", () => {
+  const emptyActivity = {
+    list_users_since: [{ users: [], nextCursor: null }],
+    list_ratings_since: [{ ratings: [], nextCursor: null }],
+    list_attendances_since: [{ attendances: [], nextCursor: null }],
+  };
+  const stubUser = (id: string): StubUserRow => ({
+    id,
+    email: `stub-${id}@local.invalid`,
+    passwordDigest: "STUB",
+    username: id,
+    avatarFileId: null,
+    avatarFileUrl: null,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  });
+  const reviewRow = (id: string, userId: string, showId: string) => ({
+    id,
+    userId,
+    showId,
+    content: "Tractorbeam into Munchkin, unreal.",
+    status: "published",
+    createdAt: "2024-08-12T00:00:00Z",
+    updatedAt: "2024-08-12T00:00:00Z",
+  });
+  const baseOpts = (mcp: ReturnType<typeof makeStubMcp>) => ({
+    isDryRun: false,
+    pullFromEpoch: false,
+    pruneOrphans: false,
+    ratingService: stubRatingService(),
+    cacheInvalidation: null,
+    changedSlugs: new Set<string>(),
+    now: new Date(),
+    mcp,
+  });
+
+  // Insert path: content + status mirror prod; userId/showId FK-resolve and the
+  // row is keyed by (showId, userId), preserving prod's id on create.
+  test("inserts a new review with content and status, preserving prod id", async () => {
+    const { db, state } = makeStubDb({
+      users: [stubUser("u-marc")],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    });
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_reviews_since: [{ reviews: [reviewRow("rev-1", "u-marc", "show-1")], nextCursor: null }],
+    });
+    const result = await syncUserActivity(db as never, baseOpts(mcp));
+    expect(result.reviewsUpserted).toBe(1);
+    expect(state.reviews).toHaveLength(1);
+    expect(state.reviews[0]).toMatchObject({
+      id: "rev-1",
+      userId: "u-marc",
+      showId: "show-1",
+      content: "Tractorbeam into Munchkin, unreal.",
+      status: "published",
+    });
+  });
+
+  // FK-skip: a review whose show isn't local (narrow --years window) is skipped,
+  // not inserted with a dangling FK.
+  test("skips a review whose show is not local", async () => {
+    const { db, state } = makeStubDb({ users: [stubUser("u-marc")] });
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_reviews_since: [{ reviews: [reviewRow("rev-1", "u-marc", "show-missing")], nextCursor: null }],
+    });
+    const result = await syncUserActivity(db as never, baseOpts(mcp));
+    expect(result.reviewsFkSkipped).toBe(1);
+    expect(state.reviews).toHaveLength(0);
+  });
+
+  // Null-show reviews aren't rendered and have no (showId, userId) key — dropped
+  // before the FK check, so they aren't even counted as FK-skipped.
+  test("skips reviews with a null showId", async () => {
+    const { db, state } = makeStubDb({
+      users: [stubUser("u-marc")],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    });
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_reviews_since: [
+        { reviews: [{ ...reviewRow("rev-1", "u-marc", "show-1"), showId: null }], nextCursor: null },
+      ],
+    });
+    const result = await syncUserActivity(db as never, baseOpts(mcp));
+    expect(result.reviewsUpserted).toBe(0);
+    expect(result.reviewsFkSkipped).toBe(0);
+    expect(state.reviews).toHaveLength(0);
+  });
+
+  // Compound-key absorption: a local review with the same (showId, userId) but a
+  // different id (older dump) absorbs the prod content in place — no duplicate,
+  // no primary-key collision.
+  test("absorbs a same-(showId,userId) local review with a different id", async () => {
+    const { db, state } = makeStubDb({
+      users: [stubUser("u-marc")],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+      reviews: [
+        {
+          id: "local-old-id",
+          userId: "u-marc",
+          showId: "show-1",
+          content: "old text",
+          status: "draft",
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+    });
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_reviews_since: [
+        {
+          reviews: [{ ...reviewRow("prod-id", "u-marc", "show-1"), content: "new text", status: "published" }],
+          nextCursor: null,
+        },
+      ],
+    });
+    const result = await syncUserActivity(db as never, baseOpts(mcp));
+    expect(result.reviewsUpserted).toBe(1);
+    expect(state.reviews).toHaveLength(1);
+    expect(state.reviews[0]).toMatchObject({ id: "local-old-id", content: "new text", status: "published" });
+  });
+});
+
+describe("syncUserActivity — blog posts", () => {
+  const emptyActivity = {
+    list_users_since: [{ users: [], nextCursor: null }],
+    list_ratings_since: [{ ratings: [], nextCursor: null }],
+    list_attendances_since: [{ attendances: [], nextCursor: null }],
+    list_reviews_since: [{ reviews: [], nextCursor: null }],
+  };
+  const stubUser = (id: string): StubUserRow => ({
+    id,
+    email: `stub-${id}@local.invalid`,
+    passwordDigest: "STUB",
+    username: id,
+    avatarFileId: null,
+    avatarFileUrl: null,
+    createdAt: new Date("2024-01-01T00:00:00Z"),
+    updatedAt: new Date("2024-01-01T00:00:00Z"),
+  });
+  const coverFile = (cloudflareId: string, variants: Record<string, string>) => ({
+    cloudflareId,
+    path: "/uploads/cover.jpg",
+    filename: "cover.jpg",
+    size: 4096,
+    type: "image/jpeg",
+    variants,
+    metadata: {},
+  });
+  const blogPost = (overrides: Record<string, unknown> = {}) => ({
+    id: "bp-1",
+    slug: "biscuits-announce-fall-tour",
+    title: "Biscuits Announce Fall Tour",
+    blurb: "Big news",
+    content: "Full content here.",
+    state: "published",
+    postType: "blog",
+    publishedAt: "2024-06-01T00:00:00Z",
+    userId: "u-marc",
+    createdAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2024-06-01T00:00:00Z",
+    coverFile: null,
+    ...overrides,
+  });
+  const baseOpts = (mcp: ReturnType<typeof makeStubMcp>) => ({
+    isDryRun: false,
+    pullFromEpoch: false,
+    pruneOrphans: false,
+    ratingService: stubRatingService(),
+    cacheInvalidation: null,
+    changedSlugs: new Set<string>(),
+    now: new Date("2024-06-02T00:00:00Z"),
+    mcp,
+  });
+
+  // Insert path: post preserves prod id + slug; the cover image is mirrored as a
+  // File (keyed by cloudflareId) + an isCover BlogPostToFile link.
+  test("inserts a published post and mirrors its cover File + link", async () => {
+    const { db, state } = makeStubDb({ users: [stubUser("u-marc")] });
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_blog_posts_since: [
+        { blogPosts: [blogPost({ coverFile: coverFile("cf-1", { public: "https://cdn/x.jpg" }) })], nextCursor: null },
+      ],
+    });
+    const result = await syncUserActivity(db as never, baseOpts(mcp));
+    expect(result.blogPostsUpserted).toBe(1);
+    expect(state.blogPosts).toHaveLength(1);
+    expect(state.blogPosts[0]).toMatchObject({ id: "bp-1", slug: "biscuits-announce-fall-tour", state: "published" });
+    expect(state.files).toHaveLength(1);
+    expect(state.files[0]).toMatchObject({ cloudflareId: "cf-1" });
+    expect(state.blogPostToFiles).toHaveLength(1);
+    expect(state.blogPostToFiles[0]).toMatchObject({ blogPostId: "bp-1", isCover: true });
+  });
+
+  // FK-skip: a post whose author isn't local is skipped, not inserted with a
+  // dangling user FK.
+  test("skips a post whose author user is not local", async () => {
+    const { db, state } = makeStubDb({});
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_blog_posts_since: [{ blogPosts: [blogPost({})], nextCursor: null }],
+    });
+    const result = await syncUserActivity(db as never, baseOpts(mcp));
+    expect(result.blogPostsFkSkipped).toBe(1);
+    expect(state.blogPosts).toHaveLength(0);
+  });
+
+  // Cover drift + idempotency: re-running with the same cloudflareId but new
+  // variants updates the File in place (no duplicate) and reuses the link.
+  test("updates an existing cover File in place by cloudflareId without duplicating", async () => {
+    const { db, state } = makeStubDb({
+      users: [stubUser("u-marc")],
+      blogPosts: [
+        {
+          id: "bp-1",
+          slug: "biscuits-announce-fall-tour",
+          title: "old title",
+          state: "published",
+          userId: "u-marc",
+          updatedAt: new Date("2024-01-01T00:00:00Z"),
+        },
+      ],
+      files: [{ id: "file-existing", cloudflareId: "cf-1", variants: { public: "old.jpg" } }],
+      blogPostToFiles: [{ id: "bptf-existing", blogPostId: "bp-1", fileId: "file-existing", isCover: true }],
+    });
+    const mcp = makeStubMcp({
+      ...emptyActivity,
+      list_blog_posts_since: [
+        { blogPosts: [blogPost({ coverFile: coverFile("cf-1", { public: "new.jpg" }) })], nextCursor: null },
+      ],
+    });
+    await syncUserActivity(db as never, baseOpts(mcp));
+    expect(state.files).toHaveLength(1);
+    expect(state.files[0]).toMatchObject({ id: "file-existing", variants: { public: "new.jpg" } });
+    expect(state.blogPostToFiles).toHaveLength(1);
   });
 });

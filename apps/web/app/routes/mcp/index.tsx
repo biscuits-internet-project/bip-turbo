@@ -284,6 +284,20 @@ const tools = [
     },
   },
   {
+    name: "list_reviews_since",
+    description:
+      "Paginated listing of reviews (id, userId, showId, content, status, timestamps) updated after a given time. Public review prose, PII-free. Used by the local sync script.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
+        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
+        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
+      },
+      required: ["since"],
+    },
+  },
+  {
     name: "list_all_user_ids",
     description: "Every user id on prod. Used by the local sync script's --full-users reconciliation pass.",
     inputSchema: { type: "object", properties: {}, required: [] },
@@ -296,6 +310,31 @@ const tools = [
   {
     name: "list_all_attendance_ids",
     description: "Every attendance id on prod. Used by the local sync script's --full-users reconciliation pass.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "list_all_review_ids",
+    description: "Every review id on prod. Used by the local sync script's --full-users reconciliation pass.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "list_blog_posts_since",
+    description:
+      "Paginated listing of PUBLISHED blog posts (title, blurb, content, slug, state, postType, timestamps, embedded cover image) updated after a given time. PII-free. Used by the local sync script.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
+        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
+        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
+      },
+      required: ["since"],
+    },
+  },
+  {
+    name: "list_all_blog_post_ids",
+    description:
+      "Every published blog post id on prod. Used by the local sync script's --full-users reconciliation pass.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
 ];
@@ -616,10 +655,15 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               list.push(mapDeltaToWire(delta));
               trackMusiciansByTrackId.set(delta.trackId, list);
             }
+            // Curated YouTube ids for the show, in insertion order. Sync's
+            // diffShowYoutubes replaces local-by-videoId and re-inserts in this
+            // order so the detail-page "first video" stays deterministic.
+            const youtubeEntries = await services.youtube.listEntriesForShow(setlist.show.id);
             setlists.push({
               showSlug: setlist.show.slug,
               showDate: setlist.show.date,
               venue: { name: setlist.venue.name, city: setlist.venue.city, state: setlist.venue.state },
+              youtubes: youtubeEntries.map((entry) => ({ videoId: entry.videoId })),
               // Whole-show performer lineup. Sync's diffShowMusicians mirrors it.
               lineup: setlist.lineup.map((member) => ({
                 musicianSlug: member.musician.slug,
@@ -710,6 +754,13 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               // Admin-curated full-rock-opera tagging. Sync mirrors via
               // findManyRockOperaSlugsForShow in buildShowDriftUpdate.
               rockOperaSlugs: rockOperaAnnotations.map((annotation) => annotation.rockOpera.slug),
+              // Denormalized display counts. Sync mirrors them as columns so
+              // local's YouTube/photo badges, hasYoutube/hasPhotos filters, and
+              // like count match prod — likes and show_photos rows aren't synced,
+              // so the column is the authoritative source for those.
+              showYoutubesCount: show.showYoutubesCount,
+              showPhotosCount: show.showPhotosCount,
+              likesCount: show.likesCount,
             });
           } else {
             errors.push({ slug, error: "Not found" });
@@ -746,6 +797,16 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               slug: song.slug,
               title: song.title,
               author: song.authorName,
+              // Structured authorship (the song_authors join). `authorName`
+              // above is the derived display string; this carries the rows sync
+              // mirrors so local's join populates. Position is the array index —
+              // song.authors is already position-ordered, and position is only
+              // used to order the authorName string, so the index is faithful.
+              authors: song.authors.map((author, index) => ({
+                slug: author.slug,
+                name: author.name,
+                position: index,
+              })),
               lyrics: song.lyrics,
               timesPlayed: song.timesPlayed,
               dateFirstPlayed: song.dateFirstPlayed,
@@ -862,6 +923,23 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       };
     }
 
+    case "list_reviews_since": {
+      const since = new Date(args.since as string);
+      const cursor = decodeSyncCursor(args.cursor as string | undefined);
+      const limit = clampSyncLimit(args.limit);
+      const rows = await services.reviews.listForSync({
+        since,
+        cursorId: cursor?.id,
+        cursorUpdatedAt: cursor?.updatedAt,
+        limit,
+      });
+      const last = rows[rows.length - 1];
+      return {
+        reviews: rows,
+        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
+      };
+    }
+
     case "list_all_user_ids": {
       return { ids: await services.users.listAllIdsForSync() };
     }
@@ -872,6 +950,31 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
 
     case "list_all_attendance_ids": {
       return { ids: await services.attendances.listAllIdsForSync() };
+    }
+
+    case "list_all_review_ids": {
+      return { ids: await services.reviews.listAllIdsForSync() };
+    }
+
+    case "list_blog_posts_since": {
+      const since = new Date(args.since as string);
+      const cursor = decodeSyncCursor(args.cursor as string | undefined);
+      const limit = clampSyncLimit(args.limit);
+      const rows = await services.blogPosts.listForSync({
+        since,
+        cursorId: cursor?.id,
+        cursorUpdatedAt: cursor?.updatedAt,
+        limit,
+      });
+      const last = rows[rows.length - 1];
+      return {
+        blogPosts: rows,
+        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
+      };
+    }
+
+    case "list_all_blog_post_ids": {
+      return { ids: await services.blogPosts.listAllIdsForSync() };
     }
 
     default:

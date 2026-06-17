@@ -49,7 +49,7 @@ Add the same block to `.cursor/mcp.json`, or use **Settings → Features → MCP
 
 ## Available Tools
 
-The server exposes 23 tools: 17 for querying the database (below) and 6 internal Sync / Replication tools (documented at the end of this section) used to mirror prod into local dev environments.
+The server exposes 27 tools: 17 for querying the database (below) and 10 internal Sync / Replication tools (documented at the end of this section) used to mirror prod into local dev environments.
 
 ### 🔍 Search Tools
 
@@ -111,9 +111,10 @@ Get complete setlists for multiple shows at once, with the full structured paylo
 
 **Input:** `showSlugs` (required, array of show slugs)
 
-**Returns:** `setlists`, each with `showSlug`, `showDate`, `venue`, and `sets`. Per track: `id`, `position`, `songTitle`, `songSlug`, `segue`, `note`, `allTimer`, `duration`, `durationSource`, `annotations`, plus the structured performer data the local sync mirrors:
+**Returns:** `setlists`, each with `showSlug`, `showDate`, `venue`, and `sets`. Per track: `id`, `position`, `songTitle`, `songSlug`, `segue`, `note`, `allTimer`, `duration`, `durationSource`, `annotations`, plus the structured data the local sync mirrors:
 
 - `lineup` (per show): the whole-show performer lineup — each member `{ musicianSlug, musicianName, knownFrom, defaultInstrument, instruments }`, with musicians and instruments carried by slug (the stable cross-environment id) plus name.
+- `youtubes` (per show): the curated YouTube video links, each `{ videoId }`, in insertion order.
 - `trackMusicians` (per track): sit-in / sat-out deltas `{ musicianSlug, musicianName, present, defaultInstrument, instruments }` (`present: true` = sit-in, `false` = sat-out).
 - `flags` (per track): structured flag enum names (e.g. `DYSLEXIC`, `INVERTED`, `UNFINISHED`, `ENDING_ONLY`). Derived recurrence columns are excluded — the consumer recomputes them.
 - `completes` (per track): completion links where this is the later (completing) track, each pointing at the earlier track by natural key `{ showSlug, set, position }`.
@@ -134,7 +135,7 @@ Get detailed information for multiple songs at once.
 
 **Input:** `slugs` (required, array of song slugs)
 
-**Returns:** `songs`, each with `slug`, `title`, `author`, `lyrics`, `timesPlayed`, `dateFirstPlayed`, `dateLastPlayed`, plus the curated admin fields `kind` (original / cover / mashup / improvisation), `legacyAuthor`, `featuredLyric`, `tabs`, `notes`, `history`, and `guitarTabsUrl`. Unknown slugs come back in an `errors` array.
+**Returns:** `songs`, each with `slug`, `title`, `author` (the derived display string), `authors` (the structured songwriting credits the local sync mirrors into the `song_authors` join — each `{ slug, name, position }`, position-ordered), `lyrics`, `timesPlayed`, `dateFirstPlayed`, `dateLastPlayed`, plus the curated admin fields `kind` (original / cover / mashup / improvisation), `featuredLyric`, `tabs`, `notes`, `history`, and `guitarTabsUrl`. Unknown slugs come back in an `errors` array.
 
 #### `get_shows`
 
@@ -142,7 +143,7 @@ Get detailed information for multiple shows at once.
 
 **Input:** `slugs` (required, array of show slugs, e.g. ["1999-12-30", "2000-01-01"])
 
-**Returns:** `shows`, each with `id`, `slug`, `date`, `venueName`, `venueCity`, `averageRating`, `ratingsCount`, `notes`, `relistenUrl`, the admin-curated stat flags `countForStats` and `dayOrder`, and `rockOperaSlugs` (full-album performances tagged on the show). Unknown slugs come back in an `errors` array.
+**Returns:** `shows`, each with `id`, `slug`, `date`, `venueName`, `venueCity`, `averageRating`, `ratingsCount`, `notes`, `relistenUrl`, the admin-curated stat flags `countForStats` and `dayOrder`, `rockOperaSlugs` (full-album performances tagged on the show), and the denormalized display counts `showYoutubesCount`, `showPhotosCount`, and `likesCount` (drive the listing-page badges, the `hasYoutube` / `hasPhotos` filters, and the like count). Unknown slugs come back in an `errors` array.
 
 #### `get_venues`
 
@@ -204,19 +205,27 @@ List all shows from a specific year.
 
 ### 🔄 Sync / Replication Tools (internal)
 
-These tools mirror prod's user-activity tables into local dev databases (see `packages/core/scripts/sync-missing-shows.ts`); they are not meant for general LLM querying. They expose a PII-free projection only — the service-layer `select` allowlist enforces the shape.
+These tools mirror prod's user-activity and public-content tables (users, ratings, attendances, reviews, blog posts) into local dev databases (see `packages/core/scripts/sync-missing-shows.ts`); they are not meant for general LLM querying. They expose a PII-free projection only — the service-layer `select` allowlist enforces the shape.
 
-#### `list_users_since`, `list_ratings_since`, `list_attendances_since`
+#### `list_users_since`, `list_ratings_since`, `list_attendances_since`, `list_reviews_since`
 
 Cursor-paginated pulls of rows changed since a timestamp.
 
 **Input:** `since` (required, ISO-8601 timestamp), `cursor` (optional, opaque base64 of `updatedAt|id`), `limit` (default 2000, max 5000)
 
-**Returns:** A `users` / `ratings` / `attendances` array plus `nextCursor` (null when the page isn't full). Users carry no email or password — only the fields needed to attach activity (`id`, `username`, avatar references, timestamps). Ratings carry `id`, `userId`, `value`, `rateableType`, `rateableId`, timestamps; attendances carry `id`, `userId`, `showId`, timestamps.
+**Returns:** A `users` / `ratings` / `attendances` / `reviews` array plus `nextCursor` (null when the page isn't full). Users carry no email or password — only the fields needed to attach activity (`id`, `username`, avatar references, timestamps). Ratings carry `id`, `userId`, `value`, `rateableType`, `rateableId`, timestamps; attendances carry `id`, `userId`, `showId`, timestamps; reviews carry `id`, `userId`, `showId`, `content` (the public review prose), `status`, timestamps.
 
-#### `list_all_user_ids`, `list_all_rating_ids`, `list_all_attendance_ids`
+#### `list_blog_posts_since`
 
-Full id dumps used by the sync's `--full-users` / prune reconcile to delete local rows no longer present on prod.
+Cursor-paginated pull of **published** blog posts changed since a timestamp, with the cover image embedded so the sync can mirror the post's File + cover link in one call.
+
+**Input:** `since` (required, ISO-8601 timestamp), `cursor` (optional), `limit` (default 2000, max 5000)
+
+**Returns:** `blogPosts` plus `nextCursor`. Each post carries `id`, `slug`, `title`, `blurb`, `content`, `state`, `postType`, `publishedAt`, `userId`, timestamps, and `coverFile` (`{ cloudflareId, path, filename, size, type, variants, metadata }`, or `null`). Drafts are never returned.
+
+#### `list_all_user_ids`, `list_all_rating_ids`, `list_all_attendance_ids`, `list_all_review_ids`, `list_all_blog_post_ids`
+
+Full id dumps used by the sync's `--full-users` / prune reconcile to delete local rows no longer present on prod. (`list_all_blog_post_ids` returns published post ids only.)
 
 **Input:** None
 
@@ -321,7 +330,7 @@ No rate limits are currently enforced, but please use the server responsibly. If
 
 ## Privacy
 
-The query tools expose only publicly available show, song, and venue data. The Sync / Replication tools expose a deliberately PII-free user projection (id, username, avatar reference, timestamps) plus ratings and attendance rows — no emails, passwords, or other account details are ever returned.
+The query tools expose only publicly available show, song, and venue data. The Sync / Replication tools expose a deliberately PII-free user projection (id, username, avatar reference, timestamps) plus ratings, attendances, reviews, and published blog posts — all already public on the site. No emails, passwords, or other account details are ever returned.
 
 ## Support
 

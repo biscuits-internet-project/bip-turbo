@@ -29,6 +29,7 @@ import { recomputeShowDuration } from "../src/tracks/show-duration";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
 const DEFAULT_BAND_SLUG = "the-disco-biscuits";
+const DEFAULT_BAND_NAME = "The Disco Biscuits";
 
 // --- MCP response types (match apps/web/app/routes/mcp/index.tsx handlers).
 // No shared Zod schemas exist between server and client for these shapes, so
@@ -69,6 +70,15 @@ export interface McpShow {
   // `countForStats`: undefined = pre-deploy MCP, explicit array (including
   // empty) = authoritative. See buildRockOperaAssignmentDiff.
   rockOperaSlugs?: string[];
+  // Denormalized counts that drive listing UI (the per-row YouTube/photo badges
+  // and `hasYoutube`/`hasPhotos` filters via getShowDatesWithFlags) and the
+  // like count. Mirrored as columns rather than recomputed: likes and photos
+  // (show_photos) aren't synced as rows, so the column is the only source, and
+  // mirroring keeps local's filters/counts matching prod verbatim. Optional +
+  // "no opinion" drift semantics like countForStats.
+  showYoutubesCount?: number;
+  showPhotosCount?: number;
+  likesCount?: number;
 }
 
 export interface McpRockOpera {
@@ -170,6 +180,28 @@ export interface McpSetlist {
   // as the per-track fields: `undefined` = pre-deploy MCP (no opinion),
   // explicit empty = "prod has no lineup for this show". See diffShowMusicians.
   lineup?: McpLineupMember[];
+  // Curated YouTube video ids for the show (the `show_youtubes` table), in
+  // insertion order so the detail-page "first video" stays deterministic.
+  // Same optional + replace-not-merge semantics: `undefined` = no opinion,
+  // explicit empty = "prod cleared this show's videos". See diffShowYoutubes.
+  youtubes?: McpShowYoutube[];
+}
+
+export interface McpShowYoutube {
+  videoId: string;
+}
+
+// A Cloudflare-backed file on the wire. `cloudflareId` is the stable cross-env
+// key the sync upserts on; `variants` (the URL map) is what the UI renders, so
+// local images resolve against prod's public CDN. PII-free.
+export interface McpFile {
+  cloudflareId: string;
+  path: string;
+  filename: string;
+  size: number;
+  type: string;
+  variants: unknown;
+  metadata: unknown;
 }
 
 export interface McpSong {
@@ -191,6 +223,18 @@ export interface McpSong {
   notes?: string | null;
   history?: string | null;
   guitarTabsUrl?: string | null;
+  // Structured authorship (the song_authors join). `author` above is the
+  // derived display string; this carries the rows sync mirrors into SongAuthor.
+  // Each entry's name lets the sync seed a missing Author row (slug is the
+  // natural key). `undefined` = no opinion (pre-deploy MCP); explicit empty =
+  // "prod has no authors for this song". See diffSongAuthors.
+  authors?: McpSongAuthor[];
+}
+
+export interface McpSongAuthor {
+  slug: string;
+  name: string;
+  position: number;
 }
 
 export interface McpVenue {
@@ -247,6 +291,37 @@ export interface McpSyncAttendance {
   showId: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Public review prose. `showId` is nullable on the model; the sync skips
+// null-show reviews (they aren't rendered and can't match the (showId, userId)
+// upsert key). No PII — content/status are public, userId resolves to a stub.
+export interface McpSyncReview {
+  id: string;
+  userId: string;
+  showId: string | null;
+  content: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Published blog post + its cover image. Keyed by slug; the cover File rides
+// inline (keyed by cloudflareId) so the sync mirrors File + BlogPostToFile
+// without a separate file endpoint. No PII — userId resolves to a stub.
+export interface McpBlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  blurb: string | null;
+  content: string | null;
+  state: string;
+  postType: string;
+  publishedAt: string | null;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+  coverFile: McpFile | null;
 }
 
 const SYNC_PAGE_LIMIT = 2000;
@@ -401,6 +476,11 @@ export function buildShowCreateInput(
     // ever shifts.
     countForStats: show.countForStats ?? true,
     dayOrder: show.dayOrder ?? null,
+    // Display counts — fall back to the schema default (0) when a pre-deploy
+    // MCP omits them, same `??` contract as countForStats.
+    showYoutubesCount: show.showYoutubesCount ?? 0,
+    showPhotosCount: show.showPhotosCount ?? 0,
+    likesCount: show.likesCount ?? 0,
     venueId: opts.venueId ?? null,
     bandId: opts.bandId ?? null,
     createdAt: now,
@@ -442,6 +522,9 @@ export interface LocalShowAggregates {
   relistenUrl: string | null;
   countForStats?: boolean;
   dayOrder?: number | null;
+  showYoutubesCount?: number;
+  showPhotosCount?: number;
+  likesCount?: number;
 }
 
 const AVERAGE_RATING_TOLERANCE = 1e-6;
@@ -457,6 +540,9 @@ export function showNeedsUpdate(local: LocalShowAggregates, remote: McpShow): bo
   // and clobbering admin-set values.
   if (remote.countForStats !== undefined && (local.countForStats ?? true) !== remote.countForStats) return true;
   if (remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder) return true;
+  if (displayCountDrift(local.showYoutubesCount, remote.showYoutubesCount)) return true;
+  if (displayCountDrift(local.showPhotosCount, remote.showPhotosCount)) return true;
+  if (displayCountDrift(local.likesCount, remote.likesCount)) return true;
   const la = local.averageRating;
   const ra = remote.averageRating;
   if (la === null || ra === null) return la !== ra;
@@ -483,6 +569,15 @@ export interface ShowDriftUpdate {
   venueId?: string | null;
   countForStats?: boolean;
   dayOrder?: number | null;
+  showYoutubesCount?: number;
+  showPhotosCount?: number;
+  likesCount?: number;
+}
+
+// Display-count drift: undefined remote = "no opinion" (pre-deploy MCP), so a
+// missing field never claims drift. Local defaults to 0 (the schema default).
+function displayCountDrift(local: number | undefined, remote: number | undefined): boolean {
+  return remote !== undefined && (local ?? 0) !== remote;
 }
 
 /**
@@ -510,8 +605,21 @@ export function buildShowDriftUpdate(
   const countForStatsDrift =
     remote.countForStats !== undefined && (local.countForStats ?? true) !== remote.countForStats;
   const dayOrderDrift = remote.dayOrder !== undefined && (local.dayOrder ?? null) !== remote.dayOrder;
+  const youtubesCountDrift = displayCountDrift(local.showYoutubesCount, remote.showYoutubesCount);
+  const photosCountDrift = displayCountDrift(local.showPhotosCount, remote.showPhotosCount);
+  const likesCountDrift = displayCountDrift(local.likesCount, remote.likesCount);
   const venueDrift = local.venueId === null && resolvedVenueId !== null;
-  if (!dateDrift && !aggregatesDrift && !countForStatsDrift && !dayOrderDrift && !venueDrift) return null;
+  if (
+    !dateDrift &&
+    !aggregatesDrift &&
+    !countForStatsDrift &&
+    !dayOrderDrift &&
+    !youtubesCountDrift &&
+    !photosCountDrift &&
+    !likesCountDrift &&
+    !venueDrift
+  )
+    return null;
   const update: ShowDriftUpdate = {};
   if (dateDrift) update.date = remote.date;
   if (aggregatesDrift) {
@@ -522,6 +630,9 @@ export function buildShowDriftUpdate(
   }
   if (countForStatsDrift) update.countForStats = remote.countForStats;
   if (dayOrderDrift) update.dayOrder = remote.dayOrder ?? null;
+  if (youtubesCountDrift) update.showYoutubesCount = remote.showYoutubesCount;
+  if (photosCountDrift) update.showPhotosCount = remote.showPhotosCount;
+  if (likesCountDrift) update.likesCount = remote.likesCount;
   if (venueDrift) update.venueId = resolvedVenueId;
   return update;
 }
@@ -1109,6 +1220,45 @@ export function diffTrackFlags(local: string[], remote: string[] | undefined): {
   return { toAdd: remote.filter((f) => !localSet.has(f)), toRemove: local.filter((f) => !remoteSet.has(f)) };
 }
 
+// Show YouTube links mirror diffTrackFlags exactly: identity by the video id,
+// replace-not-merge, `undefined` = no opinion (pre-deploy MCP). The caller
+// inserts the additions in remote order so the "first video" (oldest by
+// createdAt) stays deterministic across runs.
+export function diffShowYoutubes(
+  local: string[],
+  remote: string[] | undefined,
+): { toAdd: string[]; toRemove: string[] } {
+  if (remote === undefined) return { toAdd: [], toRemove: [] };
+  const localSet = new Set(local);
+  const remoteSet = new Set(remote);
+  return { toAdd: remote.filter((v) => !localSet.has(v)), toRemove: local.filter((v) => !remoteSet.has(v)) };
+}
+
+export interface SongAuthorEntry {
+  authorId: string;
+  position: number;
+}
+
+// SongAuthor rows keyed by authorId (resolved from slug upstream), replace-not-
+// merge. `undefined` remote = no opinion (pre-deploy MCP). An author present on
+// both sides with a changed position lands in toUpdatePositions, so a reorder
+// patches the row instead of churning a delete + re-insert.
+export function diffSongAuthors(
+  local: SongAuthorEntry[],
+  remote: SongAuthorEntry[] | undefined,
+): { toCreate: SongAuthorEntry[]; toDeleteAuthorIds: string[]; toUpdatePositions: SongAuthorEntry[] } {
+  if (remote === undefined) return { toCreate: [], toDeleteAuthorIds: [], toUpdatePositions: [] };
+  const localByAuthor = new Map(local.map((e) => [e.authorId, e.position]));
+  const remoteByAuthor = new Map(remote.map((e) => [e.authorId, e.position]));
+  return {
+    toCreate: remote.filter((e) => !localByAuthor.has(e.authorId)),
+    toDeleteAuthorIds: local.filter((e) => !remoteByAuthor.has(e.authorId)).map((e) => e.authorId),
+    toUpdatePositions: remote.filter(
+      (e) => localByAuthor.has(e.authorId) && localByAuthor.get(e.authorId) !== e.position,
+    ),
+  };
+}
+
 export interface CompletionKey {
   showSlug: string;
   set: string;
@@ -1306,6 +1456,52 @@ export function findSquatterIds(
   return stale;
 }
 
+// Upsert a File row by its stable cloudflareId, returning the local file id.
+// variants/metadata (the rendered URL maps) drift-patch on every run. Shared by
+// the blog-cover and show-photo sync so File handling stays DRY. Accepts either
+// the top-level client or a transaction client (both expose `.file`).
+async function upsertFileByCloudflareId(
+  client: Pick<Prisma.TransactionClient, "file">,
+  file: McpFile,
+  userId: string,
+  now: Date,
+): Promise<string> {
+  const variants = (file.variants ?? {}) as Prisma.InputJsonValue;
+  const metadata = (file.metadata ?? {}) as Prisma.InputJsonValue;
+  const existing = await client.file.findFirst({ where: { cloudflareId: file.cloudflareId }, select: { id: true } });
+  if (existing) {
+    await client.file.update({
+      where: { id: existing.id },
+      data: {
+        path: file.path,
+        filename: file.filename,
+        size: file.size,
+        type: file.type,
+        variants,
+        metadata,
+        updatedAt: now,
+      },
+    });
+    return existing.id;
+  }
+  const created = await client.file.create({
+    data: {
+      cloudflareId: file.cloudflareId,
+      path: file.path,
+      filename: file.filename,
+      size: file.size,
+      type: file.type,
+      userId,
+      variants,
+      metadata,
+      createdAt: now,
+      updatedAt: now,
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 interface UserActivityStats {
   usersCreated: number;
   usersUpdated: number;
@@ -1313,14 +1509,21 @@ interface UserActivityStats {
   ratingsFkSkipped: number;
   attendancesUpserted: number;
   attendancesFkSkipped: number;
+  reviewsUpserted: number;
+  reviewsFkSkipped: number;
+  blogPostsUpserted: number;
+  blogPostsFkSkipped: number;
   usersDeleted: number;
   ratingsDeleted: number;
   attendancesDeleted: number;
+  reviewsDeleted: number;
+  blogPostsDeleted: number;
   // Squatter rows deleted by the epoch id-binding reconcile (re-inserted under
   // their correct prod id during the same upsert pass). Separate from the
   // prune's *Deleted counters, which remove rows prod no longer has at all.
   ratingsReconciled: number;
   attendancesReconciled: number;
+  reviewsReconciled: number;
   aggregatesRebuilt: number;
 }
 
@@ -1379,7 +1582,7 @@ export async function syncUserActivity(
   db: typeof prisma,
   options: SyncUserActivityOptions,
 ): Promise<UserActivityStats> {
-  const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, changedSlugs } = options;
+  const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, changedSlugs, now } = options;
   const mcp = options.mcp ?? mcpCall;
   const prodShowIdToLocalId = options.prodShowIdToLocalId ?? new Map<string, string>();
   const prodTrackIdToLocalId = options.prodTrackIdToLocalId ?? new Map<string, string>();
@@ -1390,11 +1593,18 @@ export async function syncUserActivity(
     ratingsFkSkipped: 0,
     attendancesUpserted: 0,
     attendancesFkSkipped: 0,
+    reviewsUpserted: 0,
+    reviewsFkSkipped: 0,
+    blogPostsUpserted: 0,
+    blogPostsFkSkipped: 0,
     usersDeleted: 0,
     ratingsDeleted: 0,
     attendancesDeleted: 0,
+    reviewsDeleted: 0,
+    blogPostsDeleted: 0,
     ratingsReconciled: 0,
     attendancesReconciled: 0,
+    reviewsReconciled: 0,
     aggregatesRebuilt: 0,
   };
 
@@ -1404,13 +1614,17 @@ export async function syncUserActivity(
   // single-cursor approach can't pull rows whose updatedAt is below the
   // current local MAX, which happens whenever the dump that seeded the DB
   // didn't cover those rows.
-  async function localMaxUpdatedAt(table: "user" | "rating" | "attendance"): Promise<Date> {
+  async function localMaxUpdatedAt(table: "user" | "rating" | "attendance" | "review" | "blogPost"): Promise<Date> {
     if (pullFromEpoch) return new Date(0);
     let row: { updatedAt: Date } | null;
     if (table === "user")
       row = await db.user.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
     else if (table === "rating")
       row = await db.rating.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    else if (table === "review")
+      row = await db.review.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    else if (table === "blogPost")
+      row = await db.blogPost.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
     else row = await db.attendance.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
     return row?.updatedAt ?? new Date(0);
   }
@@ -1814,6 +2028,197 @@ export async function syncUserActivity(
   }
   console.log(`🎫 Attendances: +${stats.attendancesUpserted} (skipped ${stats.attendancesFkSkipped} on missing FK)`);
 
+  // --- Reviews ---
+  // Public review prose, keyed by (showId, userId) like attendances. Wrapped in
+  // try/catch so a pre-deploy prod MCP (no list_reviews_since tool) is tolerated
+  // — reviews skip until the MCP change deploys. Same buffer → resolve →
+  // epoch-reconcile → chunked-apply shape as attendances.
+  try {
+    const reviewCursor = await localMaxUpdatedAt("review");
+    console.log(`📝 Reviews: ${pullFromEpoch ? "full epoch pull" : `incremental since ${reviewCursor.toISOString()}`}`);
+    const prodReviews: McpSyncReview[] = [];
+    pageCursor = null;
+    do {
+      const args: Record<string, unknown> = { since: reviewCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+      if (pageCursor) args.cursor = pageCursor;
+      const { reviews, nextCursor } = await mcp<{ reviews: McpSyncReview[]; nextCursor: string | null }>(
+        "list_reviews_since",
+        args,
+      );
+      prodReviews.push(...reviews);
+      pageCursor = nextCursor;
+    } while (pageCursor !== null);
+
+    // Skip null-show reviews (not rendered, and no (showId, userId) key) and
+    // remap userId + showId through the drift maps, same as attendances.
+    const resolvedReviews = prodReviews
+      .filter((r): r is McpSyncReview & { showId: string } => r.showId !== null)
+      .map((r) => ({
+        ...r,
+        localUserId: prodIdToLocalId.get(r.userId) ?? r.userId,
+        localShowId: prodShowIdToLocalId.get(r.showId) ?? r.showId,
+      }));
+
+    // Epoch id-binding reconcile — same rationale as attendances: clear local
+    // rows squatting an id prod now binds to a different (user, show) before the
+    // id-preserving create runs. The (userId, showId) tuple matches attendances,
+    // so attendanceBindingKey serves both.
+    if (pullFromEpoch && !isDryRun) {
+      const prodKeyById = new Map<string, string>();
+      for (const r of resolvedReviews) prodKeyById.set(r.id, attendanceBindingKey(r.localUserId, r.localShowId));
+      const localReviews = await db.review.findMany({ select: { id: true, userId: true, showId: true } });
+      const squatterIds = new Set(
+        findSquatterIds(
+          localReviews
+            .filter((r): r is { id: string; userId: string; showId: string } => r.showId !== null)
+            .map((r) => ({ id: r.id, key: attendanceBindingKey(r.userId, r.showId) })),
+          prodKeyById,
+        ),
+      );
+      if (squatterIds.size > 0) {
+        await db.review.deleteMany({ where: { id: { in: Array.from(squatterIds) } } });
+        stats.reviewsReconciled = squatterIds.size;
+        console.log(`🧩 Reviews: reconciled ${squatterIds.size} stale id binding(s)`);
+      }
+    }
+
+    for (let offset = 0; offset < resolvedReviews.length; offset += SYNC_PAGE_LIMIT) {
+      const chunk = resolvedReviews.slice(offset, offset + SYNC_PAGE_LIMIT);
+      const reviewUserIds = Array.from(new Set(chunk.map((r) => r.localUserId)));
+      const reviewShowIds = Array.from(new Set(chunk.map((r) => r.localShowId)));
+      const [existingReviewUsers, existingReviewShows] = await Promise.all([
+        reviewUserIds.length > 0
+          ? db.user.findMany({ where: { id: { in: reviewUserIds } }, select: { id: true } })
+          : Promise.resolve([]),
+        reviewShowIds.length > 0
+          ? db.show.findMany({ where: { id: { in: reviewShowIds } }, select: { id: true } })
+          : Promise.resolve([]),
+      ]);
+      const localReviewUserSet = new Set(existingReviewUsers.map((u) => u.id));
+      const localReviewShowSet = new Set(existingReviewShows.map((s) => s.id));
+
+      for (const r of chunk) {
+        if (!localReviewUserSet.has(r.localUserId)) {
+          stats.reviewsFkSkipped++;
+          console.warn(`  ⚠️  review ${r.id}: skipping — user ${r.localUserId} not local`);
+          continue;
+        }
+        if (!localReviewShowSet.has(r.localShowId)) {
+          stats.reviewsFkSkipped++;
+          console.warn(`  ⚠️  review ${r.id}: skipping — show ${r.localShowId} not local`);
+          continue;
+        }
+        if (isDryRun) {
+          stats.reviewsUpserted++;
+          continue;
+        }
+        try {
+          // Compound-key upsert by (showId, userId) — same id-drift absorption
+          // as attendances. content/status drift patches in place.
+          await db.review.upsert({
+            where: { showId_userId: { showId: r.localShowId, userId: r.localUserId } },
+            update: { content: r.content, status: r.status, updatedAt: new Date(r.updatedAt) },
+            create: {
+              id: r.id,
+              userId: r.localUserId,
+              showId: r.localShowId,
+              content: r.content,
+              status: r.status,
+              createdAt: new Date(r.createdAt),
+              updatedAt: new Date(r.updatedAt),
+            },
+          });
+          stats.reviewsUpserted++;
+        } catch (err) {
+          console.error(`  ❌ review ${r.id} upsert failed:`, err);
+        }
+      }
+    }
+    console.log(`📝 Reviews: +${stats.reviewsUpserted} (skipped ${stats.reviewsFkSkipped} on missing FK)`);
+  } catch (err) {
+    console.log(`📝 Reviews: skipped (${err instanceof Error ? err.message : "MCP tool unavailable"})`);
+  }
+
+  // --- Blog posts ---
+  // Published posts keyed by slug, with the cover image mirrored as File +
+  // BlogPostToFile so the /blog cards render. Runs after users so the author FK
+  // resolves through prodIdToLocalId. Wrapped in try/catch for pre-deploy MCP
+  // tolerance (list_blog_posts_since absent until the MCP change deploys).
+  try {
+    const blogCursor = await localMaxUpdatedAt("blogPost");
+    console.log(
+      `📰 Blog posts: ${pullFromEpoch ? "full epoch pull" : `incremental since ${blogCursor.toISOString()}`}`,
+    );
+    const prodPosts: McpBlogPost[] = [];
+    pageCursor = null;
+    do {
+      const args: Record<string, unknown> = { since: blogCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+      if (pageCursor) args.cursor = pageCursor;
+      const { blogPosts, nextCursor } = await mcp<{ blogPosts: McpBlogPost[]; nextCursor: string | null }>(
+        "list_blog_posts_since",
+        args,
+      );
+      prodPosts.push(...blogPosts);
+      pageCursor = nextCursor;
+    } while (pageCursor !== null);
+
+    for (const post of prodPosts) {
+      const localUserId = prodIdToLocalId.get(post.userId) ?? post.userId;
+      const userExists = await db.user.findFirst({ where: { id: localUserId }, select: { id: true } });
+      if (!userExists) {
+        stats.blogPostsFkSkipped++;
+        console.warn(`  ⚠️  blog post ${post.slug}: skipping — user ${localUserId} not local`);
+        continue;
+      }
+      if (isDryRun) {
+        stats.blogPostsUpserted++;
+        continue;
+      }
+      try {
+        const postData = {
+          title: post.title,
+          blurb: post.blurb,
+          content: post.content,
+          state: post.state,
+          postType: post.postType,
+          publishedAt: post.publishedAt ? new Date(post.publishedAt) : null,
+          userId: localUserId,
+          updatedAt: new Date(post.updatedAt),
+        };
+        // Upsert by slug (the unique natural key); a local row under prod's slug
+        // absorbs the patch in place. New posts preserve prod's id + createdAt.
+        const existing = await db.blogPost.findFirst({ where: { slug: post.slug }, select: { id: true } });
+        let blogPostId: string;
+        if (existing) {
+          await db.blogPost.update({ where: { id: existing.id }, data: postData });
+          blogPostId = existing.id;
+        } else {
+          const created = await db.blogPost.create({
+            data: { ...postData, id: post.id, slug: post.slug, createdAt: new Date(post.createdAt) },
+            select: { id: true },
+          });
+          blogPostId = created.id;
+        }
+        // Mirror the cover image: upsert the File by cloudflareId, then ensure a
+        // single isCover BlogPostToFile link points at it (replace any stale one).
+        if (post.coverFile) {
+          const fileId = await upsertFileByCloudflareId(db, post.coverFile, localUserId, now);
+          const link = await db.blogPostToFile.findFirst({ where: { blogPostId, fileId }, select: { id: true } });
+          if (!link) {
+            await db.blogPostToFile.deleteMany({ where: { blogPostId, isCover: true } });
+            await db.blogPostToFile.create({ data: { blogPostId, fileId, isCover: true, createdAt: now } });
+          }
+        }
+        stats.blogPostsUpserted++;
+      } catch (err) {
+        console.error(`  ❌ blog post ${post.slug} upsert failed:`, err);
+      }
+    }
+    console.log(`📰 Blog posts: +${stats.blogPostsUpserted} (skipped ${stats.blogPostsFkSkipped} on missing FK)`);
+  } catch (err) {
+    console.log(`📰 Blog posts: skipped (${err instanceof Error ? err.message : "MCP tool unavailable"})`);
+  }
+
   // --- Full-mode reconciliation: delete local rows not on prod ---
   if (pruneOrphans) {
     console.log("🧹 Pruning local rows missing from prod");
@@ -1868,6 +2273,44 @@ export async function syncUserActivity(
       stats.ratingsDeleted = ratingsToDelete.length;
     }
     console.log(`⭐ Ratings: -${stats.ratingsDeleted}`);
+
+    // Reviews — same pattern. Before users (the user prune counts review refs).
+    // Tolerated when prod lacks list_all_review_ids (pre-deploy MCP).
+    try {
+      const { ids: prodReviewIds } = await mcp<{ ids: string[] }>("list_all_review_ids", {});
+      const prodReviewSet = new Set(prodReviewIds);
+      const localReviews = await db.review.findMany({ select: { id: true } });
+      const reviewsToDelete = localReviews.filter((r) => !prodReviewSet.has(r.id)).map((r) => r.id);
+      if (reviewsToDelete.length > 0) {
+        if (!isDryRun) {
+          await db.review.deleteMany({ where: { id: { in: reviewsToDelete } } });
+        }
+        stats.reviewsDeleted = reviewsToDelete.length;
+      }
+      console.log(`📝 Reviews: -${stats.reviewsDeleted}`);
+    } catch (err) {
+      console.log(`📝 Reviews prune: skipped (${err instanceof Error ? err.message : "MCP tool unavailable"})`);
+    }
+
+    // Blog posts — delete local published posts prod no longer has. Drop their
+    // cover links first (FK); orphan File rows are harmless and left in place.
+    // Tolerated when prod lacks list_all_blog_post_ids (pre-deploy MCP).
+    try {
+      const { ids: prodBlogIds } = await mcp<{ ids: string[] }>("list_all_blog_post_ids", {});
+      const prodBlogSet = new Set(prodBlogIds);
+      const localPosts = await db.blogPost.findMany({ where: { state: "published" }, select: { id: true } });
+      const postsToDelete = localPosts.filter((p) => !prodBlogSet.has(p.id)).map((p) => p.id);
+      if (postsToDelete.length > 0) {
+        if (!isDryRun) {
+          await db.blogPostToFile.deleteMany({ where: { blogPostId: { in: postsToDelete } } });
+          await db.blogPost.deleteMany({ where: { id: { in: postsToDelete } } });
+        }
+        stats.blogPostsDeleted = postsToDelete.length;
+      }
+      console.log(`📰 Blog posts: -${stats.blogPostsDeleted}`);
+    } catch (err) {
+      console.log(`📰 Blog posts prune: skipped (${err instanceof Error ? err.message : "MCP tool unavailable"})`);
+    }
 
     // Users last. Two FKs (ratings, attendances) — we've already deleted any
     // we're going to delete above, so a delete here for a user whose data
@@ -1947,6 +2390,9 @@ interface SyncStats {
   songsCreated: number;
   songsOrphanedDeleted: number;
   songsOrphanedWithTracks: number;
+  authorsCreated: number;
+  songAuthorsUpserted: number;
+  songAuthorsDeleted: number;
   showsOrphanedDeleted: number;
   showsOrphanedWithUserData: number;
   venuesCreated: number;
@@ -1974,6 +2420,8 @@ interface SyncStats {
   trackMusiciansDeleted: number;
   trackFlagsAdded: number;
   trackFlagsRemoved: number;
+  showYoutubesAdded: number;
+  showYoutubesRemoved: number;
   completionsUpserted: number;
   completionsDeleted: number;
   completionsSkipped: number;
@@ -2145,6 +2593,9 @@ async function syncMissingShows(): Promise<void> {
     songsCreated: 0,
     songsOrphanedDeleted: 0,
     songsOrphanedWithTracks: 0,
+    authorsCreated: 0,
+    songAuthorsUpserted: 0,
+    songAuthorsDeleted: 0,
     showsOrphanedDeleted: 0,
     showsOrphanedWithUserData: 0,
     venuesCreated: 0,
@@ -2172,6 +2623,8 @@ async function syncMissingShows(): Promise<void> {
     trackMusiciansDeleted: 0,
     trackFlagsAdded: 0,
     trackFlagsRemoved: 0,
+    showYoutubesAdded: 0,
+    showYoutubesRemoved: 0,
     completionsUpserted: 0,
     completionsDeleted: 0,
     completionsSkipped: 0,
@@ -2238,6 +2691,9 @@ async function syncMissingShows(): Promise<void> {
       venueId: true,
       countForStats: true,
       dayOrder: true,
+      showYoutubesCount: true,
+      showPhotosCount: true,
+      likesCount: true,
     } as const;
     const existingLocal = await db.show.findMany({ where: { slug: { in: realSlugs } }, select: localShowSelect });
     // Local Show.slug is nullable in the schema, but every show this script
@@ -2307,10 +2763,22 @@ async function syncMissingShows(): Promise<void> {
     }
     const setlistBySlug = new Map(setlists.map((s) => [s.showSlug, s]));
 
-    // Step 4: default band lookup. Only one band in practice (Disco Biscuits);
-    // bandId is nullable, so a missing band just means shows land without band FK.
-    const band = await db.band.findFirst({ where: { slug: DEFAULT_BAND_SLUG } });
-    if (!band) console.warn(`⚠️  No band with slug "${DEFAULT_BAND_SLUG}" in local DB; bandId will be NULL`);
+    // Step 4: default band. Only one band in practice (Disco Biscuits). A fresh
+    // local DB (or one seeded without it) lacks the row that Show.bandId
+    // references, so create it on miss — the name is cosmetic (never displayed;
+    // the show form hardcodes the band id), only the FK matters.
+    let band = await db.band.findFirst({ where: { slug: DEFAULT_BAND_SLUG }, select: { id: true } });
+    if (!band) {
+      if (isDryRun) {
+        console.log(`🎸 Would create band "${DEFAULT_BAND_SLUG}" (dry run)`);
+      } else {
+        band = await db.band.create({
+          data: { name: DEFAULT_BAND_NAME, slug: DEFAULT_BAND_SLUG, createdAt: now, updatedAt: now },
+          select: { id: true },
+        });
+        console.log(`🎸 Created band "${DEFAULT_BAND_SLUG}"`);
+      }
+    }
 
     // Step 4b: rock opera lookup table. Independent of the per-show data —
     // mirror the small (3-row) lookup so the per-show assignment diff in step
@@ -2602,6 +3070,117 @@ async function syncMissingShows(): Promise<void> {
           stats.errors++;
         }
       }
+
+      // Step 6b: song authorship (the song_authors join). Authors are shared,
+      // seeded-or-resolved by slug — Author.slug is a non-unique index, so a
+      // duplicate slug resolves to the lex-min id (like matchVenue) and re-runs
+      // stay deterministic. Then each in-scope song's SongAuthor rows are
+      // mirrored by diffSongAuthors. `undefined` authors = no opinion (pre-deploy
+      // MCP), so the whole step is a no-op until the get_songs change deploys.
+      const authorNameBySlug = new Map<string, string>();
+      for (const song of remoteSongs) {
+        for (const a of song.authors ?? []) {
+          if (!authorNameBySlug.has(a.slug)) authorNameBySlug.set(a.slug, a.name);
+        }
+      }
+      const authorSlugToId = new Map<string, string>();
+      if (authorNameBySlug.size > 0) {
+        const existingAuthors = await db.author.findMany({
+          where: { slug: { in: Array.from(authorNameBySlug.keys()) } },
+          select: { id: true, slug: true, name: true },
+        });
+        const idsBySlug = new Map<string, string[]>();
+        const nameById = new Map<string, string | null>();
+        for (const row of existingAuthors) {
+          const list = idsBySlug.get(row.slug);
+          if (list) list.push(row.id);
+          else idsBySlug.set(row.slug, [row.id]);
+          nameById.set(row.id, row.name);
+        }
+        for (const [slug, ids] of idsBySlug) authorSlugToId.set(slug, [...ids].sort()[0]);
+        for (const [slug, name] of authorNameBySlug) {
+          const existingId = authorSlugToId.get(slug);
+          if (existingId) {
+            // Name drift on the canonical (lex-min) row → patch by slug.
+            if (!isDryRun && nameById.get(existingId) !== name) {
+              try {
+                await db.author.update({ where: { id: existingId }, data: { name, updatedAt: now } });
+                songsChanged = true;
+              } catch (err) {
+                console.error(`  ❌ failed to update author ${slug}:`, err);
+                stats.errors++;
+              }
+            }
+            continue;
+          }
+          if (isDryRun) {
+            authorSlugToId.set(slug, `dry-run-author-${slug}`);
+            stats.authorsCreated++;
+            continue;
+          }
+          try {
+            const created = await db.author.create({
+              data: { name, slug, createdAt: now, updatedAt: now },
+              select: { id: true },
+            });
+            authorSlugToId.set(slug, created.id);
+            stats.authorsCreated++;
+            songsChanged = true;
+          } catch (err) {
+            console.error(`  ❌ failed to create author ${slug}:`, err);
+            stats.errors++;
+          }
+        }
+      }
+
+      for (const song of remoteSongs) {
+        if (song.authors === undefined) continue;
+        const songId = songSlugToId.get(song.slug);
+        if (!songId || songId.startsWith("dry-run-song-")) continue;
+        const desired: SongAuthorEntry[] = [];
+        for (const a of song.authors) {
+          const authorId = authorSlugToId.get(a.slug);
+          if (authorId && !authorId.startsWith("dry-run-author-")) desired.push({ authorId, position: a.position });
+        }
+        const localSongAuthorRows = await db.songAuthor.findMany({
+          where: { songId },
+          select: { authorId: true, position: true },
+        });
+        const diff = diffSongAuthors(localSongAuthorRows, desired);
+        if (diff.toCreate.length === 0 && diff.toDeleteAuthorIds.length === 0 && diff.toUpdatePositions.length === 0) {
+          continue;
+        }
+        stats.songAuthorsUpserted += diff.toCreate.length + diff.toUpdatePositions.length;
+        stats.songAuthorsDeleted += diff.toDeleteAuthorIds.length;
+        songsChanged = true;
+        const summary = `authors +${diff.toCreate.length} -${diff.toDeleteAuthorIds.length} ~${diff.toUpdatePositions.length}`;
+        if (isDryRun) {
+          console.log(`  ✍️  song ${song.slug}: ${summary} (dry run)`);
+          continue;
+        }
+        try {
+          await db.$transaction(async (tx) => {
+            if (diff.toDeleteAuthorIds.length > 0) {
+              await tx.songAuthor.deleteMany({ where: { songId, authorId: { in: diff.toDeleteAuthorIds } } });
+            }
+            for (const e of diff.toCreate) {
+              await tx.songAuthor.create({
+                data: { songId, authorId: e.authorId, position: e.position, createdAt: now, updatedAt: now },
+              });
+            }
+            for (const e of diff.toUpdatePositions) {
+              await tx.songAuthor.updateMany({
+                where: { songId, authorId: e.authorId },
+                data: { position: e.position, updatedAt: now },
+              });
+            }
+          });
+          console.log(`  ✍️  song ${song.slug}: ${summary}`);
+        } catch (err) {
+          console.error(`  ❌ failed to mirror authors for ${song.slug}:`, err);
+          stats.errors++;
+        }
+      }
     }
 
     // Step 7: insert missing show rows (no tracks yet — those land in step 8).
@@ -2634,6 +3213,9 @@ async function syncMissingShows(): Promise<void> {
           venueId,
           countForStats: show.countForStats ?? true,
           dayOrder: show.dayOrder ?? null,
+          showYoutubesCount: show.showYoutubesCount ?? 0,
+          showPhotosCount: show.showPhotosCount ?? 0,
+          likesCount: show.likesCount ?? 0,
         });
         const showDate = String(show.date);
         if (earliestInsertedDate === null || showDate < earliestInsertedDate) {
@@ -2656,6 +3238,9 @@ async function syncMissingShows(): Promise<void> {
           venueId: createdShow.venueId,
           countForStats: createdShow.countForStats,
           dayOrder: createdShow.dayOrder,
+          showYoutubesCount: createdShow.showYoutubesCount,
+          showPhotosCount: createdShow.showPhotosCount,
+          likesCount: createdShow.likesCount,
         });
         changedSlugs.add(slug);
         const showDate = String(show.date);
@@ -3437,6 +4022,68 @@ async function syncMissingShows(): Promise<void> {
           );
         }
       }
+
+      // Step 8e: show YouTube links. Show-scoped, mirrored after the setlist
+      // reconcile so every show exists locally. diffShowYoutubes keys on the
+      // video id (replace-not-merge); `undefined` remote = no opinion, so this
+      // is a no-op until the get_setlists change deploys.
+      const youtubesServed = Array.from(setlistBySlug.values()).some((s) => s.youtubes !== undefined);
+      if (youtubesServed && performerShowIds.length > 0) {
+        const localYoutubeRows = await db.showYoutube.findMany({
+          where: { showId: { in: performerShowIds } },
+          select: { showId: true, videoId: true },
+          orderBy: { createdAt: "asc" },
+        });
+        const localVideoIdsByShowId = new Map<string, string[]>();
+        for (const row of localYoutubeRows) {
+          const list = localVideoIdsByShowId.get(row.showId);
+          if (list) list.push(row.videoId);
+          else localVideoIdsByShowId.set(row.showId, [row.videoId]);
+        }
+        for (const [slug, setlist] of setlistBySlug) {
+          if (setlist.youtubes === undefined) continue;
+          const local = existingBySlug.get(slug);
+          if (!local || String(local.id).startsWith("dry-run-show-")) continue;
+          const diff = diffShowYoutubes(
+            localVideoIdsByShowId.get(local.id) ?? [],
+            setlist.youtubes.map((y) => y.videoId),
+          );
+          if (diff.toAdd.length === 0 && diff.toRemove.length === 0) continue;
+          stats.showYoutubesAdded += diff.toAdd.length;
+          stats.showYoutubesRemoved += diff.toRemove.length;
+          changedSlugs.add(slug);
+          if (isDryRun) {
+            console.log(`  📺 ${slug}: youtube +${diff.toAdd.length} -${diff.toRemove.length} (dry run)`);
+            continue;
+          }
+          try {
+            await db.$transaction(async (tx) => {
+              if (diff.toRemove.length > 0) {
+                await tx.showYoutube.deleteMany({
+                  where: { showId: local.id, videoId: { in: diff.toRemove } },
+                });
+              }
+              if (diff.toAdd.length > 0) {
+                await tx.showYoutube.createMany({
+                  // Stagger createdAt by index so oldest-first ordering (the
+                  // detail-page "first video") stays deterministic when several
+                  // videos land in one insert.
+                  data: diff.toAdd.map((videoId, index) => ({
+                    showId: local.id,
+                    videoId,
+                    createdAt: new Date(now.getTime() + index),
+                    updatedAt: now,
+                  })),
+                });
+              }
+            });
+            console.log(`  📺 ${slug}: youtube +${diff.toAdd.length} -${diff.toRemove.length}`);
+          } catch (err) {
+            console.error(`  ❌ failed to mirror youtube for ${slug}:`, err);
+            stats.errors++;
+          }
+        }
+      }
     }
 
     // Step 8b: ghost-show detection. Local shows in the synced years whose
@@ -3730,6 +4377,8 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Shows renamed (slug realigned): ${stats.showsRenamed}`);
   console.log(`Songs fetched: ${stats.songsFetched}`);
   console.log(`Songs created: ${stats.songsCreated}`);
+  console.log(`Authors created: ${stats.authorsCreated}`);
+  console.log(`Song authors (upserted / deleted): ${stats.songAuthorsUpserted} / ${stats.songAuthorsDeleted}`);
   console.log(
     `Songs orphaned (deleted / with tracks): ${stats.songsOrphanedDeleted} / ${stats.songsOrphanedWithTracks}`,
   );
@@ -3758,6 +4407,7 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
   console.log(`Show lineup (upserted / deleted): ${stats.showMusiciansUpserted} / ${stats.showMusiciansDeleted}`);
   console.log(`Track musicians (upserted / deleted): ${stats.trackMusiciansUpserted} / ${stats.trackMusiciansDeleted}`);
   console.log(`Track flags (added / removed): ${stats.trackFlagsAdded} / ${stats.trackFlagsRemoved}`);
+  console.log(`Show YouTube links (added / removed): ${stats.showYoutubesAdded} / ${stats.showYoutubesRemoved}`);
   console.log(
     `Completions (upserted / deleted / skipped): ${stats.completionsUpserted} / ${stats.completionsDeleted} / ${stats.completionsSkipped}`,
   );
@@ -3769,6 +4419,12 @@ function printSummary(stats: SyncStats, isDryRun: boolean): void {
     );
     console.log(
       `Attendances (upserted / deleted / reconciled / FK skipped): ${ua.attendancesUpserted} / ${ua.attendancesDeleted} / ${ua.attendancesReconciled} / ${ua.attendancesFkSkipped}`,
+    );
+    console.log(
+      `Reviews (upserted / deleted / reconciled / FK skipped): ${ua.reviewsUpserted} / ${ua.reviewsDeleted} / ${ua.reviewsReconciled} / ${ua.reviewsFkSkipped}`,
+    );
+    console.log(
+      `Blog posts (upserted / deleted / FK skipped): ${ua.blogPostsUpserted} / ${ua.blogPostsDeleted} / ${ua.blogPostsFkSkipped}`,
     );
     console.log(`Rating aggregates rebuilt: ${ua.aggregatesRebuilt}`);
   } else {
