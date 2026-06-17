@@ -236,4 +236,113 @@ export class BlogPostService {
     await this.redis.del(BLOG_POSTS_CACHE_KEY);
     return true;
   }
+
+  /**
+   * Sync export: page through PUBLISHED blog posts for the local sync script,
+   * with the cover image embedded so the sync can mirror the File +
+   * BlogPostToFile rows the `/blog` cards render. Only published posts travel
+   * (drafts aren't shown publicly). PII-free — `userId` resolves to a stub
+   * locally; the cover File carries only its Cloudflare variants/filename/type.
+   * Cursor + ordering match the rating/review sync: (updatedAt ASC, id ASC).
+   */
+  async listForSync(opts: {
+    since: Date;
+    cursorId?: string;
+    cursorUpdatedAt?: Date;
+    limit: number;
+  }): Promise<BlogPostForSync[]> {
+    const { since, cursorId, cursorUpdatedAt, limit } = opts;
+    const cursorWhere = cursorUpdatedAt
+      ? {
+          OR: [
+            { updatedAt: { gt: cursorUpdatedAt } },
+            { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: cursorId ?? "" } }] },
+          ],
+        }
+      : { updatedAt: { gt: since } };
+    const rows = await this.db.blogPost.findMany({
+      where: { AND: [{ state: "published" }, cursorWhere] },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      take: limit,
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        blurb: true,
+        content: true,
+        state: true,
+        postType: true,
+        publishedAt: true,
+        userId: true,
+        createdAt: true,
+        updatedAt: true,
+        files: {
+          where: { isCover: true },
+          select: {
+            file: {
+              select: {
+                cloudflareId: true,
+                path: true,
+                filename: true,
+                size: true,
+                type: true,
+                variants: true,
+                metadata: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    return rows.map((row) => {
+      const { files, ...rest } = row;
+      // Only a cover with a Cloudflare id is mirrorable (cloudflareId is the
+      // stable cross-env file key); legacy files without one are dropped.
+      const cover = files.map((f) => f.file).find((f) => f.cloudflareId !== null) ?? null;
+      return {
+        ...rest,
+        coverFile: cover
+          ? {
+              cloudflareId: cover.cloudflareId as string,
+              path: cover.path,
+              filename: cover.filename,
+              size: cover.size,
+              type: cover.type,
+              variants: cover.variants,
+              metadata: cover.metadata,
+            }
+          : null,
+      };
+    });
+  }
+
+  async listAllIdsForSync(): Promise<string[]> {
+    const rows = await this.db.blogPost.findMany({ where: { state: "published" }, select: { id: true } });
+    return rows.map((r) => r.id);
+  }
+}
+
+export interface BlogPostForSyncFile {
+  cloudflareId: string;
+  path: string;
+  filename: string;
+  size: number;
+  type: string;
+  variants: unknown;
+  metadata: unknown;
+}
+
+export interface BlogPostForSync {
+  id: string;
+  slug: string;
+  title: string;
+  blurb: string | null;
+  content: string | null;
+  state: string;
+  postType: string;
+  publishedAt: Date | null;
+  userId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  coverFile: BlogPostForSyncFile | null;
 }
