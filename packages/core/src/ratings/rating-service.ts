@@ -429,7 +429,7 @@ export class RatingService {
       LEFT JOIN venues v ON v.id = s.venue_id
       WHERE r.user_id = ${userId}::uuid
         AND r.rateable_type = 'Show'
-        AND r.value BETWEEN 1 AND 5
+        AND r.value >= 0.5
       ORDER BY ${orderBy}
       LIMIT ${take} OFFSET ${skip}
     `;
@@ -500,7 +500,7 @@ export class RatingService {
       INNER JOIN songs sg ON sg.id = t.song_id
       WHERE r.user_id = ${userId}::uuid
         AND r.rateable_type = 'Track'
-        AND r.value BETWEEN 1 AND 5
+        AND r.value >= 0.5
       ORDER BY ${orderBy}
       LIMIT ${take} OFFSET ${skip}
     `;
@@ -526,9 +526,7 @@ export class RatingService {
 
   /**
    * Distribution of a user's show ratings by concert year and star value,
-   * for the profile charts. Unlike the table queries this includes 0.5
-   * ratings (value >= 0.5, not BETWEEN 1 AND 5) so the histogram reflects
-   * every rating, and it aggregates server-side: ~250 bucket rows instead
+   * for the profile charts. Aggregates server-side: ~250 bucket rows instead
    * of the user's full (often thousands) rating set.
    */
   async getShowRatingDistribution(userId: string): Promise<RatingYearBucket[]> {
