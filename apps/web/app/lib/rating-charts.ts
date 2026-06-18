@@ -4,8 +4,7 @@ import { formatHalfStep } from "~/components/rating/rating";
 /**
  * The 0.5-step star values a rating can take, low to high. The histogram
  * always renders all ten so empty buckets read as genuine gaps rather than
- * a compressed axis. Includes 0.5, which the profile rating *tables* exclude
- * (their query filters value BETWEEN 1 AND 5) — the charts show every rating.
+ * a compressed axis.
  */
 export const RATING_BUCKETS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] as const;
 
