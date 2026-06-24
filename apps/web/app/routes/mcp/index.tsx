@@ -571,12 +571,17 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
         pagination: { page: 1, limit },
       });
 
+      const calibratedByShowId = await services.raterWeights.getDisplayedForShows(shows.map((s) => s.id));
+
       return {
         venue: { slug: venue.slug, name: venue.name, city: venue.city, state: venue.state },
         shows: shows.map((show) => ({
           slug: show.slug,
           date: show.date,
           averageRating: show.averageRating,
+          // Calibrated Show Rating (entropy-weighted, bias-centered, count-shrunk);
+          // null until the rating recompute has populated it.
+          calibratedRating: calibratedByShowId[show.id]?.rating ?? null,
           ratingsCount: show.ratingsCount,
         })),
       };
@@ -598,6 +603,8 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
         includes: ["venue"],
       });
 
+      const calibratedByShowId = await services.raterWeights.getDisplayedForShows(shows.map((s) => s.id));
+
       return {
         year,
         shows: shows.map((show) => ({
@@ -606,6 +613,9 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
           venueName: show.venue?.name || "",
           venueCity: show.venue?.city || "",
           averageRating: show.averageRating,
+          // Calibrated Show Rating (entropy-weighted, bias-centered, count-shrunk);
+          // null until the rating recompute has populated it.
+          calibratedRating: calibratedByShowId[show.id]?.rating ?? null,
         })),
       };
     }
@@ -729,9 +739,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
         try {
           const show = await services.shows.findBySlug(slug);
           if (show) {
-            const [venue, rockOperaAnnotations] = await Promise.all([
+            const [venue, rockOperaAnnotations, calibratedByShowId] = await Promise.all([
               show.venueId ? services.venues.findById(show.venueId) : Promise.resolve(null),
               services.rockOperas.findPerformancesForShow(show.id),
+              services.raterWeights.getDisplayedForShows([show.id]),
             ]);
             shows.push({
               // Preserved so sync-missing-shows can insert local rows with
@@ -743,6 +754,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               venueName: venue?.name,
               venueCity: venue?.city,
               averageRating: show.averageRating,
+              // Calibrated Show Rating (entropy-weighted, bias-centered, count-shrunk);
+              // null until the rating recompute has populated it. Not consumed by
+              // sync-missing-shows, which recomputes the calibrated score locally.
+              calibratedRating: calibratedByShowId[show.id]?.rating ?? null,
               ratingsCount: show.ratingsCount,
               notes: show.notes,
               relistenUrl: show.relistenUrl,

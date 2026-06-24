@@ -152,8 +152,15 @@ export default function Show() {
   const { user } = useSession();
   const revalidator = useRevalidator();
   const [setlistView, setSetlistView] = useSetlistView();
-  const { userRatingMap, attendanceMap } = useShowUserData([setlist.show.id]);
+  const { userRatingMap, attendanceMap, displayedRatingMap, rankComparisonMap } = useShowUserData([setlist.show.id]);
   const userRating = userRatingMap.get(setlist.show.id) ?? null;
+  // Displayed ★ is the viewer's calibrated score when their mode resolves to calibrated
+  // (server sends it only then), else the canonical average. In calibrated mode the
+  // count beside it is the post-exclusion contributing count, not the deduped count.
+  const displayed = displayedRatingMap.get(setlist.show.id);
+  const displayedShowRating = displayed?.rating ?? setlist.show.averageRating;
+  // Comparison overlay data, present only for viewers with the overlay enabled.
+  const rankComparison = rankComparisonMap.get(setlist.show.id) ?? null;
   const userAttendance = attendanceMap.get(setlist.show.id) ?? null;
 
   const internalUserId = user?.internalUserId ?? undefined;
@@ -313,7 +320,9 @@ export default function Show() {
             setlist={setlist}
             userAttendance={userAttendance}
             userRating={userRating}
-            showRating={setlist.show.averageRating}
+            showRating={displayedShowRating}
+            showRatingCount={displayed?.count ?? null}
+            rankComparison={rankComparison}
             externalSources={externalSources}
             defaultView={setlistView}
             onViewChange={setSetlistView}

@@ -10,6 +10,7 @@ export default [
 
   // Legal and info pages
   route("about", "routes/about.tsx"),
+  route("show-rating-algorithm", "routes/show-rating-algorithm.tsx"),
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),
   route("community", "routes/community.tsx"),

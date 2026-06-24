@@ -23,7 +23,7 @@ export function meta({ params }: { params: { year?: string } }) {
 }
 
 export default function TopRated() {
-  const { setlists, year, minShowRatings, countsByYear, allCount, externalSources } =
+  const { setlists, year, mode, minShowRatings, countsByYear, allCount, externalSources } =
     useSerializedLoaderData<TopRatedShowsLoaderData>();
 
   return (
@@ -36,7 +36,7 @@ export default function TopRated() {
           currentYear={year}
           basePath="/shows/top-rated/"
           showAllButton={true}
-          additionalText={`min ${minShowRatings} ratings`}
+          additionalText={mode === "calibrated" ? "all rated shows" : `min ${minShowRatings} ratings`}
           counts={countsByYear}
           allCount={allCount}
         />

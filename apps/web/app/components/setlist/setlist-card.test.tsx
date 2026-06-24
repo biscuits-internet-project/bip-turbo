@@ -423,6 +423,32 @@ describe("SetlistCard", () => {
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
+  // Calibrated mode passes the post-exclusion count via showRatingCount, which must
+  // override the embedded deduped ratingsCount on the rating badge — so a calibrated
+  // viewer sees "· 33", not the deduped "· 10". (makeSetlist embeds ratingsCount=10.)
+  test("showRatingCount overrides the embedded ratingsCount on the rating badge", async () => {
+    await setupWithRouter(
+      <SetlistCard
+        setlist={makeSetlist()}
+        userAttendance={null}
+        userRating={null}
+        showRating={4.81}
+        showRatingCount={33}
+      />,
+    );
+    expect(screen.getAllByText("33").length).toBeGreaterThan(0);
+    expect(screen.queryByText("10")).not.toBeInTheDocument();
+  });
+
+  // Simple mode (no showRatingCount): the badge falls back to the embedded deduped
+  // ratingsCount (10).
+  test("rating badge falls back to the embedded ratingsCount when showRatingCount is absent", async () => {
+    await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={4.0} />,
+    );
+    expect(screen.getAllByText("10").length).toBeGreaterThan(0);
+  });
+
   // averageSongGap=null happens for all-debut/all-repeat shows. The summary
   // line should be omitted entirely (not "Average song gap: —") so the
   // toggle row stays clean on shows where the number isn't meaningful.

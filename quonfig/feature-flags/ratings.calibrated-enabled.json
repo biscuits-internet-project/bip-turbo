@@ -1,0 +1,21 @@
+{
+  "key": "ratings.calibrated-enabled",
+  "description": "Master gate / kill switch for the calibrated show-rating feature. ON: the feature runs (cron computes scores, columns populate) but visibility is still restricted by ratings.toggle-visible. OFF: everyone sees the simple community average and the opt-in toggle is hidden. Launch state: ON.",
+  "type": "feature_flag",
+  "valueType": "bool",
+  "default": {
+    "rules": [
+      {
+        "criteria": [
+          {
+            "operator": "ALWAYS_TRUE"
+          }
+        ],
+        "value": {
+          "type": "bool",
+          "value": true
+        }
+      }
+    ]
+  }
+}

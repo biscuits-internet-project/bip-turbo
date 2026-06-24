@@ -1,0 +1,36 @@
+{
+  "key": "ratings.toggle-visible",
+  "description": "Whether a user sees the opt-in control for the calibrated show rating (the toggle in profile settings). Targeted to the rating-beta segment; flip the segment rule to ALWAYS_TRUE to let anyone opt in. Users without the toggle keep an unset preference and fall to ratings.default-calibrated. Launch state: rating-beta segment only.",
+  "type": "feature_flag",
+  "valueType": "bool",
+  "default": {
+    "rules": [
+      {
+        "criteria": [
+          {
+            "operator": "IN_SEG",
+            "valueToMatch": {
+              "type": "string",
+              "value": "rating-beta"
+            }
+          }
+        ],
+        "value": {
+          "type": "bool",
+          "value": true
+        }
+      },
+      {
+        "criteria": [
+          {
+            "operator": "ALWAYS_TRUE"
+          }
+        ],
+        "value": {
+          "type": "bool",
+          "value": false
+        }
+      }
+    ]
+  }
+}

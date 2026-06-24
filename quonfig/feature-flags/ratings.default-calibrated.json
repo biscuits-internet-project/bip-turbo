@@ -1,0 +1,21 @@
+{
+  "key": "ratings.default-calibrated",
+  "description": "The app-wide default display mode for users who have no explicit preference set. true = calibrated by default (users opt out), false = simple community average by default (users opt in). Only affects users whose preference is unset; an explicit per-user preference always wins. Launch state: false.",
+  "type": "feature_flag",
+  "valueType": "bool",
+  "default": {
+    "rules": [
+      {
+        "criteria": [
+          {
+            "operator": "ALWAYS_TRUE"
+          }
+        ],
+        "value": {
+          "type": "bool",
+          "value": false
+        }
+      }
+    ]
+  }
+}

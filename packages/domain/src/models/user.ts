@@ -8,6 +8,9 @@ export const userSchema = z.object({
   username: z.string(),
   avatarFileId: z.string().uuid().nullable(),
   avatarUrl: z.string().url().nullable(),
+  // Rating-display prefs (tri-state: null = no explicit choice → app default).
+  showCalibratedRatings: z.boolean().nullable(),
+  showRatingComparisonDebug: z.boolean().nullable(),
 });
 
 export const userMinimalSchema = userSchema

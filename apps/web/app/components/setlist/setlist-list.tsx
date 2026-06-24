@@ -43,7 +43,8 @@ export function SetlistList({
   collapsible,
 }: SetlistListProps) {
   const showIds = useMemo(() => setlists.map((s) => s.show.id), [setlists]);
-  const { attendanceMap, userRatingMap, averageRatingMap } = useShowUserData(showIds);
+  const { attendanceMap, userRatingMap, averageRatingMap, displayedRatingMap, rankComparisonMap } =
+    useShowUserData(showIds);
 
   if (setlists.length === 0) {
     return <>{empty ?? null}</>;
@@ -52,13 +53,18 @@ export function SetlistList({
   const renderCard = (setlist: Setlist | SetlistLight, index: number) => {
     const showId = setlist.show.id;
     const liveAverage = averageRatingMap.get(showId)?.average;
+    // The displayed ★ is the viewer's calibrated score when their mode resolves to
+    // calibrated (server only sends it then), else the live/canonical average.
+    const displayed = displayedRatingMap.get(showId);
     const card = (
       <SetlistCard
         setlist={setlist}
         userAttendance={attendanceMap.get(showId) ?? null}
         userRating={userRatingMap.get(showId) ?? null}
-        showRating={liveAverage ?? setlist.show.averageRating ?? null}
+        showRating={displayed?.rating ?? liveAverage ?? setlist.show.averageRating ?? null}
+        showRatingCount={displayed?.count ?? null}
         externalSources={externalSources[showId]}
+        rankComparison={rankComparisonMap.get(showId)}
         collapsible={collapsible}
       />
     );

@@ -6,6 +6,7 @@ import { BlogPostService } from "../blog-posts/blog-post-service";
 import { FileService } from "../files/file-service";
 import { InstrumentService, MusicianService } from "../musicians/musician-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
+import { RaterWeightService } from "../ratings/rater-weight-service";
 import { RatingService } from "../ratings/rating-service";
 import { ReviewService } from "../reviews/review-service";
 import { RockOperaService } from "../rock-operas/rock-opera-service";
@@ -48,6 +49,7 @@ export interface Services {
   reviews: ReviewService;
   rockOperas: RockOperaService;
   ratings: RatingService;
+  raterWeights: RaterWeightService;
   attendances: AttendanceService;
   songPageComposer: SongPageComposer;
   tourDatesService: TourDatesService;
@@ -85,6 +87,10 @@ export function createServices(container: ServiceContainer): Services {
   const nugsService = new NugsService(container.redis, container.logger);
   const archiveDotOrgService = new ArchiveDotOrgService(container.redis, container.logger);
 
+  // RaterWeightService is constructed before RatingService so rating mutations
+  // can flag the calibrated-rating tables dirty + recompute the touched show.
+  const raterWeightService = new RaterWeightService(container.db);
+
   return {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
     authors: new AuthorService(container.db, container.logger),
@@ -108,7 +114,8 @@ export function createServices(container: ServiceContainer): Services {
     personalSongHistory: new PersonalSongHistoryService(container.db, container.cache),
     reviews: new ReviewService(container.db, container.logger),
     rockOperas: rockOperaService,
-    ratings: new RatingService(container.db, container.cacheInvalidation),
+    ratings: new RatingService(container.db, container.cacheInvalidation, raterWeightService),
+    raterWeights: raterWeightService,
     attendances: new AttendanceService(container.db, container.logger),
     songPageComposer: new SongPageComposer(container.db, songService, statsService),
     tourDatesService: new TourDatesService(container.redis),

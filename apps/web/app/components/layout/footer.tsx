@@ -1,9 +1,13 @@
 import { Heart, Mail, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ContactDialog } from "~/components/contact/contact-dialog";
+import { useFeatureFlags } from "~/hooks/use-feature-flags";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  // The rating-algorithm explainer is always reachable by URL; this footer link
+  // is gated by the `ratings.explainer-nav-link` feature flag.
+  const { explainerNavLink } = useFeatureFlags();
 
   return (
     <footer className="bg-content-bg/50 border-t border-content-bg-secondary mt-auto">
@@ -33,6 +37,14 @@ export function Footer() {
           >
             About
           </Link>
+          {explainerNavLink && (
+            <Link
+              to="/show-rating-algorithm"
+              className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200"
+            >
+              Ratings
+            </Link>
+          )}
           <Link
             to="/terms"
             className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200"

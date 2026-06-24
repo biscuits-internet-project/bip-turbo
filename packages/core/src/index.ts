@@ -3,6 +3,7 @@
 export * from "./_shared/container";
 export * from "./_shared/database/models";
 // Shared exports
+export * from "./_shared/quonfig";
 export * from "./_shared/redis";
 export * from "./_shared/services";
 export * from "./annotations/annotation-service";
@@ -10,7 +11,11 @@ export * from "./attendances/attendance-service";
 export * from "./blog-posts/blog-post-service";
 // Views
 export * from "./page-composers/song-page-composer";
+export * from "./ratings/rater-weight-service";
+export * from "./ratings/rater-weighting";
+export * from "./ratings/rating-mode";
 export * from "./ratings/rating-service";
+export * from "./ratings/recompute-ratings";
 export * from "./reviews/review-service";
 export * from "./rock-operas/rock-opera-service";
 export * from "./search/postgres-search-service";

@@ -12,6 +12,8 @@ vi.mock("~/hooks/use-show-user-data", () => ({
     attendanceMap: new Map(),
     userRatingMap: new Map(),
     averageRatingMap: new Map(),
+    displayedRatingMap: new Map(),
+    rankComparisonMap: new Map(),
     isLoading: false,
     error: null,
   })),
@@ -144,6 +146,8 @@ describe("PerformanceTable", () => {
       attendanceMap: new Map([["s-soundcheck", { id: "att-1" } as never]]),
       userRatingMap: new Map(),
       averageRatingMap: new Map(),
+      displayedRatingMap: new Map(),
+      rankComparisonMap: new Map(),
       isLoading: false,
       error: null,
     });
@@ -169,6 +173,8 @@ describe("PerformanceTable", () => {
       attendanceMap: new Map([["s-attended", { id: "att-1" } as never]]),
       userRatingMap: new Map(),
       averageRatingMap: new Map(),
+      displayedRatingMap: new Map(),
+      rankComparisonMap: new Map(),
       isLoading: false,
       error: null,
     });

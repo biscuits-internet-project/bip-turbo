@@ -1,0 +1,21 @@
+{
+  "key": "ratings.recompute-enabled",
+  "description": "Gates the rating recompute that runs hourly (cron endpoint /api/cron/recompute-ratings) and at deploy (scripts/recompute-ratings.ts). ON: the dirty-gated recompute runs (rebuilds rater stats, weighted ratings, deduped averages, and the shrink anchor). OFF: kill switch (no recompute, scores go stale). Launch state: ON.",
+  "type": "feature_flag",
+  "valueType": "bool",
+  "default": {
+    "rules": [
+      {
+        "criteria": [
+          {
+            "operator": "ALWAYS_TRUE"
+          }
+        ],
+        "value": {
+          "type": "bool",
+          "value": true
+        }
+      }
+    ]
+  }
+}

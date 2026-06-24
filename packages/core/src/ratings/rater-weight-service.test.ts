@@ -1,0 +1,314 @@
+import { describe, expect, test, vi } from "vitest";
+import { RaterWeightService, rankShowComparisons } from "./rater-weight-service";
+
+describe("rankShowComparisons", () => {
+  // The 2001-09-01 overlay scenario: two single-vote 5.0 shows top the raw-average
+  // field, but the genuine #1 (highest average among well-rated shows) must own the
+  // TOP-LIST rank — thin shows only inflate the `all` field, never the top list.
+  test("thin shows inflate the all-field but never the top list", () => {
+    const shows = [
+      { id: "thin-a", canonical: 5.0, weighted: 5.0, ratingsCount: 1 },
+      { id: "thin-b", canonical: 5.0, weighted: 5.0, ratingsCount: 2 },
+      { id: "wetlands", canonical: 4.868, weighted: 4.8, ratingsCount: 34 },
+      { id: "haymaker", canonical: 4.839, weighted: 4.7, ratingsCount: 31 },
+    ];
+    const wetlands = rankShowComparisons(shows, ["wetlands"], 3.93, 3).get("wetlands");
+    // Over all shows the two thin 5.0s sit above it; on the real top list it's #1.
+    expect(wetlands?.all).toMatchObject({ canonicalRank: 3, total: 4 });
+    expect(wetlands?.top).toMatchObject({ canonicalRank: 1, total: 2 });
+  });
+
+  // A thin show keeps a real `all` rank (so its movement is visible) but is not in
+  // the top list. Its raw average can top the all-field while its shrunk score sinks.
+  test("a thin show is ranked in the all-field but absent from the top list", () => {
+    const shows = [
+      { id: "big1", canonical: 4.8, weighted: 4.8, ratingsCount: 100 },
+      { id: "big2", canonical: 4.6, weighted: 4.6, ratingsCount: 100 },
+      { id: "thin", canonical: 5.0, weighted: 5.0, ratingsCount: 1 },
+    ];
+    const thin = rankShowComparisons(shows, ["thin"], 4.0, 3).get("thin");
+    expect(thin?.top).toBeNull();
+    // Raw 5.0 tops the all-field (#1 of 3); shrunk to ~4.25 it falls below both bigs (#3).
+    expect(thin?.all).toMatchObject({ canonicalRank: 1, calibratedRank: 3, total: 3 });
+  });
+
+  // Canonical and calibrated are ranked independently within the top list:
+  // count-shrinkage pulls a thinner high-average show below a heavily-rated one.
+  test("ranks the calibrated (shrunk) score independently of canonical", () => {
+    const shows = [
+      { id: "a", canonical: 4.9, weighted: 4.9, ratingsCount: 10 },
+      { id: "b", canonical: 4.7, weighted: 4.7, ratingsCount: 500 },
+    ];
+    const ranks = rankShowComparisons(shows, ["a", "b"], 4.0, 3);
+    // a canonical 4.9 > b 4.7, but shrink(4.9,4.0,10,3)=4.692 < shrink(4.7,4.0,500,3)=4.696.
+    expect(ranks.get("a")?.top).toMatchObject({ canonicalRank: 1, calibratedRank: 2 });
+    expect(ranks.get("b")?.top).toMatchObject({ canonicalRank: 2, calibratedRank: 1 });
+  });
+});
+
+// recomputeUser persists via createMany; find the row in any createMany call's data array.
+function createdRow(createMany: ReturnType<typeof vi.fn>, match: (data: Record<string, unknown>) => boolean) {
+  for (const call of createMany.mock.calls) {
+    const data = (call[0] as { data: Record<string, unknown>[] }).data;
+    const row = data?.find(match);
+    if (row) return row;
+  }
+  return undefined;
+}
+
+describe("RaterWeightService.recomputeUser", () => {
+  // A user who rates two Aucoin-era shows across the scale but bombs every
+  // Marlon-era show at 0.5 — the barfly07/Stepnotonpets pattern.
+  function makeDb() {
+    const ratingFindMany = vi.fn().mockResolvedValue([
+      { rateableId: "s1", rateableType: "Show", value: 5, createdAt: new Date("2010-01-02") },
+      { rateableId: "s2", rateableType: "Show", value: 4, createdAt: new Date("2011-01-02") },
+      { rateableId: "s3", rateableType: "Show", value: 0.5, createdAt: new Date("2026-01-02") },
+      { rateableId: "s4", rateableType: "Show", value: 0.5, createdAt: new Date("2026-02-02") },
+    ]);
+    const showFindMany = vi.fn().mockResolvedValue([
+      { id: "s1", date: "2010-01-01", averageRating: 4.5 },
+      { id: "s2", date: "2011-01-01", averageRating: 4.2 },
+      { id: "s3", date: "2026-01-01", averageRating: 4.0 },
+      { id: "s4", date: "2026-02-01", averageRating: 3.8 },
+    ]);
+    const raterStatsFindMany = vi.fn().mockResolvedValue([]); // empty population → nobody flagged high-deviation
+    const raterStatsDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+    const raterStatsCreateMany = vi.fn().mockResolvedValue({ count: 0 });
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) }, // no alias dedup in this fixture
+      rating: { findMany: ratingFindMany, groupBy: vi.fn().mockResolvedValue([]) },
+      show: { findMany: showFindMany },
+      track: { findMany: vi.fn() },
+      raterStats: { findMany: raterStatsFindMany, deleteMany: raterStatsDeleteMany, createMany: raterStatsCreateMany },
+    } as never;
+    return { db, raterStatsCreateMany, raterStatsDeleteMany };
+  }
+
+  test("writes a GLOBAL scope row spanning all of the user's ratings", async () => {
+    const { db, raterStatsCreateMany } = makeDb();
+    await new RaterWeightService(db).recomputeUser("u1");
+    const global = createdRow(raterStatsCreateMany, (d) => d.era === "GLOBAL");
+    expect(global?.ratingsCount).toBe(4);
+  });
+
+  test("splits ratings into per-era scope rows", async () => {
+    const { db, raterStatsCreateMany } = makeDb();
+    await new RaterWeightService(db).recomputeUser("u1");
+    expect(createdRow(raterStatsCreateMany, (d) => d.era === "AUCOIN")?.ratingsCount).toBe(2);
+    expect(createdRow(raterStatsCreateMany, (d) => d.era === "MARLON")?.ratingsCount).toBe(2);
+  });
+
+  test("records zero entropy for the era the user bombs (→ zero weight at scoring)", async () => {
+    const { db, raterStatsCreateMany } = makeDb();
+    await new RaterWeightService(db).recomputeUser("u1");
+    const marlon = createdRow(raterStatsCreateMany, (d) => d.era === "MARLON");
+    expect(marlon?.entropy).toBe(0);
+  });
+
+  test("deletes the user's existing scope rows before recomputing", async () => {
+    const { db, raterStatsDeleteMany } = makeDb();
+    await new RaterWeightService(db).recomputeUser("u1");
+    expect(raterStatsDeleteMany).toHaveBeenCalledWith({ where: { userId: { in: ["u1"] } } });
+  });
+
+  test("a user with no ratings has their scope rows deleted", async () => {
+    const raterStatsDeleteMany = vi.fn().mockResolvedValue({ count: 4 });
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: { findMany: vi.fn().mockResolvedValue([]), groupBy: vi.fn().mockResolvedValue([]) },
+      raterStats: { deleteMany: raterStatsDeleteMany, createMany: vi.fn() },
+    } as never;
+    await new RaterWeightService(db).recomputeUser("u1");
+    expect(raterStatsDeleteMany).toHaveBeenCalledWith({ where: { userId: { in: ["u1"] } } });
+  });
+});
+
+describe("RaterWeightService recompute settings", () => {
+  // No settings row yet ⇒ treat as dirty so the very first recompute runs (the
+  // migration seeds one with dirty=true, but absence must not silently skip).
+  test("isDirty defaults to true when there is no settings row", async () => {
+    const db = { ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) } } as never;
+    expect(await new RaterWeightService(db).isDirty()).toBe(true);
+  });
+
+  test("isDirty reflects the stored flag", async () => {
+    const db = { ratingSettings: { findFirst: vi.fn().mockResolvedValue({ ratingsDirty: false }) } } as never;
+    expect(await new RaterWeightService(db).isDirty()).toBe(false);
+  });
+
+  test("markRecomputed updates the existing singleton (anchor + clears dirty + stamps time)", async () => {
+    const update = vi.fn().mockResolvedValue(undefined);
+    const create = vi.fn();
+    const db = {
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue({ id: "settings-1" }), update, create },
+    } as never;
+    await new RaterWeightService(db).markRecomputed(4.2);
+    expect(create).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "settings-1" },
+        data: expect.objectContaining({ showShrinkAnchor: 4.2, ratingsDirty: false }),
+      }),
+    );
+  });
+
+  test("markRecomputed creates the singleton when none exists", async () => {
+    const update = vi.fn();
+    const create = vi.fn().mockResolvedValue(undefined);
+    const db = { ratingSettings: { findFirst: vi.fn().mockResolvedValue(null), update, create } } as never;
+    await new RaterWeightService(db).markRecomputed(4.2);
+    expect(update).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ showShrinkAnchor: 4.2, ratingsDirty: false }) }),
+    );
+  });
+});
+
+describe("RaterWeightService.recomputeRateable", () => {
+  // A Marlon-era show rated 5 by a full-range credible rater (entropy 2 → full
+  // weight) and 0.5 by a zero-entropy bomber.
+  function makeDb() {
+    const ratingFindMany = vi.fn().mockResolvedValue([
+      { userId: "credible", value: 5 },
+      { userId: "bomber", value: 0.5 },
+    ]);
+    const showFindMany = vi.fn().mockResolvedValue([{ id: "s1", date: "2026-01-01", averageRating: 2.75 }]);
+    const raterStatsFindMany = vi.fn().mockResolvedValue([
+      { userId: "credible", era: "GLOBAL", mean: 4, entropy: 2, ratingsCount: 20, isExcluded: false },
+      { userId: "bomber", era: "GLOBAL", mean: 0.5, entropy: 0, ratingsCount: 30, isExcluded: false },
+      // The bomber is flagged bad-faith in this show's era (MARLON) → dropped before scoring.
+      { userId: "bomber", era: "MARLON", mean: 0.5, entropy: 0, ratingsCount: 28, isExcluded: true },
+    ]);
+    const showUpdate = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: { findMany: ratingFindMany, groupBy: vi.fn().mockResolvedValue([]) },
+      show: { findMany: showFindMany, update: showUpdate },
+      track: { findMany: vi.fn() },
+      raterStats: { findMany: raterStatsFindMany },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) },
+      $queryRaw: vi.fn().mockResolvedValue([{ mean: 2.75, stddev: 1 }]), // populationStats
+    } as never;
+    return { db, showUpdate };
+  }
+
+  test("writes the calibrated score to shows.weighted_rating, dropping the bad-faith bomber", async () => {
+    const { db, showUpdate } = makeDb();
+    await new RaterWeightService(db).recomputeRateable("Show", "s1");
+    const data = (showUpdate.mock.calls[0][0] as { data: { weightedRating: number; weightedRatingsCount: number } })
+      .data;
+    // Bomber excluded in MARLON → dropped. credible (count 20): cold-start mean
+    // shrink(4, pop 2.75, 20, k=5) = 3.75; center(5, 3.75, 2.75) = 4.0, full weight.
+    expect(data.weightedRating).toBeCloseTo(4.0, 10);
+    expect(data.weightedRatingsCount).toBe(1);
+  });
+
+  test("ignores non-show rateables (no denormalized calibrated column for tracks)", async () => {
+    const { db, showUpdate } = makeDb();
+    await new RaterWeightService(db).recomputeRateable("Track", "t1");
+    expect(showUpdate).not.toHaveBeenCalled();
+  });
+
+  // Cold-start: a brand-new rater (no rater_stats row yet) must still move the
+  // score — count 0 → pop-centered + full entropy weight, so a lone 5 reads as 5.
+  test("a brand-new rater with no stats row still moves the score", async () => {
+    const showUpdate = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: {
+        findMany: vi.fn().mockResolvedValue([{ userId: "newbie", value: 5 }]),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      show: {
+        findMany: vi.fn().mockResolvedValue([{ id: "s1", date: "2026-01-01", averageRating: 5 }]),
+        update: showUpdate,
+      },
+      track: { findMany: vi.fn() },
+      raterStats: { findMany: vi.fn().mockResolvedValue([]) }, // newbie has no stats
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) },
+      $queryRaw: vi.fn().mockResolvedValue([{ mean: 4.07, stddev: 1 }]),
+    } as never;
+    await new RaterWeightService(db).recomputeRateable("Show", "s1");
+    const data = (showUpdate.mock.calls[0][0] as { data: { weightedRating: number; weightedRatingsCount: number } })
+      .data;
+    expect(data.weightedRating).toBeCloseTo(5, 10);
+    expect(data.weightedRatingsCount).toBe(1);
+  });
+
+  // Regression: a multi-account rater whose latest vote on a show came from their
+  // SECONDARY account must still be scored with their real stats. The fix remaps each
+  // vote to the canonical account before dedup, so rater_stats (stored under the
+  // canonical id) are looked up by the canonical id — not the secondary id, which would
+  // miss them and wrongly treat a known rater as a brand-new statless one.
+  test("looks up a duplicate-account rater's stats by their canonical id", async () => {
+    const raterStatsFindMany = vi
+      .fn()
+      .mockResolvedValue([
+        { userId: "u-primary", era: "GLOBAL", mean: 4, entropy: 2, ratingsCount: 20, isExcluded: false },
+      ]);
+    const db = {
+      user: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "u-primary", username: "Tractorbeam" },
+          { id: "u-dup", username: "tractorbeam" }, // same person, case variant → canonical = u-primary (more ratings)
+        ]),
+      },
+      rating: {
+        findMany: vi.fn().mockResolvedValue([{ userId: "u-dup", value: 5, createdAt: new Date(2026, 0, 1) }]),
+        groupBy: vi.fn().mockResolvedValue([
+          { userId: "u-primary", _count: { id: 20 } },
+          { userId: "u-dup", _count: { id: 1 } },
+        ]),
+      },
+      show: {
+        findMany: vi.fn().mockResolvedValue([{ id: "s1", date: "2026-01-01", averageRating: 5 }]),
+        update: vi.fn().mockResolvedValue(undefined),
+      },
+      track: { findMany: vi.fn() },
+      raterStats: { findMany: raterStatsFindMany },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) },
+      $queryRaw: vi.fn().mockResolvedValue([{ mean: 4.07 }]),
+    } as never;
+
+    await new RaterWeightService(db).recomputeRateable("Show", "s1");
+
+    const where = (raterStatsFindMany.mock.calls[0][0] as { where: { userId: { in: string[] } } }).where;
+    expect(where.userId.in).toContain("u-primary"); // canonical id
+    expect(where.userId.in).not.toContain("u-dup"); // not the secondary account
+  });
+});
+
+describe("RaterWeightService.getDisplayedForShows", () => {
+  // The displayed count must be the calibrated, post-exclusion count
+  // (weighted_ratings_count), NOT the canonical deduped count — so the number shown
+  // beside a calibrated score reflects the cleaned population it was built from. The
+  // shrink itself still smooths by the deduped count.
+  test("returns the calibrated count (weighted_ratings_count), shrinking by the deduped count", async () => {
+    const db = {
+      show: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ id: "s1", weightedRating: 5, ratingsCount: 9, weightedRatingsCount: 3 }]),
+      },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue({ showShrinkAnchor: 3 }) },
+    } as never;
+
+    const byId = await new RaterWeightService(db).getDisplayedForShows(["s1"]);
+
+    // count = weighted_ratings_count (3), the bomber-excluded contributing count.
+    expect(byId.s1.count).toBe(3);
+    // rating = shrinkToward(5, anchor 3, deduped count 9, k=3) = (5*9 + 3*3)/(9+3) = 4.5
+    // (shrinking by the deduped 9, not the weighted 3 — which would give 4.0).
+    expect(byId.s1.rating).toBeCloseTo(4.5, 10);
+  });
+
+  test("omits shows with no calibrated score", async () => {
+    const db = {
+      show: { findMany: vi.fn().mockResolvedValue([]) },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue({ showShrinkAnchor: 3.93 }) },
+    } as never;
+
+    expect(await new RaterWeightService(db).getDisplayedForShows(["s1"])).toEqual({});
+  });
+});

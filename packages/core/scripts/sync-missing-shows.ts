@@ -22,7 +22,9 @@ import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
 import { createTestLogger } from "../src/_shared/test-logger";
 import { InstrumentService, MusicianService } from "../src/musicians/musician-service";
+import { RaterWeightService } from "../src/ratings/rater-weight-service";
 import { RatingService } from "../src/ratings/rating-service";
+import { runRatingsRecompute } from "../src/ratings/recompute-ratings";
 import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
 import { recomputeShowDuration } from "../src/tracks/show-duration";
@@ -271,6 +273,9 @@ export interface McpSyncUser {
   username: string | null;
   avatarFileId: string | null;
   avatarFileUrl: string | null;
+  // Rating-display opt-in prefs, mirrored from prod so adoption can be inspected locally.
+  showCalibratedRatings: boolean | null;
+  showRatingComparisonDebug: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1702,6 +1707,8 @@ export async function syncUserActivity(
               username: u.username,
               avatarFileId: null,
               avatarFileUrl: u.avatarFileUrl,
+              showCalibratedRatings: u.showCalibratedRatings,
+              showRatingComparisonDebug: u.showRatingComparisonDebug,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1716,6 +1723,8 @@ export async function syncUserActivity(
             data: {
               avatarFileId: null,
               avatarFileUrl: u.avatarFileUrl,
+              showCalibratedRatings: u.showCalibratedRatings,
+              showRatingComparisonDebug: u.showRatingComparisonDebug,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1729,6 +1738,8 @@ export async function syncUserActivity(
               username: u.username,
               avatarFileId: null,
               avatarFileUrl: u.avatarFileUrl,
+              showCalibratedRatings: u.showCalibratedRatings,
+              showRatingComparisonDebug: u.showRatingComparisonDebug,
               createdAt: new Date(u.createdAt),
               updatedAt: new Date(u.updatedAt),
             },
@@ -2553,6 +2564,10 @@ async function syncMissingShows(): Promise<void> {
     prisma,
     cacheInvalidation ?? (createNoopCacheInvalidation() as unknown as CacheInvalidationService),
   );
+  // Synced ratings change rater stats and every show's calibrated weighted_rating,
+  // but they bypass the live write path that flags the recompute dirty, so the
+  // sync runs the calibrated recompute itself at the end (see below).
+  const raterWeights = new RaterWeightService(prisma);
   // SegueRun rows reference Track ids in a non-FK String[] array. When the
   // setlist reconcile inserts or deletes a track, those arrays go stale; we
   // call generateSegueRunsForShow per structurally-changed show to rebuild.
@@ -4349,6 +4364,26 @@ async function syncMissingShows(): Promise<void> {
         await statsService.rebuildGapsAndSongStatsSince(earliestInsertedDate);
       } catch (err) {
         console.error("  ❌ stats rebuild failed:", err);
+        stats.errors++;
+      }
+    }
+
+    // Calibrated ratings derive from the synced ratings but aren't refreshed by
+    // this script's per-row work, so recompute them when ratings actually changed.
+    // Mark dirty (the sync touched ratings) and run the same routine the cron and
+    // deploy use, so weighted_rating + the shrink anchor aren't left stale.
+    const ratingsChanged =
+      (stats.userActivity?.ratingsUpserted ?? 0) > 0 || (stats.userActivity?.ratingsDeleted ?? 0) > 0;
+    if (!isDryRun && ratingsChanged) {
+      console.log("📊 Recomputing calibrated ratings");
+      try {
+        await db.ratingSettings.updateMany({ data: { ratingsDirty: true } });
+        const result = await runRatingsRecompute({ raterWeights, ratings: ratingService, logger });
+        if (result.ran) {
+          console.log(`  ✔ ${result.users} raters, ${result.shows} shows, anchor ${result.anchor?.toFixed(3)}`);
+        }
+      } catch (err) {
+        console.error("  ❌ calibrated recompute failed:", err);
         stats.errors++;
       }
     }

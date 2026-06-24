@@ -1,4 +1,5 @@
 import type { Route } from ".react-router/types/app/+types/root";
+import { type FeatureFlags, getFeatureFlags } from "@bip/core";
 import { type DehydratedState, HydrationBoundary } from "@tanstack/react-query";
 import { useMemo } from "react";
 import {
@@ -30,6 +31,12 @@ import stylesheet from "./styles.css?url";
 export type RootData = {
   env: ClientSideEnv;
   sessionUser: SessionUser | null;
+  /**
+   * Feature flags resolved once for the whole app so client components
+   * can read them at the point of use via `useFeatureFlags()` instead of having
+   * individual flag values threaded down as props.
+   */
+  featureFlags: FeatureFlags;
 };
 
 export type ClientSideEnv = {
@@ -52,10 +59,19 @@ export async function loader({ request }: Route.LoaderArgs): Promise<RootData> {
   // Seed useSession's initial state so user-specific UI paints on the
   // first frame instead of after supabase.auth.getSession() resolves.
   const user = await getRequestUser(request);
+  const sessionUser = user ? toSessionUser(user) : null;
+
+  // Resolve feature flags once here for the whole app; client components read them
+  // via useFeatureFlags(). Segment-targeted flags match on username, which the
+  // session user carries, so no extra DB lookup is needed.
+  const featureFlags = await getFeatureFlags(
+    sessionUser?.username ? { user: { username: sessionUser.username } } : undefined,
+  );
 
   return {
     env: clientEnv,
-    sessionUser: user ? toSessionUser(user) : null,
+    sessionUser,
+    featureFlags,
   };
 }
 

@@ -43,6 +43,10 @@ COPY --from=builder /app/packages/core/src ./packages/core/src
 # Copy deploy-time scripts run from docker-entrypoint.sh.
 COPY --from=builder /app/packages/core/scripts ./packages/core/scripts
 
+# Copy the quonfig feature-flag workspace; @quonfig/node reads it from disk at
+# runtime (local/offline datadir mode). QUONFIG_DATADIR below points here.
+COPY --from=builder /app/quonfig ./quonfig
+
 # The dev @bip/domain package.json points main/exports at ./src/index.ts, but the
 # runner only ships packages/domain/dist (not src). When the deploy-time script
 # runs core's raw TS, its `import "@bip/domain"` must resolve to the built dist —
@@ -67,6 +71,9 @@ RUN chmod +x /app/docker-entrypoint.sh
 
 ENV NODE_ENV=production
 ENV PORT=8080
+# quonfig local/offline datadir (absolute so it resolves regardless of cwd).
+ENV QUONFIG_DATADIR=/app/quonfig
+ENV QUONFIG_ENVIRONMENT=production
 
 EXPOSE 8080
 

@@ -340,6 +340,8 @@ model Show {
   relistenUrl       String?                  @map("relisten_url") @db.VarChar
   averageRating     Float?                   @default(0) @map("average_rating")
   ratingsCount      Int                      @default(0) @map("ratings_count")
+  weightedRating       Float?                @map("weighted_rating")
+  weightedRatingsCount Int                   @default(0) @map("weighted_ratings_count")
   showPhotosCount   Int                      @default(0) @map("show_photos_count")
   showYoutubesCount Int                      @default(0) @map("show_youtubes_count")
   reviewsCount      Int                      @default(0) @map("reviews_count")
@@ -761,6 +763,8 @@ model User {
   username            String?      @unique(map: "users_username_unique") @db.VarChar
   avatarFileId        String?      @map("avatar_file_id") @db.Uuid
   avatarFileUrl       String?      @map("avatar_file_url") @db.VarChar
+  showCalibratedRatings     Boolean? @map("show_adjusted_rating")
+  showRatingComparisonDebug Boolean? @map("show_rating_compare")
   avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   attendances         Attendance[]
   blogPosts           BlogPost[]
@@ -768,6 +772,7 @@ model User {
   favorites           Favorite[]
   likes               Like[]
   ratings             Rating[]
+  raterStats          RaterStats[]
   reviews             Review[]
   showPhotos          ShowPhoto[]
   files               File[]
@@ -929,4 +934,63 @@ model MemoryMetric {
   @@index([requestUrl])
   @@index([memoryDelta])
   @@map("memory_metrics")
+}
+
+/// Per-user rating behavior, computed (not entered) for the calibrated-rating
+/// system. One row per scope: a `GLOBAL` row over all of a user's ratings plus
+/// one row per drummer era. Only the fields the entropy-centered + bad-faith
+/// exclusion algorithm reads: `mean` (centering baseline), `entropy` (weight),
+/// `ratingsCount` (cold-start shrink + the ≥5 exclusion threshold), `isExcluded`
+/// (per-era bomber/fluffer flag). Derived aggregate (like Show.average_rating),
+/// maintained by RaterWeightService; never feeds the canonical displayed average.
+model RaterStats {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String       @map("user_id") @db.Uuid
+  era              RaterEra
+  kind             RateableKind
+  ratingsCount     Int          @default(0) @map("ratings_count")
+  entropy          Float        @default(0)
+  mean             Float        @default(0)
+  isExcluded       Boolean      @default(false) @map("is_excluded")
+  computedAt       DateTime     @default(now()) @map("computed_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rater_stats_users_user_id")
+
+  @@unique([userId, era, kind], map: "rater_stats_user_id_era_kind_unique")
+  @@index([era])
+  @@map("rater_stats")
+}
+
+/// Singleton row of operational/derived values for the calibrated-rating system.
+/// `showShrinkAnchor` is the cron-derived shrink target (cleaned global mean);
+/// `ratingsDirty` is set by rating writes and cleared by the cron; `lastRecomputeAt`
+/// stamps each recompute and serves as the rating-cache version key.
+model RatingSettings {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showShrinkAnchor Float     @default(4.07) @map("show_shrink_anchor")
+  ratingsDirty     Boolean   @default(true) @map("ratings_dirty")
+  lastRecomputeAt  DateTime? @map("last_recompute_at") @db.Timestamp(6)
+
+  @@map("rating_settings")
+}
+
+/// Scope a RaterStats row is computed at: GLOBAL spans all of a user's ratings;
+/// the others are the Disco Biscuits drummer eras. Mirrors RaterEra in @bip/domain.
+enum RaterEra {
+  GLOBAL
+  ALTMAN
+  AUCOIN
+  MARLON
+
+  @@map("rater_era")
+}
+
+/// Whether a RaterStats row aggregates a user's show ratings or track ratings.
+/// Tracks have a far lower baseline (most are "nothing special"), so the two
+/// must be normalized separately. Mirrors RateableKind in @bip/domain.
+enum RateableKind {
+  SHOW
+  TRACK
+
+  @@map("rateable_kind")
 }

@@ -1,0 +1,21 @@
+{
+  "key": "ratings.explainer-nav-link",
+  "description": "Whether to show the footer navigation link to the /show-rating-algorithm explainer page. The page itself is ALWAYS reachable by direct URL (and linked from the profile rating-display settings); this flag only controls the public footer link. Launch state: false.",
+  "type": "feature_flag",
+  "valueType": "bool",
+  "default": {
+    "rules": [
+      {
+        "criteria": [
+          {
+            "operator": "ALWAYS_TRUE"
+          }
+        ],
+        "value": {
+          "type": "bool",
+          "value": false
+        }
+      }
+    ]
+  }
+}

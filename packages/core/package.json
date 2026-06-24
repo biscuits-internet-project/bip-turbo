@@ -33,6 +33,7 @@
     "@bip/domain": "workspace:*",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "@quonfig/node": "^1.0.0",
     "@supabase/supabase-js": "^2.89.0",
     "dotenv": "^17.2.3",
     "postgres": "^3.4.7",

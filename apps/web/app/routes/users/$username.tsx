@@ -7,6 +7,7 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { formatHalfStep } from "~/components/rating/rating";
 import { RatingCharts } from "~/components/rating/rating-charts";
+import { RatingDisplaySettings } from "~/components/rating/rating-display-settings";
 import { formatSetLabel } from "~/components/setlist/set-label";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
@@ -409,6 +410,15 @@ export default function UserProfile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Rating-display preferences — only on your own profile, and only when a
+          feature flag makes a toggle available (the component self-hides otherwise). */}
+      {isOwnProfile && (
+        <RatingDisplaySettings
+          showCalibratedRatings={user.showCalibratedRatings}
+          showRatingComparisonDebug={user.showRatingComparisonDebug}
+        />
+      )}
 
       {/* Content Tabs — mobile shows a <select> dropdown (sm:hidden), sm+
           renders the horizontal tab strip. Mirrors the song-detail page so
