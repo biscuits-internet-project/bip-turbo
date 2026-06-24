@@ -166,6 +166,8 @@ describe("UserService.listForSync", () => {
       username: true,
       avatarFileId: true,
       avatarFileUrl: true,
+      showCalibratedRatings: true,
+      showRatingComparisonDebug: true,
       createdAt: true,
       updatedAt: true,
     });

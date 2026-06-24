@@ -1,3 +1,4 @@
+import { getFeatureFlags } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router-dom";
 import { z } from "zod";
 import honeybadger from "~/lib/honeybadger";
@@ -7,6 +8,9 @@ import { getServerClient } from "~/server/supabase";
 
 const updateUserSchema = z.object({
   username: z.string().min(3).max(50).optional(),
+  // Toggles arrive as "true"/"false" strings; persistence is flag-gated below.
+  showCalibratedRatings: z.enum(["true", "false"]).optional(),
+  showRatingComparisonDebug: z.enum(["true", "false"]).optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -63,7 +67,20 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     }
 
-    const updatedUser = await services.users.update(localUser.id, validatedData);
+    // Build the update explicitly: persist a rating pref only if the matching flag
+    // makes that toggle visible for this user (so an ineligible user can't set it via
+    // a crafted POST), and coerce the "true"/"false" strings to booleans.
+    const update: { username?: string; showCalibratedRatings?: boolean; showRatingComparisonDebug?: boolean } = {};
+    if (validatedData.username) update.username = validatedData.username;
+    const flags = await getFeatureFlags({ user: { id: localUser.id, username: localUser.username } });
+    if (flags.toggleVisible && validatedData.showCalibratedRatings !== undefined) {
+      update.showCalibratedRatings = validatedData.showCalibratedRatings === "true";
+    }
+    if (flags.compareVisible && validatedData.showRatingComparisonDebug !== undefined) {
+      update.showRatingComparisonDebug = validatedData.showRatingComparisonDebug === "true";
+    }
+
+    const updatedUser = await services.users.update(localUser.id, update);
 
     if (!updatedUser) {
       return new Response(JSON.stringify({ error: "Failed to update user" }), {

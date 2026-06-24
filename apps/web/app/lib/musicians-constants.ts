@@ -3,7 +3,7 @@
 // reference these values without the server-import-leak guardrail dragging
 // core into the client bundle.
 
-import type { ShowLineupMember } from "@bip/domain";
+import { DRUMMER_ERA_INFO, eraDateWindow, type ShowLineupMember } from "@bip/domain";
 
 // Mirrors MARLON_LINEUP_SLUGS in @bip/core/musicians/musician-constants. Kept
 // as a literal here rather than imported so this module stays free of any
@@ -14,13 +14,12 @@ const MARLON_LINEUP_SLUGS = ["jon-gutwillig", "marc-brownstein", "aron-magner", 
  * Drummer-era windows keyed by the drummer's musician slug. A drummer's
  * everyday appearances fall inside their window; the notable signal on a
  * drummer's profile is an appearance OUTSIDE it (a sit-in before or after their
- * tenure). Date ranges mirror the era filters in song-filters.ts.
+ * tenure). Derived from DRUMMER_ERA_INFO (@bip/domain) so the boundary dates
+ * live in one place.
  */
-export const DRUMMER_ERAS: Record<string, { startDate?: Date; endDate?: Date }> = {
-  "sam-altman": { endDate: new Date("2005-08-27") },
-  "allen-aucoin": { startDate: new Date("2005-12-28"), endDate: new Date("2025-09-07") },
-  "marlon-lewis": { startDate: new Date("2025-10-31") },
-};
+export const DRUMMER_ERAS: Record<string, { startDate?: Date; endDate?: Date }> = Object.fromEntries(
+  DRUMMER_ERA_INFO.map((info) => [info.musicianSlug, eraDateWindow(info)]),
+);
 
 /**
  * True when a date sits outside the given era window (before its start or after
@@ -47,11 +46,9 @@ export const EXPECTED_CORE_MEMBERS: ExpectedMember[] = [
 ];
 
 /** Drummer names keyed by slug, paired with their era window in DRUMMER_ERAS. */
-const DRUMMER_NAMES: Record<string, string> = {
-  "sam-altman": "Sam Altman",
-  "allen-aucoin": "Allen Aucoin",
-  "marlon-lewis": "Marlon Lewis",
-};
+const DRUMMER_NAMES: Record<string, string> = Object.fromEntries(
+  DRUMMER_ERA_INFO.map((info) => [info.musicianSlug, info.drummerName]),
+);
 
 /**
  * The members expected in the lineup for a show on the given date: the three

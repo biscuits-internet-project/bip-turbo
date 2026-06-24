@@ -1,7 +1,9 @@
+import type { ShowRankComparison } from "@bip/core";
 import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
 import { Check } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { CalibratedSummary } from "~/components/rating/calibrated-summary";
 import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
 import { ShowLineupNote } from "~/components/show/show-lineup-note";
 import { ShowDate } from "~/components/show-date";
@@ -27,7 +29,18 @@ interface SetlistCardProps {
   userAttendance: Attendance | null;
   userRating: Rating | number | null;
   showRating: number | null;
+  /**
+   * Count shown beside the ★ score. In calibrated mode this is the calibrated
+   * (post-exclusion) contributing count; absent ⇒ the canonical deduped count.
+   */
+  showRatingCount?: number | null;
   externalSources?: ShowExternalSources;
+  /**
+   * Simple→calibrated score + rank summary for this show. Rendered next to the ★
+   * score when present. Optional — only set for viewers with the comparison
+   * overlay enabled.
+   */
+  rankComparison?: ShowRankComparison | null;
   /**
    * When true, the card starts with its body hidden and opens on header click.
    * Clicks originating from interactive descendants (links, buttons) are
@@ -53,7 +66,9 @@ function SetlistCardComponent({
   userAttendance,
   userRating,
   showRating,
+  showRatingCount,
   externalSources,
+  rankComparison,
   collapsible = false,
   defaultView = "setlist",
   onViewChange,
@@ -125,7 +140,16 @@ function SetlistCardComponent({
   // (a Rating object or a bare number) into a single value for the badge.
   const resolvedUserRating = typeof userRating === "number" ? userRating : (userRating?.value ?? null);
   const displayedRating = showRating ?? setlist.show.averageRating ?? null;
-  const displayedCount = setlist.show.ratingsCount ?? null;
+  // In calibrated mode the count is the post-exclusion contributing count (passed
+  // alongside the calibrated score); otherwise the canonical deduped count.
+  const displayedCount = showRatingCount ?? setlist.show.ratingsCount ?? null;
+
+  // Compact calibrated-score + rank summary, rendered to the right of the ★ score.
+  const summaryEl = rankComparison ? (
+    <div className="text-[10px] leading-tight sm:text-xs">
+      <CalibratedSummary canonical={setlist.show.averageRating ?? null} rank={rankComparison} compact />
+    </div>
+  ) : null;
 
   // Toggle attendance using mutation
   const toggleAttendance = () => {
@@ -248,18 +272,22 @@ function SetlistCardComponent({
                   userRating={resolvedUserRating}
                   isAuthenticated
                 />
+                {summaryEl}
               </div>
             )}
             {!user && (
-              <RatingBadgeButton
-                rateableId={setlist.show.id}
-                rateableType="Show"
-                showSlug={setlist.show.slug}
-                initialRating={displayedRating}
-                ratingsCount={displayedCount}
-                userRating={null}
-                isAuthenticated={false}
-              />
+              <div className="flex items-center gap-2">
+                <RatingBadgeButton
+                  rateableId={setlist.show.id}
+                  rateableType="Show"
+                  showSlug={setlist.show.slug}
+                  initialRating={displayedRating}
+                  ratingsCount={displayedCount}
+                  userRating={null}
+                  isAuthenticated={false}
+                />
+                {summaryEl}
+              </div>
             )}
             <div className="pr-2 sm:pr-3">
               <ShowExternalBadges

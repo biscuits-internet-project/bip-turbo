@@ -1,3 +1,4 @@
+import { getFeatureFlags, runRatingsRecompute } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
@@ -74,9 +75,53 @@ async function refreshCommunityCache(): Promise<CronJobResult> {
   }
 }
 
+/**
+ * Hourly full rating recompute (and deploy-time backfill via the same routine).
+ * Gated by the `ratings.recompute-enabled` flag, then dirty-gated internally so it
+ * no-ops cheaply when no ratings changed since the last run.
+ */
+async function recomputeRatings(): Promise<CronJobResult> {
+  const startTime = Date.now();
+
+  try {
+    const flags = await getFeatureFlags();
+    if (!flags.recomputeEnabled) {
+      return {
+        success: true,
+        message: "Ratings recompute disabled by flag",
+        duration: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    const result = await runRatingsRecompute({
+      raterWeights: services.raterWeights,
+      ratings: services.ratings,
+      logger,
+    });
+    const duration = Date.now() - startTime;
+    const message = result.ran
+      ? `Recomputed ratings: ${result.users} raters, ${result.shows} shows, ${result.rateables} canonical averages, anchor ${result.anchor?.toFixed(3)}`
+      : "Ratings unchanged since last recompute; skipped";
+    logger.info(message);
+
+    return { success: true, message, duration, timestamp: new Date().toISOString() };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.error("Failed to recompute ratings", { error });
+    return {
+      success: false,
+      message: `Failed to recompute ratings: ${error instanceof Error ? error.message : "Unknown error"}`,
+      duration,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
 // Map of available cron jobs
 const cronJobs: Record<string, () => Promise<CronJobResult>> = {
   "community-refresh": refreshCommunityCache,
+  "recompute-ratings": recomputeRatings,
 };
 
 export async function action({ params, request }: ActionFunctionArgs) {

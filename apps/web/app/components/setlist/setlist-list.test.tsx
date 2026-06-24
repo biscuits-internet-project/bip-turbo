@@ -110,6 +110,9 @@ function setMockReturn(
     attendanceMap: overrides.attendanceMap ?? new Map(),
     userRatingMap: overrides.userRatingMap ?? new Map(),
     averageRatingMap: overrides.averageRatingMap ?? new Map(),
+    weightedRatingMap: new Map(),
+    displayedRatingMap: new Map(),
+    rankComparisonMap: new Map(),
     isLoading: false,
     error: null,
   });

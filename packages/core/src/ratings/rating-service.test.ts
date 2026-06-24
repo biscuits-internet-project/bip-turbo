@@ -9,6 +9,30 @@ const cacheInvalidation = {
   invalidateShowComprehensive: vi.fn(),
 } as never;
 
+// Build distinct-user rating rows (no dedup collision) for the canonical-average
+// path, which now reads rating.findMany + collapses duplicate accounts. Returns
+// rows shaped like the service's select (value + createdAt + userId + user.username).
+function ratingRows(...values: number[]) {
+  return values.map((value, i) => ({
+    value,
+    createdAt: new Date(2024, 0, 1 + i),
+    userId: `u${i}`,
+    user: { username: `u${i}` },
+  }));
+}
+
+// Same, but tagged with a rateableId for the bulk rebuildAggregatesFor path
+// (one findMany returns rows across many rateables; the service buckets them).
+function taggedRows(rateableId: string, ...values: number[]) {
+  return values.map((value, i) => ({
+    rateableId,
+    value,
+    createdAt: new Date(2024, 0, 1 + i),
+    userId: `${rateableId}-u${i}`,
+    user: { username: `${rateableId}-u${i}` },
+  }));
+}
+
 // Flattens a $queryRaw mock call (TemplateStringsArray + Prisma.Sql
 // interpolations) into a single SQL string so tests can assert on the
 // composed ORDER BY clause. Prisma.Sql exposes its template parts under
@@ -29,6 +53,27 @@ function flattenSqlFromMockCall(call: unknown[]): string {
     }
   }
   return parts.join("");
+}
+
+// rebuildAggregatesFor bulk-writes via `$executeRaw`UPDATE <table> ... ${Prisma.join(rows)}``.
+// Each captured call's interpolations are [Prisma.raw(table), Prisma.join(rows)]: the raw
+// fragment's `strings` carry the table name, the joined fragment's flattened `values` are
+// [id, averageRating, ratingsCount, ...]. Decode them so tests assert the written averages.
+function bulkAverageWrites(executeRaw: ReturnType<typeof vi.fn>) {
+  return executeRaw.mock.calls.map((call) => {
+    const rawFragment = call[1] as { strings: string[] };
+    const joined = call[2] as { values: unknown[] };
+    const table = rawFragment.strings.join("").trim();
+    const tuples: Array<{ id: string; averageRating: number; ratingsCount: number }> = [];
+    for (let i = 0; i + 3 <= joined.values.length; i += 3) {
+      tuples.push({
+        id: joined.values[i] as string,
+        averageRating: joined.values[i + 1] as number,
+        ratingsCount: joined.values[i + 2] as number,
+      });
+    }
+    return { table, tuples };
+  });
 }
 
 type ShowRatingRow = {
@@ -410,13 +455,10 @@ describe("RatingService.clearForUser", () => {
   // runs as on upsert.
   test("deletes the user's rating row and recomputes the rateable's denormalized average", async () => {
     const deleteMany = vi.fn().mockResolvedValue({ count: 1 });
-    const aggregate = vi.fn().mockResolvedValue({
-      _avg: { value: 4.2 },
-      _count: { id: 5 },
-    });
+    const findMany = vi.fn().mockResolvedValue(ratingRows(4, 4, 4, 4, 5)); // 5 distinct raters, avg 4.2
     const showUpdate = vi.fn().mockResolvedValue(undefined);
     const db = {
-      rating: { deleteMany, aggregate },
+      rating: { deleteMany, findMany },
       show: { update: showUpdate },
       track: { update: vi.fn() },
     } as never;
@@ -430,7 +472,7 @@ describe("RatingService.clearForUser", () => {
       where: { userId: "u1", rateableId: "show-1", rateableType: "Show" },
     });
     // Recompute path ran against the same rateable.
-    expect(aggregate).toHaveBeenCalledWith(
+    expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { rateableId: "show-1", rateableType: "Show" } }),
     );
     // Denormalized fields on the Show row got the recomputed values.
@@ -449,7 +491,7 @@ describe("RatingService.clearForUser", () => {
     const db = {
       rating: {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        aggregate: vi.fn().mockResolvedValue({ _avg: { value: null }, _count: { id: 0 } }),
+        findMany: vi.fn().mockResolvedValue([]), // last rating gone → 0/0
       },
       show: { update: vi.fn() },
       track: { update: vi.fn() },
@@ -469,7 +511,7 @@ describe("RatingService.clearForUser", () => {
     const db = {
       rating: {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 3.5 }, _count: { id: 2 } }),
+        findMany: vi.fn().mockResolvedValue(ratingRows(3, 4)), // 2 distinct raters, avg 3.5
       },
       show: { update: showUpdate },
       track: { update: trackUpdate },
@@ -495,7 +537,7 @@ describe("RatingService.clearForUser", () => {
     const db = {
       rating: {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 4.0 }, _count: { id: 1 } }),
+        findMany: vi.fn().mockResolvedValue(ratingRows(4)), // single rater, avg 4.0
       },
       show: { update: vi.fn() },
       track: { update: vi.fn() },
@@ -516,16 +558,17 @@ describe("RatingService.clearForUser", () => {
     expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
   });
 
-  // Track-type clears must invalidate the show's setlist cache. The cached
-  // setlist payload at CacheKeys.show.data(slug) embeds each track's
-  // averageRating/ratingsCount, so the recompute on Track.update would be
-  // shadowed by the stale Redis payload on the next read.
-  test("invalidates the show cache when clearing a Track rating with a showSlug", async () => {
-    const invalidateShow = vi.fn();
+  // Track-type clears bust the show comprehensively, year-scoped, exactly like
+  // Show clears. Track.averageRating/ratingsCount are embedded in BOTH the
+  // per-show show.data payload AND the year-listing shows:list payload (its
+  // gap-chart view shows track averages), so a track rating change must purge
+  // the year listing too or the listing serves stale "Rate" buttons.
+  test("invalidates the show comprehensively, year-scoped, when clearing a Track rating with a showSlug", async () => {
+    const invalidate = vi.fn();
     const db = {
       rating: {
         deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 3.5 }, _count: { id: 2 } }),
+        findMany: vi.fn().mockResolvedValue(ratingRows(3, 4)), // 2 distinct raters, avg 3.5
       },
       show: { update: vi.fn() },
       track: { update: vi.fn() },
@@ -533,8 +576,8 @@ describe("RatingService.clearForUser", () => {
 
     const service = new RatingService(db, {
       invalidateAttendanceCaches: vi.fn(),
-      invalidateShow,
-      invalidateShowComprehensive: vi.fn(),
+      invalidateShow: vi.fn(),
+      invalidateShowComprehensive: invalidate,
     } as never);
     await service.clearForUser({
       rateableId: "track-1",
@@ -543,33 +586,31 @@ describe("RatingService.clearForUser", () => {
       showSlug: "2024-08-12-cap-theatre",
     });
 
-    expect(invalidateShow).toHaveBeenCalledWith("2024-08-12-cap-theatre");
+    expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
   });
 });
 
 describe("RatingService.rebuildAggregatesFor", () => {
-  // Bulk version of updateRateableAverageRating used by the sync script after
-  // importing many ratings at once. Single groupBy per rateableType collapses
-  // N rateables to one query each; per-rateable .update writes the resulting
-  // averageRating / ratingsCount onto Show or Track.
-  test("recomputes Show.averageRating + ratingsCount in one groupBy per type", async () => {
-    const showGroupBy = vi.fn().mockResolvedValue([
-      { rateableId: "show-1", _avg: { value: 4.5 }, _count: { id: 2 } },
-      { rateableId: "show-2", _avg: { value: 3.0 }, _count: { id: 1 } },
+  // Bulk version of updateRateableAverageRating used by the sync/recompute after
+  // importing many ratings. One findMany per rateableType pulls every rating (with
+  // username for dedup); a single bulk `UPDATE ... FROM (VALUES …)` per type writes
+  // the deduped averageRating / ratingsCount onto Show or Track (no per-row round-trip).
+  test("recomputes Show.averageRating + ratingsCount in one bulk write per type", async () => {
+    const showFindMany = vi.fn().mockResolvedValue([
+      ...taggedRows("show-1", 4, 5), // avg 4.5, count 2
+      ...taggedRows("show-2", 3), // avg 3.0, count 1
     ]);
-    const showUpdate = vi.fn().mockResolvedValue(undefined);
-    const trackUpdate = vi.fn();
-    const trackGroupBy = vi.fn();
+    const trackFindMany = vi.fn();
+    const executeRaw = vi.fn().mockResolvedValue(1);
     const db = {
       rating: {
-        groupBy: vi
+        findMany: vi
           .fn()
           .mockImplementation((args: { where: { rateableType: string } }) =>
-            args.where.rateableType === "Show" ? showGroupBy(args) : trackGroupBy(args),
+            args.where.rateableType === "Show" ? showFindMany(args) : trackFindMany(args),
           ),
       },
-      show: { update: showUpdate },
-      track: { update: trackUpdate },
+      $executeRaw: executeRaw,
     } as never;
 
     const service = new RatingService(db, cacheInvalidation);
@@ -578,65 +619,48 @@ describe("RatingService.rebuildAggregatesFor", () => {
       { rateableId: "show-2", rateableType: "Show" },
     ]);
 
-    expect(showUpdate).toHaveBeenCalledTimes(2);
-    expect(showUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "show-1" },
-        data: expect.objectContaining({ averageRating: 4.5, ratingsCount: 2 }),
-      }),
+    const writes = bulkAverageWrites(executeRaw);
+    expect(writes).toHaveLength(1);
+    expect(writes[0].table).toContain("shows");
+    expect(writes[0].tuples).toEqual(
+      expect.arrayContaining([
+        { id: "show-1", averageRating: 4.5, ratingsCount: 2 },
+        { id: "show-2", averageRating: 3.0, ratingsCount: 1 },
+      ]),
     );
-    expect(showUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "show-2" },
-        data: expect.objectContaining({ averageRating: 3.0, ratingsCount: 1 }),
-      }),
-    );
-    expect(trackUpdate).not.toHaveBeenCalled();
-    expect(trackGroupBy).not.toHaveBeenCalled();
+    expect(trackFindMany).not.toHaveBeenCalled();
   });
 
-  // Rateables whose ratings dropped to zero (deleted last rating in full
-  // mode) don't appear in the groupBy result. The bulk method must zero
-  // them out anyway, matching what updateRateableAverageRating does for the
-  // single-row delete path.
+  // Rateables whose ratings dropped to zero (deleted last rating in full mode)
+  // don't appear in the findMany result. The bulk method must still zero them out,
+  // matching updateRateableAverageRating's single-row delete behavior.
   test("zeroes out rateables that no longer have any ratings", async () => {
-    const showUpdate = vi.fn();
-    const db = {
-      rating: {
-        groupBy: vi.fn().mockResolvedValue([]),
-      },
-      show: { update: showUpdate },
-      track: { update: vi.fn() },
-    } as never;
+    const executeRaw = vi.fn().mockResolvedValue(1);
+    const db = { rating: { findMany: vi.fn().mockResolvedValue([]) }, $executeRaw: executeRaw } as never;
 
     const service = new RatingService(db, cacheInvalidation);
     await service.rebuildAggregatesFor([{ rateableId: "show-abandoned", rateableType: "Show" }]);
 
-    expect(showUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "show-abandoned" },
-        data: expect.objectContaining({ averageRating: 0, ratingsCount: 0 }),
-      }),
-    );
+    expect(bulkAverageWrites(executeRaw)[0].tuples).toContainEqual({
+      id: "show-abandoned",
+      averageRating: 0,
+      ratingsCount: 0,
+    });
   });
 
-  // Mixed types in one call: one groupBy hits the Show table, one hits the
-  // Track table. Per-rateable updates land on the matching denormalized row.
-  test("dispatches Show + Track rateables to the right tables", async () => {
-    const showUpdate = vi.fn();
-    const trackUpdate = vi.fn();
+  // Mixed types in one call: one bulk write targets the shows table, one the tracks
+  // table, each carrying the matching deduped averages.
+  test("writes Show + Track rateables to their respective tables", async () => {
+    const executeRaw = vi.fn().mockResolvedValue(1);
     const db = {
       rating: {
-        groupBy: vi
+        findMany: vi
           .fn()
           .mockImplementation(async (args: { where: { rateableType: string } }) =>
-            args.where.rateableType === "Show"
-              ? [{ rateableId: "show-1", _avg: { value: 5.0 }, _count: { id: 3 } }]
-              : [{ rateableId: "track-1", _avg: { value: 3.5 }, _count: { id: 2 } }],
+            args.where.rateableType === "Show" ? taggedRows("show-1", 5, 5, 5) : taggedRows("track-1", 3, 4),
           ),
       },
-      show: { update: showUpdate },
-      track: { update: trackUpdate },
+      $executeRaw: executeRaw,
     } as never;
 
     const service = new RatingService(db, cacheInvalidation);
@@ -645,22 +669,23 @@ describe("RatingService.rebuildAggregatesFor", () => {
       { rateableId: "track-1", rateableType: "Track" },
     ]);
 
-    expect(showUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "show-1" } }));
-    expect(trackUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "track-1" } }));
+    const writes = bulkAverageWrites(executeRaw);
+    const showWrite = writes.find((w) => w.table.includes("shows"));
+    const trackWrite = writes.find((w) => w.table.includes("tracks"));
+    expect(showWrite?.tuples.map((t) => t.id)).toContain("show-1");
+    expect(trackWrite?.tuples.map((t) => t.id)).toContain("track-1");
   });
 
   test("no-ops on an empty pair list", async () => {
-    const groupBy = vi.fn();
-    const db = {
-      rating: { groupBy },
-      show: { update: vi.fn() },
-      track: { update: vi.fn() },
-    } as never;
+    const findMany = vi.fn();
+    const executeRaw = vi.fn();
+    const db = { rating: { findMany }, $executeRaw: executeRaw } as never;
 
     const service = new RatingService(db, cacheInvalidation);
     await service.rebuildAggregatesFor([]);
 
-    expect(groupBy).not.toHaveBeenCalled();
+    expect(findMany).not.toHaveBeenCalled();
+    expect(executeRaw).not.toHaveBeenCalled();
   });
 });
 
@@ -726,11 +751,12 @@ describe("RatingService.listForSync", () => {
 });
 
 describe("RatingService.upsert", () => {
-  // Same motivation as the Track-clear case in clearForUser: the show's
-  // cached setlist embeds Track.averageRating/ratingsCount, so the upsert
-  // path has to bust the show cache for the rating mutation to surface.
-  test("invalidates the show cache when upserting a Track rating with a showSlug", async () => {
-    const invalidateShow = vi.fn();
+  // Track ratings bust the show comprehensively, year-scoped, exactly like Show
+  // ratings: Track.averageRating/ratingsCount are embedded in BOTH the per-show
+  // show.data payload AND the year-listing shows:list payload (its gap-chart view
+  // shows track averages), so the year listing must be purged too.
+  test("invalidates the show comprehensively, year-scoped, when upserting a Track rating with a showSlug", async () => {
+    const invalidateShowComprehensive = vi.fn();
     const now = new Date("2024-08-12T00:00:00Z");
     const db = {
       rating: {
@@ -743,7 +769,7 @@ describe("RatingService.upsert", () => {
           createdAt: now,
           updatedAt: now,
         }),
-        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 4.0 }, _count: { id: 1 } }),
+        findMany: vi.fn().mockResolvedValue(ratingRows(4)),
       },
       show: { update: vi.fn() },
       track: { update: vi.fn() },
@@ -751,8 +777,8 @@ describe("RatingService.upsert", () => {
 
     const service = new RatingService(db, {
       invalidateAttendanceCaches: vi.fn(),
-      invalidateShow,
-      invalidateShowComprehensive: vi.fn(),
+      invalidateShow: vi.fn(),
+      invalidateShowComprehensive,
     } as never);
     await service.upsert({
       rateableId: "track-1",
@@ -762,7 +788,7 @@ describe("RatingService.upsert", () => {
       showSlug: "2024-08-12-cap-theatre",
     });
 
-    expect(invalidateShow).toHaveBeenCalledWith("2024-08-12-cap-theatre");
+    expect(invalidateShowComprehensive).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
   });
 
   // Show ratings go through invalidateShowComprehensive — the year is parsed
@@ -783,7 +809,7 @@ describe("RatingService.upsert", () => {
           createdAt: now,
           updatedAt: now,
         }),
-        aggregate: vi.fn().mockResolvedValue({ _avg: { value: 5.0 }, _count: { id: 1 } }),
+        findMany: vi.fn().mockResolvedValue(ratingRows(5)),
       },
       show: { update: vi.fn() },
       track: { update: vi.fn() },
@@ -803,5 +829,190 @@ describe("RatingService.upsert", () => {
     });
 
     expect(invalidateShowComprehensive).toHaveBeenCalledWith(undefined, "2018-07-12-red-rocks", [2018]);
+  });
+});
+
+describe("RatingService experimental rater-weight refresh", () => {
+  // When a RaterWeightService is injected, rating mutations also re-score the
+  // actor and re-roll the rateable in the experimental tables. Without one (the
+  // default), nothing extra happens — the canonical path is unchanged.
+  function makeDb() {
+    const now = new Date("2024-08-12T00:00:00Z");
+    return {
+      rating: {
+        upsert: vi.fn().mockResolvedValue({
+          id: "r1",
+          userId: "u1",
+          rateableId: "show-1",
+          rateableType: "Show",
+          value: 5,
+          createdAt: now,
+          updatedAt: now,
+        }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([{ value: 5, createdAt: now, userId: "u1", user: { username: "u1" } }]),
+      },
+      show: { update: vi.fn() },
+      track: { update: vi.fn() },
+      ratingSettings: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    } as never;
+  }
+
+  test("upsert marks the calibrated tables dirty and re-rolls the rateable (not the actor)", async () => {
+    const raterWeights = {
+      recomputeUser: vi.fn().mockResolvedValue(undefined),
+      recomputeRateable: vi.fn().mockResolvedValue(undefined),
+    };
+    const db = makeDb();
+    const service = new RatingService(db, cacheInvalidation, raterWeights as never);
+    await service.upsert({ rateableId: "show-1", rateableType: "Show", userId: "u1", value: 5 });
+
+    // The actor's stats are NOT recomputed on write (the cron handles that); only
+    // the touched rateable is re-rolled, and the tables are flagged dirty.
+    expect(raterWeights.recomputeUser).not.toHaveBeenCalled();
+    expect(raterWeights.recomputeRateable).toHaveBeenCalledWith("Show", "show-1");
+    expect(
+      (db as { ratingSettings: { updateMany: ReturnType<typeof vi.fn> } }).ratingSettings.updateMany,
+    ).toHaveBeenCalledWith({
+      data: { ratingsDirty: true },
+    });
+  });
+
+  test("clearForUser re-rolls the rateable", async () => {
+    const raterWeights = {
+      recomputeUser: vi.fn().mockResolvedValue(undefined),
+      recomputeRateable: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new RatingService(makeDb(), cacheInvalidation, raterWeights as never);
+    await service.clearForUser({ rateableId: "show-1", rateableType: "Show", userId: "u1" });
+
+    expect(raterWeights.recomputeRateable).toHaveBeenCalledWith("Show", "show-1");
+  });
+
+  test("a rater-weight failure never breaks the rating write", async () => {
+    const raterWeights = {
+      recomputeUser: vi.fn(),
+      recomputeRateable: vi.fn().mockRejectedValue(new Error("side-table boom")),
+    };
+    const service = new RatingService(makeDb(), cacheInvalidation, raterWeights as never);
+
+    await expect(
+      service.upsert({ rateableId: "show-1", rateableType: "Show", userId: "u1", value: 5 }),
+    ).resolves.toMatchObject({ id: "r1" });
+  });
+});
+
+// The displayed community average must be the de-duplicated denormalized column
+// (the same value Top Rated orders by), NOT a live AVG over raw ratings — which
+// would double-count duplicate accounts and disagree with the ranking + count.
+describe("RatingService.getAveragesForRateables", () => {
+  test("reads the de-duplicated Show columns, not a live average", async () => {
+    const db = {
+      show: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "show-1", averageRating: 4.72, ratingsCount: 18 },
+          { id: "show-2", averageRating: 4.5, ratingsCount: 30 },
+        ]),
+      },
+      // A live AVG would touch rating.* — left undefined so any such call throws.
+    } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    expect(await service.getAveragesForRateables(["show-1", "show-2"], "Show")).toEqual({
+      "show-1": { average: 4.72, count: 18 },
+      "show-2": { average: 4.5, count: 30 },
+    });
+  });
+
+  test("reads the Track columns for track rateables", async () => {
+    const db = {
+      track: { findMany: vi.fn().mockResolvedValue([{ id: "t1", averageRating: 3.5, ratingsCount: 5 }]) },
+    } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    expect(await service.getAveragesForRateables(["t1"], "Track")).toEqual({ t1: { average: 3.5, count: 5 } });
+  });
+
+  test("omits unrated rateables (null average or zero count)", async () => {
+    const db = {
+      show: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "rated", averageRating: 4.0, ratingsCount: 3 },
+          { id: "null-avg", averageRating: null, ratingsCount: 0 },
+          { id: "zero-count", averageRating: 0, ratingsCount: 0 },
+        ]),
+      },
+    } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    expect(await service.getAveragesForRateables(["rated", "null-avg", "zero-count"], "Show")).toEqual({
+      rated: { average: 4.0, count: 3 },
+    });
+  });
+
+  test("returns empty without querying when given no ids", async () => {
+    const findMany = vi.fn();
+    const service = new RatingService({ show: { findMany } } as never, cacheInvalidation);
+
+    expect(await service.getAveragesForRateables([], "Show")).toEqual({});
+    expect(findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("RatingService.getAverageForRateable", () => {
+  test("returns the de-duplicated column average for a rated rateable", async () => {
+    const db = {
+      show: { findMany: vi.fn().mockResolvedValue([{ id: "s1", averageRating: 4.72, ratingsCount: 18 }]) },
+    } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    expect(await service.getAverageForRateable("s1", "Show")).toBe(4.72);
+  });
+
+  test("returns null for an unrated rateable", async () => {
+    const db = { show: { findMany: vi.fn().mockResolvedValue([]) } } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    expect(await service.getAverageForRateable("s1", "Show")).toBeNull();
+  });
+});
+
+describe("RatingService.getRatingDistribution", () => {
+  // The histogram total sits right next to the deduped count label, so it must
+  // dedupe too — a raw groupBy would over-count one person's duplicate accounts
+  // and the bars would sum higher than the count shown.
+  test("collapses duplicate accounts to one most-recent vote per person", async () => {
+    const db = {
+      rating: {
+        findMany: vi.fn().mockResolvedValue([
+          { value: 5, createdAt: new Date(2024, 0, 1), userId: "u1", user: { username: "Tractorbeam" } },
+          // Same human, case-variant account, newer vote — the 5 above drops, this 2 wins.
+          { value: 2, createdAt: new Date(2024, 0, 5), userId: "u2", user: { username: "tractorbeam" } },
+          { value: 4, createdAt: new Date(2024, 0, 2), userId: "u3", user: { username: "Spaga" } },
+        ]),
+      },
+    } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    const distribution = await service.getRatingDistribution("show-1", "Show");
+    const countByValue = Object.fromEntries(distribution.map((bucket) => [bucket.value, bucket.count]));
+
+    expect(countByValue).toEqual({ 2: 1, 4: 1 });
+    expect(distribution.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(2);
+  });
+
+  // 0 / sub-0.5 rows are "unrated" sentinels, not real votes.
+  test("excludes values below 0.5", async () => {
+    const db = {
+      rating: {
+        findMany: vi.fn().mockResolvedValue([
+          { value: 0, createdAt: new Date(2024, 0, 1), userId: "u1", user: { username: "Helicopters" } },
+          { value: 3, createdAt: new Date(2024, 0, 2), userId: "u2", user: { username: "Crickets" } },
+        ]),
+      },
+    } as never;
+    const service = new RatingService(db, cacheInvalidation);
+
+    expect(await service.getRatingDistribution("show-1", "Show")).toEqual([{ value: 3, count: 1 }]);
   });
 });

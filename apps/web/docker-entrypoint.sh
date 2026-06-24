@@ -26,5 +26,8 @@ bun prisma migrate deploy \
 echo "Recomputing pending stats..."
 bun run scripts/recompute-pending.ts
 
+echo "Recomputing ratings (deploy-time backfill; no-op when unchanged)..."
+bun run scripts/recompute-ratings.ts
+
 cd /app/apps/web
 exec "$@"

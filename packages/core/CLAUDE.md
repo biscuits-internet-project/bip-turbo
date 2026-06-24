@@ -13,6 +13,25 @@
 - Database queries are centralized in repository classes
 - Use the dependency injection container for service instantiation
 
+## Rating aggregates MUST dedupe (one human, one vote)
+
+Some users rated under several accounts (case/space username variants, re-registrations after the
+rewrite). Any *shared* aggregate over the `ratings` table — average, count, distribution histogram,
+calibrated score — MUST collapse those duplicate accounts to a single most-recent vote per person,
+or the number silently disagrees with everything else on the page (e.g. a histogram summing to 20
+next to a "18 ratings" label).
+
+- **Never** compute a shared rating aggregate with a raw `db.rating.groupBy` / `_avg` / `_count` /
+  `AVG(...)`. Those count alias accounts twice.
+- Per-rateable aggregates source their rows from `RatingService.dedupedRatingsFor(...)` (the single
+  deduped fetch). Bulk paths run the same `dedupeRatings` rule (in `rating-service.ts`) over their
+  multi-rateable fetch. The rule itself lives in exactly one function — don't reinline it.
+- **Dedup is universal** (simple *and* calibrated views). It is NOT the same as bad-faith **bomber
+  exclusion**, which shapes ONLY the calibrated score — never the displayed average/count or the
+  histogram.
+- Scope: aggregate-only. A user's own ratings *history* (their profile) is never deduped — it lists
+  that account's literal votes.
+
 ## Prisma 7 Configuration
 
 Prisma 7 removed `url` from the `datasource` block in schema files. Use `prisma.config.ts` instead.

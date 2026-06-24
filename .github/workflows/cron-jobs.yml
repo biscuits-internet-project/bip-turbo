@@ -11,6 +11,7 @@ on:
         type: choice
         options:
           - community-refresh
+          - recompute-ratings
       timeout:
         description: 'Timeout in minutes'
         required: false
@@ -61,6 +62,32 @@ jobs:
             echo "$body" | jq '.' || echo "$body"
           else
             echo "❌ Cron job failed with status $http_code"
+            echo "$body" | jq '.' || echo "$body"
+            exit 1
+          fi
+
+      # The hourly schedule also drives the rating recompute (dirty-gated server-side,
+      # so it's a cheap no-op when no ratings changed). Manual runs select it via the
+      # job input instead, which the step above handles.
+      - name: Run ratings recompute (scheduled)
+        if: github.event_name == 'schedule'
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ env.PRODUCTION_URL }}/api/cron/recompute-ratings" \
+            -H "Content-Type: application/json" \
+            --max-time 600)
+
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Ratings recompute completed successfully"
+            echo "$body" | jq '.' || echo "$body"
+          else
+            echo "❌ Ratings recompute failed with status $http_code"
             echo "$body" | jq '.' || echo "$body"
             exit 1
           fi

@@ -9,6 +9,17 @@ vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/server/show-external-sources", () => ({ computeShowExternalSources: vi.fn() }));
 vi.mock("~/server/show-user-data", () => ({ computeShowUserData: vi.fn() }));
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
+// The rating-display card reads flags via this hook; off by default in these tests.
+vi.mock("~/hooks/use-feature-flags", () => ({
+  useFeatureFlags: () => ({
+    calibratedEnabled: false,
+    toggleVisible: false,
+    compareVisible: false,
+    defaultCalibrated: false,
+    explainerNavLink: false,
+    recomputeEnabled: false,
+  }),
+}));
 
 // Default loader payload — most attendance has a Disco Biscuits setlist
 // (per project test convention).

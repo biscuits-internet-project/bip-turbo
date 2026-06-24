@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { average, median } from "./math";
+import { average, median, shrinkToward } from "./math";
 
 describe("average", () => {
   // Empty input returns null so callers can branch on "render the value
@@ -44,5 +44,33 @@ describe("median", () => {
   // pair up in the gap-chart UI.)
   test("is unmoved by a single outlier value", () => {
     expect(median([1, 2, 3, 4, 1000])).toBe(3);
+  });
+});
+
+describe("shrinkToward", () => {
+  // No sample falls all the way back to the anchor (avoids 0/0 and lets a
+  // ratingless show read as the population baseline rather than NaN).
+  test("returns the anchor when count is zero or negative", () => {
+    expect(shrinkToward(5, 3, 0, 3)).toBe(3);
+    expect(shrinkToward(5, 3, -2, 3)).toBe(3);
+  });
+
+  // weight = count/(count+k): at count === k the value and anchor are weighted
+  // equally, so the result is their midpoint.
+  test("weights value and anchor equally when count equals k", () => {
+    expect(shrinkToward(5, 3, 3, 3)).toBe(4);
+  });
+
+  // Few ratings leave the anchor dominant; many let the value dominate.
+  test("shifts from anchor-dominated to value-dominated as count grows", () => {
+    expect(shrinkToward(5, 3, 1, 3)).toBe(3.5); // w = 0.25
+    expect(shrinkToward(5, 3, 9, 3)).toBe(4.5); // w = 0.75
+  });
+
+  // A larger k holds the value near the anchor for longer (more shrinkage at
+  // the same count).
+  test("larger k means more shrinkage toward the anchor", () => {
+    expect(shrinkToward(5, 3, 3, 3)).toBe(4); // w = 0.5
+    expect(shrinkToward(5, 3, 3, 9)).toBe(3.5); // w = 0.25
   });
 });

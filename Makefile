@@ -23,6 +23,18 @@ lint:
 test:
 	bun run test
 
+# Run a package's tests filtered to certain files (vitest path/name substrings).
+# Defaults to the core package. Examples:
+#   make test-file FILES="quonfig"
+#   make test-file PKG=web FILES="setlist-card"
+#   make test-file PKG=core FILES="rater-weight rater-weighting"
+test-file:
+	@if [ -z "$(FILES)" ]; then \
+		echo "Usage: make test-file [PKG=core|web|domain] FILES=\"<path-or-name substrings>\""; \
+		exit 1; \
+	fi
+	bun run -F @bip/$(or $(PKG),core) test $(FILES)
+
 format:
 	@if [ -z "$(FILES)" ]; then \
 		echo "Usage: make format FILES=\"file1.ts file2.tsx\""; \
@@ -79,6 +91,12 @@ db-restore:
 
 recompute-pending:
 	cd packages/core && doppler run -- bun run scripts/recompute-pending.ts
+
+recompute-ratings:
+	cd packages/core && QUONFIG_DATADIR=$(CURDIR)/quonfig doppler run -- bun run scripts/recompute-ratings.ts
+
+rating-validity-eval:
+	cd packages/core && doppler run -- bun run scripts/rating-validity-eval.ts
 
 db-sync-missing-shows:
 	cd packages/core && doppler run -- bun run scripts/sync-missing-shows.ts $(if $(HELP),--help) $(if $(YEARS),--years=$(YEARS)) $(if $(DRY_RUN),--dry-run) $(if $(PRUNE_GHOST_SHOWS),--prune-ghost-shows) $(if $(NO_USERS),--no-users) $(if $(FULL_USERS),--full-users) $(if $(PRUNE_USERS),--prune-users)

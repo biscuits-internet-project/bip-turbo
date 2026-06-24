@@ -10,6 +10,8 @@ vi.mock("~/hooks/use-show-user-data", () => ({
     attendanceMap: new Map(),
     userRatingMap: new Map(),
     averageRatingMap: new Map(),
+    displayedRatingMap: new Map(),
+    rankComparisonMap: new Map(),
     isLoading: false,
     error: null,
   })),
@@ -34,6 +36,8 @@ describe("useAttendanceRowHighlight", () => {
       attendanceMap: new Map(),
       userRatingMap: new Map(),
       averageRatingMap: new Map(),
+      displayedRatingMap: new Map(),
+      rankComparisonMap: new Map(),
       isLoading: false,
       error: null,
     });
@@ -47,6 +51,8 @@ describe("useAttendanceRowHighlight", () => {
       attendanceMap: new Map([["show-attended", { id: "att-1" } as never]]),
       userRatingMap: new Map(),
       averageRatingMap: new Map(),
+      displayedRatingMap: new Map(),
+      rankComparisonMap: new Map(),
       isLoading: false,
       error: null,
     });
@@ -84,6 +90,8 @@ describe("useAttendanceRowHighlight", () => {
       attendanceMap: new Map([["show-yes", { id: "att-1" } as never]]),
       userRatingMap: new Map(),
       averageRatingMap: new Map(),
+      displayedRatingMap: new Map(),
+      rankComparisonMap: new Map(),
       isLoading: false,
       error: null,
     });
@@ -126,6 +134,8 @@ describe("useAttendanceRowHighlight", () => {
       attendanceMap: new Map(),
       userRatingMap: mockUserRatingMap,
       averageRatingMap: mockAverageRatingMap,
+      displayedRatingMap: new Map(),
+      rankComparisonMap: new Map(),
       isLoading: false,
       error: null,
     });

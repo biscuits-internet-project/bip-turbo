@@ -1,3 +1,4 @@
+import type { ShowRankComparison } from "@bip/core";
 import type { Attendance } from "@bip/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -9,6 +10,8 @@ interface UseShowUserDataResult {
   attendanceMap: Map<string, Attendance | null>;
   userRatingMap: Map<string, number | null>;
   averageRatingMap: Map<string, { average: number; count: number } | null>;
+  displayedRatingMap: Map<string, { rating: number; count: number }>;
+  rankComparisonMap: Map<string, ShowRankComparison>;
   isLoading: boolean;
   error: Error | null;
 }
@@ -18,12 +21,16 @@ function mergeShowUserData(results: ShowUserDataResponse[]): ShowUserDataRespons
     attendances: {},
     userRatings: {},
     averageRatings: {},
+    displayedRatings: {},
+    rankComparisons: {},
   };
 
   for (const result of results) {
     Object.assign(merged.attendances, result.attendances);
     Object.assign(merged.userRatings, result.userRatings);
     Object.assign(merged.averageRatings, result.averageRatings);
+    Object.assign(merged.displayedRatings, result.displayedRatings);
+    Object.assign(merged.rankComparisons, result.rankComparisons);
   }
 
   return merged;
@@ -71,10 +78,32 @@ export function useShowUserData(showIds: string[]): UseShowUserDataResult {
     return map;
   }, [data?.averageRatings]);
 
+  const displayedRatingMap = useMemo(() => {
+    const map = new Map<string, { rating: number; count: number }>();
+    if (data?.displayedRatings) {
+      for (const [showId, value] of Object.entries(data.displayedRatings)) {
+        map.set(showId, value);
+      }
+    }
+    return map;
+  }, [data?.displayedRatings]);
+
+  const rankComparisonMap = useMemo(() => {
+    const map = new Map<string, ShowRankComparison>();
+    if (data?.rankComparisons) {
+      for (const [showId, value] of Object.entries(data.rankComparisons)) {
+        map.set(showId, value);
+      }
+    }
+    return map;
+  }, [data?.rankComparisons]);
+
   return {
     attendanceMap,
     userRatingMap,
     averageRatingMap,
+    displayedRatingMap,
+    rankComparisonMap,
     isLoading,
     error: error as Error | null,
   };

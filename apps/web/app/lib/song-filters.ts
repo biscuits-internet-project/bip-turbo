@@ -1,3 +1,5 @@
+import { DRUMMER_ERA_INFO, eraDateWindow } from "@bip/domain";
+
 export interface SongFilterConfig {
   label: string;
   startDate?: Date;
@@ -20,10 +22,14 @@ const yearFilters: Record<string, SongFilterConfig> = Object.fromEntries(
   }),
 );
 
+// Drummer-era options derived from DRUMMER_ERA_INFO so the boundary dates live in
+// one place; `triscuits` is a special short window, not a drummer era.
+const drummerEraFilters: Record<string, SongFilterConfig> = Object.fromEntries(
+  DRUMMER_ERA_INFO.map((info) => [info.filterKey, { label: info.filterLabel, ...eraDateWindow(info) }]),
+);
+
 const eraFilters: Record<string, SongFilterConfig> = {
-  sammy: { label: "Sammy Era", endDate: new Date("2005-08-27") },
-  allen: { label: "Allen Era", startDate: new Date("2005-12-28"), endDate: new Date("2025-09-07") },
-  marlon: { label: "Marlon Era", startDate: new Date("2025-10-31") },
+  ...drummerEraFilters,
   triscuits: { label: "Triscuits", startDate: new Date("2000-03-11"), endDate: new Date("2000-07-12") },
 };
 

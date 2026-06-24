@@ -1,5 +1,5 @@
-import type { FilterCondition } from "@bip/core/_shared/database/types";
-import type { Setlist, Show } from "@bip/domain";
+import type { RatingMode } from "@bip/core";
+import type { Setlist } from "@bip/domain";
 import { type DehydratedState, dehydrate } from "@tanstack/react-query";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import type { PublicContext } from "~/lib/base-loaders";
@@ -8,6 +8,7 @@ import { createPrefetchClient } from "~/lib/query-prefetch";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
+import { resolveViewerRatingMode } from "~/server/viewer-rating";
 
 const MIN_SHOW_RATINGS = 10;
 const TOP_RATED_LIMIT = 100;
@@ -15,6 +16,7 @@ const TOP_RATED_LIMIT = 100;
 export interface TopRatedShowsLoaderData {
   setlists: Setlist[];
   year: number | null;
+  mode: RatingMode;
   minShowRatings: number;
   countsByYear: Record<number, number>;
   allCount: number;
@@ -26,44 +28,21 @@ export async function getTopRatedShows(
   year: number | null,
   context: Pick<PublicContext, "currentUser">,
 ): Promise<TopRatedShowsLoaderData> {
-  const yearFilters: FilterCondition<Show>[] = year
-    ? [
-        {
-          field: "date",
-          operator: "gte",
-          value: `${year}-01-01`,
-        },
-        {
-          field: "date",
-          operator: "lte",
-          value: `${year}-12-31`,
-        },
-      ]
-    : [];
-  const shows = await services.shows.search("", {
-    pagination: { page: 1, limit: TOP_RATED_LIMIT },
-    sort: [
-      { field: "averageRating", direction: "desc" },
-      { field: "ratingsCount", direction: "desc" },
-      { field: "date", direction: "desc" },
-    ],
-    filters: [
-      {
-        field: "averageRating",
-        operator: "gt",
-        value: 0,
-      },
-      {
-        field: "ratingsCount",
-        operator: "gt",
-        value: MIN_SHOW_RATINGS,
-      },
-      ...yearFilters,
-    ],
-    includes: ["venue"],
-  });
+  // Reorder per viewer: calibrated-mode viewers see the shrunk weighted ranking,
+  // everyone else the canonical-average ranking.
+  const { mode } = await resolveViewerRatingMode(context);
+  // The calibrated score already shrinks thin shows toward the global average, so
+  // it needs no ratings floor; the simple average has no such guard, so it keeps one
+  // (else a single 5.0 vote tops the list).
+  const minRatings = mode === "calibrated" ? 0 : MIN_SHOW_RATINGS;
 
-  const showIds = shows.map((show) => show.id);
+  // One eligible+ranked set feeds both the list and the year-picker counts, so the
+  // counts can't disagree with what the list shows.
+  const ranked = await services.raterWeights.rankedShows(mode, minRatings);
+  const showYear = (date: string) => Number(date.slice(0, 4));
+
+  const inScope = year ? ranked.filter((show) => showYear(show.date) === year) : ranked;
+  const showIds = inScope.slice(0, TOP_RATED_LIMIT).map((show) => show.id);
   const rawSetlists = await services.setlists.findManyByShowIds(showIds);
   // findManyByShowIds defaults to `date DESC` ordering, which wipes out the
   // rank order from the shows query. Reindex back into rank order here.
@@ -78,27 +57,24 @@ export async function getTopRatedShows(
     queryFn: () => computeShowUserData(context, showIds),
   });
 
-  // Per-year counts for the year picker, capped by the page's row limit so
-  // the number matches what actually appears when the user clicks that year.
-  // Each year route returns at most TOP_RATED_LIMIT rows.
-  const ratedShows = await services.shows.findMany({
-    filters: [{ field: "ratingsCount", operator: "gt", value: MIN_SHOW_RATINGS }],
-  });
+  // Per-year counts for the year picker, grouped off the same ranked set, capped
+  // by the page's row limit so each number matches what the list shows when that
+  // year is opened.
   const countsByYear: Record<number, number> = {};
-  for (const show of ratedShows) {
-    const showYear = Number(String(show.date).slice(0, 4));
-    countsByYear[showYear] = (countsByYear[showYear] ?? 0) + 1;
+  for (const show of ranked) {
+    const yr = showYear(show.date);
+    countsByYear[yr] = (countsByYear[yr] ?? 0) + 1;
   }
-  for (const yearKey of Object.keys(countsByYear)) {
-    const n = Number(yearKey);
-    countsByYear[n] = Math.min(countsByYear[n], TOP_RATED_LIMIT);
+  for (const yr of Object.keys(countsByYear)) {
+    countsByYear[Number(yr)] = Math.min(countsByYear[Number(yr)], TOP_RATED_LIMIT);
   }
-  const allCount = Math.min(ratedShows.length, TOP_RATED_LIMIT);
+  const allCount = Math.min(ranked.length, TOP_RATED_LIMIT);
 
   return {
     setlists,
     year,
-    minShowRatings: MIN_SHOW_RATINGS,
+    mode,
+    minShowRatings: minRatings,
     countsByYear,
     allCount,
     externalSources,

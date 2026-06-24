@@ -5,6 +5,9 @@ const getAveragesForRateables = vi.fn();
 const findManyByUserIdAndShowIds = vi.fn();
 const findManyByUserIdAndRateableIds = vi.fn();
 const findByEmail = vi.fn();
+const getDisplayedForShows = vi.fn().mockResolvedValue({});
+const getShowRankComparisons = vi.fn().mockResolvedValue({});
+const getFeatureFlags = vi.fn();
 
 vi.mock("~/server/services", () => ({
   services: {
@@ -18,7 +21,30 @@ vi.mock("~/server/services", () => ({
     users: {
       findByEmail: (...args: unknown[]) => findByEmail(...args),
     },
+    raterWeights: {
+      getDisplayedForShows: (...args: unknown[]) => getDisplayedForShows(...args),
+      getShowRankComparisons: (...args: unknown[]) => getShowRankComparisons(...args),
+    },
   },
+}));
+
+// Mock @bip/core so the web test stays light: getFeatureFlags is controllable per
+// test; resolveRatingMode uses the real precedence logic (gate, pref, default).
+vi.mock("@bip/core", () => ({
+  getFeatureFlags: (...args: unknown[]) => getFeatureFlags(...args),
+  resolveRatingMode: (
+    pref: boolean | null | undefined,
+    flags: { calibratedEnabled: boolean; defaultCalibrated: boolean },
+  ) =>
+    !flags.calibratedEnabled
+      ? "simple"
+      : pref != null
+        ? pref
+          ? "calibrated"
+          : "simple"
+        : flags.defaultCalibrated
+          ? "calibrated"
+          : "simple",
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -27,9 +53,19 @@ vi.mock("~/lib/logger", () => ({
 
 import { computeShowUserData } from "./show-user-data";
 
+const FLAGS = {
+  calibratedEnabled: true,
+  toggleVisible: false,
+  defaultCalibrated: false,
+  compareVisible: false,
+  explainerNavLink: false,
+  recomputeEnabled: true,
+};
+
 describe("computeShowUserData", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getFeatureFlags.mockResolvedValue({ ...FLAGS });
   });
 
   // An empty input short-circuits before hitting any service. Callers pass
@@ -38,7 +74,13 @@ describe("computeShowUserData", () => {
   test("returns empty skeleton and makes no service calls when showIds is empty", async () => {
     const result = await computeShowUserData({ currentUser: undefined }, []);
 
-    expect(result).toEqual({ attendances: {}, userRatings: {}, averageRatings: {} });
+    expect(result).toEqual({
+      attendances: {},
+      userRatings: {},
+      averageRatings: {},
+      displayedRatings: {},
+      rankComparisons: {},
+    });
     expect(getAveragesForRateables).not.toHaveBeenCalled();
     expect(findManyByUserIdAndShowIds).not.toHaveBeenCalled();
     expect(findManyByUserIdAndRateableIds).not.toHaveBeenCalled();
@@ -106,5 +148,51 @@ describe("computeShowUserData", () => {
     expect(result.userRatings["show-2"]).toBe(5);
     expect(result.averageRatings["show-1"]).toEqual({ average: 4.0, count: 5 });
     expect(result.averageRatings["show-2"]).toEqual({ average: 3.0, count: 2 });
+  });
+
+  // Simple mode (the default for a user with no explicit pref) must NOT run the
+  // calibrated-score or rank-comparison queries — those are the expensive parts.
+  test("skips calibrated + rank queries in simple mode", async () => {
+    getAveragesForRateables.mockResolvedValue({});
+    findByEmail.mockResolvedValue({ id: "user-1", email: "evan@foo.net", showCalibratedRatings: null });
+    findManyByUserIdAndShowIds.mockResolvedValue([]);
+    findManyByUserIdAndRateableIds.mockResolvedValue([]);
+
+    const result = await computeShowUserData({ currentUser: { id: "a", email: "evan@foo.net", isAdmin: false } }, [
+      "show-1",
+    ]);
+
+    expect(getDisplayedForShows).not.toHaveBeenCalled();
+    expect(getShowRankComparisons).not.toHaveBeenCalled();
+    expect(result.displayedRatings).toEqual({});
+  });
+
+  // An opted-in user (showCalibratedRatings=true) gets the calibrated score; the
+  // comparison overlay also loads when they enable it AND the flag allows.
+  test("loads calibrated scores for an opted-in user, plus the overlay when compare is enabled", async () => {
+    getAveragesForRateables.mockResolvedValue({});
+    findByEmail.mockResolvedValue({
+      id: "user-1",
+      email: "evan@foo.net",
+      showCalibratedRatings: true,
+      showRatingComparisonDebug: true,
+    });
+    findManyByUserIdAndShowIds.mockResolvedValue([]);
+    findManyByUserIdAndRateableIds.mockResolvedValue([]);
+    getDisplayedForShows.mockResolvedValue({ "show-1": { rating: 4.2, count: 18 } });
+    getFeatureFlags.mockResolvedValue({ ...FLAGS, compareVisible: true });
+    const rank = {
+      calibrated: 4.2,
+      all: { canonicalRank: 12, calibratedRank: 6, total: 300 },
+      top: { canonicalRank: 10, calibratedRank: 5, total: 100 },
+    };
+    getShowRankComparisons.mockResolvedValue({ "show-1": rank });
+
+    const result = await computeShowUserData({ currentUser: { id: "a", email: "evan@foo.net", isAdmin: false } }, [
+      "show-1",
+    ]);
+
+    expect(result.displayedRatings["show-1"]).toEqual({ rating: 4.2, count: 18 });
+    expect(result.rankComparisons["show-1"]).toEqual(rank);
   });
 });

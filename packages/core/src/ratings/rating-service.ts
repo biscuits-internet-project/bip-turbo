@@ -3,6 +3,69 @@ import { Prisma } from "@prisma/client";
 import { type CacheInvalidationService, yearFromShowSlug } from "../_shared/cache";
 import type { DbClient, DbRating } from "../_shared/database/models";
 import { setSortKeySql, showOrderBySql } from "../_shared/show-ordering";
+import { aliasKey, mostRecentPerKey } from "./rater-aliases";
+import type { RaterWeightService } from "./rater-weight-service";
+
+interface DedupableRating {
+  value: number;
+  createdAt: Date;
+  userId: string;
+  username: string | null;
+}
+
+/**
+ * Prisma select for any rating row that feeds a dedup-collapsed aggregate. The
+ * username (via the user relation) is what lets {@link dedupeRatings} fold alias
+ * accounts, so every per-rateable aggregate fetch should select this shape.
+ */
+const RATING_DEDUP_SELECT = {
+  value: true,
+  createdAt: true,
+  userId: true,
+  user: { select: { username: true } },
+} as const;
+
+/** Map a {@link RATING_DEDUP_SELECT} row to the shape the dedup helpers consume. */
+function toDedupableRating(row: {
+  value: number;
+  createdAt: Date;
+  userId: string;
+  user: { username: string | null } | null;
+}): DedupableRating {
+  return { value: row.value, createdAt: row.createdAt, userId: row.userId, username: row.user?.username ?? null };
+}
+
+/**
+ * The one-human-one-vote rule, in ONE place: collapse a person's duplicate
+ * accounts (case/space variants, re-registrations) to their single most-recent
+ * vote. Every shared aggregate in this service — average, count, distribution
+ * histogram — must run its rows through this. A raw COUNT/AVG/groupBy over the
+ * Rating table double-counts alias accounts and silently disagrees with the
+ * displayed numbers. (The calibrated score applies the same rule via
+ * buildCanonicalUserMap in rater-weight-service. Aggregate-only — a user's own
+ * ratings history is never deduped.)
+ */
+function dedupeRatings<T extends DedupableRating>(ratings: ReadonlyArray<T>): T[] {
+  return mostRecentPerKey(ratings, (rating) =>
+    rating.username ? aliasKey(rating.username, rating.userId) : rating.userId,
+  );
+}
+
+/** Mean + count of an already-deduped rating set (the displayed canonical pair). */
+function averageOf(deduped: ReadonlyArray<{ value: number }>): { averageRating: number; ratingsCount: number } {
+  const ratingsCount = deduped.length;
+  const averageRating = ratingsCount === 0 ? 0 : deduped.reduce((sum, rating) => sum + rating.value, 0) / ratingsCount;
+  return { averageRating, ratingsCount };
+}
+
+/**
+ * The canonical average + count over a rateable's ratings, deduped first. The
+ * bulk rebuild path uses this on its per-rateable groups; single-rateable callers
+ * go through {@link RatingService.dedupedRatingsFor} + {@link averageOf}.
+ */
+function dedupedAverage(ratings: ReadonlyArray<DedupableRating>): { averageRating: number; ratingsCount: number } {
+  return averageOf(dedupeRatings(ratings));
+}
 
 export type ShowRatingsSort = "date" | "rating" | "modified";
 export type TrackRatingsSort = "date" | "set" | "track" | "song" | "rating" | "modified";
@@ -144,21 +207,51 @@ export class RatingService {
   constructor(
     protected readonly db: DbClient,
     protected readonly cacheInvalidation: CacheInvalidationService,
+    // Optional so existing callers/tests are unaffected. When present, rating
+    // mutations also maintain the calibrated rater-weighting tables.
+    protected readonly raterWeights?: RaterWeightService,
   ) {}
+
+  /**
+   * After a rating mutation: mark the calibrated-rating tables dirty (cheap, so the
+   * hourly cron rebuilds the actor's stats + the cross-show ripple) and do the
+   * one cheap thing inline — recompute the touched rateable's calibrated score from
+   * current stats so the rated show updates immediately. We deliberately do NOT
+   * recompute the actor's stats here: the old delete-then-recreate-per-write was
+   * heavy and could wipe stats on a transient failure. The recompute is
+   * best-effort (swallowed) so it never breaks the live rating write.
+   */
+  private async refreshRaterWeights(rateableId: string, rateableType: string): Promise<void> {
+    if (!this.raterWeights) return;
+    // Flag the calibrated tables dirty so the hourly cron rebuilds stats + the ripple.
+    await this.db.ratingSettings.updateMany({ data: { ratingsDirty: true } });
+    try {
+      await this.raterWeights.recomputeRateable(rateableType, rateableId);
+    } catch {
+      // Calibrated-rating side data; a failure here must not break rating writes.
+    }
+  }
+
+  /**
+   * The single source of deduped ratings for one rateable. EVERY per-rateable
+   * shared aggregate (canonical average, count, distribution histogram) must
+   * source its rows here so the one-human-one-vote dedup can never be skipped by
+   * accident. The bulk {@link rebuildAggregatesFor} path runs the same
+   * {@link dedupeRatings} rule over its multi-rateable fetch.
+   */
+  private async dedupedRatingsFor(rateableId: string, rateableType: string): Promise<DedupableRating[]> {
+    const rows = await this.db.rating.findMany({
+      where: { rateableId, rateableType },
+      select: RATING_DEDUP_SELECT,
+    });
+    return dedupeRatings(rows.map(toDedupableRating));
+  }
 
   private async updateRateableAverageRating(
     rateableId: string,
     rateableType: string,
   ): Promise<{ averageRating: number; ratingsCount: number }> {
-    // Calculate the new average rating and count
-    const stats = await this.db.rating.aggregate({
-      where: { rateableId, rateableType },
-      _avg: { value: true },
-      _count: { id: true },
-    });
-
-    const averageRating = stats._avg.value ?? 0;
-    const ratingsCount = stats._count.id;
+    const { averageRating, ratingsCount } = averageOf(await this.dedupedRatingsFor(rateableId, rateableType));
 
     // Update the appropriate table based on rateable type
     if (rateableType === "Show") {
@@ -200,45 +293,48 @@ export class RatingService {
       else if (rateableType === "Track") trackIds.add(rateableId);
     }
 
-    const now = new Date();
-
-    if (showIds.size > 0) {
-      const rows = await this.db.rating.groupBy({
-        by: ["rateableId"],
-        where: { rateableType: "Show", rateableId: { in: Array.from(showIds) } },
-        _avg: { value: true },
-        _count: { id: true },
+    // Dedup duplicate accounts per rateable (one most-recent vote per person).
+    const groupRatingsByRateable = async (rateableType: string, ids: Set<string>) => {
+      const rows = await this.db.rating.findMany({
+        where: { rateableType, rateableId: { in: Array.from(ids) } },
+        select: { rateableId: true, ...RATING_DEDUP_SELECT },
       });
-      const statsById = new Map(rows.map((r) => [r.rateableId, r]));
-      for (const id of showIds) {
-        const stats = statsById.get(id);
-        const averageRating = stats?._avg.value ?? 0;
-        const ratingsCount = stats?._count.id ?? 0;
-        await this.db.show.update({
-          where: { id },
-          data: { averageRating, ratingsCount, updatedAt: now },
-        });
+      const byRateable = new Map<string, DedupableRating[]>();
+      for (const r of rows) {
+        const bucket = byRateable.get(r.rateableId) ?? [];
+        bucket.push(toDedupableRating(r));
+        byRateable.set(r.rateableId, bucket);
       }
-    }
+      return byRateable;
+    };
 
-    if (trackIds.size > 0) {
-      const rows = await this.db.rating.groupBy({
-        by: ["rateableId"],
-        where: { rateableType: "Track", rateableId: { in: Array.from(trackIds) } },
-        _avg: { value: true },
-        _count: { id: true },
-      });
-      const statsById = new Map(rows.map((r) => [r.rateableId, r]));
-      for (const id of trackIds) {
-        const stats = statsById.get(id);
-        const averageRating = stats?._avg.value ?? 0;
-        const ratingsCount = stats?._count.id ?? 0;
-        await this.db.track.update({
-          where: { id },
-          data: { averageRating, ratingsCount, updatedAt: now },
-        });
+    // One `UPDATE ... FROM (VALUES …)` per chunk instead of an update per rateable:
+    // a full recompute touches ~14k rateables (mostly tracks), where per-row
+    // round-trips dominated the runtime. Rateables with no surviving ratings get
+    // zeroed (dedupedAverage of [] → 0/0).
+    const writeAverages = async (rateableType: string, table: "shows" | "tracks", ids: Set<string>) => {
+      if (ids.size === 0) return;
+      const byRateable = await groupRatingsByRateable(rateableType, ids);
+      const entries = Array.from(ids, (id) => ({ id, ...dedupedAverage(byRateable.get(id) ?? []) }));
+      const CHUNK = 1000;
+      for (let i = 0; i < entries.length; i += CHUNK) {
+        const rows = entries
+          .slice(i, i + CHUNK)
+          .map(
+            (entry) =>
+              Prisma.sql`(${entry.id}::uuid, ${entry.averageRating}::double precision, ${entry.ratingsCount}::int)`,
+          );
+        await this.db.$executeRaw`
+          UPDATE ${Prisma.raw(table)} AS t
+          SET average_rating = v.average_rating, ratings_count = v.ratings_count, updated_at = NOW()
+          FROM (VALUES ${Prisma.join(rows)}) AS v(id, average_rating, ratings_count)
+          WHERE t.id = v.id
+        `;
       }
-    }
+    };
+
+    await writeAverages("Show", "shows", showIds);
+    await writeAverages("Track", "tracks", trackIds);
   }
 
   /**
@@ -322,56 +418,63 @@ export class RatingService {
       },
     });
 
-    if (data.rateableType === "Show" && data.showSlug) {
+    if (data.showSlug) {
+      // Both show and track ratings write denormalized averageRating/ratingsCount
+      // that the cached setlist payloads embed — the per-show show.data payload AND
+      // the year-listing shows:list payload (whose gap-chart view shows track
+      // averages). Comprehensive invalidation busts both, year-scoped for listings.
       const year = yearFromShowSlug(data.showSlug);
       await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug, year !== null ? [year] : []);
-    } else if (data.rateableType === "Track" && data.showSlug) {
-      // The show's cached setlist payload at CacheKeys.show.data(slug)
-      // embeds Track.averageRating/ratingsCount on each track, so a rating
-      // mutation has to bust that cache for subsequent reads to surface the
-      // new denormalized values.
-      await this.cacheInvalidation.invalidateShow(data.showSlug);
     }
 
     // Update the related show/track average rating and count
     await this.updateRateableAverageRating(data.rateableId, data.rateableType);
+    await this.refreshRaterWeights(data.rateableId, data.rateableType);
 
     return mapRatingToDomainEntity(result);
   }
 
+  /**
+   * The de-duplicated community average for one rateable, read from the
+   * denormalized column via {@link getAveragesForRateables} so it matches the
+   * ranking and honors dedup (a live `AVG()` would double-count duplicate
+   * accounts). Null when the rateable has no ratings.
+   */
   async getAverageForRateable(rateableId: string, rateableType: string): Promise<number | null> {
-    const result = await this.db.rating.aggregate({
-      where: { rateableId, rateableType },
-      _avg: {
-        value: true,
-      },
-    });
-
-    return result._avg.value;
+    const averages = await this.getAveragesForRateables([rateableId], rateableType);
+    return averages[rateableId]?.average ?? null;
   }
 
+  /**
+   * The community average + count for a set of rateables, read from the
+   * denormalized `average_rating`/`ratings_count` columns. Those are the
+   * de-duplicated values (one human, one vote), kept fresh by the rating write
+   * path, and are the same numbers Top Rated orders by, so the displayed average
+   * matches the ranking. A live `AVG()` here would double-count duplicate accounts
+   * and disagree with both.
+   */
   async getAveragesForRateables(
     rateableIds: string[],
     rateableType: string,
   ): Promise<Record<string, { average: number; count: number }>> {
     if (rateableIds.length === 0) return {};
 
-    const results = await this.db.rating.groupBy({
-      by: ["rateableId"],
-      where: {
-        rateableId: { in: rateableIds },
-        rateableType,
-      },
-      _avg: { value: true },
-      _count: { id: true },
-    });
+    const rows =
+      rateableType === "Track"
+        ? await this.db.track.findMany({
+            where: { id: { in: rateableIds } },
+            select: { id: true, averageRating: true, ratingsCount: true },
+          })
+        : await this.db.show.findMany({
+            where: { id: { in: rateableIds } },
+            select: { id: true, averageRating: true, ratingsCount: true },
+          });
 
     const averages: Record<string, { average: number; count: number }> = {};
-    for (const result of results) {
-      averages[result.rateableId] = {
-        average: result._avg.value ?? 0,
-        count: result._count.id,
-      };
+    for (const row of rows) {
+      if (row.averageRating != null && row.ratingsCount > 0) {
+        averages[row.id] = { average: row.averageRating, count: row.ratingsCount };
+      }
     }
 
     return averages;
@@ -563,17 +666,21 @@ export class RatingService {
 
   /**
    * Distribution of a single rateable's ratings by star value, for the
-   * per-show / per-track histograms. Groups by value over the
-   * (rateable_type, rateable_id) index and includes 0.5 ratings so the
-   * chart reflects every vote.
+   * per-show / per-track histograms. Deduped (one human, one vote) so the bar
+   * total matches the deduped count shown beside the chart — a raw groupBy
+   * would over-count duplicate accounts. Not bomber-excluded: this mirrors the
+   * deduped canonical population, and exclusion only ever shapes the calibrated
+   * score, not the displayed average/count. Includes 0.5 ratings so every real
+   * vote shows.
    */
   async getRatingDistribution(rateableId: string, rateableType: string): Promise<RatingValueBucket[]> {
-    const rows = await this.db.rating.groupBy({
-      by: ["value"],
-      where: { rateableId, rateableType, value: { gte: 0.5 } },
-      _count: { id: true },
-    });
-    return rows.map((row) => ({ value: row.value, count: row._count.id }));
+    const deduped = await this.dedupedRatingsFor(rateableId, rateableType);
+    const countByValue = new Map<number, number>();
+    for (const rating of deduped) {
+      if (rating.value < 0.5) continue;
+      countByValue.set(rating.value, (countByValue.get(rating.value) ?? 0) + 1);
+    }
+    return Array.from(countByValue, ([value, count]) => ({ value, count }));
   }
 
   async deleteByRateableId(rateableId: string, rateableType: string): Promise<void> {
@@ -606,15 +713,14 @@ export class RatingService {
     });
 
     const stats = await this.updateRateableAverageRating(data.rateableId, data.rateableType);
+    await this.refreshRaterWeights(data.rateableId, data.rateableType);
 
-    if (data.rateableType === "Show" && data.showSlug) {
+    if (data.showSlug) {
+      // Same as the upsert path: both show and track ratings change denormalized
+      // averages embedded in the show.data AND year-listing shows:list payloads,
+      // so bust both, year-scoped for listings.
       const year = yearFromShowSlug(data.showSlug);
       await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug, year !== null ? [year] : []);
-    } else if (data.rateableType === "Track" && data.showSlug) {
-      // Same reason as the upsert path: Track.averageRating/ratingsCount
-      // live inside the cached setlist payload, so a recompute has to bust
-      // the show cache.
-      await this.cacheInvalidation.invalidateShow(data.showSlug);
     }
 
     return stats;

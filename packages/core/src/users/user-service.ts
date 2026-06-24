@@ -32,6 +32,8 @@ function mapUserToDomainEntity(dbUser: DbUser): User {
     avatarUrl: dbUser.avatarFileUrl ?? null,
     createdAt: dbUser.createdAt,
     updatedAt: dbUser.updatedAt,
+    showCalibratedRatings: dbUser.showCalibratedRatings ?? null,
+    showRatingComparisonDebug: dbUser.showRatingComparisonDebug ?? null,
   };
 }
 
@@ -477,6 +479,9 @@ export class UserService {
       username: string | null;
       avatarFileId: string | null;
       avatarFileUrl: string | null;
+      // Rating-display opt-in prefs, mirrored to local so prod adoption can be inspected.
+      showCalibratedRatings: boolean | null;
+      showRatingComparisonDebug: boolean | null;
       createdAt: Date;
       updatedAt: Date;
     }>
@@ -499,6 +504,8 @@ export class UserService {
         username: true,
         avatarFileId: true,
         avatarFileUrl: true,
+        showCalibratedRatings: true,
+        showRatingComparisonDebug: true,
         createdAt: true,
         updatedAt: true,
       },
