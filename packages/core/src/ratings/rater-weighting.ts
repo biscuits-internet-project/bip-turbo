@@ -270,3 +270,41 @@ export function computeCleanedScopeStats(ratings: ReadonlyArray<ScopedRating>): 
   result.set("GLOBAL", { ...statsOfRatings(globalBase), isExcluded: false });
   return result;
 }
+
+/**
+ * The contributing set of a show's deduped ratings: the votes that actually feed
+ * the calibrated score. Drops raters flagged bad-faith in this show's era; falls
+ * back to all ratings if that empties the show (so a score/distribution always
+ * exists). The single source of the "who counts" rule, shared by
+ * {@link computeShowWeighted} (which sums them) and the calibrated histogram
+ * (which counts them by raw value) so the two can never disagree on membership.
+ */
+export function selectContributingRatings<T extends { userId: string }>(
+  ratings: ReadonlyArray<T>,
+  showEra: RaterEra | null,
+  isExcludedInEra: (userId: string, era: RaterEra) => boolean,
+): T[] {
+  const excludedHere = new Set<string>();
+  if (showEra) {
+    for (const rating of ratings) {
+      if (isExcludedInEra(rating.userId, showEra)) excludedHere.add(rating.userId);
+    }
+  }
+  const active = ratings.filter((rating) => !excludedHere.has(rating.userId));
+  return active.length > 0 ? active : [...ratings];
+}
+
+/**
+ * Group raw star values into per-value `{ value, count }` buckets, skipping the
+ * sub-0.5 "unrated" sentinel. The single bucketing rule behind every per-rateable
+ * histogram (the deduped community distribution and the calibrated contributing
+ * distribution) so both bucket and floor-filter identically.
+ */
+export function bucketRatingValues(values: ReadonlyArray<number>): Array<{ value: number; count: number }> {
+  const countByValue = new Map<number, number>();
+  for (const value of values) {
+    if (value < 0.5) continue;
+    countByValue.set(value, (countByValue.get(value) ?? 0) + 1);
+  }
+  return Array.from(countByValue, ([value, count]) => ({ value, count }));
+}

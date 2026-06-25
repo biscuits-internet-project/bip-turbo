@@ -35,6 +35,7 @@ import { formatDateLong, formatMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
+import { resolveViewerRatingMode } from "~/server/viewer-rating";
 
 interface ShowLoaderData {
   setlist: Setlist;
@@ -78,13 +79,21 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
   });
 
   // Load reviews, photos, adjacent shows, and the rating distribution fresh
-  // (not cached - simple indexed queries). The distribution feeds the
-  // right-rail histogram; one groupBy over the ratings index is cheap.
+  // (not cached - simple indexed queries). The distribution feeds the right-rail
+  // histogram and tracks the viewer's rating mode: calibrated viewers see the
+  // contributing set (bombers/fluffers dropped) so the bar total matches the
+  // calibrated count beside the score; everyone else sees the deduped community
+  // distribution.
+  const { mode } = await resolveViewerRatingMode(context);
+  const ratingDistributionQuery =
+    mode === "calibrated"
+      ? services.raterWeights.getCalibratedDistribution(setlist.show.id)
+      : services.ratings.getRatingDistribution(setlist.show.id, "Show");
   const [reviews, photos, adjacentShows, ratingDistribution] = await Promise.all([
     services.reviews.findByShowId(setlist.show.id),
     services.files.findByShowId(setlist.show.id),
     services.shows.findAdjacentShows(setlist.show.date, setlist.show.slug),
-    services.ratings.getRatingDistribution(setlist.show.id, "Show"),
+    ratingDistributionQuery,
   ]);
 
   logger.info(`Show data loaded for ${slug} - setlist cached, reviews fresh`);
