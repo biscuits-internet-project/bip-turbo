@@ -5,6 +5,7 @@ import type { DbClient, DbRating } from "../_shared/database/models";
 import { setSortKeySql, showOrderBySql } from "../_shared/show-ordering";
 import { aliasKey, mostRecentPerKey } from "./rater-aliases";
 import type { RaterWeightService } from "./rater-weight-service";
+import { bucketRatingValues } from "./rater-weighting";
 
 interface DedupableRating {
   value: number;
@@ -675,12 +676,7 @@ export class RatingService {
    */
   async getRatingDistribution(rateableId: string, rateableType: string): Promise<RatingValueBucket[]> {
     const deduped = await this.dedupedRatingsFor(rateableId, rateableType);
-    const countByValue = new Map<number, number>();
-    for (const rating of deduped) {
-      if (rating.value < 0.5) continue;
-      countByValue.set(rating.value, (countByValue.get(rating.value) ?? 0) + 1);
-    }
-    return Array.from(countByValue, ([value, count]) => ({ value, count }));
+    return bucketRatingValues(deduped.map((rating) => rating.value));
   }
 
   async deleteByRateableId(rateableId: string, rateableType: string): Promise<void> {

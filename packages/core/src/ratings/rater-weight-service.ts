@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
 import { aliasKey, mostRecentPerKey } from "./rater-aliases";
 import {
+  bucketRatingValues,
   COLD_START_ENTROPY_K,
   COLD_START_RATER_K,
   computeCleanedScopeStats,
@@ -17,7 +18,9 @@ import {
   rateableKindFromType,
   type ScopedRating,
   SHRINK_K,
+  selectContributingRatings,
 } from "./rater-weighting";
+import type { RatingValueBucket } from "./rating-service";
 
 interface RateableRef {
   rateableType: string;
@@ -146,14 +149,11 @@ function computeShowWeighted(
   statByUserEra: StatByUserEra,
   pop: PopulationStats,
 ): { weightedRating: number | null; weightedRatingsCount: number } {
-  const excludedHere = new Set<string>();
-  if (showEra) {
-    for (const rating of ratings) {
-      if (statByUserEra(rating.userId, showEra)?.isExcluded) excludedHere.add(rating.userId);
-    }
-  }
-  const activeRatings = ratings.filter((rating) => !excludedHere.has(rating.userId));
-  const used = activeRatings.length > 0 ? activeRatings : ratings;
+  const used = selectContributingRatings(
+    ratings,
+    showEra,
+    (userId, era) => statByUserEra(userId, era)?.isExcluded ?? false,
+  );
 
   const result = entropyWeightedCenteredAverage(
     used.map((rating) => {
@@ -292,6 +292,31 @@ export class RaterWeightService {
       };
     }
     return byId;
+  }
+
+  /**
+   * The calibrated histogram for one show: raw-star-value buckets of the exact
+   * contributing set the calibrated score is built from (deduped, era bombers/
+   * fluffers dropped). Bars stay raw star values; only membership differs from the
+   * community distribution, so the bar total equals the displayed
+   * `weighted_ratings_count` — both derive from the same
+   * {@link loadCanonicalShowRatings} + {@link selectContributingRatings}. With no
+   * `rater_stats` yet (or no exclusions) it degrades to the full deduped set, matching
+   * the canonical distribution the headline falls back to. Empty when unrated.
+   */
+  async getCalibratedDistribution(showId: string): Promise<RatingValueBucket[]> {
+    const ratings = await this.loadCanonicalShowRatings("Show", showId);
+    if (ratings.length === 0) return [];
+    const { era, statByUserEra } = await this.loadShowExclusionContext(
+      showId,
+      ratings.map((rating) => rating.userId),
+    );
+    const used = selectContributingRatings(
+      ratings,
+      era,
+      (userId, scopeEra) => statByUserEra(userId, scopeEra)?.isExcluded ?? false,
+    );
+    return bucketRatingValues(used.map((rating) => rating.value));
   }
 
   /**
@@ -444,48 +469,47 @@ export class RaterWeightService {
   }
 
   /**
-   * Recompute one show's calibrated score (`shows.weighted_rating`) from current
-   * rater_stats. Show-only — tracks have no denormalized calibrated column. The
-   * batch passes `population` + the prebuilt canonical map to skip per-call work.
+   * The show's deduped ratings under the one-human-one-vote rule: pull every raw
+   * vote, remap each to its canonical account FIRST so a multi-account rater is one
+   * person (and their stats, stored under the canonical id, are found regardless of
+   * which account cast the latest vote), then keep one most-recent vote per person.
+   * The single deduped source for both the calibrated score and the calibrated
+   * histogram, so they can never disagree on the population. Empty when unrated.
    */
-  async recomputeRateable(
+  private async loadCanonicalShowRatings(
     rateableType: string,
     rateableId: string,
-    population?: PopulationStats,
     canonicalUsers?: Map<string, string>,
-  ): Promise<void> {
-    if (rateableType !== "Show") return;
-
+  ): Promise<Array<{ userId: string; value: number; createdAt: Date }>> {
     const rawRatings = await this.db.rating.findMany({
       where: { rateableType, rateableId },
       select: { userId: true, value: true, createdAt: true },
     });
-    if (rawRatings.length === 0) {
-      await this.db.show.update({
-        where: { id: rateableId },
-        data: { weightedRating: null, weightedRatingsCount: 0 },
-      });
-      return;
-    }
-
-    // Collapse duplicate accounts to one (most recent) vote per person, remapping each
-    // vote to its canonical account FIRST so the rater's stats (stored under the
-    // canonical id) are found — a multi-account rater is one person, scored once with
-    // their real stats regardless of which account cast the latest vote.
+    if (rawRatings.length === 0) return [];
     const canonical = canonicalUsers ?? (await this.buildCanonicalUserMap());
-    const ratings = mostRecentPerKey(
+    return mostRecentPerKey(
       rawRatings.map((rating) => ({ ...rating, userId: canonical.get(rating.userId) ?? rating.userId })),
       (rating) => rating.userId,
     );
+  }
 
-    const kind = rateableKindFromType(rateableType);
-    const meta = await this.loadRateableMeta([{ rateableType, rateableId }]);
-    const date = meta.get(rateableKey(rateableType, rateableId))?.date;
+  /**
+   * The bad-faith-exclusion context for scoring/bucketing one show: its drummer era
+   * (null when the date is unknown) plus a `(userId, era) → stats` lookup over the
+   * show-kind `rater_stats`. Shared by the calibrated score and histogram so both read
+   * the same exclusion flags. The histogram only needs `isExcluded`; the score also
+   * reads the mean/entropy off the same rows, so one query serves both.
+   */
+  private async loadShowExclusionContext(
+    showId: string,
+    userIds: string[],
+  ): Promise<{ era: RaterEra | null; statByUserEra: StatByUserEra }> {
+    const meta = await this.loadRateableMeta([{ rateableType: "Show", rateableId: showId }]);
+    const date = meta.get(rateableKey("Show", showId))?.date;
     const era = date ? drummerEraForDate(date) : null;
-    const pop = population ?? (await this.populationStats(kind));
 
     const statRows = await this.db.raterStats.findMany({
-      where: { userId: { in: ratings.map((rating) => rating.userId) }, kind },
+      where: { userId: { in: userIds }, kind: "SHOW" },
       select: { userId: true, era: true, mean: true, entropy: true, ratingsCount: true, isExcluded: true },
     });
     const byUserEra = new Map<string, RaterScopeStat>();
@@ -498,6 +522,36 @@ export class RaterWeightService {
       });
     }
     const statByUserEra: StatByUserEra = (userId, scopeEra) => byUserEra.get(`${userId}:${scopeEra}`);
+    return { era, statByUserEra };
+  }
+
+  /**
+   * Recompute one show's calibrated score (`shows.weighted_rating`) from current
+   * rater_stats. Show-only — tracks have no denormalized calibrated column. The
+   * batch passes `population` + the prebuilt canonical map to skip per-call work.
+   */
+  async recomputeRateable(
+    rateableType: string,
+    rateableId: string,
+    population?: PopulationStats,
+    canonicalUsers?: Map<string, string>,
+  ): Promise<void> {
+    if (rateableType !== "Show") return;
+
+    const ratings = await this.loadCanonicalShowRatings(rateableType, rateableId, canonicalUsers);
+    if (ratings.length === 0) {
+      await this.db.show.update({
+        where: { id: rateableId },
+        data: { weightedRating: null, weightedRatingsCount: 0 },
+      });
+      return;
+    }
+
+    const { era, statByUserEra } = await this.loadShowExclusionContext(
+      rateableId,
+      ratings.map((rating) => rating.userId),
+    );
+    const pop = population ?? (await this.populationStats(rateableKindFromType(rateableType)));
 
     const { weightedRating, weightedRatingsCount } = computeShowWeighted(ratings, era, statByUserEra, pop);
     await this.db.show.update({

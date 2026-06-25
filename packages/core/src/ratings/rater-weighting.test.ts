@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  bucketRatingValues,
   center,
   computeCleanedScopeStats,
   entropyWeight,
@@ -9,6 +10,7 @@ import {
   RATER_ERAS,
   ratingEntropy,
   type ScopedRating,
+  selectContributingRatings,
 } from "./rater-weighting";
 
 // ratingEntropy — Shannon information entropy over a rater's value distribution.
@@ -174,5 +176,42 @@ describe("computeCleanedScopeStats", () => {
     const scopes = computeCleanedScopeStats(ratings);
     expect(scopes.get("GLOBAL")?.mean).toBe(0.5);
     expect(scopes.get("GLOBAL")?.isExcluded).toBe(false);
+  });
+});
+
+// selectContributingRatings — the "who counts" rule shared by the calibrated score
+// and histogram: drop the era's bad-faith raters, but never empty the show.
+describe("selectContributingRatings", () => {
+  const ratings = [
+    { userId: "credible", value: 5 },
+    { userId: "bomber", value: 0.5 },
+  ];
+
+  test("drops raters flagged bad-faith in the show's era", () => {
+    const used = selectContributingRatings(ratings, "MARLON", (userId) => userId === "bomber");
+    expect(used).toEqual([{ userId: "credible", value: 5 }]);
+  });
+
+  test("keeps everyone when the show has no era (date unknown)", () => {
+    const used = selectContributingRatings(ratings, null, () => true);
+    expect(used).toEqual(ratings);
+  });
+
+  test("falls back to all ratings when exclusion would empty the show", () => {
+    const used = selectContributingRatings(ratings, "MARLON", () => true);
+    expect(used).toEqual(ratings);
+  });
+});
+
+// bucketRatingValues — the single per-rateable histogram bucketing rule: group by
+// star value, skipping the sub-0.5 "unrated" sentinel.
+describe("bucketRatingValues", () => {
+  test("counts each star value and skips sub-0.5 sentinels", () => {
+    const buckets = bucketRatingValues([5, 5, 4, 0.5, 0.25, 0]);
+    expect(Object.fromEntries(buckets.map((b) => [b.value, b.count]))).toEqual({ 5: 2, 4: 1, 0.5: 1 });
+  });
+
+  test("returns no buckets for an empty set", () => {
+    expect(bucketRatingValues([])).toEqual([]);
   });
 });

@@ -312,3 +312,104 @@ describe("RaterWeightService.getDisplayedForShows", () => {
     expect(await new RaterWeightService(db).getDisplayedForShows(["s1"])).toEqual({});
   });
 });
+
+describe("RaterWeightService.getCalibratedDistribution", () => {
+  // A MARLON-era show (2026-01-01) rated by a full-range credible rater, a middle
+  // one-note rater (always 3, NOT a bomber), and a flagged floor-bomber.
+  function makeDb(overrides?: { bomberExcluded?: boolean; onenoteExcluded?: boolean }) {
+    const ratingFindMany = vi.fn().mockResolvedValue([
+      { userId: "credible", value: 5, createdAt: new Date("2026-01-02") },
+      { userId: "onenote", value: 3, createdAt: new Date("2026-01-03") },
+      { userId: "bomber", value: 0.5, createdAt: new Date("2026-01-04") },
+    ]);
+    const showFindMany = vi.fn().mockResolvedValue([{ id: "s1", date: "2026-01-01" }]);
+    const raterStatsFindMany = vi.fn().mockResolvedValue([
+      { userId: "credible", era: "GLOBAL", mean: 4, entropy: 2, ratingsCount: 20, isExcluded: false },
+      {
+        userId: "onenote",
+        era: "MARLON",
+        mean: 3,
+        entropy: 0,
+        ratingsCount: 12,
+        isExcluded: overrides?.onenoteExcluded ?? false,
+      },
+      {
+        userId: "bomber",
+        era: "MARLON",
+        mean: 0.5,
+        entropy: 0,
+        ratingsCount: 28,
+        isExcluded: overrides?.bomberExcluded ?? true,
+      },
+    ]);
+    const showUpdate = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) }, // no alias dedup in this fixture
+      rating: { findMany: ratingFindMany, groupBy: vi.fn().mockResolvedValue([]) },
+      show: { findMany: showFindMany, update: showUpdate },
+      track: { findMany: vi.fn() },
+      raterStats: { findMany: raterStatsFindMany },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) },
+      $queryRaw: vi.fn().mockResolvedValue([{ mean: 2.75 }]), // populationStats (recompute path only)
+    } as never;
+    return { db, showUpdate };
+  }
+
+  function asMap(buckets: Array<{ value: number; count: number }>): Record<number, number> {
+    return Object.fromEntries(buckets.map((b) => [b.value, b.count]));
+  }
+
+  test("drops the era-flagged bomber but keeps a middle one-note rater (raw star values)", async () => {
+    const { db } = makeDb();
+    const buckets = await new RaterWeightService(db).getCalibratedDistribution("s1");
+    // bomber (0.5) excluded; credible (5) and the non-extreme one-note (3) remain.
+    expect(asMap(buckets)).toEqual({ 5: 1, 3: 1 });
+  });
+
+  test("its bar total equals the weighted_ratings_count the score path writes", async () => {
+    const { db, showUpdate } = makeDb();
+    const service = new RaterWeightService(db);
+    const buckets = await service.getCalibratedDistribution("s1");
+    await service.recomputeRateable("Show", "s1");
+    const total = buckets.reduce((sum, b) => sum + b.count, 0);
+    const written = (showUpdate.mock.calls[0][0] as { data: { weightedRatingsCount: number } }).data
+      .weightedRatingsCount;
+    expect(total).toBe(written);
+  });
+
+  test("falls back to the full deduped set when every rater is excluded (never empty)", async () => {
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: "credible", value: 5, createdAt: new Date("2026-01-02") },
+          { userId: "onenote", value: 3, createdAt: new Date("2026-01-03") },
+          { userId: "bomber", value: 0.5, createdAt: new Date("2026-01-04") },
+        ]),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      show: { findMany: vi.fn().mockResolvedValue([{ id: "s1", date: "2026-01-01" }]) },
+      track: { findMany: vi.fn() },
+      raterStats: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: "credible", era: "MARLON", mean: 5, entropy: 0, ratingsCount: 10, isExcluded: true },
+          { userId: "onenote", era: "MARLON", mean: 3, entropy: 0, ratingsCount: 12, isExcluded: true },
+          { userId: "bomber", era: "MARLON", mean: 0.5, entropy: 0, ratingsCount: 28, isExcluded: true },
+        ]),
+      },
+    } as never;
+    const buckets = await new RaterWeightService(db).getCalibratedDistribution("s1");
+    expect(asMap(buckets)).toEqual({ 5: 1, 3: 1, 0.5: 1 });
+  });
+
+  test("returns no buckets for an unrated show", async () => {
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: { findMany: vi.fn().mockResolvedValue([]), groupBy: vi.fn().mockResolvedValue([]) },
+      show: { findMany: vi.fn().mockResolvedValue([{ id: "s1", date: "2026-01-01" }]) },
+      track: { findMany: vi.fn() },
+      raterStats: { findMany: vi.fn().mockResolvedValue([]) },
+    } as never;
+    expect(await new RaterWeightService(db).getCalibratedDistribution("s1")).toEqual([]);
+  });
+});
