@@ -92,8 +92,13 @@ export const trackSchema = z.object({
   allTimer: z.boolean().nullable().default(false),
   previousTrackId: z.string().uuid().nullable(),
   nextTrackId: z.string().uuid().nullable(),
-  averageRating: z.number().default(0.0).nullable(),
-  ratingsCount: z.number().default(0),
+  // Live rating values, populated only by fresh single-track reads
+  // (track-service → /api/tracks/:id). The structural setlist payloads
+  // deliberately omit them so a rating write never staleness-busts the
+  // (long-lived) setlist cache; setlist views read averages live via the
+  // track tier-2 path instead. See cache-keys "tier split".
+  averageRating: z.number().nullable().optional(),
+  ratingsCount: z.number().optional(),
   gap: z.number().nullable(),
   previousPerformanceShowId: z.string().uuid().nullable(),
   duration: z.number().nullable(),
@@ -142,8 +147,6 @@ export const trackLightSchema = z.object({
   likesCount: z.number().default(0),
   note: z.string().nullable(),
   allTimer: z.boolean().nullable().default(false),
-  averageRating: z.number().default(0.0).nullable(),
-  ratingsCount: z.number().default(0),
   gap: z.number().nullable(),
   previousPerformanceShowId: z.string().uuid().nullable(),
   duration: z.number().nullable(),

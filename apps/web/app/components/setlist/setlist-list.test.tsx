@@ -72,8 +72,6 @@ function makeSetlist(id: string, title: string, averageRating: number | null = 4
             likesCount: 0,
             note: null,
             allTimer: false,
-            averageRating: null,
-            ratingsCount: 0,
             gap: null,
             previousPerformanceShowId: null,
             duration: null,
@@ -181,10 +179,11 @@ describe("SetlistList", () => {
     expect(setlistCardMock.mock.calls[1][0].userRating).toBe(5);
   });
 
-  // averageRatingMap (live data from the client query) wins when present;
-  // otherwise we fall back to the statically-denormalized setlist.show.averageRating
-  // so ratings still display on first render before the client query resolves.
-  test("showRating prefers averageRatingMap over the denormalized value, falls back when missing", async () => {
+  // showRating comes from the live averageRatingMap (loader-prefetched, then the
+  // client query). Ratings no longer ride in the structural setlist blob, so a
+  // show absent from the map renders no ★ rather than a stale denormalized value.
+  // canonicalRating mirrors the canonical average for the comparison summary.
+  test("showRating comes from averageRatingMap and is null when the show is absent", async () => {
     setMockReturn({
       averageRatingMap: new Map([["show-1", { average: 4.75, count: 20 }]]),
     });
@@ -197,7 +196,9 @@ describe("SetlistList", () => {
     );
 
     expect(setlistCardMock.mock.calls[0][0].showRating).toBe(4.75);
-    expect(setlistCardMock.mock.calls[1][0].showRating).toBe(3.2);
+    expect(setlistCardMock.mock.calls[0][0].canonicalRating).toBe(4.75);
+    expect(setlistCardMock.mock.calls[1][0].showRating).toBeNull();
+    expect(setlistCardMock.mock.calls[1][0].canonicalRating).toBeNull();
   });
 
   // SetlistList must hand the hook every show id so the batched POST fetches

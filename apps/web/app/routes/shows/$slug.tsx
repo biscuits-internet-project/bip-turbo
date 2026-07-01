@@ -28,13 +28,14 @@ import { notFound } from "~/lib/errors";
 import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { deriveShowLineupNotes } from "~/lib/lineup-notes";
 import { logger } from "~/lib/logger";
-import { showUserDataQueryKey } from "~/lib/query-keys";
+import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient } from "~/lib/query-prefetch";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
 import { formatDateLong, formatMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
+import { computeTrackUserRatings } from "~/server/track-user-ratings";
 import { resolveViewerRatingMode } from "~/server/viewer-rating";
 
 interface ShowLoaderData {
@@ -116,6 +117,17 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     queryFn: () => computeShowUserData(context, showIds),
   });
 
+  // Prefetch per-track community averages (and the viewer's own ratings) keyed
+  // exactly as the gap-chart table's useTrackUserRatings call, so opening the
+  // setlist via `?view=gap-chart` paints the Rating column with no flash. Track
+  // ratings no longer ride in the cached setlist blob, so this live read is
+  // their first-paint source.
+  const trackIds = setlist.sets.flatMap((set) => set.tracks.map((track) => track.id));
+  await queryClient.prefetchQuery({
+    queryKey: trackUserRatingsQueryKey(trackIds),
+    queryFn: () => computeTrackUserRatings(context, trackIds),
+  });
+
   const nugsLinks: ExternalLink[] = nugsReleases.map((release) => ({
     url: release.url,
     label: `Listen on nugs.net${release.artistName === "Tractorbeam" ? " (Tractorbeam)" : ""}`,
@@ -161,13 +173,18 @@ export default function Show() {
   const { user } = useSession();
   const revalidator = useRevalidator();
   const [setlistView, setSetlistView] = useSetlistView();
-  const { userRatingMap, attendanceMap, displayedRatingMap, rankComparisonMap } = useShowUserData([setlist.show.id]);
+  const { userRatingMap, attendanceMap, averageRatingMap, displayedRatingMap, rankComparisonMap } = useShowUserData([
+    setlist.show.id,
+  ]);
   const userRating = userRatingMap.get(setlist.show.id) ?? null;
+  // The canonical (deduped) community average + count, read live — ratings no
+  // longer ride in the structural setlist blob.
+  const canonicalAverage = averageRatingMap.get(setlist.show.id);
   // Displayed ★ is the viewer's calibrated score when their mode resolves to calibrated
   // (server sends it only then), else the canonical average. In calibrated mode the
   // count beside it is the post-exclusion contributing count, not the deduped count.
   const displayed = displayedRatingMap.get(setlist.show.id);
-  const displayedShowRating = displayed?.rating ?? setlist.show.averageRating;
+  const displayedShowRating = displayed?.rating ?? canonicalAverage?.average ?? null;
   // Comparison overlay data, present only for viewers with the overlay enabled.
   const rankComparison = rankComparisonMap.get(setlist.show.id) ?? null;
   const userAttendance = attendanceMap.get(setlist.show.id) ?? null;
@@ -330,7 +347,8 @@ export default function Show() {
             userAttendance={userAttendance}
             userRating={userRating}
             showRating={displayedShowRating}
-            showRatingCount={displayed?.count ?? null}
+            showRatingCount={displayed?.count ?? canonicalAverage?.count ?? null}
+            canonicalRating={canonicalAverage?.average ?? null}
             rankComparison={rankComparison}
             externalSources={externalSources}
             defaultView={setlistView}

@@ -75,8 +75,6 @@ type DbTrackLight = {
   likesCount: number;
   note: string | null;
   allTimer: boolean | null;
-  averageRating: number | null;
-  ratingsCount: number;
   gap: number | null;
   previousPerformanceShowId: string | null;
   duration: number | null;
@@ -384,6 +382,11 @@ export function mapTrackToDomainEntity(
     createdAt,
     updatedAt,
     slug,
+    // Dropped from the structural blob: rating values change far more often
+    // than the setlist and would otherwise staleness-bust this cache. Setlist
+    // views read the live community average via the track tier-2 path instead.
+    averageRating: _averageRating,
+    ratingsCount: _ratingsCount,
     previousPerformanceShow,
     trackFlags,
     segueRecurrences,
@@ -605,8 +608,6 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
     likesCount: track.likesCount,
     note: track.note,
     allTimer: track.allTimer,
-    averageRating: track.averageRating,
-    ratingsCount: track.ratingsCount,
     gap: track.gap,
     previousPerformanceShowId: track.previousPerformanceShowId,
     duration: track.duration,
@@ -1024,8 +1025,6 @@ export class SetlistService {
             likesCount: true,
             note: true,
             allTimer: true,
-            averageRating: true,
-            ratingsCount: true,
             gap: true,
             previousPerformanceShowId: true,
             duration: true,

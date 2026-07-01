@@ -30,7 +30,7 @@ export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChan
   const { user } = useSession();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
-  const { userRatingMap } = useTrackUserRatings(trackIds);
+  const { userRatingMap, averageRatingMap } = useTrackUserRatings(trackIds);
 
   const setlistTracks = useMemo(
     () => tracks.map((t) => ({ id: t.id, songId: t.songId, set: t.set, position: t.position })),
@@ -51,8 +51,8 @@ export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChan
   }, [tracks, data, setlistTracks, showDate]);
 
   const columns = useMemo(
-    () => createPersonalSetlistColumns({ showSlug, userRatingMap, isAuthenticated }),
-    [showSlug, userRatingMap, isAuthenticated],
+    () => createPersonalSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
+    [showSlug, averageRatingMap, userRatingMap, isAuthenticated],
   );
 
   // Hoist the summary up to the parent so it can render alongside the

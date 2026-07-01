@@ -5,9 +5,10 @@ import { trackUserRatingsQueryKey } from "~/lib/query-keys";
 import type { TrackUserRatingsResponse } from "~/server/track-user-ratings";
 
 function mergeTrackUserRatings(results: TrackUserRatingsResponse[]): TrackUserRatingsResponse {
-  const merged: TrackUserRatingsResponse = { userRatings: {} };
+  const merged: TrackUserRatingsResponse = { userRatings: {}, averageRatings: {} };
   for (const result of results) {
     Object.assign(merged.userRatings, result.userRatings);
+    Object.assign(merged.averageRatings, result.averageRatings);
   }
   return merged;
 }
@@ -41,5 +42,15 @@ export function useTrackUserRatings(trackIds: string[]) {
     return map;
   }, [data?.userRatings]);
 
-  return { userRatingMap, isLoading };
+  const averageRatingMap = useMemo(() => {
+    const map = new Map<string, { average: number; count: number }>();
+    if (data?.averageRatings) {
+      for (const [trackId, value] of Object.entries(data.averageRatings)) {
+        map.set(trackId, value);
+      }
+    }
+    return map;
+  }, [data?.averageRatings]);
+
+  return { userRatingMap, averageRatingMap, isLoading };
 }

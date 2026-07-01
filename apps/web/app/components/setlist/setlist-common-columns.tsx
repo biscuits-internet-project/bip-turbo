@@ -27,12 +27,15 @@ function withSetPositionTiebreak<T extends TrackLight>(primary: (a: T, b: T) => 
 
 /**
  * Per-row inputs the rating column needs that the row itself doesn't carry:
- * the show slug (target of any rating mutation), the viewer's rating map
- * (resolved from useTrackUserRatings at the table level), and the auth
- * state. Identical between the catalog and personal column factories.
+ * the show slug (target of any rating mutation), the community average map and
+ * the viewer's rating map (both resolved live from useTrackUserRatings at the
+ * table level — community averages no longer ride in the structural setlist
+ * blob), and the auth state. Identical between the catalog and personal column
+ * factories.
  */
 export interface SetlistRatingContext {
   showSlug: string;
+  averageRatingMap: Map<string, { average: number; count: number }>;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
 }
@@ -49,7 +52,7 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
   // so they cluster at the bottom on desc and the top on asc. First click
   // sorts descending — "best rated first" matches the mental model when
   // scanning a setlist for highlights.
-  return columnHelper.accessor((row) => row.averageRating ?? Number.NEGATIVE_INFINITY, {
+  return columnHelper.accessor((row) => ctx.averageRatingMap.get(row.id)?.average ?? Number.NEGATIVE_INFINITY, {
     id: "rating",
     header: ({ column }) => <SortableHeader column={column} label="Rating" />,
     // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
@@ -67,20 +70,23 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
     // setlist shares the same show date, so date can't disambiguate here —
     // set+position is the canonical narrative tiebreak instead.
     sortingFn: withSetPositionTiebreak<T>((a, b) => {
-      const aRating = a.averageRating ?? Number.NEGATIVE_INFINITY;
-      const bRating = b.averageRating ?? Number.NEGATIVE_INFINITY;
+      const aAvg = ctx.averageRatingMap.get(a.id);
+      const bAvg = ctx.averageRatingMap.get(b.id);
+      const aRating = aAvg?.average ?? Number.NEGATIVE_INFINITY;
+      const bRating = bAvg?.average ?? Number.NEGATIVE_INFINITY;
       if (aRating !== bRating) return aRating - bRating;
-      return (a.ratingsCount ?? 0) - (b.ratingsCount ?? 0);
+      return (aAvg?.count ?? 0) - (bAvg?.count ?? 0);
     }),
     sortDescFirst: true,
     cell: (info) => {
       const row = info.row.original;
+      const average = ctx.averageRatingMap.get(row.id) ?? null;
       return (
         <TrackRatingCell
           trackId={row.id}
           showSlug={ctx.showSlug}
-          initialRating={row.averageRating ?? null}
-          ratingsCount={row.ratingsCount ?? null}
+          initialRating={average?.average ?? null}
+          ratingsCount={average?.count ?? null}
           userRating={ctx.userRatingMap.get(row.id) ?? null}
           isAuthenticated={ctx.isAuthenticated}
         />

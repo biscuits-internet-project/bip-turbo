@@ -1,7 +1,5 @@
-import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
 import { getFeatureFlags } from "../src/_shared/quonfig";
-import { RedisService } from "../src/_shared/redis";
 import { createTestLogger } from "../src/_shared/test-logger";
 import { RaterWeightService } from "../src/ratings/rater-weight-service";
 import { RatingService } from "../src/ratings/rating-service";
@@ -24,19 +22,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  const redisUrl = process.env.REDIS_URL;
-  const redis = redisUrl ? new RedisService(redisUrl, logger) : null;
-  if (redis) await redis.connect();
-  const cache = redis ? new CacheService(redis, logger) : null;
-  const cacheInvalidation = cache ? new CacheInvalidationService(cache, logger) : undefined;
-
   const raterWeights = new RaterWeightService(prisma);
-  const ratings = new RatingService(prisma, cacheInvalidation as never, raterWeights);
+  const ratings = new RatingService(prisma, raterWeights);
 
   try {
     await runRatingsRecompute({ raterWeights, ratings, logger });
   } finally {
-    await redis?.disconnect();
     await prisma.$disconnect();
   }
 }

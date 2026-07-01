@@ -27,6 +27,7 @@ export function createPersonalSetlistColumns(
 ): ColumnDef<PersonalSetlistTableRow, unknown>[] {
   const ratingCtx: SetlistRatingContext = {
     showSlug: ctx?.showSlug ?? "",
+    averageRatingMap: ctx?.averageRatingMap ?? new Map(),
     userRatingMap: ctx?.userRatingMap ?? new Map(),
     isAuthenticated: ctx?.isAuthenticated ?? false,
   };

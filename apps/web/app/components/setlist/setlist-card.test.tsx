@@ -17,7 +17,11 @@ vi.mock("~/hooks/use-show-user-data", () => ({
 // view; that path calls useTrackUserRatings which needs a QueryClient. Stub
 // it so the table renders without any React Query setup.
 vi.mock("~/hooks/use-track-user-ratings", () => ({
-  useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
+  useTrackUserRatings: vi.fn(() => ({
+    userRatingMap: new Map<string, number>(),
+    averageRatingMap: new Map<string, { average: number; count: number }>(),
+    isLoading: false,
+  })),
 }));
 // SetlistTable also fetches the catalog play-dates blob for the Played
 // Before column; stub it so the gap-chart view renders without React Query.
@@ -87,8 +91,6 @@ function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
             likesCount: 0,
             note: null,
             allTimer: false,
-            averageRating: null,
-            ratingsCount: 0,
             gap: null,
             previousPerformanceShowId: null,
             duration: null,
@@ -423,10 +425,11 @@ describe("SetlistCard", () => {
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
-  // Calibrated mode passes the post-exclusion count via showRatingCount, which must
-  // override the embedded deduped ratingsCount on the rating badge — so a calibrated
-  // viewer sees "· 33", not the deduped "· 10". (makeSetlist embeds ratingsCount=10.)
-  test("showRatingCount overrides the embedded ratingsCount on the rating badge", async () => {
+  // The count beside the ★ comes entirely from the live showRatingCount prop
+  // (canonical in simple mode, post-exclusion in calibrated mode). Ratings no
+  // longer ride in the setlist blob, so the badge shows "· 33", and the
+  // blob's stale ratingsCount=10 is never read.
+  test("rating badge shows the live showRatingCount", async () => {
     await setupWithRouter(
       <SetlistCard
         setlist={makeSetlist()}
@@ -440,13 +443,14 @@ describe("SetlistCard", () => {
     expect(screen.queryByText("10")).not.toBeInTheDocument();
   });
 
-  // Simple mode (no showRatingCount): the badge falls back to the embedded deduped
-  // ratingsCount (10).
-  test("rating badge falls back to the embedded ratingsCount when showRatingCount is absent", async () => {
+  // No live count prop: the badge shows no count. The embedded ratingsCount (10)
+  // is NOT a fallback anymore — rating values were removed from the structural
+  // blob, so nothing reads setlist.show.ratingsCount.
+  test("rating badge does not fall back to the embedded ratingsCount", async () => {
     await setupWithRouter(
       <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={4.0} />,
     );
-    expect(screen.getAllByText("10").length).toBeGreaterThan(0);
+    expect(screen.queryByText("10")).not.toBeInTheDocument();
   });
 
   // averageSongGap=null happens for all-debut/all-repeat shows. The summary

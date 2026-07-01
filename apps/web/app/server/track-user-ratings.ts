@@ -3,26 +3,38 @@ import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 export interface TrackUserRatingsResponse {
+  /** The current user's own rating per track (absent when unrated/unauthenticated). */
   userRatings: Record<string, number | null>;
+  /**
+   * The deduped community average + count per track, read live from the
+   * denormalized columns. Public, so it's populated for anonymous visitors too.
+   * Lives here rather than in the structural setlist cache so a rating write
+   * never staleness-busts the (long-lived) setlist blob.
+   */
+  averageRatings: Record<string, { average: number; count: number }>;
 }
 
 /**
- * Fetches the current user's ratings for a batch of tracks. Returns an empty
- * `userRatings` map for unauthenticated visitors (track ratings are
- * user-scoped — there is no public aggregate to surface here, unlike shows).
- * Shared by the `/api/tracks/user-ratings` action and any loader that wants
- * to seed React Query's cache so PerformanceTable / setlist gap-chart views
- * render personal ratings on first paint.
+ * Fetches the live per-track rating data a setlist/performance view needs that
+ * doesn't belong in the structural cache: the public community average+count
+ * (everyone, every request) and the current user's own rating (authenticated
+ * only). Shared by the `/api/tracks/user-ratings` action and any loader that
+ * wants to seed React Query's cache so PerformanceTable / setlist gap-chart
+ * views render ratings on first paint.
  */
 export async function computeTrackUserRatings(
   context: Pick<PublicContext, "currentUser">,
   trackIds: string[],
 ): Promise<TrackUserRatingsResponse> {
-  const response: TrackUserRatingsResponse = { userRatings: {} };
+  const response: TrackUserRatingsResponse = { userRatings: {}, averageRatings: {} };
 
-  if (trackIds.length === 0 || !context.currentUser) return response;
+  if (trackIds.length === 0) return response;
 
   try {
+    response.averageRatings = await services.ratings.getAveragesForRateables(trackIds, "Track");
+
+    if (!context.currentUser) return response;
+
     const user = await services.users.findByEmail(context.currentUser.email);
     if (!user) return response;
 

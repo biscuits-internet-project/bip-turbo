@@ -1,14 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { RatingService } from "./rating-service";
 
-// Minimal stub — service only invalidates caches at write paths; the read
-// methods under test don't touch it.
-const cacheInvalidation = {
-  invalidateAttendanceCaches: vi.fn(),
-  invalidateShow: vi.fn(),
-  invalidateShowComprehensive: vi.fn(),
-} as never;
-
 // Build distinct-user rating rows (no dedup collision) for the canonical-average
 // path, which now reads rating.findMany + collapses duplicate accounts. Returns
 // rows shaped like the service's select (value + createdAt + userId + user.username).
@@ -110,7 +102,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
   test("default sort=date desc orders via showOrderBySql with createdAt tiebreaker", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findShowRatingsByUserId("u1");
 
@@ -127,7 +119,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
   test("maps rows into the slim shape (no userId/rateableId/updatedAt)", async () => {
     const queryRaw = vi.fn().mockResolvedValue([showRatingRow()]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     const result = await service.findShowRatingsByUserId("u1");
 
@@ -157,7 +149,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
       .fn()
       .mockResolvedValue([showRatingRow({ venue_name: null, venue_city: null, venue_state: null })]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     const result = await service.findShowRatingsByUserId("u1");
 
@@ -171,7 +163,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
   test("supports skip/take pagination via LIMIT/OFFSET", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findShowRatingsByUserId("u1", { skip: 200, take: 100 });
 
@@ -192,7 +184,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
   test("uses INNER JOIN against shows so orphaned ratings drop", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findShowRatingsByUserId("u1");
 
@@ -206,7 +198,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
   test("sort=rating desc orders by r.value then showOrderBySql DESC then createdAt", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findShowRatingsByUserId("u1", { sort: "rating", direction: "desc" });
 
@@ -220,7 +212,7 @@ describe("RatingService.findShowRatingsByUserId", () => {
   test("sort=modified asc orders by r.created_at then showOrderBySql ASC", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findShowRatingsByUserId("u1", { sort: "modified", direction: "asc" });
 
@@ -270,7 +262,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("default sort=date desc orders by showOrderBySql DESC then set + position DESC", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1");
 
@@ -288,7 +280,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("maps rows into the slim shape", async () => {
     const queryRaw = vi.fn().mockResolvedValue([trackRatingRow()]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     const result = await service.findTrackRatingsByUserId("u1");
 
@@ -320,7 +312,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("returns track.show.venue = null when venue_name is null", async () => {
     const queryRaw = vi.fn().mockResolvedValue([trackRatingRow({ venue_name: null })]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     const result = await service.findTrackRatingsByUserId("u1");
 
@@ -330,7 +322,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("supports skip/take pagination via LIMIT/OFFSET", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1", { skip: 100, take: 100 });
 
@@ -343,7 +335,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("sort=set asc orders by setSortKeySql ASC then position ASC then showOrderBySql ASC", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1", { sort: "set", direction: "asc" });
 
@@ -357,7 +349,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("sort=track asc orders by position ASC then setSortKeySql ASC then showOrderBySql ASC", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1", { sort: "track", direction: "asc" });
 
@@ -371,7 +363,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("sort=song asc orders by LOWER(song.title)", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1", { sort: "song", direction: "asc" });
 
@@ -383,7 +375,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("sort=rating desc orders by r.value then showOrderBySql then set/position", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1", { sort: "rating", direction: "desc" });
 
@@ -396,7 +388,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("sort=modified asc orders by r.created_at then showOrderBySql ASC", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1", { sort: "modified", direction: "asc" });
 
@@ -411,7 +403,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("projects encores_in_set via a per-row tracks subquery", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1");
 
@@ -427,7 +419,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("exposes encoresInSet on the returned track shape", async () => {
     const queryRaw = vi.fn().mockResolvedValue([trackRatingRow({ track_set: "E1", encores_in_set: 1 })]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     const result = await service.findTrackRatingsByUserId("u1");
 
@@ -437,7 +429,7 @@ describe("RatingService.findTrackRatingsByUserId", () => {
   test("INNER JOINs tracks/shows/songs so orphan ratings drop", async () => {
     const queryRaw = vi.fn().mockResolvedValue([]);
     const db = { $queryRaw: queryRaw } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     await service.findTrackRatingsByUserId("u1");
 
@@ -463,7 +455,7 @@ describe("RatingService.clearForUser", () => {
       track: { update: vi.fn() },
     } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     const result = await service.clearForUser({ rateableId: "show-1", rateableType: "Show", userId: "u1" });
 
     expect(result).toEqual({ averageRating: 4.2, ratingsCount: 5 });
@@ -497,7 +489,7 @@ describe("RatingService.clearForUser", () => {
       track: { update: vi.fn() },
     } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     const result = await service.clearForUser({ rateableId: "show-1", rateableType: "Show", userId: "u1" });
 
     expect(result).toEqual({ averageRating: 0, ratingsCount: 0 });
@@ -517,7 +509,7 @@ describe("RatingService.clearForUser", () => {
       track: { update: trackUpdate },
     } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     await service.clearForUser({ rateableId: "track-1", rateableType: "Track", userId: "u1" });
 
     expect(trackUpdate).toHaveBeenCalledWith(
@@ -527,66 +519,6 @@ describe("RatingService.clearForUser", () => {
       }),
     );
     expect(showUpdate).not.toHaveBeenCalled();
-  });
-
-  // Show-type clears invalidate the show's comprehensive cache the same
-  // way upsert does, so the next read of the show payload sees the new
-  // averageRating + ratingsCount.
-  test("invalidates the show cache when clearing a Show rating with a showSlug", async () => {
-    const invalidate = vi.fn();
-    const db = {
-      rating: {
-        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        findMany: vi.fn().mockResolvedValue(ratingRows(4)), // single rater, avg 4.0
-      },
-      show: { update: vi.fn() },
-      track: { update: vi.fn() },
-    } as never;
-
-    const service = new RatingService(db, {
-      invalidateAttendanceCaches: vi.fn(),
-      invalidateShow: vi.fn(),
-      invalidateShowComprehensive: invalidate,
-    } as never);
-    await service.clearForUser({
-      rateableId: "show-1",
-      rateableType: "Show",
-      userId: "u1",
-      showSlug: "2024-08-12-cap-theatre",
-    });
-
-    expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
-  });
-
-  // Track-type clears bust the show comprehensively, year-scoped, exactly like
-  // Show clears. Track.averageRating/ratingsCount are embedded in BOTH the
-  // per-show show.data payload AND the year-listing shows:list payload (its
-  // gap-chart view shows track averages), so a track rating change must purge
-  // the year listing too or the listing serves stale "Rate" buttons.
-  test("invalidates the show comprehensively, year-scoped, when clearing a Track rating with a showSlug", async () => {
-    const invalidate = vi.fn();
-    const db = {
-      rating: {
-        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
-        findMany: vi.fn().mockResolvedValue(ratingRows(3, 4)), // 2 distinct raters, avg 3.5
-      },
-      show: { update: vi.fn() },
-      track: { update: vi.fn() },
-    } as never;
-
-    const service = new RatingService(db, {
-      invalidateAttendanceCaches: vi.fn(),
-      invalidateShow: vi.fn(),
-      invalidateShowComprehensive: invalidate,
-    } as never);
-    await service.clearForUser({
-      rateableId: "track-1",
-      rateableType: "Track",
-      userId: "u1",
-      showSlug: "2024-08-12-cap-theatre",
-    });
-
-    expect(invalidate).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
   });
 });
 
@@ -613,7 +545,7 @@ describe("RatingService.rebuildAggregatesFor", () => {
       $executeRaw: executeRaw,
     } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     await service.rebuildAggregatesFor([
       { rateableId: "show-1", rateableType: "Show" },
       { rateableId: "show-2", rateableType: "Show" },
@@ -638,7 +570,7 @@ describe("RatingService.rebuildAggregatesFor", () => {
     const executeRaw = vi.fn().mockResolvedValue(1);
     const db = { rating: { findMany: vi.fn().mockResolvedValue([]) }, $executeRaw: executeRaw } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     await service.rebuildAggregatesFor([{ rateableId: "show-abandoned", rateableType: "Show" }]);
 
     expect(bulkAverageWrites(executeRaw)[0].tuples).toContainEqual({
@@ -663,7 +595,7 @@ describe("RatingService.rebuildAggregatesFor", () => {
       $executeRaw: executeRaw,
     } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     await service.rebuildAggregatesFor([
       { rateableId: "show-1", rateableType: "Show" },
       { rateableId: "track-1", rateableType: "Track" },
@@ -681,7 +613,7 @@ describe("RatingService.rebuildAggregatesFor", () => {
     const executeRaw = vi.fn();
     const db = { rating: { findMany }, $executeRaw: executeRaw } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     await service.rebuildAggregatesFor([]);
 
     expect(findMany).not.toHaveBeenCalled();
@@ -697,7 +629,7 @@ describe("RatingService.listForSync", () => {
     const findMany = vi.fn().mockResolvedValue([]);
     const db = { rating: { findMany } } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     const since = new Date("2024-01-01T00:00:00Z");
     await service.listForSync({ since, limit: 100 });
 
@@ -712,7 +644,7 @@ describe("RatingService.listForSync", () => {
     const findMany = vi.fn().mockResolvedValue([]);
     const db = { rating: { findMany } } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     const cursorUpdatedAt = new Date("2024-05-01T00:00:00Z");
     await service.listForSync({
       since: new Date(0),
@@ -735,7 +667,7 @@ describe("RatingService.listForSync", () => {
     const findMany = vi.fn().mockResolvedValue([]);
     const db = { rating: { findMany } } as never;
 
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
     await service.listForSync({ since: new Date(0), limit: 100 });
 
     expect(findMany.mock.calls[0][0].select).toEqual({
@@ -751,53 +683,13 @@ describe("RatingService.listForSync", () => {
 });
 
 describe("RatingService.upsert", () => {
-  // Track ratings bust the show comprehensively, year-scoped, exactly like Show
-  // ratings: Track.averageRating/ratingsCount are embedded in BOTH the per-show
-  // show.data payload AND the year-listing shows:list payload (its gap-chart view
-  // shows track averages), so the year listing must be purged too.
-  test("invalidates the show comprehensively, year-scoped, when upserting a Track rating with a showSlug", async () => {
-    const invalidateShowComprehensive = vi.fn();
+  // Writing a rating recomputes and persists the deduped denormalized
+  // averageRating/ratingsCount on the rateable row — the value setlist views
+  // read live afterward. (Rating writes no longer touch any structural cache;
+  // there is no cache-invalidation dependency to exercise.)
+  test("recomputes and writes the rateable's denormalized average", async () => {
     const now = new Date("2024-08-12T00:00:00Z");
-    const db = {
-      rating: {
-        upsert: vi.fn().mockResolvedValue({
-          id: "r1",
-          userId: "u1",
-          rateableId: "track-1",
-          rateableType: "Track",
-          value: 4,
-          createdAt: now,
-          updatedAt: now,
-        }),
-        findMany: vi.fn().mockResolvedValue(ratingRows(4)),
-      },
-      show: { update: vi.fn() },
-      track: { update: vi.fn() },
-    } as never;
-
-    const service = new RatingService(db, {
-      invalidateAttendanceCaches: vi.fn(),
-      invalidateShow: vi.fn(),
-      invalidateShowComprehensive,
-    } as never);
-    await service.upsert({
-      rateableId: "track-1",
-      rateableType: "Track",
-      userId: "u1",
-      value: 4,
-      showSlug: "2024-08-12-cap-theatre",
-    });
-
-    expect(invalidateShowComprehensive).toHaveBeenCalledWith(undefined, "2024-08-12-cap-theatre", [2024]);
-  });
-
-  // Show ratings go through invalidateShowComprehensive — the year is parsed
-  // from the slug's leading `YYYY-MM-DD-` so the past-year edge entry on
-  // `/shows/year/YYYY` gets purged. Without the right year, a 2018 rating
-  // would clear Redis but leave the 24h-cached year listing stale.
-  test("passes the slug's year to invalidateShowComprehensive on a Show rating", async () => {
-    const invalidateShowComprehensive = vi.fn();
-    const now = new Date("2018-07-12T00:00:00Z");
+    const showUpdate = vi.fn().mockResolvedValue(undefined);
     const db = {
       rating: {
         upsert: vi.fn().mockResolvedValue({
@@ -805,30 +697,25 @@ describe("RatingService.upsert", () => {
           userId: "u1",
           rateableId: "show-1",
           rateableType: "Show",
-          value: 5,
+          value: 4,
           createdAt: now,
           updatedAt: now,
         }),
-        findMany: vi.fn().mockResolvedValue(ratingRows(5)),
+        findMany: vi.fn().mockResolvedValue(ratingRows(4, 4, 4, 5)), // 4 distinct raters, avg 4.25
       },
-      show: { update: vi.fn() },
+      show: { update: showUpdate },
       track: { update: vi.fn() },
     } as never;
 
-    const service = new RatingService(db, {
-      invalidateAttendanceCaches: vi.fn(),
-      invalidateShow: vi.fn(),
-      invalidateShowComprehensive,
-    } as never);
-    await service.upsert({
-      rateableId: "show-1",
-      rateableType: "Show",
-      userId: "u1",
-      value: 5,
-      showSlug: "2018-07-12-red-rocks",
-    });
+    const service = new RatingService(db);
+    await service.upsert({ rateableId: "show-1", rateableType: "Show", userId: "u1", value: 4 });
 
-    expect(invalidateShowComprehensive).toHaveBeenCalledWith(undefined, "2018-07-12-red-rocks", [2018]);
+    expect(showUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "show-1" },
+        data: expect.objectContaining({ averageRating: 4.25, ratingsCount: 4 }),
+      }),
+    );
   });
 });
 
@@ -864,7 +751,7 @@ describe("RatingService experimental rater-weight refresh", () => {
       recomputeRateable: vi.fn().mockResolvedValue(undefined),
     };
     const db = makeDb();
-    const service = new RatingService(db, cacheInvalidation, raterWeights as never);
+    const service = new RatingService(db, raterWeights as never);
     await service.upsert({ rateableId: "show-1", rateableType: "Show", userId: "u1", value: 5 });
 
     // The actor's stats are NOT recomputed on write (the cron handles that); only
@@ -883,7 +770,7 @@ describe("RatingService experimental rater-weight refresh", () => {
       recomputeUser: vi.fn().mockResolvedValue(undefined),
       recomputeRateable: vi.fn().mockResolvedValue(undefined),
     };
-    const service = new RatingService(makeDb(), cacheInvalidation, raterWeights as never);
+    const service = new RatingService(makeDb(), raterWeights as never);
     await service.clearForUser({ rateableId: "show-1", rateableType: "Show", userId: "u1" });
 
     expect(raterWeights.recomputeRateable).toHaveBeenCalledWith("Show", "show-1");
@@ -894,7 +781,7 @@ describe("RatingService experimental rater-weight refresh", () => {
       recomputeUser: vi.fn(),
       recomputeRateable: vi.fn().mockRejectedValue(new Error("side-table boom")),
     };
-    const service = new RatingService(makeDb(), cacheInvalidation, raterWeights as never);
+    const service = new RatingService(makeDb(), raterWeights as never);
 
     await expect(
       service.upsert({ rateableId: "show-1", rateableType: "Show", userId: "u1", value: 5 }),
@@ -916,7 +803,7 @@ describe("RatingService.getAveragesForRateables", () => {
       },
       // A live AVG would touch rating.* — left undefined so any such call throws.
     } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     expect(await service.getAveragesForRateables(["show-1", "show-2"], "Show")).toEqual({
       "show-1": { average: 4.72, count: 18 },
@@ -928,7 +815,7 @@ describe("RatingService.getAveragesForRateables", () => {
     const db = {
       track: { findMany: vi.fn().mockResolvedValue([{ id: "t1", averageRating: 3.5, ratingsCount: 5 }]) },
     } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     expect(await service.getAveragesForRateables(["t1"], "Track")).toEqual({ t1: { average: 3.5, count: 5 } });
   });
@@ -943,7 +830,7 @@ describe("RatingService.getAveragesForRateables", () => {
         ]),
       },
     } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     expect(await service.getAveragesForRateables(["rated", "null-avg", "zero-count"], "Show")).toEqual({
       rated: { average: 4.0, count: 3 },
@@ -952,7 +839,7 @@ describe("RatingService.getAveragesForRateables", () => {
 
   test("returns empty without querying when given no ids", async () => {
     const findMany = vi.fn();
-    const service = new RatingService({ show: { findMany } } as never, cacheInvalidation);
+    const service = new RatingService({ show: { findMany } } as never);
 
     expect(await service.getAveragesForRateables([], "Show")).toEqual({});
     expect(findMany).not.toHaveBeenCalled();
@@ -964,14 +851,14 @@ describe("RatingService.getAverageForRateable", () => {
     const db = {
       show: { findMany: vi.fn().mockResolvedValue([{ id: "s1", averageRating: 4.72, ratingsCount: 18 }]) },
     } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     expect(await service.getAverageForRateable("s1", "Show")).toBe(4.72);
   });
 
   test("returns null for an unrated rateable", async () => {
     const db = { show: { findMany: vi.fn().mockResolvedValue([]) } } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     expect(await service.getAverageForRateable("s1", "Show")).toBeNull();
   });
@@ -992,7 +879,7 @@ describe("RatingService.getRatingDistribution", () => {
         ]),
       },
     } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     const distribution = await service.getRatingDistribution("show-1", "Show");
     const countByValue = Object.fromEntries(distribution.map((bucket) => [bucket.value, bucket.count]));
@@ -1011,7 +898,7 @@ describe("RatingService.getRatingDistribution", () => {
         ]),
       },
     } as never;
-    const service = new RatingService(db, cacheInvalidation);
+    const service = new RatingService(db);
 
     expect(await service.getRatingDistribution("show-1", "Show")).toEqual([{ value: 3, count: 1 }]);
   });

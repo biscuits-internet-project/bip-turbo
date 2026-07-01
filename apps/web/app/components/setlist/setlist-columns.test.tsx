@@ -37,8 +37,6 @@ function makeTrack(
     likesCount: 0,
     note: null,
     allTimer: false,
-    averageRating: overrides.averageRating ?? null,
-    ratingsCount: overrides.ratingsCount ?? 0,
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
     duration: overrides.duration ?? null,
@@ -52,6 +50,12 @@ function makeTrack(
     song: overrides.song ?? { id: overrides.songId, title: "Basis for a Day", slug: "basis-for-a-day" },
     priorPerformanceCount: overrides.priorPerformanceCount ?? 0,
   };
+}
+
+// Build the community-average map the rating column reads. Track ratings no
+// longer live on the row — they come from the live tier-2 fetch (averageRatingMap).
+function avgMap(entries: Array<[id: string, average: number, count: number]>) {
+  return new Map(entries.map(([id, average, count]) => [id, { average, count }]));
 }
 
 // Renders the column definitions through a real table so we exercise the cell
@@ -250,34 +254,22 @@ describe("createSetlistColumns", () => {
   // canonical setlist order.
   test("sorting by Rating tiebreaks on vote count when averages match", async () => {
     const user = userEvent.setup();
-    await renderTable([
-      // Two tracks tied at 4.5; "Confrontation" has more votes so it should
-      // sort ahead of "Crickets" when the table sorts rating descending.
-      makeTrack({
-        songId: "a",
-        position: 1,
-        set: "S1",
-        averageRating: 4.5,
-        ratingsCount: 3,
-        song: { id: "a", title: "Crickets", slug: "c" },
-      }),
-      makeTrack({
-        songId: "b",
-        position: 2,
-        set: "S1",
-        averageRating: 4.5,
-        ratingsCount: 50,
-        song: { id: "b", title: "Confrontation", slug: "co" },
-      }),
-      makeTrack({
-        songId: "c",
-        position: 3,
-        set: "S1",
-        averageRating: 3.0,
-        ratingsCount: 100,
-        song: { id: "c", title: "Above the Waves", slug: "a" },
-      }),
-    ]);
+    await renderTable(
+      [
+        // Two tracks tied at 4.5; "Confrontation" has more votes so it should
+        // sort ahead of "Crickets" when the table sorts rating descending.
+        makeTrack({ songId: "a", position: 1, set: "S1", song: { id: "a", title: "Crickets", slug: "c" } }),
+        makeTrack({ songId: "b", position: 2, set: "S1", song: { id: "b", title: "Confrontation", slug: "co" } }),
+        makeTrack({ songId: "c", position: 3, set: "S1", song: { id: "c", title: "Above the Waves", slug: "a" } }),
+      ],
+      {
+        averageRatingMap: avgMap([
+          ["t-1", 4.5, 3],
+          ["t-2", 4.5, 50],
+          ["t-3", 3.0, 100],
+        ]),
+      },
+    );
     // First click on Rating sorts descending ("best first" via sortDescFirst).
     await user.click(screen.getByRole("button", { name: /Rating/i }));
     const songCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
@@ -297,31 +289,12 @@ describe("createSetlistColumns", () => {
   // columns: tiebreak direction follows primary direction.
   test("sorting by Rating with identical rating+votes falls back to set+position", async () => {
     const user = userEvent.setup();
+    // No averageRatingMap entries → every row is unrated, so the rating axis ties
+    // and the sort falls through to set+position.
     await renderTable([
-      makeTrack({
-        songId: "a",
-        position: 3,
-        set: "S1",
-        averageRating: null,
-        ratingsCount: 0,
-        song: { id: "a", title: "Crickets", slug: "c" },
-      }),
-      makeTrack({
-        songId: "b",
-        position: 1,
-        set: "S1",
-        averageRating: null,
-        ratingsCount: 0,
-        song: { id: "b", title: "Above the Waves", slug: "a" },
-      }),
-      makeTrack({
-        songId: "c",
-        position: 2,
-        set: "S1",
-        averageRating: null,
-        ratingsCount: 0,
-        song: { id: "c", title: "Basis for a Day", slug: "b" },
-      }),
+      makeTrack({ songId: "a", position: 3, set: "S1", song: { id: "a", title: "Crickets", slug: "c" } }),
+      makeTrack({ songId: "b", position: 1, set: "S1", song: { id: "b", title: "Above the Waves", slug: "a" } }),
+      makeTrack({ songId: "c", position: 2, set: "S1", song: { id: "c", title: "Basis for a Day", slug: "b" } }),
     ]);
     await user.click(screen.getByRole("button", { name: /Rating/i }));
     const songCells = screen.getAllByRole("cell").filter((_, i) => i % 9 === 3);
@@ -553,19 +526,21 @@ describe("createSetlistColumns", () => {
         makeTrack({
           songId: "song-basis",
           position: 1,
-          averageRating: 4.2,
-          ratingsCount: 17,
           song: { id: "song-basis", title: "Basis for a Day", slug: "basis-for-a-day" },
         }),
         makeTrack({
           songId: "song-munchkin",
           position: 2,
-          averageRating: null,
-          ratingsCount: 0,
           song: { id: "song-munchkin", title: "Munchkin Invasion", slug: "munchkin-invasion" },
         }),
       ],
-      { showSlug: "2024-07-19-camden", userRatingMap, isAuthenticated: true },
+      {
+        showSlug: "2024-07-19-camden",
+        // t-1 has a community average; t-2 is unrated (absent from the map → null).
+        averageRatingMap: avgMap([["t-1", 4.2, 17]]),
+        userRatingMap,
+        isAuthenticated: true,
+      },
     );
 
     expectAllMockedShallowComponent("TrackRatingCell", [
@@ -580,8 +555,10 @@ describe("createSetlistColumns", () => {
       {
         trackId: "t-2",
         showSlug: "2024-07-19-camden",
+        // Absent from averageRatingMap → both the average and its count are null
+        // (the row no longer carries a default ratingsCount of 0).
         initialRating: null,
-        ratingsCount: 0,
+        ratingsCount: null,
         userRating: null,
         isAuthenticated: true,
       },
@@ -592,15 +569,16 @@ describe("createSetlistColumns", () => {
   // handled inside RatingBadgeButton). The factory must forward
   // isAuthenticated=false without crashing when no userRatingMap is given.
   test("Rating cells render with anonymous viewer (no userRatingMap)", async () => {
-    await renderTable([
-      makeTrack({
-        songId: "song-crickets",
-        position: 1,
-        averageRating: 3.8,
-        ratingsCount: 5,
-        song: { id: "song-crickets", title: "Crickets", slug: "crickets" },
-      }),
-    ]);
+    await renderTable(
+      [
+        makeTrack({
+          songId: "song-crickets",
+          position: 1,
+          song: { id: "song-crickets", title: "Crickets", slug: "crickets" },
+        }),
+      ],
+      { averageRatingMap: avgMap([["t-1", 3.8, 5]]) },
+    );
 
     expectAllMockedShallowComponent("TrackRatingCell", [
       {
