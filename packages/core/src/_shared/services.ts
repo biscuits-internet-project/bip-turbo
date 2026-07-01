@@ -114,7 +114,7 @@ export function createServices(container: ServiceContainer): Services {
     personalSongHistory: new PersonalSongHistoryService(container.db, container.cache),
     reviews: new ReviewService(container.db, container.logger),
     rockOperas: rockOperaService,
-    ratings: new RatingService(container.db, container.cacheInvalidation, raterWeightService),
+    ratings: new RatingService(container.db, raterWeightService),
     raterWeights: raterWeightService,
     attendances: new AttendanceService(container.db, container.logger),
     songPageComposer: new SongPageComposer(container.db, songService, statsService),

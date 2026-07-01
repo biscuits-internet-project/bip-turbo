@@ -36,7 +36,7 @@ export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) 
   const { user } = useSession();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
-  const { userRatingMap } = useTrackUserRatings(trackIds);
+  const { userRatingMap, averageRatingMap } = useTrackUserRatings(trackIds);
   const { data: songPlayDates, isLoading: isPlayDatesLoading } = useSongPlayDates();
 
   const rows: SetlistTableRow[] = useMemo(() => {
@@ -47,8 +47,8 @@ export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) 
   }, [tracks, songPlayDates, isPlayDatesLoading, showDate]);
 
   const columns = useMemo(
-    () => createSetlistColumns({ showSlug, userRatingMap, isAuthenticated }),
-    [showSlug, userRatingMap, isAuthenticated],
+    () => createSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
+    [showSlug, averageRatingMap, userRatingMap, isAuthenticated],
   );
   return (
     <DataTable

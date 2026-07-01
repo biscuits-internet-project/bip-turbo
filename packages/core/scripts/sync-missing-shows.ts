@@ -332,16 +332,6 @@ export interface McpBlogPost {
 const SYNC_PAGE_LIMIT = 2000;
 
 /**
- * No-op CacheInvalidationService used when the script runs without REDIS.
- * RatingService.rebuildAggregatesFor doesn't call any of these methods, but
- * the constructor still requires the dependency.
- */
-function createNoopCacheInvalidation(): Record<string, () => Promise<void>> {
-  const noop = async () => {};
-  return new Proxy({}, { get: () => noop }) as Record<string, () => Promise<void>>;
-}
-
-/**
  * Synthetic email used for every stub user mirrored from prod. The real
  * email never leaves prod, but User.email is NOT NULL UNIQUE, so we
  * generate a deterministic placeholder from the prod uuid. Tests assert
@@ -2556,14 +2546,10 @@ async function syncMissingShows(): Promise<void> {
   // RatingService.rebuildAggregatesFor is the bulk version of the per-row
   // recompute used by the live mutation path. The user-activity pass calls
   // it once at the end for every (rateableType, rateableId) it touched.
-  // cacheInvalidation is only used by the per-row mutation methods (upsert /
-  // clearForUser), not by rebuildAggregatesFor — the script does its own
-  // outer invalidation pass on changedSlugs — so a no-op stub is sufficient
-  // in REDIS-less local runs.
-  const ratingService = new RatingService(
-    prisma,
-    cacheInvalidation ?? (createNoopCacheInvalidation() as unknown as CacheInvalidationService),
-  );
+  // RatingService needs no cache-invalidation dependency: the sync only calls
+  // rebuildAggregatesFor (rating writes no longer bust any structural cache),
+  // and it does its own outer invalidation pass on changedSlugs.
+  const ratingService = new RatingService(prisma);
   // Synced ratings change rater stats and every show's calibrated weighted_rating,
   // but they bypass the live write path that flags the recompute dirty, so the
   // sync runs the calibrated recompute itself at the end (see below).

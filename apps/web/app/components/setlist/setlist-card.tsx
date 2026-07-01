@@ -34,6 +34,14 @@ interface SetlistCardProps {
    * (post-exclusion) contributing count; absent ⇒ the canonical deduped count.
    */
   showRatingCount?: number | null;
+  /**
+   * The canonical (deduped community) average, read live from useShowUserData.
+   * Used by the calibrated/rank comparison summary, which always compares
+   * against the canonical score regardless of the viewer's display mode.
+   * Ratings no longer ride in the structural setlist blob, so this is supplied
+   * by the parent rather than read off `setlist.show`.
+   */
+  canonicalRating?: number | null;
   externalSources?: ShowExternalSources;
   /**
    * Simple→calibrated score + rank summary for this show. Rendered next to the ★
@@ -67,6 +75,7 @@ function SetlistCardComponent({
   userRating,
   showRating,
   showRatingCount,
+  canonicalRating,
   externalSources,
   rankComparison,
   collapsible = false,
@@ -139,15 +148,16 @@ function SetlistCardComponent({
   // Resolve the user's rating from either of the supported prop shapes
   // (a Rating object or a bare number) into a single value for the badge.
   const resolvedUserRating = typeof userRating === "number" ? userRating : (userRating?.value ?? null);
-  const displayedRating = showRating ?? setlist.show.averageRating ?? null;
+  const displayedRating = showRating ?? null;
   // In calibrated mode the count is the post-exclusion contributing count (passed
-  // alongside the calibrated score); otherwise the canonical deduped count.
-  const displayedCount = showRatingCount ?? setlist.show.ratingsCount ?? null;
+  // alongside the calibrated score); otherwise the canonical deduped count. Both
+  // arrive live from useShowUserData — ratings no longer live in the setlist blob.
+  const displayedCount = showRatingCount ?? null;
 
   // Compact calibrated-score + rank summary, rendered to the right of the ★ score.
   const summaryEl = rankComparison ? (
     <div className="text-[10px] leading-tight sm:text-xs">
-      <CalibratedSummary canonical={setlist.show.averageRating ?? null} rank={rankComparison} compact />
+      <CalibratedSummary canonical={canonicalRating ?? null} rank={rankComparison} compact />
     </div>
   ) : null;
 

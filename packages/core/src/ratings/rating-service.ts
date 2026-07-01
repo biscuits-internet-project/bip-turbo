@@ -1,6 +1,5 @@
 import type { Rating } from "@bip/domain";
 import { Prisma } from "@prisma/client";
-import { type CacheInvalidationService, yearFromShowSlug } from "../_shared/cache";
 import type { DbClient, DbRating } from "../_shared/database/models";
 import { setSortKeySql, showOrderBySql } from "../_shared/show-ordering";
 import { aliasKey, mostRecentPerKey } from "./rater-aliases";
@@ -207,7 +206,6 @@ function mapRatingToDomainEntity(dbRating: DbRating): Rating {
 export class RatingService {
   constructor(
     protected readonly db: DbClient,
-    protected readonly cacheInvalidation: CacheInvalidationService,
     // Optional so existing callers/tests are unaffected. When present, rating
     // mutations also maintain the calibrated rater-weighting tables.
     protected readonly raterWeights?: RaterWeightService,
@@ -419,16 +417,12 @@ export class RatingService {
       },
     });
 
-    if (data.showSlug) {
-      // Both show and track ratings write denormalized averageRating/ratingsCount
-      // that the cached setlist payloads embed — the per-show show.data payload AND
-      // the year-listing shows:list payload (whose gap-chart view shows track
-      // averages). Comprehensive invalidation busts both, year-scoped for listings.
-      const year = yearFromShowSlug(data.showSlug);
-      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug, year !== null ? [year] : []);
-    }
-
-    // Update the related show/track average rating and count
+    // No cache invalidation here. Rating values no longer live in the structural
+    // setlist caches (show.data / shows:list): setlist views read the community
+    // average live via the show/track tier-2 read paths (computeShowUserData,
+    // computeTrackUserRatings), which see this denormalized-column update on the
+    // very next request. Decoupling rating writes from the structural caches is
+    // the point of the tier split — busting them here was the old band-aid.
     await this.updateRateableAverageRating(data.rateableId, data.rateableType);
     await this.refreshRaterWeights(data.rateableId, data.rateableType);
 
@@ -711,14 +705,8 @@ export class RatingService {
     const stats = await this.updateRateableAverageRating(data.rateableId, data.rateableType);
     await this.refreshRaterWeights(data.rateableId, data.rateableType);
 
-    if (data.showSlug) {
-      // Same as the upsert path: both show and track ratings change denormalized
-      // averages embedded in the show.data AND year-listing shows:list payloads,
-      // so bust both, year-scoped for listings.
-      const year = yearFromShowSlug(data.showSlug);
-      await this.cacheInvalidation.invalidateShowComprehensive(undefined, data.showSlug, year !== null ? [year] : []);
-    }
-
+    // No cache invalidation — see the note in `upsert`. Rating values are read
+    // live from the tier-2 paths, not from the structural setlist caches.
     return stats;
   }
 }

@@ -9,7 +9,11 @@ vi.mock("~/hooks/use-session", () => ({
   useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
 }));
 vi.mock("~/hooks/use-track-user-ratings", () => ({
-  useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
+  useTrackUserRatings: vi.fn(() => ({
+    userRatingMap: new Map<string, number>(),
+    averageRatingMap: new Map<string, { average: number; count: number }>(),
+    isLoading: false,
+  })),
 }));
 // Stub the rating cell so the row's rating column has a deterministic
 // presence we can assert on without exercising RatingBadgeButton.
@@ -54,8 +58,6 @@ function makeTrack(overrides: Partial<TrackLight> & { id: string; songId: string
     likesCount: 0,
     note: null,
     allTimer: false,
-    averageRating: null,
-    ratingsCount: 0,
     gap: null,
     previousPerformanceShowId: null,
     duration: overrides.duration ?? null,

@@ -10,7 +10,11 @@ vi.mock("~/hooks/use-session", () => ({
   useSession: vi.fn(() => ({ user: null, supabase: null })),
 }));
 vi.mock("~/hooks/use-track-user-ratings", () => ({
-  useTrackUserRatings: vi.fn(() => ({ userRatingMap: new Map<string, number>(), isLoading: false })),
+  useTrackUserRatings: vi.fn(() => ({
+    userRatingMap: new Map<string, number>(),
+    averageRatingMap: new Map<string, { average: number; count: number }>(),
+    isLoading: false,
+  })),
 }));
 vi.mock("~/hooks/use-song-play-dates", () => ({
   useSongPlayDates: vi.fn(() => ({ data: {} as Record<string, string[]>, isLoading: false })),
@@ -37,8 +41,6 @@ function makeTrack(overrides: Partial<TrackLight> & { songId: string; position: 
     likesCount: 0,
     note: null,
     allTimer: false,
-    averageRating: null,
-    ratingsCount: 0,
     gap: overrides.gap ?? null,
     previousPerformanceShowId: overrides.previousPerformanceShowId ?? null,
     duration: overrides.duration ?? null,
@@ -128,11 +130,12 @@ describe("SetlistTable", () => {
     expect(screen.getByRole("link", { name: "Confrontation" })).toBeInTheDocument();
   });
 
-  // SetlistTable threads the viewer's per-track ratings into the column
-  // factory so the rightmost Rating column knows which tracks the viewer
-  // has already rated. useTrackUserRatings is invoked with the row's
-  // trackIds; its userRatingMap shows up in each TrackRatingCell.
-  test("passes useTrackUserRatings map and auth state into rating cells", async () => {
+  // SetlistTable threads useTrackUserRatings into the column factory so the
+  // rightmost Rating column gets BOTH the live community average (from
+  // averageRatingMap — track ratings no longer ride in the row/blob) and the
+  // viewer's own rating (userRatingMap). useTrackUserRatings is invoked with
+  // the row's trackIds; both maps show up in each TrackRatingCell.
+  test("passes the live average + user-rating maps and auth state into rating cells", async () => {
     vi.mocked(useSession).mockReturnValue({
       // biome-ignore lint/suspicious/noExplicitAny: minimal mock; test only reads `user`
       user: { id: "user-1" } as any,
@@ -141,6 +144,7 @@ describe("SetlistTable", () => {
     });
     vi.mocked(useTrackUserRatings).mockReturnValue({
       userRatingMap: new Map([["t-1", 5]]),
+      averageRatingMap: new Map([["t-1", { average: 4.4, count: 22 }]]),
       isLoading: false,
     });
 
@@ -152,8 +156,6 @@ describe("SetlistTable", () => {
           makeTrack({
             songId: "song-basis",
             position: 1,
-            averageRating: 4.4,
-            ratingsCount: 22,
             song: { id: "song-basis", title: "Basis for a Day", slug: "basis-for-a-day" },
           }),
         ]}
@@ -162,9 +164,13 @@ describe("SetlistTable", () => {
 
     expect(useTrackUserRatings).toHaveBeenCalledWith(["t-1"]);
     expect(screen.getByTestId("TrackRatingCell")).toBeInTheDocument();
-    expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"showSlug":"2024-07-19-camden"');
-    expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"userRating":5');
-    expect(screen.getByTestId("TrackRatingCell").textContent).toContain('"isAuthenticated":true');
+    const cell = screen.getByTestId("TrackRatingCell").textContent ?? "";
+    expect(cell).toContain('"showSlug":"2024-07-19-camden"');
+    expect(cell).toContain('"userRating":5');
+    expect(cell).toContain('"isAuthenticated":true');
+    // The community average + count come from the tier-2 map, not the row.
+    expect(cell).toContain('"initialRating":4.4');
+    expect(cell).toContain('"ratingsCount":22');
   });
 
   // Wiring: SetlistTable threads each row's songId into the catalog blob,

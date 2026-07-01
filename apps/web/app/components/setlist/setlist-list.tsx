@@ -52,7 +52,7 @@ export function SetlistList({
 
   const renderCard = (setlist: Setlist | SetlistLight, index: number) => {
     const showId = setlist.show.id;
-    const liveAverage = averageRatingMap.get(showId)?.average;
+    const live = averageRatingMap.get(showId);
     // The displayed ★ is the viewer's calibrated score when their mode resolves to
     // calibrated (server only sends it then), else the live/canonical average.
     const displayed = displayedRatingMap.get(showId);
@@ -61,8 +61,9 @@ export function SetlistList({
         setlist={setlist}
         userAttendance={attendanceMap.get(showId) ?? null}
         userRating={userRatingMap.get(showId) ?? null}
-        showRating={displayed?.rating ?? liveAverage ?? setlist.show.averageRating ?? null}
-        showRatingCount={displayed?.count ?? null}
+        showRating={displayed?.rating ?? live?.average ?? null}
+        showRatingCount={displayed?.count ?? live?.count ?? null}
+        canonicalRating={live?.average ?? null}
         externalSources={externalSources[showId]}
         rankComparison={rankComparisonMap.get(showId)}
         collapsible={collapsible}

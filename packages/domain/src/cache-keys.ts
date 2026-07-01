@@ -11,8 +11,10 @@ export const CacheKeys = {
    * Show-related cache keys
    */
   show: {
-    /** Complete show + setlist data for show page */
-    data: (slug: string) => `show:${slug}:data:v13`,
+    /** Complete show + setlist data for show page. :v14 — tracks no longer
+     *  embed averageRating/ratingsCount (rating values moved to the live
+     *  tier-2 read path so rating writes don't staleness-bust this blob). */
+    data: (slug: string) => `show:${slug}:data:v14`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
@@ -31,7 +33,9 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      return `shows:list:${filterHash}:v13`;
+      // :v14 — tracks dropped averageRating/ratingsCount (rating values moved
+      // to the live tier-2 read path). See CacheKeys.show.data.
+      return `shows:list:${filterHash}:v14`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -45,8 +49,9 @@ export const CacheKeys = {
    * Setlist cache keys
    */
   setlist: {
-    /** Complete setlist data with tracks and annotations */
-    data: (slug: string) => `setlist:${slug}:data:v13`,
+    /** Complete setlist data with tracks and annotations. :v14 — tracks no
+     *  longer embed averageRating/ratingsCount (moved to live tier-2). */
+    data: (slug: string) => `setlist:${slug}:data:v14`,
   },
 
   /**
@@ -137,7 +142,7 @@ export const CacheKeys = {
      * have 400+ attended shows and the un-paginated payload is large enough
      * to be slow to deserialize/transport even from Redis.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v12`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v13`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -162,7 +167,7 @@ export const CacheKeys = {
    */
   rockOperas: {
     /** Resource-page list payload: setlists + external sources for one rock opera. */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v10`,
+    performances: (slug: string) => `rock-operas:performances:${slug}:v11`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },
@@ -172,7 +177,7 @@ export const CacheKeys = {
    */
   home: {
     /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v12`,
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v13`,
   },
 
   /**

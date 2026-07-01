@@ -30,6 +30,7 @@ export type SetlistTableRow = TrackLight & { priorPerformanceCount: number | nul
 export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): ColumnDef<SetlistTableRow, unknown>[] {
   const ratingCtx: SetlistRatingContext = {
     showSlug: ctx?.showSlug ?? "",
+    averageRatingMap: ctx?.averageRatingMap ?? new Map(),
     userRatingMap: ctx?.userRatingMap ?? new Map(),
     isAuthenticated: ctx?.isAuthenticated ?? false,
   };
