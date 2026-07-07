@@ -68,6 +68,13 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         continue-on-error: true
 
+      - name: Redis reachable by container name
+        if: inputs.action == 'diagnose'
+        run: kamal server exec 'docker run --rm --network kamal redis:7-alpine redis-cli -h bip-web-redis ping'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
       - name: App logs
         if: inputs.action == 'diagnose'
         run: kamal app logs --lines 50
