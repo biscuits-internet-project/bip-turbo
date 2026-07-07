@@ -24,7 +24,6 @@ registry:
 env:
   secret:
     - BASE_URL
-    - REDIS_URL
     - SUPABASE_URL
     - SUPABASE_ANON_KEY
     - SUPABASE_SERVICE_ROLE_KEY
@@ -41,6 +40,9 @@ env:
   clear:
     APP_ENV: production
     PORT: "8080"
+    # Container-name DNS on the kamal Docker network; accessory IPs change on
+    # restart, so never point this at a raw container IP.
+    REDIS_URL: redis://bip-web-redis:6379
 
 builder:
   arch: amd64
@@ -54,7 +56,7 @@ accessories:
   redis:
     image: redis:7-alpine
     host: 5.161.124.129
-    port: 6379
+    port: "127.0.0.1:6379:6379"
     directories:
       - bip-web-redis-data:/data
     cmd: redis-server --appendonly yes
