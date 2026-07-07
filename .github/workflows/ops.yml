@@ -84,7 +84,7 @@ jobs:
 
       - name: Reboot redis accessory
         if: inputs.action == 'restart-redis'
-        run: kamal accessory reboot redis -y
+        run: kamal accessory reboot redis
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
