@@ -1,0 +1,102 @@
+name: Server Ops
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Operation to run on the prod host"
+        required: true
+        type: choice
+        options:
+          - diagnose
+          - restart-redis
+          - prune-docker
+
+concurrency:
+  group: deploy-web-app
+  cancel-in-progress: false
+
+jobs:
+  ops:
+    name: ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Install Kamal
+        run: gem install kamal
+
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Set up SSH known hosts
+        run: ssh-keyscan -t ed25519 5.161.124.129 >> ~/.ssh/known_hosts
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Disk usage
+        if: inputs.action == 'diagnose'
+        run: kamal server exec 'df -h /'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: All containers
+        if: inputs.action == 'diagnose'
+        run: kamal server exec 'docker ps -a'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: Redis accessory details
+        if: inputs.action == 'diagnose'
+        run: kamal accessory details redis
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: Redis logs
+        if: inputs.action == 'diagnose'
+        run: kamal accessory logs redis --lines 100
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: App logs
+        if: inputs.action == 'diagnose'
+        run: kamal app logs --lines 50
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: Reboot redis accessory
+        if: inputs.action == 'restart-redis'
+        run: kamal accessory reboot redis -y
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      - name: Redis status after reboot
+        if: inputs.action == 'restart-redis'
+        run: |
+          kamal accessory details redis
+          kamal accessory logs redis --lines 50
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      - name: Prune unused Docker data
+        if: inputs.action == 'prune-docker'
+        run: kamal server exec 'docker system prune -af'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      - name: Disk usage after prune
+        if: inputs.action == 'prune-docker'
+        run: kamal server exec 'df -h /'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
