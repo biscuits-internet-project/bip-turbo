@@ -59,7 +59,9 @@ accessories:
     port: "127.0.0.1:6379:6379"
     directories:
       - bip-web-redis-data:/data
-    cmd: redis-server --appendonly yes
+    # Cap memory and evict LRU: everything cached is rebuildable, and an
+    # uncapped redis grows until the kernel OOM-kills it (2026-07-07 outage).
+    cmd: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
 
   postgres:
     image: postgres:18-alpine
