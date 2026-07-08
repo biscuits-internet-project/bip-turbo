@@ -47,6 +47,27 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         continue-on-error: true
 
+      - name: Memory usage
+        if: inputs.action == 'diagnose'
+        run: kamal server exec 'free -h'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: Container memory usage
+        if: inputs.action == 'diagnose'
+        run: kamal server exec 'docker stats --no-stream'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
+      - name: Redis memory info
+        if: inputs.action == 'diagnose'
+        run: kamal server exec 'docker exec bip-web-redis redis-cli INFO memory'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        continue-on-error: true
+
       - name: All containers
         if: inputs.action == 'diagnose'
         run: kamal server exec 'docker ps -a'
