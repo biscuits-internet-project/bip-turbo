@@ -61,9 +61,9 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         continue-on-error: true
 
-      - name: Redis memory info
+      - name: Redis info (memory, hit rate, evictions)
         if: inputs.action == 'diagnose'
-        run: kamal server exec 'docker exec bip-web-redis redis-cli INFO memory'
+        run: kamal server exec 'docker exec bip-web-redis redis-cli INFO'
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         continue-on-error: true
