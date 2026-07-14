@@ -29,16 +29,20 @@ vi.mock("~/server/show-user-data", () => ({
   computeShowUserData: (...args: unknown[]) => computeShowUserDataFn(...args),
 }));
 
-// Use a real QueryClient so dehydrate() can call getDefaultOptions(),
-// but spy on `prefetchQuery` so tests can assert what the loader queued
-// for hydration.
-vi.mock("~/lib/query-prefetch", () => ({
-  createPrefetchClient: () => {
-    const client = new QueryClient();
-    client.prefetchQuery = prefetchQuery as never;
-    return client;
-  },
-}));
+// Use a real QueryClient (and the real dehydrateAndClear) so dehydration
+// behaves as in production, but spy on `prefetchQuery` so tests can assert
+// what the loader queued for hydration.
+vi.mock("~/lib/query-prefetch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/lib/query-prefetch")>();
+  return {
+    ...actual,
+    createPrefetchClient: () => {
+      const client = new QueryClient();
+      client.prefetchQuery = prefetchQuery as never;
+      return client;
+    },
+  };
+});
 
 const { getRockOperaPerformances } = await import("./rock-opera-performances");
 

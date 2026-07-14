@@ -1,6 +1,6 @@
 import type { RatingValueBucket, ShowNavItem } from "@bip/core";
 import { type ArchiveDotOrgRecording, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { deriveShowLineupNotes } from "~/lib/lineup-notes";
 import { logger } from "~/lib/logger";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getShowMeta, getShowStructuredData } from "~/lib/seo";
 import { formatDateLong, formatMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
@@ -149,7 +149,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<ShowLoad
     photos,
     adjacentShows,
     ratingDistribution,
-    dehydratedState: dehydrate(queryClient),
+    dehydratedState: dehydrateAndClear(queryClient),
   };
 });
 

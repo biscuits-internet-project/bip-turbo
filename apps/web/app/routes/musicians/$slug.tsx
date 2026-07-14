@@ -1,6 +1,6 @@
 import type { Instrument, Musician, MusicianAppearanceShow, Song, SongPagePerformance } from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Pencil } from "lucide-react";
 import { useMemo } from "react";
@@ -29,7 +29,7 @@ import {
   musicianTablePreset,
 } from "~/lib/musicians-constants";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getMusicianMeta } from "~/lib/seo";
 import { fetchFilteredSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
@@ -175,7 +175,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
     }),
   ]);
 
-  return { ...data, dehydratedState: dehydrate(queryClient) };
+  return { ...data, dehydratedState: dehydrateAndClear(queryClient) };
 });
 
 export function meta({ data }: { data?: LoaderData }) {

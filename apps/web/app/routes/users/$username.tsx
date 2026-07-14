@@ -1,6 +1,5 @@
 import type { RatingWithShow, RatingWithTrack, ShowRatingsSort, TrackRatingsSort } from "@bip/core";
 import { CacheKeys, compareByShowDate } from "@bip/domain";
-import { dehydrate } from "@tanstack/react-query";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
 import { useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
@@ -22,7 +21,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { showUserDataQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { formatDateLong, formatDateShort, formatDateShortMobile } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -193,7 +192,7 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     blogPosts,
     attendedSetlists,
     attendedExternalSources,
-    dehydratedState: dehydrate(queryClient),
+    dehydratedState: dehydrateAndClear(queryClient),
     attendedPagination: {
       page: clampedAttendedPage,
       pageSize: ATTENDED_SHOWS_PAGE_SIZE,

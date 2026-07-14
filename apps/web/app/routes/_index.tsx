@@ -1,5 +1,5 @@
 import { type BlogPostWithUser, CacheKeys, type Setlist, type TourDate } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
@@ -11,7 +11,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { showUserDataQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 import { getHomeMeta } from "~/lib/seo";
 import { services } from "~/server/services";
@@ -157,7 +157,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     recentShows,
     onThisDayCounts,
     externalSources,
-    dehydratedState: dehydrate(queryClient),
+    dehydratedState: dehydrateAndClear(queryClient),
   };
 });
 

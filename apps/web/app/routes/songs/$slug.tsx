@@ -1,5 +1,5 @@
 import { compareByShowDate, type SongPageView } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { BarChart3, FileTextIcon, Flame, GuitarIcon, History, ListMusic, Pencil } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
@@ -24,7 +24,7 @@ import { publicLoader } from "~/lib/base-loaders";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { pickGapTier } from "~/lib/gap-tier";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getSongMeta, getSongStructuredData } from "~/lib/seo";
 import { services } from "~/server/services";
 import { computeShowUserData } from "~/server/show-user-data";
@@ -52,7 +52,7 @@ export const loader = publicLoader(async ({ params, context }: LoaderFunctionArg
     }),
   ]);
 
-  return { ...view, dehydratedState: dehydrate(queryClient) };
+  return { ...view, dehydratedState: dehydrateAndClear(queryClient) };
 });
 
 function ReviewNote({ notes }: { notes: string }) {

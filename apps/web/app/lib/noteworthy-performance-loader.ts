@@ -1,8 +1,8 @@
 import type { AllTimersPageView } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { services } from "~/server/services";
 import { computeShowUserData } from "~/server/show-user-data";
 import { computeTrackUserRatings } from "~/server/track-user-ratings";
@@ -46,6 +46,6 @@ export function createNoteworthyLoader({
       }),
     ]);
 
-    return { ...view, dehydratedState: dehydrate(queryClient) };
+    return { ...view, dehydratedState: dehydrateAndClear(queryClient) };
   });
 }

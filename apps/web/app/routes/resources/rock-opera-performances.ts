@@ -1,9 +1,9 @@
 import { CacheKeys, type Setlist } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import type { PublicContext } from "~/lib/base-loaders";
 import { showUserDataQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
@@ -62,6 +62,6 @@ export async function getRockOperaPerformances(
   return {
     performances: cached.performances,
     externalSources: cached.externalSources,
-    dehydratedState: dehydrate(queryClient),
+    dehydratedState: dehydrateAndClear(queryClient),
   };
 }
