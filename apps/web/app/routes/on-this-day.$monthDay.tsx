@@ -1,5 +1,5 @@
 import { CacheKeys, type SetlistLight, type SongPagePerformance } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { Link, redirect } from "react-router";
@@ -12,7 +12,7 @@ import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-perfor
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { addDaysYearAgnostic, formatMonthDay, formatMonthDayShort, isValidMonthDay } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -104,7 +104,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
     previousMonthDay,
     nextMonthDay,
     externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
-    dehydratedState: dehydrate(queryClient),
+    dehydratedState: dehydrateAndClear(queryClient),
   };
 });
 

@@ -1,4 +1,4 @@
-import { type DehydratedState, QueryClient } from "@tanstack/react-query";
+import { type DehydratedState, dehydrate, QueryClient } from "@tanstack/react-query";
 
 /**
  * Per-request `QueryClient` for loader-side prefetching. Each call returns a
@@ -19,6 +19,21 @@ export function createPrefetchClient(): QueryClient {
       },
     },
   });
+}
+
+/**
+ * Dehydrate a per-request prefetch client and immediately release everything
+ * it holds. React Query schedules a gcTime (5 min) timer on each prefetched
+ * query even when nothing observes it, so an un-cleared client pins its
+ * payloads in server memory for five minutes after the response is gone;
+ * at peak traffic that's minutes of requests held on the heap. `dehydrate`
+ * copies the data first, so the returned state (and client-side hydration)
+ * is unaffected. Loaders must use this instead of bare `dehydrate`.
+ */
+export function dehydrateAndClear(queryClient: QueryClient): DehydratedState {
+  const state = dehydrate(queryClient);
+  queryClient.clear();
+  return state;
 }
 
 /**

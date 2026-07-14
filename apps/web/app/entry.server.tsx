@@ -6,9 +6,14 @@ import { renderToPipeableStream } from "react-dom/server";
 import type { AppLoadContext, EntryContext } from "react-router";
 import { ServerRouter } from "react-router";
 import honeybadger from "~/lib/honeybadger";
-import { logger } from "~/server/logger";
+import { createLogger, logger } from "~/server/logger";
+import { startMemoryLogging } from "~/server/memory-log";
 
 export const streamTimeout = 5_000;
+
+// Dedicated info-level logger: production's default level is `warn`, which
+// would swallow the memory timeline the line exists to produce.
+startMemoryLogging(createLogger({ level: "info" }));
 
 export default function handleRequest(
   request: Request,

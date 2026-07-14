@@ -10,15 +10,42 @@ import type { RedisService } from "../redis";
 export const CATALOG_TTL_SECONDS = 60 * 60 * 24;
 
 /**
+ * Lifetime of the in-process copy of the parsed map. Every Redis read
+ * deserializes the whole multi-MB catalog, and the hottest pages read several
+ * catalogs per request; the memo caps that at one parse per instance per
+ * window. Minutes-scale so a catalog refreshed in Redis is picked up promptly.
+ */
+export const MEMO_TTL_SECONDS = 60 * 5;
+
+/**
+ * Recursively freeze a parsed catalog map. The memo hands the same object to
+ * every request for the memo window, so an accidental mutation by one caller
+ * would silently corrupt what all other requests see; freezing makes it throw
+ * at the mutation site instead. Values are plain JSON (no cycles).
+ */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const key of Object.keys(value)) {
+      deepFreeze((value as Record<string, unknown>)[key]);
+    }
+  }
+  return value;
+}
+
+/**
  * Shared caching layer for external catalogs that are small enough to fetch in
  * one bulk request and index by ISO date (YYYY-MM-DD). Exists so every external
  * integration (nugs.net, archive.org) doesn't reinvent read-through Redis with
- * single-flight and empty-result handling. Treat the fetcher as slow and
- * expensive — the whole point is that each catalog refresh pays that cost once
- * per instance per TTL window, not once per user request.
+ * single-flight, empty-result handling, and an in-process memo of the parsed
+ * map. Treat the fetcher as slow and expensive (each catalog refresh pays that
+ * cost once per instance per TTL window, not once per user request) and the
+ * Redis payload as large: without the memo every request re-deserializes the
+ * full multi-MB map.
  */
 export class DateIndexedCatalog<T> {
   private inFlight: Promise<Record<string, T>> | null = null;
+  private memo: { map: Record<string, T>; expiresAt: number } | null = null;
 
   /**
    * @param redis Shared Redis client. The catalog persists its entire date-indexed
@@ -58,8 +85,13 @@ export class DateIndexedCatalog<T> {
   }
 
   private async getMap(): Promise<Record<string, T>> {
+    if (this.memo && Date.now() < this.memo.expiresAt) return this.memo.map;
+
     const cached = await this.redis.get<Record<string, T>>(this.cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      this.remember(cached);
+      return cached;
+    }
 
     if (this.inFlight) return this.inFlight;
 
@@ -76,11 +108,21 @@ export class DateIndexedCatalog<T> {
       const map = await this.fetcher();
       if (Object.keys(map).length > 0) {
         await this.redis.set<Record<string, T>>(this.cacheKey, map, { EX: CATALOG_TTL_SECONDS });
+        this.remember(map);
       }
       return map;
     } catch (error) {
       this.logger?.error("DateIndexedCatalog fetch failed", { cacheKey: this.cacheKey, error });
       return {};
     }
+  }
+
+  /**
+   * Keep the parsed map in process memory for {@link MEMO_TTL_SECONDS}. Only
+   * non-empty maps are remembered: an empty result means the fetch failed or
+   * returned nothing, and memoizing it would suppress the retry.
+   */
+  private remember(map: Record<string, T>): void {
+    this.memo = { map: deepFreeze(map), expiresAt: Date.now() + MEMO_TTL_SECONDS * 1000 };
   }
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { RedisService } from "../redis";
-import { DateIndexedCatalog } from "./date-indexed-catalog";
+import { DateIndexedCatalog, MEMO_TTL_SECONDS } from "./date-indexed-catalog";
 
 interface SongRecord {
   song: string;
@@ -127,6 +127,68 @@ describe("DateIndexedCatalog", () => {
     const result = await catalog.findByDate("1999-04-09");
 
     expect(result).toBeUndefined();
+  });
+
+  // Every Redis read of a catalog deserializes the whole multi-MB map, and the
+  // hottest pages do it several times per request. The in-process memo must
+  // absorb repeat reads within its window so per-request allocation stays flat.
+  test("memo: repeat lookups within the memo window read Redis once", async () => {
+    const fetcher = vi.fn(async () => SAMPLE_MAP);
+    redis.__store.set("catalog:test", SAMPLE_MAP);
+    const catalog = new DateIndexedCatalog<SongRecord>(redis, "catalog:test", fetcher);
+
+    await catalog.findByDate("2007-12-28");
+    await catalog.findByDate("2001-09-01");
+    await catalog.getAll();
+
+    expect(redis.get).toHaveBeenCalledTimes(1);
+  });
+
+  // The memo must expire so a catalog refreshed in Redis (daily TTL) is picked
+  // up within minutes, not held until the process restarts.
+  test("memo: expires after its TTL and re-reads Redis", async () => {
+    const fetcher = vi.fn(async () => SAMPLE_MAP);
+    redis.__store.set("catalog:test", SAMPLE_MAP);
+    const catalog = new DateIndexedCatalog<SongRecord>(redis, "catalog:test", fetcher);
+    const nowSpy = vi.spyOn(Date, "now");
+
+    nowSpy.mockReturnValue(1_000_000);
+    await catalog.findByDate("2007-12-28");
+    nowSpy.mockReturnValue(1_000_000 + MEMO_TTL_SECONDS * 1000 + 1);
+    await catalog.findByDate("2007-12-28");
+
+    expect(redis.get).toHaveBeenCalledTimes(2);
+  });
+
+  // A cold-cache fetch must seed the memo too: the request that pays for the
+  // upstream fetch shouldn't be followed by a Redis re-read from the next one.
+  test("memo: a successful cold-cache fetch seeds the memo", async () => {
+    const fetcher = vi.fn(async () => SAMPLE_MAP);
+    const catalog = new DateIndexedCatalog<SongRecord>(redis, "catalog:test", fetcher);
+
+    await catalog.findByDate("2007-12-28");
+    const result = await catalog.findByDate("2001-09-01");
+
+    expect(result).toEqual({ song: "Aceetobee" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(redis.get).toHaveBeenCalledTimes(1);
+  });
+
+  // The memoized map is shared by every request for the memo window, so a
+  // caller mutating it would corrupt what other requests see. Freezing turns
+  // that bug into a loud TypeError at the mutation site.
+  test("memo: the shared map is deeply frozen", async () => {
+    const fetcher = vi.fn(async () => ({ "2007-12-28": { song: "Basis for a Day" } }));
+    const catalog = new DateIndexedCatalog<SongRecord>(redis, "catalog:test", fetcher);
+
+    const all = await catalog.getAll();
+    const entry = await catalog.findByDate("2007-12-28");
+
+    expect(Object.isFrozen(all)).toBe(true);
+    expect(Object.isFrozen(entry)).toBe(true);
+    expect(() => {
+      (all as Record<string, SongRecord>)["1999-12-31"] = { song: "Munchkin Invasion" };
+    }).toThrow(TypeError);
   });
 
   // The catalog applies a one-day TTL to every successful fetch — external

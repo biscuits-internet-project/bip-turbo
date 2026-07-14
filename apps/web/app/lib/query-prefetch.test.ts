@@ -1,7 +1,7 @@
 import { dehydrate } from "@tanstack/react-query";
 import { describe, expect, test } from "vitest";
 import { showUserDataQueryKey } from "./query-keys";
-import { createPrefetchClient, mergeDehydratedStates } from "./query-prefetch";
+import { createPrefetchClient, dehydrateAndClear, mergeDehydratedStates } from "./query-prefetch";
 
 describe("createPrefetchClient", () => {
   // Loaders must get a fresh client per request. A module-level singleton
@@ -25,6 +25,26 @@ describe("createPrefetchClient", () => {
     const state = dehydrate(client);
     expect(state.queries.length).toBe(1);
     expect(state.queries[0].queryKey).toEqual(showUserDataQueryKey(["show-1"]));
+  });
+});
+
+describe("dehydrateAndClear", () => {
+  // Loaders dehydrate a per-request client and then have no further use for
+  // it, but React Query pins every prefetched query in memory for gcTime
+  // (5 min) via a scheduled GC timer. Clearing at dehydrate time releases the
+  // payload with the response instead of five minutes later.
+  test("returns the dehydrated queries and empties the client cache", async () => {
+    const client = createPrefetchClient();
+    await client.prefetchQuery({
+      queryKey: ["setlist", "basis-for-a-day"],
+      queryFn: async () => ({ opener: "Basis for a Day" }),
+    });
+
+    const state = dehydrateAndClear(client);
+
+    expect(state.queries).toHaveLength(1);
+    expect(state.queries[0].state.data).toEqual({ opener: "Basis for a Day" });
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
   });
 });
 

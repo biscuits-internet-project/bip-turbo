@@ -1,5 +1,5 @@
 import type { Setlist, Venue } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { CalendarDays, Edit, MapPin, Ticket } from "lucide-react";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
@@ -12,7 +12,7 @@ import { StatBox } from "~/components/ui/stat-box";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { showUserDataQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getVenueMeta, getVenueStructuredData } from "~/lib/seo";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -66,7 +66,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
     queryFn: () => computeShowUserData(context, showIds),
   });
 
-  return { venue, setlists, stats, externalSources, dehydratedState: dehydrate(queryClient) };
+  return { venue, setlists, stats, externalSources, dehydratedState: dehydrateAndClear(queryClient) };
 });
 
 export function meta({ data }: { data: LoaderData }) {

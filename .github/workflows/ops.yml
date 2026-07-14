@@ -10,6 +10,7 @@ on:
           - diagnose
           - cache-census
           - app-logs
+          - memory-timeline
           - restart-redis
           - prune-docker
 
@@ -111,6 +112,15 @@ jobs:
       - name: App logs (errors only, deep)
         if: inputs.action == 'app-logs'
         run: kamal app logs --lines 5000 2>&1 | grep -iE "error|warn|fatal" | tail -300 || echo "No error lines in the last 5000"
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      # The app emits one "process memory" line per minute (entry.server.tsx).
+      # These are four flat integers with no request data, so printing them in
+      # a public run log is safe. 1440 lines ≈ a full day of RSS/heap timeline.
+      - name: App memory timeline
+        if: inputs.action == 'memory-timeline'
+        run: kamal app logs --lines 20000 2>&1 | grep -F '"process memory"' | tail -1440 || echo "No memory lines found"
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 

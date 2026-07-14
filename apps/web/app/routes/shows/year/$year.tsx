@@ -1,5 +1,5 @@
 import { CacheKeys, type SetlistLight } from "@bip/domain";
-import { type DehydratedState, dehydrate } from "@tanstack/react-query";
+import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ClientLoaderFunctionArgs } from "react-router";
@@ -17,7 +17,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { showUserDataQueryKey } from "~/lib/query-keys";
-import { createPrefetchClient } from "~/lib/query-prefetch";
+import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getShowsMeta } from "~/lib/seo";
 import { parseTriState, type TriState, triStateToBoolean } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
@@ -111,7 +111,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
       showCountsByYear: emptyCounts,
       monthCounts: emptyCounts,
       filters,
-      dehydratedState: dehydrate(searchClient),
+      dehydratedState: dehydrateAndClear(searchClient),
     };
   }
 
@@ -169,7 +169,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     showCountsByYear,
     monthCounts,
     filters,
-    dehydratedState: dehydrate(queryClient),
+    dehydratedState: dehydrateAndClear(queryClient),
   };
 });
 
