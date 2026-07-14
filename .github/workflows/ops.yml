@@ -8,6 +8,8 @@ on:
         type: choice
         options:
           - diagnose
+          - cache-census
+          - app-logs
           - restart-redis
           - prune-docker
 
@@ -96,12 +98,47 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         continue-on-error: true
 
-      - name: App logs
+      # Run logs on a public repo are world-readable, so only error/warn lines
+      # may be printed — never raw request logs.
+      - name: App logs (errors only)
         if: inputs.action == 'diagnose'
-        run: kamal app logs --lines 50
+        run: kamal app logs --lines 500 2>&1 | grep -iE "error|warn|fatal" | tail -100 || echo "No error lines in the last 500"
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         continue-on-error: true
+
+      # Deeper errors-only log pull (same public-visibility rule as above).
+      - name: App logs (errors only, deep)
+        if: inputs.action == 'app-logs'
+        run: kamal app logs --lines 5000 2>&1 | grep -iE "error|warn|fatal" | tail -300 || echo "No error lines in the last 5000"
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      # Census of what's resident in redis: keys, MB, and average idle time per
+      # key family, plus the biggest individual keys. MEMORY USAGE and OBJECT
+      # IDLETIME don't touch LRU access times, so the census doesn't distort
+      # what it measures.
+      - name: Redis cache census
+        if: inputs.action == 'cache-census'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          kamal server exec "docker exec bip-web-redis sh -c 'redis-cli --scan | while read -r k; do echo \"\$(redis-cli MEMORY USAGE \"\$k\") \$(redis-cli OBJECT IDLETIME \"\$k\") \$k\"; done'" > census-raw.txt
+          grep -E '^[0-9]+ [0-9]+ ' census-raw.txt > census.txt || { echo "No census lines returned"; exit 1; }
+          echo "=== By key family (sorted by MB) ==="
+          awk '{ split($3, seg, ":"); fam = seg[1];
+                 count[fam]++; bytes[fam] += $1; idle[fam] += $2 }
+               END { for (f in count)
+                       printf "%-22s %6d keys %9.1f MB  avg idle %6.1f h\n",
+                              f, count[f], bytes[f]/1048576, idle[f]/count[f]/3600 }' census.txt \
+            | sort -k4 -rn
+          echo ""
+          echo "=== Top 15 keys by size ==="
+          sort -rn census.txt | head -15 \
+            | awk '{ printf "%8.2f MB  idle %7.1f h  %s\n", $1/1048576, $2/3600, $3 }'
+          echo ""
+          echo "=== Totals ==="
+          awk '{ n++; b += $1 } END { printf "%d keys, %.1f MB\n", n, b/1048576 }' census.txt
 
       - name: Reboot redis accessory
         if: inputs.action == 'restart-redis'
