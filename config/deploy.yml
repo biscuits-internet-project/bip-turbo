@@ -5,6 +5,13 @@ servers:
   web:
     hosts:
       - 5.161.124.129
+    options:
+      # Contain app memory growth: the 3.7GB no-swap host freezes for ~30min
+      # when any process exhausts RAM (2026-07-14 outage). Under a limit,
+      # docker OOM-kills just the app and the restart policy revives it in
+      # seconds. Headroom: redis is capped at 512mb, postgres/proxy/other
+      # tenants use roughly another 1gb.
+      memory: 1536m
 
 proxy:
   ssl: true
