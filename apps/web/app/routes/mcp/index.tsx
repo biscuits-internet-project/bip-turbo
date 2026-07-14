@@ -612,10 +612,15 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
           date: show.date,
           venueName: show.venue?.name || "",
           venueCity: show.venue?.city || "",
+          venueState: show.venue?.state || "",
           averageRating: show.averageRating,
+          ratingsCount: show.ratingsCount,
           // Calibrated Show Rating (entropy-weighted, bias-centered, count-shrunk);
           // null until the rating recompute has populated it.
           calibratedRating: calibratedByShowId[show.id]?.rating ?? null,
+          // contributing rater count for the calibrated score (post-exclusion, so
+          // smaller than ratingsCount); null when calibratedRating is null.
+          calibratedRatingsCount: calibratedByShowId[show.id]?.count ?? null,
         })),
       };
     }
