@@ -1,11 +1,5 @@
 import type { RatingValueBucket, ShowNavItem } from "@bip/core";
-import {
-  type ArchiveDotOrgRecording,
-  CacheKeys,
-  type ReviewMinimal,
-  type Setlist,
-  type ShowFile,
-} from "@bip/domain";
+import { type ArchiveDotOrgRecording, CacheKeys, type ReviewMinimal, type Setlist, type ShowFile } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Edit } from "lucide-react";
 import { Link, useRevalidator } from "react-router-dom";

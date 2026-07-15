@@ -1,3 +1,5 @@
 #!/bin/bash
-# Before committing, ensure linting passes.
-bun run lint
+# Before committing, ensure linting and formatting pass. CI enforces both
+# (bun run lint + bun run format:check), so catching them here avoids a
+# red build for a fixable-in-place diff.
+bun run lint && bun run format:check
