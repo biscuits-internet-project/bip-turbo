@@ -124,7 +124,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
             ...(era?.startDate ? { excludeRangeStart: era.startDate } : {}),
             ...(era?.endDate ? { excludeRangeEnd: era.endDate } : {}),
           }),
-          services.setlists.findManyByShowIdsLight(showIds, { sort: [{ field: "date", direction: "desc" }] }),
+          services.setlists.findManyByShowIds(showIds, { sort: [{ field: "date", direction: "desc" }] }),
         ]);
 
         songs = songsPlayed;

@@ -1,5 +1,5 @@
 import type { ShowRankComparison } from "@bip/core";
-import type { Attendance, Rating, Setlist, SetlistLight } from "@bip/domain";
+import type { Attendance, Rating, Setlist } from "@bip/domain";
 import { Check } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -25,7 +25,7 @@ import { ShowExternalBadges, type ShowExternalSources } from "./show-external-ba
 export type SetlistView = "setlist" | "gap-chart" | "personal";
 
 interface SetlistCardProps {
-  setlist: Setlist | SetlistLight;
+  setlist: Setlist;
   userAttendance: Attendance | null;
   userRating: Rating | number | null;
   showRating: number | null;

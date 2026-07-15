@@ -1,4 +1,4 @@
-import type { SetlistLight } from "@bip/domain";
+import type { Setlist } from "@bip/domain";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import type { TriState } from "~/lib/tri-state-filter";
 
@@ -26,7 +26,7 @@ function isActive(state: TriState | undefined): boolean {
  * callers can use it unconditionally on every request without breaking
  * downstream reference equality.
  */
-export function applyExternalSourceFilters<T extends Pick<SetlistLight, "show">>(
+export function applyExternalSourceFilters<T extends Pick<Setlist, "show">>(
   setlists: T[],
   externalSources: Record<string, ShowExternalSources>,
   flags: ExternalSourceFilterFlags,

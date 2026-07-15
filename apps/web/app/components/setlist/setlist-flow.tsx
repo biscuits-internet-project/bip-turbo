@@ -1,4 +1,4 @@
-import type { Setlist, SetlistLight } from "@bip/domain";
+import type { Setlist } from "@bip/domain";
 import { formatDuration } from "@bip/domain";
 import { Link } from "react-router-dom";
 import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
@@ -15,7 +15,7 @@ import { TrackRatingOverlay } from "./track-rating-overlay";
  * can be rendered and tested on its own, apart from the rating/attendance/
  * view-toggle machinery around it.
  */
-export function SetlistFlow({ setlist }: { setlist: Setlist | SetlistLight }) {
+export function SetlistFlow({ setlist }: { setlist: Setlist }) {
   const allTracks = setlist.sets.flatMap((set) => set.tracks);
   const { trackFootnoteIndices, orderedFootnotes } = buildShowFootnotes(setlist);
 

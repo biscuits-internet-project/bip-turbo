@@ -3,7 +3,7 @@ import type { ShowExternalSources } from "~/components/setlist/show-external-bad
 import { applyExternalSourceFilters } from "./apply-external-source-filters";
 
 // Minimal setlist-like shape accepted by the helper — it only needs `show.id`.
-// Using `as never` casts in tests so we don't build out a full SetlistLight.
+// Using `as never` casts in tests so we don't build out a full Setlist.
 function setlist(id: string) {
   return { show: { id } } as never;
 }

@@ -216,13 +216,13 @@ function makeRockOperaStub(): RockOperaService {
   } as unknown as RockOperaService;
 }
 
-describe("SetlistService.findManyLight", () => {
+describe("SetlistService.findMany", () => {
   // monthDay filter passes endsWith to Prisma's date where clause
   test("applies endsWith date filter when monthDay is provided", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({
+    await service.findMany({
       filters: { monthDay: "04-04" },
       sort: [{ field: "date", direction: "desc" }],
     });
@@ -237,7 +237,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({
+    await service.findMany({
       filters: { year: 2024 },
     });
 
@@ -250,7 +250,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({ filters: {} });
+    await service.findMany({ filters: {} });
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.date).toBeUndefined();
@@ -264,7 +264,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({ filters: { year: 2024 } });
+    await service.findMany({ filters: { year: 2024 } });
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.include.showMusicians).toBeDefined();
@@ -277,7 +277,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({
+    await service.findMany({
       filters: { year: 2024, hasYoutube: true },
     });
 
@@ -292,7 +292,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({
+    await service.findMany({
       filters: { year: 2024, hasYoutube: false },
     });
 
@@ -306,7 +306,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({
+    await service.findMany({
       filters: { year: 2024, hasPhotos: false },
     });
 
@@ -320,7 +320,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({ filters: { year: 2024 } });
+    await service.findMany({ filters: { year: 2024 } });
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.showYoutubesCount).toBeUndefined();
@@ -334,7 +334,7 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({
+    await service.findMany({
       filters: { year: 2024, hasPhotos: true, hasYoutube: false },
     });
 
@@ -352,14 +352,14 @@ describe("SetlistService.findManyLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({ filters: { year: 2024 } });
+    await service.findMany({ filters: { year: 2024 } });
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.venueId).toEqual({ not: null });
   });
 });
 
-describe("SetlistService.findManyByShowIdsLight", () => {
+describe("SetlistService.findManyByShowIds", () => {
   // The light by-ids query backs cached list payloads (attended-setlists,
   // rock-opera performances). Its whole reason to exist is that the song
   // select stays lean: the cached blob can't embed lyrics/history text the
@@ -368,7 +368,7 @@ describe("SetlistService.findManyByShowIdsLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyByShowIdsLight(["show-1"]);
+    await service.findManyByShowIds(["show-1"]);
 
     const songSelect = db.show.findMany.mock.calls[0][0].include.tracks.select.song.select;
     expect(songSelect.id).toBe(true);
@@ -388,7 +388,7 @@ describe("SetlistService.findManyByShowIdsLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyByShowIdsLight(["show-1", "show-2"]);
+    await service.findManyByShowIds(["show-1", "show-2"]);
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.id).toEqual({ in: ["show-1", "show-2"] });
@@ -402,8 +402,8 @@ describe("SetlistService.findManyByShowIdsLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyByShowIdsLight(["show-1"]);
-    await service.findManyByShowIdsLight(["show-1"], { sort: [{ field: "date", direction: "asc" }] });
+    await service.findManyByShowIds(["show-1"]);
+    await service.findManyByShowIds(["show-1"], { sort: [{ field: "date", direction: "asc" }] });
 
     const [defaultCall, sortedCall] = db.show.findMany.mock.calls;
     expect(defaultCall[0].orderBy[0]).toEqual({ date: "desc" });
@@ -416,7 +416,7 @@ describe("SetlistService.findManyByShowIdsLight", () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    const result = await service.findManyByShowIdsLight([]);
+    const result = await service.findManyByShowIds([]);
 
     expect(result).toEqual([]);
     expect(db.show.findMany).not.toHaveBeenCalled();
@@ -523,7 +523,7 @@ describe("SetlistService.findByShowSlug", () => {
     await service.findByShowSlug("2024-07-26-red-rocks-amphitheatre-morrison-co");
 
     const call = db.show.findUnique.mock.calls[0][0];
-    expect(call.include.tracks.include.previousPerformanceShow).toEqual({
+    expect(call.include.tracks.select.previousPerformanceShow).toEqual({
       select: { date: true, slug: true },
     });
   });
@@ -790,18 +790,105 @@ describe("SetlistService.findByShowSlug", () => {
     const setlist = await service.findByShowSlug("2026-03-20");
     const track = setlist?.sets.flatMap((s) => s.tracks).find((t) => t.id === "t-1");
     expect(track?.song?.authorName).toBe("Chris Lorenzo, Eats Everything");
-    expect(track?.song?.authors.map((a) => a.name)).toEqual(["Chris Lorenzo", "Eats Everything"]);
+  });
+
+  // The show-page cache (show:<slug>:data) stores this payload verbatim, so
+  // the query must not select the text-heavy song columns: they dominated
+  // the blob size and nothing on the show page reads them. The one extra
+  // field beyond the list-view lean set is dateFirstPlayed, which the show
+  // page's debut-year chart derives from.
+  test("selects only the lean song fields, never the text-heavy columns", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findByShowSlug("2024-07-26-red-rocks-amphitheatre-morrison-co");
+
+    const call = db.show.findUnique.mock.calls[0][0];
+    const songSelect = call.include.tracks.select?.song?.select;
+    expect(songSelect).toBeDefined();
+    expect(songSelect).toMatchObject({ id: true, title: true, slug: true, kind: true, dateFirstPlayed: true });
+    for (const heavyColumn of ["lyrics", "history", "notes", "tabs", "featuredLyric", "yearlyPlayData"]) {
+      expect(songSelect).not.toHaveProperty(heavyColumn);
+    }
+  });
+
+  // Even when the DB row carries the heavy song columns (e.g. a stale query
+  // shape), the mapper must not thread them into the cached payload, and it
+  // must thread dateFirstPlayed through for the debut-year chart.
+  test("maps the track song to the lean shape with dateFirstPlayed", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+    db.show.findUnique.mockResolvedValue({
+      id: "show-1",
+      slug: "2024-12-31",
+      date: "2024-12-31",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      venueId: "v-1",
+      bandId: "b-1",
+      tracks: [
+        {
+          id: "t-1",
+          showId: "show-1",
+          songId: "song-a",
+          set: "S1",
+          position: 1,
+          segue: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          likesCount: 0,
+          slug: "t-1",
+          note: null,
+          allTimer: false,
+          previousTrackId: null,
+          nextTrackId: null,
+          averageRating: 0,
+          ratingsCount: 0,
+          gap: 5,
+          previousPerformanceShowId: null,
+          previousPerformanceShow: null,
+          duration: null,
+          durationSource: null,
+          song: {
+            id: "song-a",
+            title: "Above the Waves",
+            slug: "above-the-waves",
+            kind: "original",
+            dateFirstPlayed: new Date("2001-04-21"),
+            lyrics: "row upon row of lyric text",
+            history: "paragraphs of history",
+            songAuthors: [],
+          },
+          annotations: [],
+        },
+      ],
+      venue: {
+        id: "v-1",
+        name: "Red Rocks",
+        slug: "red-rocks",
+        city: "Morrison",
+        country: "US",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    const setlist = await service.findByShowSlug("2024-12-31");
+    const song = setlist?.sets.flatMap((s) => s.tracks).find((t) => t.id === "t-1")?.song;
+    expect(song?.dateFirstPlayed).toEqual(new Date("2001-04-21"));
+    expect(song).not.toHaveProperty("lyrics");
+    expect(song).not.toHaveProperty("history");
   });
 });
 
-describe("SetlistService.findManyLight", () => {
-  // findManyLight powers the list pages (year, top-rated, etc.). The gap-chart
+describe("SetlistService.findMany", () => {
+  // findMany powers the list pages (year, top-rated, etc.). The gap-chart
   // toggle on those pages needs the same prior-show pointer + averageSongGap.
   test("includes previousPerformanceShow date+slug on tracks", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
 
-    await service.findManyLight({ filters: { year: 2024 } });
+    await service.findMany({ filters: { year: 2024 } });
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.include.tracks.select.previousPerformanceShow).toEqual({
@@ -810,13 +897,24 @@ describe("SetlistService.findManyLight", () => {
     expect(call.include.tracks.select.gap).toBe(true);
     expect(call.include.tracks.select.previousPerformanceShowId).toBe(true);
   });
+
+  // SongLight carries dateFirstPlayed (the show page's debut-year chart reads
+  // it), and every light query shares one include, so the select must load it.
+  test("selects dateFirstPlayed on the lean track song", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findMany({ filters: { year: 2024 } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.include.tracks.select.song.select.dateFirstPlayed).toBe(true);
+  });
 });
 
 describe("SetlistService.findMany stub filtering", () => {
-  // findMany dropped venueless stub shows in JS *after* pagination, so a stub
-  // landing on a page silently shrank it below the page size. Filter at the SQL
-  // boundary instead (mirroring findManyLight) so pagination counts stay exact
-  // and stubs never reach the listing.
+  // Stubs must be filtered at the SQL boundary, not in JS after pagination,
+  // so a venueless stub landing on a page can't silently shrink it below the
+  // page size and pagination counts stay exact.
   test("excludes venueless stubs at the SQL boundary when no venue filter is given", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
@@ -837,34 +935,6 @@ describe("SetlistService.findMany stub filtering", () => {
 
     const call = db.show.findMany.mock.calls[0][0];
     expect(call.where.venueId).toBe("venue-1");
-  });
-
-  // The homepage and venue pages build setlists via findMany and render them
-  // with the heavy mapper, so the query must join every relation that mapper
-  // reads — the song author (debut-footnote text), structured flags / segue
-  // recurrences / completions, and the track + show performer lineups — or those
-  // footnotes silently vanish (the mapper defaults each absent relation to []).
-  test("joins every relation the heavy setlist mapper renders", async () => {
-    const db = makeMockDb();
-    const service = new SetlistService(db as never, makeRockOperaStub());
-
-    await service.findMany({ filters: { year: 2024 } });
-
-    const call = db.show.findMany.mock.calls[0][0];
-    const trackInclude = call.include.tracks.include;
-    expect(trackInclude.song).toEqual({
-      include: {
-        songAuthors: {
-          select: { position: true, author: { select: { id: true, name: true, slug: true } } },
-          orderBy: { position: "asc" },
-        },
-      },
-    });
-    expect(trackInclude.trackFlags).toBeDefined();
-    expect(trackInclude.segueRecurrences).toBeDefined();
-    expect(trackInclude.completionsAsLater).toBeDefined();
-    expect(trackInclude.trackMusicians).toBeDefined();
-    expect(call.include.showMusicians).toBeDefined();
   });
 });
 

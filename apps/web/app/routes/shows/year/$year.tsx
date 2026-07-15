@@ -1,4 +1,4 @@
-import { CacheKeys, type SetlistLight } from "@bip/domain";
+import { CacheKeys, type Setlist } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -28,7 +28,7 @@ import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
 
 interface LoaderData {
-  setlists: SetlistLight[];
+  setlists: Setlist[];
   year: number;
   searchQuery?: string;
   externalSources: Record<string, ShowExternalSources>;
@@ -84,7 +84,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
   };
   const emptyCounts: Record<number, number> = {};
 
-  let setlists: SetlistLight[] = [];
+  let setlists: Setlist[] = [];
 
   // If there's a search query with at least MIN_SEARCH_CHARS characters, use the search functionality.
   // Source filters are hidden in this branch — year-page browse nav is replaced by search results.
@@ -94,7 +94,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
 
     if (shows.length > 0) {
       const showIds = shows.map((show) => show.id);
-      setlists = await services.setlists.findManyByShowIdsLight(showIds);
+      setlists = await services.setlists.findManyByShowIds(showIds);
     }
 
     const searchShowIds = setlists.map((s) => s.show.id);
@@ -129,7 +129,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
 
   setlists = await services.cache.getOrSet(yearCacheKey, async () => {
     logger.info(`Loading shows from DB for year: ${yearInt}`);
-    return await services.setlists.findManyLight({
+    return await services.setlists.findMany({
       filters: {
         year: yearInt,
         hasPhotos: triStateToBoolean(filters.photos),

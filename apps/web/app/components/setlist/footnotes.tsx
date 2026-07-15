@@ -1,11 +1,4 @@
-import type {
-  Annotation,
-  SegueRecurrenceKind,
-  Setlist,
-  SetlistLight,
-  SongPagePerformance,
-  TrackMusicianDelta,
-} from "@bip/domain";
+import type { Annotation, SegueRecurrenceKind, Setlist, SongPagePerformance, TrackMusicianDelta } from "@bip/domain";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -713,7 +706,7 @@ export function dataDrivenFootnoteSources(
  * debut suppression, and numbers them. Both the public setlist view and the
  * admin show-edit view derive through this so their wording can never diverge.
  */
-export function buildShowFootnotes(setlist: Setlist | SetlistLight): DerivedFootnotes {
+export function buildShowFootnotes(setlist: Setlist): DerivedFootnotes {
   const allTracks = setlist.sets.flatMap((set) => set.tracks);
   // Whole-show guests are surfaced in the show-level lineup note, so their
   // per-track "with" footnotes are suppressed; for guests below 100% coverage

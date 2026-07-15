@@ -40,11 +40,11 @@ export const loader = adminLoader(async ({ params }) => {
   // Get venues for the venue selector
   const venues = await services.venues.findMany({});
 
-  // Get tracks for this show. The edit forms use this lighter shape; the
-  // read-only footnotes derive from the heavier setlist below.
+  // Get tracks for this show. The edit forms use this flat shape; the
+  // read-only footnotes derive from the full setlist structure below.
   const tracks = await services.tracks.findByShowId(show.id);
 
-  // The full setlist carries flags/performers/completions/recurrence per track,
+  // The setlist carries flags/performers/completions/recurrence per track,
   // which TrackManager runs through the same footnote engine as the public
   // setlist so admins see the current derived state before editing.
   const footnoteSetlist = await services.setlists.findByShowSlug(slug as string);

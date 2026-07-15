@@ -1,11 +1,11 @@
-import type { SetlistLight } from "@bip/domain";
+import type { Setlist } from "@bip/domain";
 import { type DehydratedState, QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const cacheGetOrSet = vi.fn();
 const findPerformanceShowIds = vi.fn();
 const findPerformancesForShow = vi.fn();
-const findManyByShowIdsLight = vi.fn();
+const findManyByShowIds = vi.fn();
 const computeShowExternalSourcesFn = vi.fn();
 const computeShowUserDataFn = vi.fn();
 const prefetchQuery = vi.fn();
@@ -17,7 +17,7 @@ vi.mock("~/server/services", () => ({
       findPerformanceShowIds: (...args: unknown[]) => findPerformanceShowIds(...args),
       findPerformancesForShow: (...args: unknown[]) => findPerformancesForShow(...args),
     },
-    setlists: { findManyByShowIdsLight: (...args: unknown[]) => findManyByShowIdsLight(...args) },
+    setlists: { findManyByShowIds: (...args: unknown[]) => findManyByShowIds(...args) },
   },
 }));
 
@@ -46,10 +46,10 @@ vi.mock("~/lib/query-prefetch", async (importOriginal) => {
 
 const { getRockOperaPerformances } = await import("./rock-opera-performances");
 
-function makeSetlist(showId: string, date: string): SetlistLight {
+function makeSetlist(showId: string, date: string): Setlist {
   return {
-    show: { id: showId, slug: `${date}-show`, date } as SetlistLight["show"],
-    venue: { id: "v-1", slug: "v", name: "Venue", city: "City", state: "ST", country: "US" } as SetlistLight["venue"],
+    show: { id: showId, slug: `${date}-show`, date } as Setlist["show"],
+    venue: { id: "v-1", slug: "v", name: "Venue", city: "City", state: "ST", country: "US" } as Setlist["venue"],
     sets: [],
     annotations: [],
     averageSongGap: null,
@@ -68,7 +68,7 @@ describe("getRockOperaPerformances", () => {
     cacheGetOrSet.mockReset();
     findPerformanceShowIds.mockReset();
     findPerformancesForShow.mockReset();
-    findManyByShowIdsLight.mockReset();
+    findManyByShowIds.mockReset();
     computeShowExternalSourcesFn.mockReset();
     computeShowUserDataFn.mockReset();
     prefetchQuery.mockReset();
@@ -87,7 +87,7 @@ describe("getRockOperaPerformances", () => {
 
     expect(result.performances).toEqual([]);
     expect(result.externalSources).toEqual({});
-    expect(findManyByShowIdsLight).not.toHaveBeenCalled();
+    expect(findManyByShowIds).not.toHaveBeenCalled();
     expect(prefetchQuery).not.toHaveBeenCalled();
   });
 
@@ -102,10 +102,10 @@ describe("getRockOperaPerformances", () => {
 
     const usedKey = cacheGetOrSet.mock.calls[0][0] as string;
     expect(usedKey).toMatch(/^rock-operas:performances:hot-air-balloon/);
-    // v12 = the SetlistLight shape (lean track songs, no lyrics/history).
+    // v13 = the Setlist shape with dateFirstPlayed on the lean song.
     // A payload-shape change without a version bump would serve stale-shape
     // blobs from deployed instances until TTL (the cache-versioning rule).
-    expect(usedKey).toContain(":v12");
+    expect(usedKey).toContain(":v13");
   });
 
   // Setlists must be loaded by show id in chronological-asc order so the
@@ -113,24 +113,21 @@ describe("getRockOperaPerformances", () => {
   // Drives the resource page's display contract.
   test("requests setlists ordered by date asc", async () => {
     findPerformanceShowIds.mockResolvedValue(["show-1", "show-2"]);
-    findManyByShowIdsLight.mockResolvedValue([
-      makeSetlist("show-1", "1998-12-31"),
-      makeSetlist("show-2", "1999-01-24"),
-    ]);
+    findManyByShowIds.mockResolvedValue([makeSetlist("show-1", "1998-12-31"), makeSetlist("show-2", "1999-01-24")]);
     findPerformancesForShow.mockResolvedValue([]);
     computeShowExternalSourcesFn.mockResolvedValue({});
 
     await getRockOperaPerformances("hot-air-balloon", context);
 
-    expect(findManyByShowIdsLight).toHaveBeenCalledWith(["show-1", "show-2"], {
+    expect(findManyByShowIds).toHaveBeenCalledWith(["show-1", "show-2"], {
       sort: [{ field: "date", direction: "asc" }],
     });
   });
 
   // SetlistService now overlays rockOperaPerformances on every returned
-  // setlist (in findManyByShowIdsLight), so the loader just passes its result
+  // setlist (in findManyByShowIds), so the loader just passes its result
   // through untouched. The loader itself no longer makes annotation
-  // lookups — verified by mocking findManyByShowIdsLight with already-overlay'd
+  // lookups — verified by mocking findManyByShowIds with already-overlay'd
   // setlists and asserting they pass through verbatim.
   test("passes through rockOperaPerformances populated by SetlistService", async () => {
     findPerformanceShowIds.mockResolvedValue(["show-1", "show-2"]);
@@ -158,7 +155,7 @@ describe("getRockOperaPerformances", () => {
         ],
       },
     ];
-    findManyByShowIdsLight.mockResolvedValue(setlistsWithAnnotations);
+    findManyByShowIds.mockResolvedValue(setlistsWithAnnotations);
     computeShowExternalSourcesFn.mockResolvedValue({});
 
     const result = await getRockOperaPerformances("hot-air-balloon", context);
@@ -176,7 +173,7 @@ describe("getRockOperaPerformances", () => {
   test("computes external sources from every performance's show in one call", async () => {
     findPerformanceShowIds.mockResolvedValue(["show-1", "show-2"]);
     const setlists = [makeSetlist("show-1", "1998-12-31"), makeSetlist("show-2", "1999-01-24")];
-    findManyByShowIdsLight.mockResolvedValue(setlists);
+    findManyByShowIds.mockResolvedValue(setlists);
     findPerformancesForShow.mockResolvedValue([]);
     computeShowExternalSourcesFn.mockResolvedValue({ "show-1": {}, "show-2": {} });
 
@@ -193,10 +190,7 @@ describe("getRockOperaPerformances", () => {
   // resolves. Same pattern as /shows/top-rated.
   test("prefetches show user data keyed by every performance's show id", async () => {
     findPerformanceShowIds.mockResolvedValue(["show-1", "show-2"]);
-    findManyByShowIdsLight.mockResolvedValue([
-      makeSetlist("show-1", "1998-12-31"),
-      makeSetlist("show-2", "1999-01-24"),
-    ]);
+    findManyByShowIds.mockResolvedValue([makeSetlist("show-1", "1998-12-31"), makeSetlist("show-2", "1999-01-24")]);
     findPerformancesForShow.mockResolvedValue([]);
     computeShowExternalSourcesFn.mockResolvedValue({});
 
@@ -224,7 +218,7 @@ describe("getRockOperaPerformances", () => {
     const result = await getRockOperaPerformances("hot-air-balloon", context);
 
     expect(findPerformanceShowIds).not.toHaveBeenCalled();
-    expect(findManyByShowIdsLight).not.toHaveBeenCalled();
+    expect(findManyByShowIds).not.toHaveBeenCalled();
     expect(findPerformancesForShow).not.toHaveBeenCalled();
     expect(computeShowExternalSourcesFn).not.toHaveBeenCalled();
     expect(result.performances).toBe(cachedPayload.performances);

@@ -1,4 +1,4 @@
-import type { SetlistLight } from "@bip/domain";
+import type { Setlist } from "@bip/domain";
 import { setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
@@ -61,14 +61,14 @@ function flowSetlist(
   sets: Array<{ label: string; tracks: ReturnType<typeof durTrack>[] }>,
   annotations: Array<{ trackId: string; desc: string }> = [],
   showDate?: string,
-): SetlistLight {
+): Setlist {
   return {
     show: { id: "show-1", date: showDate },
     sets: sets.map((s, i) => ({ label: s.label, sort: i + 1, tracks: s.tracks })),
     annotations,
     trackMusicianDeltas: [],
     lineup: [],
-  } as unknown as SetlistLight;
+  } as unknown as Setlist;
 }
 
 describe("SetlistFlow", () => {
