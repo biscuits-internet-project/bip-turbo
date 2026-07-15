@@ -1,4 +1,5 @@
 import type { Logger } from "@bip/domain";
+import { deepFreeze } from "../deep-freeze";
 import type { RedisService } from "../redis";
 
 /**
@@ -16,22 +17,6 @@ export const CATALOG_TTL_SECONDS = 60 * 60 * 24;
  * window. Minutes-scale so a catalog refreshed in Redis is picked up promptly.
  */
 export const MEMO_TTL_SECONDS = 60 * 5;
-
-/**
- * Recursively freeze a parsed catalog map. The memo hands the same object to
- * every request for the memo window, so an accidental mutation by one caller
- * would silently corrupt what all other requests see; freezing makes it throw
- * at the mutation site instead. Values are plain JSON (no cycles).
- */
-function deepFreeze<T>(value: T): T {
-  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const key of Object.keys(value)) {
-      deepFreeze((value as Record<string, unknown>)[key]);
-    }
-  }
-  return value;
-}
 
 /**
  * Shared caching layer for external catalogs that are small enough to fetch in

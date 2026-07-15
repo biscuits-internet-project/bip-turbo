@@ -13,6 +13,7 @@ on:
           - memory-timeline
           - restart-redis
           - prune-docker
+          - stop-builder
 
 concurrency:
   group: deploy-web-app
@@ -167,6 +168,25 @@ jobs:
       - name: Prune unused Docker data
         if: inputs.action == 'prune-docker'
         run: kamal server exec 'docker system prune -af'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      # The co-located coaching-tree app deploys via a Kamal remote builder,
+      # which leaves its buildx builder container running (and holding
+      # ~645MiB) between deploys. Stopping it is safe: buildx bootstraps a
+      # fresh builder on the next remote build, and the running app container
+      # is untouched.
+      - name: Stop idle buildx builder containers
+        if: inputs.action == 'stop-builder'
+        run: kamal server exec 'docker ps -q --filter name=buildx_buildkit | xargs -r docker stop'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      - name: Memory after builder stop
+        if: inputs.action == 'stop-builder'
+        run: |
+          kamal server exec 'docker stats --no-stream'
+          kamal server exec 'free -h'
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
