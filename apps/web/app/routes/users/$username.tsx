@@ -169,7 +169,7 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
 
   const { attendedSetlists, attendedExternalSources } = pageShowIds.length
     ? await services.cache.getOrSet(CacheKeys.users.attendedSetlists(user.id, clampedAttendedPage), async () => {
-        const setlists = await services.setlists.findManyByShowIds(pageShowIds);
+        const setlists = await services.setlists.findManyByShowIdsLight(pageShowIds);
         const externalSources: Record<string, ShowExternalSources> = await computeShowExternalSources(
           setlists.map((s) => s.show),
         );

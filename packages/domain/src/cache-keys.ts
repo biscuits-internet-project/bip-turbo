@@ -140,9 +140,10 @@ export const CacheKeys = {
      * Pre-built SetlistList payload (setlists + external sources) for one
      * page of a user's attended shows. Paginated because the heaviest users
      * have 400+ attended shows and the un-paginated payload is large enough
-     * to be slow to deserialize/transport even from Redis.
+     * to be slow to deserialize/transport even from Redis. :v14 bump:
+     * setlists are SetlistLight (lean track songs; no lyrics/history text).
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v13`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v14`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -166,8 +167,10 @@ export const CacheKeys = {
    * shows.list / users.attendedSetlists payloads.
    */
   rockOperas: {
-    /** Resource-page list payload: setlists + external sources for one rock opera. */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v11`,
+    /** Resource-page list payload: setlists + external sources for one rock
+     *  opera. :v12 bump: setlists are SetlistLight (lean track songs; no
+     *  lyrics/history text). */
+    performances: (slug: string) => `rock-operas:performances:${slug}:v12`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },

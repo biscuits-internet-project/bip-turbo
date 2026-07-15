@@ -1,4 +1,4 @@
-import { CacheKeys, type Setlist } from "@bip/domain";
+import { CacheKeys, type SetlistLight } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import type { PublicContext } from "~/lib/base-loaders";
@@ -14,7 +14,7 @@ export interface RockOperaPerformancesLoaderData {
    * The 1st-ever performance is the FIRST item; SetlistList renders this
    * order directly with `numbered`, so the gutter naturally shows 1..N.
    */
-  performances: Setlist[];
+  performances: SetlistLight[];
   externalSources: Record<string, ShowExternalSources>;
   dehydratedState: DehydratedState;
 }
@@ -35,13 +35,13 @@ export async function getRockOperaPerformances(
   const cached = await services.cache.getOrSet(cacheKey, async () => {
     const showIds = await services.rockOperas.findPerformanceShowIds(rockOperaSlug);
     if (showIds.length === 0) {
-      return { performances: [] as Setlist[], externalSources: {} };
+      return { performances: [] as SetlistLight[], externalSources: {} };
     }
     // Sort ASC so the oldest (1st-ever full performance) lands first in
     // the array — SetlistList's `numbered` gutter then displays 1..N
     // naturally. SetlistService overlays rockOperaPerformances on every
     // returned setlist, so no further annotation lookup is needed here.
-    const setlists = await services.setlists.findManyByShowIds(showIds, {
+    const setlists = await services.setlists.findManyByShowIdsLight(showIds, {
       sort: [{ field: "date", direction: "asc" }],
     });
     const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));

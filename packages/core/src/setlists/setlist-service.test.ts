@@ -359,6 +359,70 @@ describe("SetlistService.findManyLight", () => {
   });
 });
 
+describe("SetlistService.findManyByShowIdsLight", () => {
+  // The light by-ids query backs cached list payloads (attended-setlists,
+  // rock-opera performances). Its whole reason to exist is that the song
+  // select stays lean: the cached blob can't embed lyrics/history text the
+  // DB never returns. Guards the 7-10MB-per-page regression this replaced.
+  test("selects only lean song fields, no lyrics/history/notes/tabs", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findManyByShowIdsLight(["show-1"]);
+
+    const songSelect = db.show.findMany.mock.calls[0][0].include.tracks.select.song.select;
+    expect(songSelect.id).toBe(true);
+    expect(songSelect.title).toBe(true);
+    expect(songSelect.slug).toBe(true);
+    expect(songSelect.kind).toBe(true);
+    expect(songSelect.lyrics).toBeUndefined();
+    expect(songSelect.history).toBeUndefined();
+    expect(songSelect.notes).toBeUndefined();
+    expect(songSelect.tabs).toBeUndefined();
+  });
+
+  // Only the requested shows, and orphan placeholder shows (no venue) dropped
+  // at the SQL boundary: the id list can include a stub (e.g. top-rated
+  // joins), which would otherwise render as a blank row.
+  test("filters to the requested show ids and excludes venue-less stubs", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findManyByShowIdsLight(["show-1", "show-2"]);
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.where.id).toEqual({ in: ["show-1", "show-2"] });
+    expect(call.where.venueId).toEqual({ not: null });
+  });
+
+  // Newest-first by default (most list views want recent shows on top); an
+  // explicit sort option overrides it (rock opera pages want oldest-first
+  // numbering).
+  test("orders date desc by default and honors a sort override", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findManyByShowIdsLight(["show-1"]);
+    await service.findManyByShowIdsLight(["show-1"], { sort: [{ field: "date", direction: "asc" }] });
+
+    const [defaultCall, sortedCall] = db.show.findMany.mock.calls;
+    expect(defaultCall[0].orderBy[0]).toEqual({ date: "desc" });
+    expect(sortedCall[0].orderBy[0]).toEqual({ date: "asc" });
+  });
+
+  // Empty input short-circuits with no query, e.g. a user with no attended
+  // shows on the page.
+  test("returns [] without querying when given no show ids", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    const result = await service.findManyByShowIdsLight([]);
+
+    expect(result).toEqual([]);
+    expect(db.show.findMany).not.toHaveBeenCalled();
+  });
+});
+
 describe("eligibleGapsForAggregation", () => {
   // Debuts (gap === null) are excluded so they don't drag the eventual
   // average down to "we never played this".
@@ -801,20 +865,6 @@ describe("SetlistService.findMany stub filtering", () => {
     expect(trackInclude.completionsAsLater).toBeDefined();
     expect(trackInclude.trackMusicians).toBeDefined();
     expect(call.include.showMusicians).toBeDefined();
-  });
-});
-
-describe("SetlistService.findManyByShowIds stub filtering", () => {
-  // Same post-pagination undercount as findMany: the id list can include a stub
-  // (e.g. top-rated joins), so exclude venueless shows in the query.
-  test("excludes venueless stubs at the SQL boundary", async () => {
-    const db = makeMockDb();
-    const service = new SetlistService(db as never, makeRockOperaStub());
-
-    await service.findManyByShowIds(["show-1", "show-2"]);
-
-    const call = db.show.findMany.mock.calls[0][0];
-    expect(call.where.venueId).toEqual({ not: null });
   });
 });
 

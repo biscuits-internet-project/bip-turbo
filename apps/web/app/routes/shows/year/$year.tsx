@@ -94,7 +94,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
 
     if (shows.length > 0) {
       const showIds = shows.map((show) => show.id);
-      setlists = await services.setlists.findManyByShowIds(showIds);
+      setlists = await services.setlists.findManyByShowIdsLight(showIds);
     }
 
     const searchShowIds = setlists.map((s) => s.show.id);
