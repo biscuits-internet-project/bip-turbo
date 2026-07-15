@@ -1,4 +1,4 @@
-import { type BlogPostWithUser, CacheKeys, type SetlistLight, type TourDate } from "@bip/domain";
+import { type BlogPostWithUser, CacheKeys, type Setlist, type TourDate } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,12 +21,12 @@ import { computeShowUserData } from "~/server/show-user-data";
 
 interface LoaderData {
   tourDates: TourDate[];
-  mobileRecentShows: SetlistLight[];
-  desktopRecentShows: SetlistLight[];
+  mobileRecentShows: Setlist[];
+  desktopRecentShows: Setlist[];
   recentBlogPosts: Array<BlogPostWithUser>;
   latestEpisode: AcastEpisode | null;
   nextTourDate: TourDate | null;
-  recentShows: SetlistLight[];
+  recentShows: Setlist[];
   onThisDayCounts: { showCount: number; allTimerCount: number };
   externalSources: Record<string, ShowExternalSources>;
   dehydratedState: DehydratedState;
@@ -54,7 +54,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     CacheKeys.home.recentSetlists(15),
     async () => {
       logger.info("Loading recent setlists from DB for home page");
-      return await services.setlists.findManyLight({
+      return await services.setlists.findMany({
         pagination: { limit: 15 },
         sort: [{ field: "date", direction: "desc" }],
       });

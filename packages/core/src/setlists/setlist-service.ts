@@ -12,7 +12,6 @@ import {
   type SegueRecurrence,
   type SegueRecurrenceKind,
   type Setlist,
-  type SetlistLight,
   type Show,
   type ShowLineupMember,
   type SongAuthor,
@@ -109,6 +108,7 @@ type DbTrackLight = {
     title: string;
     slug: string;
     kind: string | null;
+    dateFirstPlayed: Date | string | null;
     songAuthors?: SongAuthorRow[];
   } | null;
   annotations: DbAnnotation[];
@@ -538,65 +538,6 @@ function getSetSortOrder(setLabel: string): number {
   return 999;
 }
 
-function mapSetlistToDomainEntity(
-  show: DbShow & {
-    tracks: (DbTrack & {
-      song: DbSong | null;
-      annotations: DbAnnotation[];
-      previousPerformanceShow?: { date: string; slug: string | null } | null;
-      trackMusicians?: DbTrackMusicianWithRelations[];
-    })[];
-    venue: DbVenue;
-    showMusicians?: DbShowMusicianWithRelations[];
-  },
-): Setlist {
-  const tracks = show.tracks ?? [];
-  const setGroups = new Map<string, (DbTrack & { song: DbSong | null; annotations: DbAnnotation[] })[]>();
-
-  // Group tracks by set label
-  for (const track of tracks) {
-    const setTracks = setGroups.get(track.set) ?? [];
-    setTracks.push(track);
-    setGroups.set(track.set, setTracks);
-  }
-
-  // Convert the grouped tracks into sets
-  const sets = Array.from(setGroups.entries()).map(([label, setTracks]) => {
-    // Sort tracks by position within each set
-    const sortedTracks = [...setTracks].sort((a, b) => {
-      // Ensure we're sorting numerically by position
-      const posA = Number(a.position);
-      const posB = Number(b.position);
-      return posA - posB;
-    });
-
-    return {
-      label,
-      sort: getSetSortOrder(label),
-      tracks: sortedTracks.map((t) => mapTrackToDomainEntity(t)),
-    };
-  });
-
-  // Sort sets by their sort order
-  sets.sort((a, b) => a.sort - b.sort);
-
-  const eligible = eligibleGapsForAggregation(tracks);
-  return {
-    show: mapShowToDomainEntity(show),
-    venue: mapVenueToDomainEntity(show.venue),
-    sets,
-    annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),
-    averageSongGap: average(eligible),
-    medianSongGap: median(eligible),
-    debutCount: computeDebutCount(tracks),
-    rockOperaPerformances: [],
-    lineup: (show.showMusicians ?? []).map(mapShowMusicianToLineupMember),
-    trackMusicianDeltas: tracks.flatMap((track) =>
-      (track.trackMusicians ?? []).map((tm) => mapTrackMusicianToDelta(tm, track.id)),
-    ),
-  };
-}
-
 function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
   return {
     id: track.id,
@@ -653,18 +594,19 @@ function mapTrackLightToDomainEntity(track: DbTrackLight): TrackLight {
           slug: track.song.slug,
           kind: narrowSongKind(track.song.kind),
           authorName: joinAuthorNames(track.song.songAuthors),
+          dateFirstPlayed: track.song.dateFirstPlayed ? new Date(track.song.dateFirstPlayed) : null,
         }
       : undefined,
   };
 }
 
-function mapSetlistLightToDomainEntity(
+function mapSetlistToDomainEntity(
   show: DbShow & {
     tracks: DbTrackLight[];
     venue: DbVenue;
     showMusicians?: DbShowMusicianWithRelations[];
   },
-): SetlistLight {
+): Setlist {
   const tracks = show.tracks ?? [];
   const setGroups = new Map<string, DbTrackLight[]>();
 
@@ -780,34 +722,16 @@ export const TRACK_FOOTNOTE_INCLUDE = {
   ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
 } as const;
 
-// Every show + track relation the heavy mapper (mapSetlistToDomainEntity) reads:
-// the song author for debut-footnote text, the structured flags / segue
-// recurrences / completion links, and the per-track plus whole-show performer
-// lineups. Shared by every query that returns a heavy Setlist so the joins stay
-// in lockstep — a query missing one silently blanks that footnote category,
-// since the mapper defaults each absent relation to an empty array.
-const HEAVY_SETLIST_INCLUDE = {
-  tracks: {
-    include: {
-      song: { include: { ...SONG_AUTHORS_SETLIST_INCLUDE } },
-      annotations: true,
-      previousPerformanceShow: { select: { date: true, slug: true } },
-      ...TRACK_PERFORMER_INCLUDE,
-      ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
-    },
-  },
-  venue: true,
-  ...SINGLE_SHOW_PERFORMER_INCLUDE,
-} as const;
-
-// Light counterpart of HEAVY_SETLIST_INCLUDE: everything the light mapper
-// (mapSetlistLightToDomainEntity) reads, with the track's song narrowed to the
-// lean list-view fields. The song select deliberately omits the text-heavy
-// columns (lyrics, history, notes, tabs): light payloads back redis-cached
-// list views, and those columns dominated the blob size while nothing in a
-// list view reads them. Shared by every query that returns SetlistLight so
-// the joins stay in lockstep with the mapper.
-const LIGHT_SETLIST_INCLUDE = {
+// Everything the setlist mapper (mapSetlistToDomainEntity) reads, with
+// the track's song narrowed to the lean fields (plus dateFirstPlayed for the
+// show page's debut-year chart). The song select deliberately omits the
+// text-heavy columns (lyrics, history, notes, tabs): these payloads back
+// redis-cached list views and the show page, and those columns dominated the
+// blob size while nothing reading the payload uses them. Shared by every
+// setlist query so the joins stay in lockstep with the mapper; a query
+// missing a relation silently blanks that footnote category, since the
+// mapper defaults each absent relation to an empty array.
+const SETLIST_INCLUDE = {
   tracks: {
     select: {
       id: true,
@@ -832,6 +756,7 @@ const LIGHT_SETLIST_INCLUDE = {
           title: true,
           slug: true,
           kind: true,
+          dateFirstPlayed: true,
           ...SONG_AUTHORS_SETLIST_INCLUDE,
         },
       },
@@ -855,7 +780,7 @@ export class SetlistService {
     private readonly rockOperas: RockOperaService,
   ) {}
 
-  private async overlayRockOperaAnnotations<T extends Setlist | SetlistLight>(setlists: T[]): Promise<T[]> {
+  private async overlayRockOperaAnnotations<T extends Setlist>(setlists: T[]): Promise<T[]> {
     if (setlists.length === 0) return setlists;
     const annotations = await this.rockOperas.findPerformancesForShows(setlists.map((s) => s.show.id));
     if (annotations.size === 0) return setlists;
@@ -866,28 +791,18 @@ export class SetlistService {
     return setlists;
   }
 
-  async findByShowId(id: string): Promise<Setlist | null> {
-    const show = await this.db.show.findUnique({
-      where: { id },
-      relationLoadStrategy: "join",
-      include: HEAVY_SETLIST_INCLUDE,
-    });
-
-    if (!show || !show.venue) return null;
-
-    const setlist = mapSetlistToDomainEntity({
-      ...show,
-      venue: show.venue,
-    });
-    await this.overlayRockOperaAnnotations([setlist]);
-    return setlist;
-  }
-
+  /**
+   * Find one show's setlist in the lean shape: each track's song carries only
+   * id/title/slug/kind/authors/dateFirstPlayed, no lyrics/history text. This
+   * payload is cached verbatim under show:<slug>:data and feeds the show
+   * page, the show edit page's footnotes, and the MCP setlist getters, none
+   * of which read the text-heavy song columns.
+   */
   async findByShowSlug(slug: string): Promise<Setlist | null> {
     const result = await this.db.show.findUnique({
       where: { slug },
       relationLoadStrategy: "join",
-      include: HEAVY_SETLIST_INCLUDE,
+      include: SETLIST_INCLUDE,
     });
 
     if (!result || !result.venue) return null;
@@ -901,20 +816,20 @@ export class SetlistService {
   }
 
   /**
-   * Find setlists for a set of show ids in the lean list-view shape: each
-   * track's song carries only id/title/slug/kind/authors, no lyrics/history
+   * Find setlists for a set of show ids in the lean shape: each track's song
+   * carries only id/title/slug/kind/authors/dateFirstPlayed, no lyrics/history
    * text. Every by-ids consumer is a list view (attended-shows pages, rock
    * opera performances, top-rated, musician appearances), and the redis-cached
    * ones ran to multiple MB per cached page when the full song objects rode
-   * along. Single-show pages needing full data use findByShowSlug/findByShowId.
+   * along.
    */
-  async findManyByShowIdsLight(
+  async findManyByShowIds(
     showIds: string[],
     options?: {
       pagination?: PaginationOptions;
       sort?: SortOptions<Show>[];
     },
-  ): Promise<SetlistLight[]> {
+  ): Promise<Setlist[]> {
     if (!showIds.length) return [];
 
     const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_DESC);
@@ -935,63 +850,7 @@ export class SetlistService {
       skip,
       take,
       relationLoadStrategy: "join",
-      include: LIGHT_SETLIST_INCLUDE,
-    });
-
-    const setlists = results
-      .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
-      .map((show) =>
-        mapSetlistLightToDomainEntity({
-          ...show,
-          venue: show.venue,
-          tracks: show.tracks.map((track) => ({
-            ...track,
-            annotations: track.annotations || [],
-          })),
-        }),
-      );
-    return this.overlayRockOperaAnnotations(setlists);
-  }
-
-  async findMany(options?: {
-    pagination?: PaginationOptions;
-    sort?: SortOptions<Show>[];
-    filters?: SetlistFilter;
-  }): Promise<Setlist[]> {
-    const year = options?.filters?.year;
-    const monthDay = options?.filters?.monthDay;
-    const venueId = options?.filters?.venueId;
-    const hasPhotos = options?.filters?.hasPhotos;
-    const hasYoutube = options?.filters?.hasYoutube;
-
-    const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_ASC);
-    const skip =
-      options?.pagination?.page && options?.pagination?.limit
-        ? (options.pagination.page - 1) * options.pagination.limit
-        : undefined;
-    const take = options?.pagination?.limit;
-
-    const results = await this.db.show.findMany({
-      where: {
-        // Explicit caller venueId (the venue-detail page) wins; otherwise apply
-        // the stub filter to drop orphan placeholder shows that have no venue.
-        venueId: venueId !== undefined ? venueId : NON_STUB_SHOWS_WHERE.venueId,
-        date: monthDay
-          ? { endsWith: `-${monthDay}` }
-          : year
-            ? {
-                gte: `${year}-01-01`,
-                lt: `${year + 1}-01-01`,
-              }
-            : undefined,
-        showPhotosCount: countFilter(hasPhotos),
-        showYoutubesCount: countFilter(hasYoutube),
-      },
-      orderBy,
-      skip,
-      take,
-      relationLoadStrategy: "join",
-      include: HEAVY_SETLIST_INCLUDE,
+      include: SETLIST_INCLUDE,
     });
 
     const setlists = results
@@ -1010,14 +869,14 @@ export class SetlistService {
   }
 
   /**
-   * Find setlists with minimal song data (id, title, slug only).
-   * Use this for list views where full song objects (lyrics, history) aren't needed.
+   * Find setlists by year / calendar-day / venue / media filters. Powers the
+   * homepage recents and the year, on-this-day, and venue-detail listings.
    */
-  async findManyLight(options?: {
+  async findMany(options?: {
     pagination?: PaginationOptions;
     sort?: SortOptions<Show>[];
     filters?: SetlistFilter;
-  }): Promise<SetlistLight[]> {
+  }): Promise<Setlist[]> {
     const year = options?.filters?.year;
     const monthDay = options?.filters?.monthDay;
     const venueId = options?.filters?.venueId;
@@ -1052,13 +911,13 @@ export class SetlistService {
       skip,
       take,
       relationLoadStrategy: "join",
-      include: LIGHT_SETLIST_INCLUDE,
+      include: SETLIST_INCLUDE,
     });
 
     const setlists = results
       .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
       .map((show) =>
-        mapSetlistLightToDomainEntity({
+        mapSetlistToDomainEntity({
           ...show,
           venue: show.venue,
           tracks: show.tracks.map((track) => ({

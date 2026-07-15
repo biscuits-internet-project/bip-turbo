@@ -1,4 +1,4 @@
-import type { SetlistLight } from "@bip/domain";
+import type { Setlist } from "@bip/domain";
 import { expectMockedShallowComponent, mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -45,7 +45,7 @@ vi.mock("./anniversary-badge", () => ({
 
 import { SetlistCard } from "./setlist-card";
 
-function makeSetlist(overrides: { showDate?: string } = {}): SetlistLight {
+function makeSetlist(overrides: { showDate?: string } = {}): Setlist {
   return {
     show: {
       id: "show-1",

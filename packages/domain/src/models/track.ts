@@ -133,6 +133,9 @@ export const songLightSchema = z.object({
   // names the origin for covers/mashups.
   kind: z.enum(["original", "cover", "mashup", "improvisation"]).nullable().optional(),
   authorName: z.string().nullable().optional(),
+  // Carried for the show page's debut-year chart, which derives each song's
+  // debut year from its first-played date.
+  dateFirstPlayed: z.date().nullable().optional(),
 });
 
 export type SongLight = z.infer<typeof songLightSchema>;

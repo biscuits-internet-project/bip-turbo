@@ -33,7 +33,7 @@ export class CacheInvalidationService {
   async invalidateShow(slug: string): Promise<void> {
     this.logger.info(`Invalidating show cache for slug: ${slug}`);
 
-    await Promise.all([this.cache.del(CacheKeys.show.data(slug)), this.cache.del(CacheKeys.setlist.data(slug))]);
+    await this.cache.del(CacheKeys.show.data(slug));
   }
 
   /**
@@ -49,7 +49,7 @@ export class CacheInvalidationService {
 
     this.logger.info(`Invalidating show cache for ID: ${showId}, slug: ${slug}`);
 
-    await Promise.all([this.cache.del(CacheKeys.show.data(slug)), this.cache.del(CacheKeys.setlist.data(slug))]);
+    await this.cache.del(CacheKeys.show.data(slug));
   }
 
   /**
@@ -83,11 +83,11 @@ export class CacheInvalidationService {
       // Per-user song-history embeds the catalog of tracks at each attended
       // show; a show metadata or tracks change can shift values.
       this.cache.delPattern(CacheKeys.users.allSongHistory()),
-      // Rock opera resource pages embed full Setlists (with tracks,
-      // annotations, ratings, notes, date) for every tagged show. Any
+      // Rock opera resource pages embed Setlist payloads (tracks,
+      // annotations, notes, date) for every tagged show. Any
       // show-affecting mutation can stale them.
       this.cache.delPattern(CacheKeys.rockOperas.allPerformances()),
-      // show.data caches per-slug Setlists with rockOperaPerformances
+      // show.data caches per-slug setlists with rockOperaPerformances
       // baked in (SetlistService overlays them in findByShowSlug etc.).
       // When a tagged show's date moves or any rock opera assignment
       // changes, neighbors' annotations (rank/prev/next) shift — wipe

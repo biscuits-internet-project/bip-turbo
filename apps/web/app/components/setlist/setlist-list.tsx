@@ -1,4 +1,4 @@
-import type { Setlist, SetlistLight } from "@bip/domain";
+import type { Setlist } from "@bip/domain";
 import { Fragment, type ReactNode, useMemo } from "react";
 import { useShowUserData } from "~/hooks/use-show-user-data";
 import { SetlistCard } from "./setlist-card";
@@ -15,7 +15,7 @@ import type { ShowExternalSources } from "./show-external-badges";
  * this component mounts, so attendance / rating badges paint with the HTML.
  */
 interface SetlistListProps {
-  setlists: Array<Setlist | SetlistLight>;
+  setlists: Array<Setlist>;
   externalSources: Record<string, ShowExternalSources>;
   /** Rendered when `setlists` is empty. Defaults to nothing. */
   empty?: ReactNode;
@@ -50,7 +50,7 @@ export function SetlistList({
     return <>{empty ?? null}</>;
   }
 
-  const renderCard = (setlist: Setlist | SetlistLight, index: number) => {
+  const renderCard = (setlist: Setlist, index: number) => {
     const showId = setlist.show.id;
     const live = averageRatingMap.get(showId);
     // The displayed ★ is the viewer's calibrated score when their mode resolves to
@@ -85,7 +85,7 @@ export function SetlistList({
   };
 
   if (groupByMonth) {
-    const groups = new Map<number, Array<Setlist | SetlistLight>>();
+    const groups = new Map<number, Array<Setlist>>();
     for (const setlist of setlists) {
       const month = new Date(setlist.show.date).getMonth();
       const bucket = groups.get(month);

@@ -3,7 +3,7 @@ import { services } from "~/server/services";
 
 /**
  * Minimal show shape accepted by {@link computeShowExternalSources}. Defined
- * loosely so every kind of setlist/show fixture (Setlist, SetlistLight, etc.)
+ * loosely so every kind of setlist/show fixture (Setlist, etc.)
  * can satisfy it without coercion.
  */
 interface ShowLike {

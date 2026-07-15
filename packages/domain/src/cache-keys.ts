@@ -11,10 +11,10 @@ export const CacheKeys = {
    * Show-related cache keys
    */
   show: {
-    /** Complete show + setlist data for show page. :v14 — tracks no longer
-     *  embed averageRating/ratingsCount (rating values moved to the live
-     *  tier-2 read path so rating writes don't staleness-bust this blob). */
-    data: (slug: string) => `show:${slug}:data:v14`,
+    /** Complete show + setlist data for show page. :v15 bump: the payload is
+     *  now Setlist, so track songs carry only the lean fields (id/title/
+     *  slug/kind/authors/dateFirstPlayed), no lyrics/history/notes/tabs text. */
+    data: (slug: string) => `show:${slug}:data:v15`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
@@ -33,9 +33,8 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      // :v14 — tracks dropped averageRating/ratingsCount (rating values moved
-      // to the live tier-2 read path). See CacheKeys.show.data.
-      return `shows:list:${filterHash}:v14`;
+      // :v15 bump: SongLight gained dateFirstPlayed (Setlist shape change).
+      return `shows:list:${filterHash}:v15`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -43,15 +42,6 @@ export const CacheKeys = {
 
     /** Show + all-timer counts for a calendar day (On This Day home page widget) */
     onThisDayCounts: (monthDay: string) => `shows:on-this-day-counts:${monthDay}`,
-  },
-
-  /**
-   * Setlist cache keys
-   */
-  setlist: {
-    /** Complete setlist data with tracks and annotations. :v14 — tracks no
-     *  longer embed averageRating/ratingsCount (moved to live tier-2). */
-    data: (slug: string) => `setlist:${slug}:data:v14`,
   },
 
   /**
@@ -116,8 +106,10 @@ export const CacheKeys = {
    * Musician profile page cache keys
    */
   musicians: {
-    /** Full musician profile payload (appearances, songs played/written, performances). */
-    page: (slug: string) => `musician:${slug}:data:v4`,
+    /** Full musician profile payload (appearances, songs played/written,
+     *  performances). :v5 bump: SongLight gained dateFirstPlayed (Setlist
+     *  shape change; performances embed Setlist). */
+    page: (slug: string) => `musician:${slug}:data:v5`,
     /** Every musician profile cache (for pattern deletion on broad mutations). */
     allPages: () => "musician:*:data:*",
   },
@@ -140,10 +132,10 @@ export const CacheKeys = {
      * Pre-built SetlistList payload (setlists + external sources) for one
      * page of a user's attended shows. Paginated because the heaviest users
      * have 400+ attended shows and the un-paginated payload is large enough
-     * to be slow to deserialize/transport even from Redis. :v14 bump:
-     * setlists are SetlistLight (lean track songs; no lyrics/history text).
+     * to be slow to deserialize/transport even from Redis. :v15 bump:
+     * SongLight gained dateFirstPlayed (Setlist shape change).
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v14`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v15`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -168,9 +160,9 @@ export const CacheKeys = {
    */
   rockOperas: {
     /** Resource-page list payload: setlists + external sources for one rock
-     *  opera. :v12 bump: setlists are SetlistLight (lean track songs; no
-     *  lyrics/history text). */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v12`,
+     *  opera. :v13 bump: SongLight gained dateFirstPlayed (Setlist
+     *  shape change). */
+    performances: (slug: string) => `rock-operas:performances:${slug}:v13`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },
@@ -179,8 +171,9 @@ export const CacheKeys = {
    * Home page cache keys
    */
   home: {
-    /** Recent setlists for home page (limit + sort direction) */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v14`,
+    /** Recent setlists for home page (limit + sort direction). :v15 bump:
+     *  SongLight gained dateFirstPlayed (Setlist shape change). */
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v15`,
   },
 
   /**

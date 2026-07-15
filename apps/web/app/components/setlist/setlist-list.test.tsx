@@ -1,4 +1,4 @@
-import type { Attendance, SetlistLight } from "@bip/domain";
+import type { Attendance, Setlist } from "@bip/domain";
 import { setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -26,7 +26,7 @@ vi.mock("~/hooks/use-show-user-data", () => ({
 
 import { SetlistList } from "./setlist-list";
 
-function makeSetlist(id: string, title: string, averageRating: number | null = 4.0, date = "2021-04-14"): SetlistLight {
+function makeSetlist(id: string, title: string, averageRating: number | null = 4.0, date = "2021-04-14"): Setlist {
   return {
     show: {
       id,

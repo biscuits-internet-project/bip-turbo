@@ -12,7 +12,7 @@ type SongRef = { title: string; slug: string };
 
 export type DebutYearTrack = {
   songId: string;
-  song?: { title: string; slug: string; dateFirstPlayed: Date | null } | null;
+  song?: { title: string; slug: string; dateFirstPlayed?: Date | null } | null;
 };
 
 export type DebutYearSetlist = {

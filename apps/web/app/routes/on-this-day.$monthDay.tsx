@@ -1,4 +1,4 @@
-import { CacheKeys, type SetlistLight, type SongPagePerformance } from "@bip/domain";
+import { CacheKeys, type Setlist, type SongPagePerformance } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import type { ClientLoaderFunctionArgs } from "react-router";
@@ -20,7 +20,7 @@ import { computeShowUserData } from "~/server/show-user-data";
 import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
 interface LoaderData {
-  setlists: SetlistLight[];
+  setlists: Setlist[];
   performances: SongPagePerformance[];
   monthDay: string;
   displayLabel: string;
@@ -58,7 +58,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
 
   const [setlists, jamChartsResult] = await Promise.all([
     services.cache.getOrSet(setlistsCacheKey, async () => {
-      return services.setlists.findManyLight({
+      return services.setlists.findMany({
         filters: { monthDay },
         sort: [{ field: "date", direction: "desc" }],
       });
