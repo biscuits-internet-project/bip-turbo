@@ -14,20 +14,10 @@ import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 import { getHomeMeta } from "~/lib/seo";
+import { type AcastEpisode, getLatestPodcastEpisode } from "~/server/latest-podcast-episode";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
-
-interface AcastEpisode {
-  id: string;
-  title: string;
-  description: string;
-  publishDate: string;
-  duration: number;
-  mediaUrl: string;
-  image: string;
-  url: string;
-}
 
 interface LoaderData {
   tourDates: TourDate[];
@@ -43,9 +33,8 @@ interface LoaderData {
 }
 
 export const loader = publicLoader<LoaderData>(async ({ context }) => {
-  const allTourDates = Array.isArray(await services.tourDatesService.getTourDates())
-    ? await services.tourDatesService.getTourDates()
-    : [];
+  const tourDatesResult = await services.tourDatesService.getTourDates();
+  const allTourDates = Array.isArray(tourDatesResult) ? tourDatesResult : [];
 
   // Find next tour date (first upcoming show)
   const now = new Date();
@@ -119,17 +108,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     queryFn: () => computeShowUserData(context, allShowIds),
   });
 
-  // Fetch latest podcast episode
-  let latestEpisode: AcastEpisode | null = null;
-  try {
-    const response = await fetch(
-      "https://feeder.acast.com/api/v1/shows/d690923d-524e-5c8b-b29f-d66517615b5b?limit=1&from=0",
-    );
-    const data = await response.json();
-    latestEpisode = data.episodes?.[0] || null;
-  } catch (error) {
-    logger.error("Error fetching latest episode", { error });
-  }
+  const latestEpisode = await getLatestPodcastEpisode();
 
   const today = new Date();
   const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;

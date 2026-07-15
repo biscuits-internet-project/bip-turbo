@@ -7,10 +7,9 @@ on:
       job:
         description: 'Cron job to run'
         required: true
-        default: 'community-refresh'
+        default: 'recompute-ratings'
         type: choice
         options:
-          - community-refresh
           - recompute-ratings
       timeout:
         description: 'Timeout in minutes'
@@ -20,7 +19,8 @@ on:
   
   # Scheduled triggers
   schedule:
-    # Run community refresh every hour
+    # Run the ratings recompute every hour (dirty-gated server-side, so it's
+    # a cheap no-op when no ratings changed)
     - cron: '0 * * * *'
 
 env:
@@ -35,8 +35,8 @@ jobs:
     steps:
       - name: Set job from schedule
         if: github.event_name == 'schedule'
-        run: echo "CRON_JOB=community-refresh" >> $GITHUB_ENV
-      
+        run: echo "CRON_JOB=recompute-ratings" >> $GITHUB_ENV
+
       - name: Set job from manual trigger
         if: github.event_name == 'workflow_dispatch'
         run: echo "CRON_JOB=${{ github.event.inputs.job }}" >> $GITHUB_ENV
@@ -66,28 +66,3 @@ jobs:
             exit 1
           fi
 
-      # The hourly schedule also drives the rating recompute (dirty-gated server-side,
-      # so it's a cheap no-op when no ratings changed). Manual runs select it via the
-      # job input instead, which the step above handles.
-      - name: Run ratings recompute (scheduled)
-        if: github.event_name == 'schedule'
-        run: |
-          response=$(curl -s -w "\n%{http_code}" -X POST \
-            "${{ env.PRODUCTION_URL }}/api/cron/recompute-ratings" \
-            -H "Content-Type: application/json" \
-            --max-time 600)
-
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n -1)
-
-          echo "HTTP Status: $http_code"
-          echo "Response: $body"
-
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "✅ Ratings recompute completed successfully"
-            echo "$body" | jq '.' || echo "$body"
-          else
-            echo "❌ Ratings recompute failed with status $http_code"
-            echo "$body" | jq '.' || echo "$body"
-            exit 1
-          fi
