@@ -1,4 +1,4 @@
-import { type BlogPostWithUser, CacheKeys, type Setlist, type TourDate } from "@bip/domain";
+import { type BlogPostWithUser, CacheKeys, type SetlistLight, type TourDate } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -21,12 +21,12 @@ import { computeShowUserData } from "~/server/show-user-data";
 
 interface LoaderData {
   tourDates: TourDate[];
-  mobileRecentShows: Setlist[];
-  desktopRecentShows: Setlist[];
+  mobileRecentShows: SetlistLight[];
+  desktopRecentShows: SetlistLight[];
   recentBlogPosts: Array<BlogPostWithUser>;
   latestEpisode: AcastEpisode | null;
   nextTourDate: TourDate | null;
-  recentShows: Setlist[];
+  recentShows: SetlistLight[];
   onThisDayCounts: { showCount: number; allTimerCount: number };
   externalSources: Record<string, ShowExternalSources>;
   dehydratedState: DehydratedState;
@@ -44,14 +44,23 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-  // Cache the recent setlists (core show data only - user-specific data handled separately)
-  const recentSetlists = await services.cache.getOrSet(CacheKeys.home.recentSetlists(15), async () => {
-    logger.info("Loading recent setlists from DB for home page");
-    return await services.setlists.findMany({
-      pagination: { limit: 15 },
-      sort: [{ field: "date", direction: "desc" }],
-    });
-  });
+  // Cache the recent setlists (core show data only - user-specific data
+  // handled separately). Light payload: the cards use none of the full
+  // Track/song weight (lyrics, histories), and this key is read on every
+  // homepage request, so it must stay small. The memo skips re-parsing it
+  // per request; admin setlist edits still show immediately (invalidation
+  // clears the memo).
+  const recentSetlists = await services.cache.getOrSet(
+    CacheKeys.home.recentSetlists(15),
+    async () => {
+      logger.info("Loading recent setlists from DB for home page");
+      return await services.setlists.findManyLight({
+        pagination: { limit: 15 },
+        sort: [{ field: "date", direction: "desc" }],
+      });
+    },
+    { memoTtlSeconds: 300 },
+  );
 
   logger.info(`Home page setlists loaded: ${recentSetlists.length} shows`);
 
