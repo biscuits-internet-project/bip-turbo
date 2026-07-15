@@ -177,9 +177,12 @@ export function getSongsMeta() {
 
 // Generate meta tags for a song detail page
 export function getSongMeta(song: Song & { timesPlayed?: number; debutDate?: string }) {
-  const title = `${song.title} by ${SEO_CONFIG.bandName} | ${SEO_CONFIG.siteName}`;
+  // Covers and mashups are written by someone other than the band, so credit the
+  // song's own authors. Falls back to the band for songs with none recorded.
+  const byLine = song.authorName || SEO_CONFIG.bandName;
+  const title = `${song.title} by ${byLine} | ${SEO_CONFIG.siteName}`;
   const debutYear = song.debutDate ? new Date(song.debutDate).getFullYear() : "";
-  const description = `View performance history, lyrics, tabs, and statistics for "${song.title}" by ${SEO_CONFIG.bandName}.${song.timesPlayed ? ` Played ${song.timesPlayed} times` : ""}${debutYear ? ` since ${debutYear}` : ""}.`;
+  const description = `View performance history, lyrics, tabs, and statistics for "${song.title}" by ${byLine}.${song.timesPlayed ? ` Played ${song.timesPlayed} times` : ""}${debutYear ? ` since ${debutYear}` : ""}.`;
   const url = `${SEO_CONFIG.url}/songs/${song.slug}`;
 
   const keywords = [
