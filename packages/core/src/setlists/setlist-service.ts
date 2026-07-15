@@ -21,6 +21,7 @@ import {
   type TrackMusicianDelta,
   type Venue,
 } from "@bip/domain";
+import type { Prisma } from "@prisma/client";
 import type {
   DbAnnotation,
   DbClient,
@@ -654,13 +655,18 @@ function mapSetlistToDomainEntity(
 // instruments played. Loaded on list queries too (not just single-show fetches)
 // so the synthesized "with <guest> on <instrument>" footnotes render in setlist
 // listings, matching the free-text annotations they replaced.
-// The musician (with default instrument) + played instruments for one lineup
-// row. Shared so ShowService.getLineup loads exactly what
-// mapShowMusicianToLineupMember reads, keeping the edit page's read-only
-// lineup identical to the show page's.
+// The musician (with default instrument) + played instruments for one
+// performer row: a show lineup member or a per-track sit-in/sat-out delta,
+// which load the identical shape. Shared so ShowService.getLineup loads
+// exactly what mapShowMusicianToLineupMember reads, keeping the edit page's
+// read-only lineup identical to the show page's. Instruments order by slug
+// (unique): the bridge tables have no position column, so an unordered
+// include returns DB insertion order, which differs between environments
+// (prod vs. a local restore) and destabilizes cached payloads and MCP sync
+// diffs.
 export const LINEUP_MEMBER_INCLUDE = {
   musician: { include: { defaultInstrument: true } },
-  instruments: { include: { instrument: true } },
+  instruments: { include: { instrument: true }, orderBy: { instrument: { slug: "asc" } } },
 } as const;
 
 const SINGLE_SHOW_PERFORMER_INCLUDE = {
@@ -671,12 +677,14 @@ const SINGLE_SHOW_PERFORMER_INCLUDE = {
 
 export const TRACK_PERFORMER_INCLUDE = {
   trackMusicians: {
-    include: {
-      musician: { include: { defaultInstrument: true } },
-      instruments: { include: { instrument: true } },
-    },
+    include: LINEUP_MEMBER_INCLUDE,
   },
 } as const;
+
+// Annotations have no curated order column and the footnote list renders them
+// in array order, so entry order (createdAt, id as a same-timestamp tiebreak)
+// keeps footnote numbering deterministic across environments.
+export const ANNOTATION_ORDER_BY: Prisma.AnnotationOrderByWithRelationInput[] = [{ createdAt: "asc" }, { id: "asc" }];
 
 // Structured flags plus both ends of the cross-show completion link. A track
 // that is the *later* one completing an earlier version owns a `completionsAsLater`
@@ -760,7 +768,7 @@ const SETLIST_INCLUDE = {
           ...SONG_AUTHORS_SETLIST_INCLUDE,
         },
       },
-      annotations: true,
+      annotations: { orderBy: ANNOTATION_ORDER_BY },
     },
   },
   venue: true,

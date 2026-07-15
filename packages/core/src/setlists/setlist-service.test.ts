@@ -359,6 +359,36 @@ describe("SetlistService.findMany", () => {
   });
 });
 
+describe("deterministic relation ordering", () => {
+  // Instrument bridges and annotations have no curated position column, so an
+  // include without orderBy returns DB insertion order, which differs between
+  // prod and a local restore, destabilizing cached blobs and MCP sync diffs.
+  // Every setlist query must order instruments by slug (unique) and
+  // annotations by entry time (createdAt, id tiebreak).
+  test("orders lineup and track-performer instruments by instrument slug", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findMany({ filters: { year: 2024 } });
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.include.showMusicians.include.instruments.orderBy).toEqual({ instrument: { slug: "asc" } });
+    expect(call.include.tracks.select.trackMusicians.include.instruments.orderBy).toEqual({
+      instrument: { slug: "asc" },
+    });
+  });
+
+  test("orders track annotations by createdAt with id tiebreak", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+
+    await service.findManyByShowIds(["show-1"]);
+
+    const call = db.show.findMany.mock.calls[0][0];
+    expect(call.include.tracks.select.annotations.orderBy).toEqual([{ createdAt: "asc" }, { id: "asc" }]);
+  });
+});
+
 describe("SetlistService.findManyByShowIds", () => {
   // The light by-ids query backs cached list payloads (attended-setlists,
   // rock-opera performances). Its whole reason to exist is that the song

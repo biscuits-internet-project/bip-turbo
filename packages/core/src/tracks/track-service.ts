@@ -13,6 +13,7 @@ import { buildIncludeClause, buildOrderByClause, buildWhereClause } from "../_sh
 import type { QueryOptions } from "../_shared/database/types";
 import { slugify } from "../_shared/utils/slugify";
 import {
+  ANNOTATION_ORDER_BY,
   mapTrackMusicianToDelta,
   mapTrackToDomainEntity as mapTrackRowToFootnoteDomain,
   TRACK_FOOTNOTE_INCLUDE,
@@ -164,7 +165,7 @@ export class TrackService {
     const result = await this.db.track.findUnique({
       where: { id },
       include: {
-        annotations: true,
+        annotations: { orderBy: ANNOTATION_ORDER_BY },
         song: true,
       },
     });
@@ -327,7 +328,7 @@ export class TrackService {
       orderBy: [{ position: "asc" }],
       include: {
         song: true,
-        annotations: true,
+        annotations: { orderBy: ANNOTATION_ORDER_BY },
       },
     });
 
