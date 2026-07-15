@@ -800,6 +800,48 @@ const HEAVY_SETLIST_INCLUDE = {
   ...SINGLE_SHOW_PERFORMER_INCLUDE,
 } as const;
 
+// Light counterpart of HEAVY_SETLIST_INCLUDE: everything the light mapper
+// (mapSetlistLightToDomainEntity) reads, with the track's song narrowed to the
+// lean list-view fields. The song select deliberately omits the text-heavy
+// columns (lyrics, history, notes, tabs): light payloads back redis-cached
+// list views, and those columns dominated the blob size while nothing in a
+// list view reads them. Shared by every query that returns SetlistLight so
+// the joins stay in lockstep with the mapper.
+const LIGHT_SETLIST_INCLUDE = {
+  tracks: {
+    select: {
+      id: true,
+      showId: true,
+      songId: true,
+      set: true,
+      position: true,
+      segue: true,
+      likesCount: true,
+      note: true,
+      allTimer: true,
+      gap: true,
+      previousPerformanceShowId: true,
+      duration: true,
+      durationSource: true,
+      previousPerformanceShow: { select: { date: true, slug: true } },
+      ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
+      ...TRACK_PERFORMER_INCLUDE,
+      song: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          kind: true,
+          ...SONG_AUTHORS_SETLIST_INCLUDE,
+        },
+      },
+      annotations: true,
+    },
+  },
+  venue: true,
+  ...SINGLE_SHOW_PERFORMER_INCLUDE,
+} as const;
+
 export class SetlistService {
   constructor(
     private readonly db: DbClient,
@@ -859,18 +901,20 @@ export class SetlistService {
   }
 
   /**
-   * Find setlists by an array of show IDs
-   * @param showIds Array of show IDs to find setlists for
-   * @param options Optional query options for pagination, sorting, etc.
-   * @returns An array of setlists for the specified show IDs
+   * Find setlists for a set of show ids in the lean list-view shape: each
+   * track's song carries only id/title/slug/kind/authors, no lyrics/history
+   * text. Every by-ids consumer is a list view (attended-shows pages, rock
+   * opera performances, top-rated, musician appearances), and the redis-cached
+   * ones ran to multiple MB per cached page when the full song objects rode
+   * along. Single-show pages needing full data use findByShowSlug/findByShowId.
    */
-  async findManyByShowIds(
+  async findManyByShowIdsLight(
     showIds: string[],
     options?: {
       pagination?: PaginationOptions;
       sort?: SortOptions<Show>[];
     },
-  ): Promise<Setlist[]> {
+  ): Promise<SetlistLight[]> {
     if (!showIds.length) return [];
 
     const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_DESC);
@@ -882,9 +926,7 @@ export class SetlistService {
 
     const results = await this.db.show.findMany({
       where: {
-        id: {
-          in: showIds,
-        },
+        id: { in: showIds },
         // Drop orphan placeholder shows with no venue so they never reach a
         // listing (and so pagination counts stay exact).
         venueId: NON_STUB_SHOWS_WHERE.venueId,
@@ -892,19 +934,16 @@ export class SetlistService {
       orderBy,
       skip,
       take,
-      // Single LATERAL-joined query instead of 5 batched roundtrips. With
-      // 100 shows × ~25 tracks each + relations, the per-roundtrip latency
-      // dominates the page load on un-cached routes (top-rated etc).
       relationLoadStrategy: "join",
-      include: HEAVY_SETLIST_INCLUDE,
+      include: LIGHT_SETLIST_INCLUDE,
     });
 
     const setlists = results
-      .filter((show) => show.venue !== null)
+      .filter((result): result is typeof result & { venue: NonNullable<typeof result.venue> } => result.venue !== null)
       .map((show) =>
-        mapSetlistToDomainEntity({
+        mapSetlistLightToDomainEntity({
           ...show,
-          venue: show.venue as DbVenue,
+          venue: show.venue,
           tracks: show.tracks.map((track) => ({
             ...track,
             annotations: track.annotations || [],
@@ -1013,40 +1052,7 @@ export class SetlistService {
       skip,
       take,
       relationLoadStrategy: "join",
-      include: {
-        tracks: {
-          select: {
-            id: true,
-            showId: true,
-            songId: true,
-            set: true,
-            position: true,
-            segue: true,
-            likesCount: true,
-            note: true,
-            allTimer: true,
-            gap: true,
-            previousPerformanceShowId: true,
-            duration: true,
-            durationSource: true,
-            previousPerformanceShow: { select: { date: true, slug: true } },
-            ...TRACK_FLAGS_AND_COMPLETIONS_INCLUDE,
-            ...TRACK_PERFORMER_INCLUDE,
-            song: {
-              select: {
-                id: true,
-                title: true,
-                slug: true,
-                kind: true,
-                ...SONG_AUTHORS_SETLIST_INCLUDE,
-              },
-            },
-            annotations: true,
-          },
-        },
-        venue: true,
-        ...SINGLE_SHOW_PERFORMER_INCLUDE,
-      },
+      include: LIGHT_SETLIST_INCLUDE,
     });
 
     const setlists = results

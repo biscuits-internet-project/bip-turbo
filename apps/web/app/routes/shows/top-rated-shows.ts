@@ -1,5 +1,5 @@
 import type { RatingMode } from "@bip/core";
-import type { Setlist } from "@bip/domain";
+import type { SetlistLight } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import type { PublicContext } from "~/lib/base-loaders";
@@ -14,7 +14,7 @@ const MIN_SHOW_RATINGS = 10;
 const TOP_RATED_LIMIT = 100;
 
 export interface TopRatedShowsLoaderData {
-  setlists: Setlist[];
+  setlists: SetlistLight[];
   year: number | null;
   mode: RatingMode;
   minShowRatings: number;
@@ -43,11 +43,11 @@ export async function getTopRatedShows(
 
   const inScope = year ? ranked.filter((show) => showYear(show.date) === year) : ranked;
   const showIds = inScope.slice(0, TOP_RATED_LIMIT).map((show) => show.id);
-  const rawSetlists = await services.setlists.findManyByShowIds(showIds);
-  // findManyByShowIds defaults to `date DESC` ordering, which wipes out the
-  // rank order from the shows query. Reindex back into rank order here.
+  const rawSetlists = await services.setlists.findManyByShowIdsLight(showIds);
+  // findManyByShowIdsLight defaults to `date DESC` ordering, which wipes out
+  // the rank order from the shows query. Reindex back into rank order here.
   const byShowId = new Map(rawSetlists.map((s) => [s.show.id, s]));
-  const setlists = showIds.map((id) => byShowId.get(id)).filter((s): s is Setlist => s !== undefined);
+  const setlists = showIds.map((id) => byShowId.get(id)).filter((s): s is SetlistLight => s !== undefined);
 
   const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
 
