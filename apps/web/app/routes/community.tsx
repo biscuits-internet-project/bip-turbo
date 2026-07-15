@@ -9,78 +9,11 @@ import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { logger } from "~/lib/logger";
-import { services } from "~/server/services";
+import { type CommunityPageData, getCommunityPageData } from "~/server/community-page";
 
-interface LoaderData {
-  allUserStats: UserStats[];
-  topReviewers: UserStats[];
-  topAttenders: UserStats[];
-  topRaters: UserStats[];
-  topBloggers: UserStats[];
-  communityTotals: {
-    totalUsers: number;
-    totalReviews: number;
-    totalAttendances: number;
-    totalRatings: number;
-  };
-  lastUpdated?: string;
-}
+type LoaderData = CommunityPageData;
 
-export const loader = publicLoader<LoaderData>(async () => {
-  const cacheKey = "community-page-data";
-
-  // Always try to get from cache first
-  try {
-    const redis = services.redis;
-    const [cached, lastUpdated] = await Promise.all([
-      redis.get<Omit<LoaderData, "lastUpdated">>(cacheKey),
-      redis.get<string>("community-last-updated"),
-    ]);
-
-    if (cached) {
-      logger.info("Community data served from Redis cache");
-      // Debug: Log a sample user to see what we got from cache
-      if (cached.allUserStats && cached.allUserStats.length > 0) {
-        logger.info("Sample cached user stats", { userStats: cached.allUserStats[0] });
-      }
-      return {
-        ...cached,
-        lastUpdated: lastUpdated || undefined,
-      };
-    }
-  } catch (error) {
-    logger.error("Redis cache read failed for community page", { error });
-  }
-
-  // If no cache exists, return minimal fallback data
-  // The cron job should populate the cache soon
-  logger.warn("No community cache found - returning minimal fallback data");
-
-  // Still try to get the last updated timestamp even without cached data
-  let lastUpdated: string | undefined;
-  try {
-    const redis = services.redis;
-    lastUpdated = (await redis.get<string>("community-last-updated")) || undefined;
-  } catch (error) {
-    logger.error("Failed to get last updated timestamp", { error });
-  }
-
-  return {
-    allUserStats: [],
-    topReviewers: [],
-    topAttenders: [],
-    topRaters: [],
-    topBloggers: [],
-    communityTotals: {
-      totalUsers: 0,
-      totalReviews: 0,
-      totalAttendances: 0,
-      totalRatings: 0,
-    },
-    lastUpdated,
-  };
-});
+export const loader = publicLoader<LoaderData>(async () => getCommunityPageData());
 
 export function meta() {
   return [
@@ -89,6 +22,9 @@ export function meta() {
       name: "description",
       content: "Meet the Disco Biscuits community - our most active reviewers, show-goers, and contributors.",
     },
+    // Nothing links here in normal navigation; keep crawlers from indexing it
+    // so search engines stop sending bots back to rebuild the cache.
+    { name: "robots", content: "noindex" },
   ];
 }
 

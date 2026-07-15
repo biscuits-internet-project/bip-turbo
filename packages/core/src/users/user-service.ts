@@ -22,6 +22,30 @@ export interface UserStats {
   blogPostCount: number;
 }
 
+export type UserStatsMetric = "reviews" | "attendance" | "ratings" | "blogPostCount";
+
+const METRIC_COUNT: Record<UserStatsMetric, (stats: UserStats) => number> = {
+  reviews: (stats) => stats.reviewCount,
+  attendance: (stats) => stats.attendanceCount,
+  ratings: (stats) => stats.ratingCount,
+  blogPostCount: (stats) => stats.blogPostCount,
+};
+
+/**
+ * Rank already-loaded user stats by one activity metric. Pure so the
+ * community page build can derive every leaderboard from a single
+ * getUserStats() pass instead of re-querying per metric. Users with a zero
+ * count for the metric are dropped, not ranked last. Does not mutate the
+ * input.
+ */
+export function topUsersByMetric(userStats: UserStats[], metric: UserStatsMetric, limit: number): UserStats[] {
+  const count = METRIC_COUNT[metric];
+  return userStats
+    .filter((stats) => count(stats) > 0)
+    .sort((a, b) => count(b) - count(a))
+    .slice(0, limit);
+}
+
 // Mapper functions
 function mapUserToDomainEntity(dbUser: DbUser): User {
   return {
@@ -385,14 +409,6 @@ export class UserService {
         user._count.blogPosts,
       );
 
-      // Debug: Check if methods are returning undefined
-      this.logger.info("User stats calculated", {
-        username: user.username,
-        badges,
-        communityScore,
-        blogPostCount: user._count.blogPosts,
-      });
-
       return {
         user: mapUserToDomainEntity(user),
         reviewCount: user._count.reviews,
@@ -404,67 +420,6 @@ export class UserService {
         blogPostCount: user._count.blogPosts,
       };
     });
-  }
-
-  async getTopUsersByMetric(
-    metric: "reviews" | "attendance" | "ratings" | "blogPostCount",
-    limit: number = 10,
-  ): Promise<UserStats[]> {
-    const userStats = await this.getUserStats();
-
-    // Filter out users with 0 count for the specific metric
-    const filteredStats = userStats.filter((stats) => {
-      switch (metric) {
-        case "reviews":
-          return stats.reviewCount > 0;
-        case "attendance":
-          return stats.attendanceCount > 0;
-        case "ratings":
-          return stats.ratingCount > 0;
-        case "blogPostCount": {
-          const hasBlogs = stats.blogPostCount > 0;
-          this.logger.info("Checking blogPostCount filter", {
-            username: stats.user.username,
-            blogPostCount: stats.blogPostCount,
-            hasBlogs,
-          });
-          return hasBlogs;
-        }
-        default:
-          return true;
-      }
-    });
-
-    this.logger.info("Metric filter applied", {
-      metric,
-      totalUsers: userStats.length,
-      filteredUsers: filteredStats.length,
-    });
-
-    if (metric === "blogPostCount") {
-      this.logger.info("Top bloggers after filter", {
-        topBloggers: filteredStats
-          .slice(0, 3)
-          .map((s) => ({ username: s.user.username, blogPostCount: s.blogPostCount })),
-      });
-    }
-
-    const sortedStats = filteredStats.sort((a, b) => {
-      switch (metric) {
-        case "reviews":
-          return b.reviewCount - a.reviewCount;
-        case "attendance":
-          return b.attendanceCount - a.attendanceCount;
-        case "ratings":
-          return b.ratingCount - a.ratingCount;
-        case "blogPostCount":
-          return b.blogPostCount - a.blogPostCount;
-        default:
-          return 0;
-      }
-    });
-
-    return sortedStats.slice(0, limit);
   }
 
   /**

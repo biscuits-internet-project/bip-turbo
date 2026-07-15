@@ -1,5 +1,6 @@
 import { AlertTriangle, Ghost } from "lucide-react";
 import { isRouteErrorResponse, Link, useRouteError } from "react-router-dom";
+import { ContactDialog } from "~/components/contact/contact-dialog";
 import { Button } from "../ui/button";
 
 function getErrorMessage(error: unknown): string {
@@ -59,9 +60,11 @@ export function NotFound() {
 
       <p className="mt-8 max-w-md text-sm text-muted-foreground">
         If you think this is a mistake, please{" "}
-        <Link to="/community" className="text-primary underline-offset-4 hover:underline">
-          let us know
-        </Link>
+        <ContactDialog>
+          <button type="button" className="text-primary underline-offset-4 hover:underline">
+            let us know
+          </button>
+        </ContactDialog>
         .
       </p>
     </div>

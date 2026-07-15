@@ -10,71 +10,6 @@ interface CronJobResult {
   timestamp: string;
 }
 
-async function refreshCommunityCache(): Promise<CronJobResult> {
-  const startTime = Date.now();
-
-  try {
-    logger.info("Starting community cache refresh...");
-
-    // Clear existing cache
-    const redis = services.redis;
-    await redis.del("community-page-data");
-
-    // Fetch fresh data (same logic as community route loader)
-    const [allUserStats, communityTotals, topReviewers, topAttenders, topRaters, topBloggers] = await Promise.all([
-      services.users.getUserStats(),
-      services.users.getCommunityTotals(),
-      services.users.getTopUsersByMetric("reviews", 5),
-      services.users.getTopUsersByMetric("attendance", 5),
-      services.users.getTopUsersByMetric("ratings", 5),
-      services.users.getTopUsersByMetric("blogPostCount", 5),
-    ]);
-
-    const result = {
-      allUserStats: allUserStats, // Show all users, no limit
-      topReviewers,
-      topAttenders,
-      topRaters,
-      topBloggers,
-      communityTotals,
-      lastUpdated: new Date().toISOString(),
-    };
-
-    // Debug: Log a sample user to see the structure
-    if (allUserStats.length > 0) {
-      logger.info("COMMUNITY_SCORE_DEBUG", { communityScore: allUserStats[0].communityScore });
-      logger.info("BADGES_DEBUG", { badges: allUserStats[0].badges });
-      logger.info("REVIEW_COUNT_DEBUG", { reviewCount: allUserStats[0].reviewCount });
-    }
-
-    // Cache the fresh data (no expiration - refreshed by cron)
-    await redis.set("community-page-data", result);
-
-    // Store last execution timestamp separately
-    await redis.set("community-last-updated", new Date().toISOString());
-
-    const duration = Date.now() - startTime;
-    logger.info(`Community cache refreshed successfully in ${duration}ms`);
-
-    return {
-      success: true,
-      message: `Community cache refreshed successfully. Cached ${allUserStats.length} user stats.`,
-      duration,
-      timestamp: new Date().toISOString(),
-    };
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    logger.error("Failed to refresh community cache", { error });
-
-    return {
-      success: false,
-      message: `Failed to refresh community cache: ${error instanceof Error ? error.message : "Unknown error"}`,
-      duration,
-      timestamp: new Date().toISOString(),
-    };
-  }
-}
-
 /**
  * Hourly full rating recompute (and deploy-time backfill via the same routine).
  * Gated by the `ratings.recompute-enabled` flag, then dirty-gated internally so it
@@ -118,9 +53,9 @@ async function recomputeRatings(): Promise<CronJobResult> {
   }
 }
 
-// Map of available cron jobs
+// Map of available cron jobs. The community page builds its own cache on
+// demand (see ~/server/community-page), so no cron warms it anymore.
 const cronJobs: Record<string, () => Promise<CronJobResult>> = {
-  "community-refresh": refreshCommunityCache,
   "recompute-ratings": recomputeRatings,
 };
 

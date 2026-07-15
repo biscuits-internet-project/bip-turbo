@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { UserService } from "./user-service";
+import { topUsersByMetric, UserService, type UserStats } from "./user-service";
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never;
 
@@ -199,5 +199,63 @@ describe("UserService.listForSync", () => {
       OR: [{ updatedAt: { gt: cursorUpdatedAt } }, { AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: "u-uuid" } }] }],
     });
     expect(findMany.mock.calls[0][0].orderBy).toEqual([{ updatedAt: "asc" }, { id: "asc" }]);
+  });
+});
+
+/** Minimal UserStats fixture; only the count fields matter to the ranking. */
+function makeStats(
+  username: string,
+  counts: Partial<Pick<UserStats, "reviewCount" | "attendanceCount" | "ratingCount" | "blogPostCount">>,
+): UserStats {
+  return {
+    user: { username } as UserStats["user"],
+    reviewCount: 0,
+    attendanceCount: 0,
+    ratingCount: 0,
+    averageRating: null,
+    badges: [],
+    communityScore: 0,
+    blogPostCount: 0,
+    ...counts,
+  };
+}
+
+describe("topUsersByMetric", () => {
+  // The community page build derives all four leaderboards from ONE
+  // getUserStats() pass. The ranking itself is pure: drop users with a zero
+  // count for the metric, sort by that count descending, cap at the limit.
+  test("filters zero-count users, sorts descending, and applies the limit", () => {
+    const stats = [
+      makeStats("magner", { reviewCount: 2 }),
+      makeStats("barber", { reviewCount: 9 }),
+      makeStats("brownie", { reviewCount: 0 }),
+      makeStats("allen", { reviewCount: 5 }),
+    ];
+
+    const top = topUsersByMetric(stats, "reviews", 2);
+
+    expect(top.map((s) => s.user.username)).toEqual(["barber", "allen"]);
+  });
+
+  // Each metric must rank by its own count; a heavy reviewer with zero blog
+  // posts belongs on the reviews board and not the bloggers board.
+  test("ranks by the requested metric only", () => {
+    const stats = [
+      makeStats("magner", { reviewCount: 50, blogPostCount: 0 }),
+      makeStats("barber", { reviewCount: 1, blogPostCount: 3 }),
+    ];
+
+    expect(topUsersByMetric(stats, "blogPostCount", 5).map((s) => s.user.username)).toEqual(["barber"]);
+    expect(topUsersByMetric(stats, "attendance", 5)).toEqual([]);
+  });
+
+  // The ranking must not reorder the caller's array in place; the page build
+  // reuses the same stats array for four metrics and for the full user list.
+  test("does not mutate the input array", () => {
+    const stats = [makeStats("magner", { ratingCount: 1 }), makeStats("barber", { ratingCount: 7 })];
+
+    topUsersByMetric(stats, "ratings", 5);
+
+    expect(stats.map((s) => s.user.username)).toEqual(["magner", "barber"]);
   });
 });
