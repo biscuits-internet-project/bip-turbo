@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { RatingService } from "../src/ratings/rating-service";
 import {
+  attendanceBindingKey,
   buildRockOperaAssignmentDiff,
   buildSetlistReconciliation,
   buildShowCreateInput,
@@ -28,6 +29,7 @@ import {
   parseYearsArg,
   planShowRenames,
   planVenueOrphans,
+  ratingBindingKey,
   resolveCompletionLinks,
   STUB_USER_PASSWORD_DIGEST,
   showNeedsUpdate,
@@ -4035,5 +4037,32 @@ describe("syncUserActivity — blog posts", () => {
     expect(state.files).toHaveLength(1);
     expect(state.files[0]).toMatchObject({ id: "file-existing", variants: { public: "new.jpg" } });
     expect(state.blogPostToFiles).toHaveLength(1);
+  });
+});
+
+// The binding keys flatten user + rateable into one Map key, so the separator is
+// load-bearing: if it could occur inside a component, two distinct tuples would
+// collide and the id-binding reconcile would silently mis-pair rows. NUL is the
+// one character a uuid or rateableType can't contain. Written as a \u0000 escape
+// so the source stays plain text rather than reading as binary to grep.
+describe("ratingBindingKey / attendanceBindingKey", () => {
+  test("joins components with a NUL separator", () => {
+    expect(ratingBindingKey("u1", "r1", "Show")).toBe(`u1\u0000r1\u0000Show`);
+    expect(attendanceBindingKey("u1", "s1")).toBe(`u1\u0000s1`);
+  });
+
+  // The collision the separator exists to prevent: concatenated bare, ("ab","c")
+  // and ("a","bc") would both flatten to "abc".
+  test("does not collide when a boundary shifts between components", () => {
+    expect(attendanceBindingKey("ab", "c")).not.toBe(attendanceBindingKey("a", "bc"));
+    expect(ratingBindingKey("ab", "c", "Show")).not.toBe(ratingBindingKey("a", "bc", "Show"));
+  });
+
+  test("distinguishes rateable types for the same user and rateable", () => {
+    expect(ratingBindingKey("u1", "r1", "Show")).not.toBe(ratingBindingKey("u1", "r1", "Track"));
+  });
+
+  test("returns an equal key for an equal tuple, so repeat lookups hit one Map entry", () => {
+    expect(ratingBindingKey("u1", "r1", "Show")).toBe(ratingBindingKey("u1", "r1", "Show"));
   });
 });

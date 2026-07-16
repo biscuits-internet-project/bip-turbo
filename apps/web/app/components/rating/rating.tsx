@@ -1,4 +1,6 @@
 import { Star } from "lucide-react";
+import { usePreferences } from "~/hooks/use-preferences";
+import { ratingColor } from "~/lib/rating-colors";
 
 interface RatingProps {
   rating: number | null;
@@ -23,7 +25,39 @@ export function formatHalfStep(value: number): string {
   return String(whole);
 }
 
+/**
+ * Inline style that puts a rating value on the purple-to-green scale, or
+ * nothing when the viewer has opted out. A style rather than a class because
+ * the color is a continuous function of the value.
+ */
+function ratingColorStyle(value: number, enabled: boolean): { color: string } | undefined {
+  return enabled ? { color: ratingColor(value) } : undefined;
+}
+
+/**
+ * Gold star followed by a rating value on the color scale. `label` carries the
+ * formatted text because callers format differently (a community average wants
+ * 2 decimals, a personal score wants the ½ glyph) while the color always comes
+ * from the underlying number.
+ */
+export function StarValue({ value, label }: { value: number; label: string }) {
+  const { colorCodeRatings } = usePreferences();
+  return (
+    <span className="inline-flex items-center whitespace-nowrap">
+      <Star className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-rating-gold mr-0.5 sm:mr-1" />
+      <span
+        className="font-medium text-xs sm:text-sm text-content-text-primary"
+        style={ratingColorStyle(value, colorCodeRatings)}
+      >
+        {label}
+      </span>
+    </span>
+  );
+}
+
 export const RatingComponent = ({ rating, ratingsCount, userRating }: RatingProps) => {
+  const { colorCodeRatings } = usePreferences();
+
   if (!rating) return <div className="text-xs sm:text-sm text-content-text-secondary">Rate</div>;
   const hasUserRating = typeof userRating === "number" && userRating > 0;
   // Tighter inter-element gaps when the user has rated — the row is
@@ -32,10 +66,7 @@ export const RatingComponent = ({ rating, ratingsCount, userRating }: RatingProp
   const outerGap = hasUserRating ? "gap-1" : "gap-1 sm:gap-1.5";
   return (
     <div className={`flex items-center ${outerGap}`}>
-      <div className="flex items-center">
-        <Star className="h-3 w-3 sm:h-4 sm:w-4 text-rating-gold mr-0.5 sm:mr-1" />
-        <span className="font-medium text-xs sm:text-sm text-content-text-primary">{rating.toFixed(2)}</span>
-      </div>
+      <StarValue value={rating} label={rating.toFixed(2)} />
       {ratingsCount &&
         ratingsCount > 0 &&
         (hasUserRating ? (
@@ -65,6 +96,7 @@ export const RatingComponent = ({ rating, ratingsCount, userRating }: RatingProp
             // as its integer; the slot is wide enough for "5½" while still
             // centering "5".
             className="font-medium text-[10px] sm:text-xs text-content-text-primary inline-block min-w-[2ch] text-center whitespace-nowrap"
+            style={ratingColorStyle(userRating, colorCodeRatings)}
           >
             {formatHalfStep(userRating)}
           </span>

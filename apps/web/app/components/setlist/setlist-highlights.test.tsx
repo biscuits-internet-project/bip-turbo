@@ -225,9 +225,9 @@ describe("SetlistHighlights (compressed)", () => {
   });
 
   // Each row carries the corresponding flame icon. All-timer rows get the
-  // orange flame; jam-chart rows (note only) get the off-white flame so
+  // orange flame; jam-chart rows (note only) get the gold flame so
   // the two categories are visually distinct in the same list.
-  test("orange flame on all-timer rows, off-white flame on jam-chart rows", async () => {
+  test("orange flame on all-timer rows, gold flame on jam-chart rows", async () => {
     const setlist = makeSetlist([
       {
         label: "S1",
@@ -244,8 +244,8 @@ describe("SetlistHighlights (compressed)", () => {
     expect(basisRow).not.toBeNull();
     const aceeFlame = within(aceeRow as HTMLElement).getByLabelText("All-timer");
     const basisFlame = within(basisRow as HTMLElement).getByLabelText("Jam chart");
-    expect(aceeFlame.getAttribute("class") ?? "").toMatch(/text-orange-500/);
-    expect(basisFlame.getAttribute("class") ?? "").toMatch(/text-content-text-primary/);
+    expect(aceeFlame.getAttribute("class") ?? "").toMatch(/text-flame-all-timer/);
+    expect(basisFlame.getAttribute("class") ?? "").toMatch(/text-flame-jam/);
   });
 
   // Tracks render in canonical show order (set bucket → position within

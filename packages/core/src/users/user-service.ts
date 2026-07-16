@@ -58,6 +58,7 @@ function mapUserToDomainEntity(dbUser: DbUser): User {
     updatedAt: dbUser.updatedAt,
     showCalibratedRatings: dbUser.showCalibratedRatings ?? null,
     showRatingComparisonDebug: dbUser.showRatingComparisonDebug ?? null,
+    colorCodeRatings: dbUser.colorCodeRatings ?? null,
   };
 }
 
@@ -437,6 +438,7 @@ export class UserService {
       // Rating-display opt-in prefs, mirrored to local so prod adoption can be inspected.
       showCalibratedRatings: boolean | null;
       showRatingComparisonDebug: boolean | null;
+      colorCodeRatings: boolean | null;
       createdAt: Date;
       updatedAt: Date;
     }>
@@ -461,6 +463,7 @@ export class UserService {
         avatarFileUrl: true,
         showCalibratedRatings: true,
         showRatingComparisonDebug: true,
+        colorCodeRatings: true,
         createdAt: true,
         updatedAt: true,
       },

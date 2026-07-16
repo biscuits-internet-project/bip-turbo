@@ -22,16 +22,17 @@ describe("TrackIcon", () => {
   test("renders an orange flame when allTimer is true", () => {
     render(<TrackIcon track={{ allTimer: true, note: null }} />);
     const flame = screen.getByLabelText("All-timer");
-    expect(flame.getAttribute("class") ?? "").toMatch(/text-orange-500/);
+    expect(flame.getAttribute("class") ?? "").toMatch(/text-flame-all-timer/);
   });
 
-  // Jam-chart (note only) gets the off-white flame so it reads as a
-  // quieter signal next to the orange all-timer flame on the same list.
-  test("renders an off-white flame when only note is set", () => {
+  // Jam-chart (note only) gets the gold flame. Color is the only thing telling
+  // the two markers apart, so each carries its own token rather than inheriting
+  // from the caller — the two are close in hue and easy to conflate otherwise.
+  test("renders a gold flame when only note is set", () => {
     render(<TrackIcon track={{ allTimer: false, note: "Big Type II Spaga." }} />);
     const flame = screen.getByLabelText("Jam chart");
-    expect(flame.getAttribute("class") ?? "").toMatch(/text-content-text-primary/);
-    expect(flame.getAttribute("class") ?? "").not.toMatch(/text-orange-500/);
+    expect(flame.getAttribute("class") ?? "").toMatch(/text-flame-jam/);
+    expect(flame.getAttribute("class") ?? "").not.toMatch(/text-flame-all-timer/);
   });
 
   // When both flags are set, orange (all-timer) wins — it's the stronger
@@ -40,7 +41,7 @@ describe("TrackIcon", () => {
   test("orange flame wins when both allTimer and note are set", () => {
     render(<TrackIcon track={{ allTimer: true, note: "Story of the World > Crickets." }} />);
     const flame = screen.getByLabelText("All-timer");
-    expect(flame.getAttribute("class") ?? "").toMatch(/text-orange-500/);
+    expect(flame.getAttribute("class") ?? "").toMatch(/text-flame-all-timer/);
   });
 
   // Allow callers to pin a custom size — the same component is used in

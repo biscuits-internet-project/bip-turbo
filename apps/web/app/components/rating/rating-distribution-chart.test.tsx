@@ -2,7 +2,10 @@ import type { RatingValueBucket } from "@bip/core";
 import { setup } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import { RatingDistributionChart, RatingHistogramTooltip } from "./rating-distribution-chart";
+import { PreferencesProvider } from "~/hooks/use-preferences";
+import { CHART_COLORS } from "~/lib/chart-colors";
+import { RATING_COLOR_GREEN, RATING_COLOR_NEUTRAL, RATING_COLOR_PURPLE } from "~/lib/rating-colors";
+import { RatingAxisTick, RatingDistributionChart, RatingHistogramTooltip } from "./rating-distribution-chart";
 
 // Recharts ResponsiveContainer measures parent layout via ResizeObserver,
 // which jsdom doesn't implement. Stub it to a fixed-size div so the chart
@@ -43,6 +46,53 @@ describe("RatingDistributionChart", () => {
   test("uses the singular when exactly one rating", async () => {
     await setup(<RatingDistributionChart buckets={[{ value: 5, count: 1 }]} />);
     expect(screen.getByText("1 rating")).toBeInTheDocument();
+  });
+});
+
+// Recharts injects x/y/payload into the element passed as `tick`, and jsdom
+// won't render the axis, so drive the tick directly with the props recharts
+// would supply. `payload.index` is the row index into RATING_BUCKETS; the
+// label recharts hands over is the already-formatted glyph.
+describe("RatingAxisTick", () => {
+  const renderTick = (index: number, label: string, colorCodeRatings: boolean | null = true) =>
+    setup(
+      <PreferencesProvider colorCodeRatings={colorCodeRatings}>
+        <svg role="img" aria-label="axis">
+          <RatingAxisTick x={10} y={20} fontSize={12} payload={{ value: label, index }} />
+        </svg>
+      </PreferencesProvider>,
+    );
+
+  // The axis doubles as the scale's legend: each tick renders in the color that
+  // rating's value renders in everywhere else.
+  test("tints each tick with its own bucket's color", async () => {
+    const low = await renderTick(0, "½");
+    expect(low.container.querySelector("text")).toHaveAttribute("fill", RATING_COLOR_PURPLE);
+    low.unmount();
+
+    const mid = await renderTick(6, "3½");
+    expect(mid.container.querySelector("text")).toHaveAttribute("fill", RATING_COLOR_NEUTRAL);
+    mid.unmount();
+
+    const high = await renderTick(9, "5");
+    expect(high.container.querySelector("text")).toHaveAttribute("fill", RATING_COLOR_GREEN);
+  });
+
+  test("still renders the label recharts supplies", async () => {
+    const { container } = await renderTick(6, "3½");
+    expect(container.querySelector("text")?.textContent).toBe("3½");
+  });
+
+  // The preference has to reach the axis too, or it only half applies. Both the
+  // explicit opt-out and the unset default must leave the axis plain.
+  test("falls back to the plain axis color when the viewer opts out", async () => {
+    const { container } = await renderTick(9, "5", false);
+    expect(container.querySelector("text")).toHaveAttribute("fill", CHART_COLORS.axis);
+  });
+
+  test("falls back to the plain axis color by default", async () => {
+    const { container } = await renderTick(9, "5", null);
+    expect(container.querySelector("text")).toHaveAttribute("fill", CHART_COLORS.axis);
   });
 });
 

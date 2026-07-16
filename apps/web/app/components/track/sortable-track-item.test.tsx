@@ -111,8 +111,7 @@ describe("SortableTrackItem", () => {
       <SortableTrackItem track={makeTrack({ allTimer: true })} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    // Flame icon has text-orange-500. Assert one is present.
-    const flames = container.querySelectorAll("svg.text-orange-500");
+    const flames = container.querySelectorAll("svg.text-flame-all-timer");
     expect(flames.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -121,7 +120,7 @@ describe("SortableTrackItem", () => {
       <SortableTrackItem track={makeTrack({ allTimer: false })} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    expect(container.querySelector("svg.text-orange-500")).toBeNull();
+    expect(container.querySelector("svg.text-flame-all-timer")).toBeNull();
   });
 
   // Segue marker (">") renders inline next to the title when present.

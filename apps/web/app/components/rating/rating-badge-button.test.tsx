@@ -80,7 +80,7 @@ describe("RatingBadgeButton", () => {
     );
 
     const button = container.querySelector("button");
-    expect(button?.className).toContain("border-amber-500");
+    expect(button).toHaveAttribute("data-rated", "true");
   });
 
   test("shows dashed border when userRating is null", async () => {
@@ -187,7 +187,7 @@ describe("RatingBadgeButton", () => {
     );
 
     let button = container.querySelector("button");
-    expect(button?.className).toContain("border-amber-500");
+    expect(button).toHaveAttribute("data-rated", "true");
 
     rerender(
       <MemoryRouter>
@@ -205,7 +205,7 @@ describe("RatingBadgeButton", () => {
 
     button = container.querySelector("button");
     expect(button?.className).toContain("border-dashed");
-    expect(button?.className).not.toContain("bg-amber-500");
+    expect(button).toHaveAttribute("data-rated", "false");
   });
 
   // Size variant: "compact" is for table cells — uses py-1 and tighter
@@ -294,7 +294,7 @@ describe("RatingBadgeButton", () => {
   // the badge drops its amber chrome and the re-opened editor seeds with
   // an empty state — same local-capture path as a fresh submission, just
   // with a null value.
-  test("captures a cleared rating and drops the amber chrome", async () => {
+  test("captures a cleared rating and drops the gold edge", async () => {
     const user = userEvent.setup();
     const { container } = await setupWithRouter(
       <RatingBadgeButton
@@ -309,9 +309,9 @@ describe("RatingBadgeButton", () => {
       />,
     );
 
-    // Initial rated state — amber chrome.
+    // Initial rated state — gold edge.
     let button = container.querySelector("button") as HTMLButtonElement;
-    expect(button.className).toContain("bg-amber-500/10");
+    expect(button).toHaveAttribute("data-rated", "true");
 
     // Open the editor and fire the clear flow through StarRating's spy.
     await user.click(button);
@@ -321,9 +321,9 @@ describe("RatingBadgeButton", () => {
       lastProps.onAverageRatingChange(3.8, 4);
     });
 
-    // Editor collapsed; the badge re-renders without the amber chrome.
+    // Editor collapsed; the badge re-renders without the gold edge.
     button = container.querySelector("button") as HTMLButtonElement;
-    expect(button.className).not.toContain("bg-amber-500/10");
+    expect(button).toHaveAttribute("data-rated", "false");
     expect(button.className).toContain("border-dashed");
 
     // Re-opening seeds the editor with null, not the stale prop.

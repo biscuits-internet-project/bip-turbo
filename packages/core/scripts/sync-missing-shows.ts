@@ -276,6 +276,7 @@ export interface McpSyncUser {
   // Rating-display opt-in prefs, mirrored from prod so adoption can be inspected locally.
   showCalibratedRatings: boolean | null;
   showRatingComparisonDebug: boolean | null;
+  colorCodeRatings: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1413,16 +1414,17 @@ async function mcpBulkChunked<TItem, TRow>(
 
 // Compound-key strings mirroring the rating / attendance unique constraints
 // (ratings_user_id_rateable_id_rateable_type_unique,
-// attendances_user_id_show_id_unique). The space separator can't appear in a
-// uuid or rateableType, so distinct tuples never collide. Detects id↔content
-// divergence
-// between local and prod — see findSquatterIds.
+// attendances_user_id_show_id_unique). The NUL separator can't appear in a
+// uuid or rateableType, so distinct tuples never collide. It's written as a
+// \u0000 escape rather than a literal byte, which would make tools classify
+// this whole file as binary and cause plain grep to skip it silently.
+// Detects id↔content divergence between local and prod, see findSquatterIds.
 export function ratingBindingKey(userId: string, rateableId: string, rateableType: string): string {
-  return `${userId} ${rateableId} ${rateableType}`;
+  return `${userId}\u0000${rateableId}\u0000${rateableType}`;
 }
 
 export function attendanceBindingKey(userId: string, showId: string): string {
-  return `${userId} ${showId}`;
+  return `${userId}\u0000${showId}`;
 }
 
 /**
@@ -1699,6 +1701,7 @@ export async function syncUserActivity(
               avatarFileUrl: u.avatarFileUrl,
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
+              colorCodeRatings: u.colorCodeRatings,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1715,6 +1718,7 @@ export async function syncUserActivity(
               avatarFileUrl: u.avatarFileUrl,
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
+              colorCodeRatings: u.colorCodeRatings,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1730,6 +1734,7 @@ export async function syncUserActivity(
               avatarFileUrl: u.avatarFileUrl,
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
+              colorCodeRatings: u.colorCodeRatings,
               createdAt: new Date(u.createdAt),
               updatedAt: new Date(u.updatedAt),
             },

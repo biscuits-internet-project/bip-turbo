@@ -303,7 +303,7 @@ describe("SetlistCard", () => {
   // in the Rating | number | null resolver inside SetlistCard would slip
   // through — the RatingBadgeButton itself is rated tested in isolation,
   // but the resolver lives here.
-  test("rating badge shows amber border when userRating is a bare number", async () => {
+  test("rating badge shows the gold rated border when userRating is a bare number", async () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "user-1" } as never,
       supabase: null as never,
@@ -314,12 +314,12 @@ describe("SetlistCard", () => {
     );
     const buttons = container.querySelectorAll("button");
     // The rating badge is the trailing rated-styled button in the header.
-    const ratingButton = Array.from(buttons).find((btn) => btn.className.includes("bg-amber-500/10"));
+    const ratingButton = Array.from(buttons).find((btn) => btn.dataset.rated === "true");
     expect(ratingButton).toBeDefined();
-    expect(ratingButton?.className).toContain("border-amber-500");
+    expect(ratingButton).toHaveAttribute("data-rated", "true");
   });
 
-  test("rating badge shows amber border when userRating is a Rating object", async () => {
+  test("rating badge shows the gold rated border when userRating is a Rating object", async () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "user-1" } as never,
       supabase: null as never,
@@ -338,9 +338,9 @@ describe("SetlistCard", () => {
       <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={ratingObj} showRating={null} />,
     );
     const buttons = container.querySelectorAll("button");
-    const ratingButton = Array.from(buttons).find((btn) => btn.className.includes("bg-amber-500/10"));
+    const ratingButton = Array.from(buttons).find((btn) => btn.dataset.rated === "true");
     expect(ratingButton).toBeDefined();
-    expect(ratingButton?.className).toContain("border-amber-500");
+    expect(ratingButton).toHaveAttribute("data-rated", "true");
   });
 
   // The dashed (unrated) state is the default when the viewer is logged in
@@ -356,9 +356,10 @@ describe("SetlistCard", () => {
       <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
     );
     const buttons = container.querySelectorAll("button");
-    const dashedButton = Array.from(buttons).find((btn) => btn.className.includes("border-dashed"));
-    expect(dashedButton).toBeDefined();
-    expect(dashedButton?.className).not.toContain("bg-amber-500/10");
+    const ratingButton = Array.from(buttons).find((btn) => btn.dataset.rated !== undefined);
+    expect(ratingButton).toBeDefined();
+    expect(ratingButton).toHaveAttribute("data-rated", "false");
+    expect(ratingButton?.className).toContain("border-dashed");
   });
 
   // Clicking "gap chart" swaps to the table view. Existence of the

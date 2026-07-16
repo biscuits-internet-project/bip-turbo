@@ -19,7 +19,7 @@ interface TrackIconProps {
 
 /**
  * Visual marker for noteworthy tracks. Renders the orange flame when the
- * track is an all-timer, the off-white flame when it carries a curated
+ * track is an all-timer, the gold flame when it carries a curated
  * jam-chart note but isn't an all-timer, and nothing otherwise. The
  * surrounding hover/click affordance for showing the note text is
  * provided by the caller (e.g. AllTimerCell wraps the flame in a
@@ -32,7 +32,7 @@ export function TrackIcon({ track, iconClassName, className }: TrackIconProps) {
 
   if (!allTimer && !note) return null;
 
-  const colorClass = allTimer ? "text-orange-500" : "text-content-text-primary";
+  const colorClass = allTimer ? "text-flame-all-timer" : "text-flame-jam";
   const sizeClass = iconClassName ?? "h-4 w-4";
   const label = allTimer ? "All-timer" : "Jam chart";
   return (

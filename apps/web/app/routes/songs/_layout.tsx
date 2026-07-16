@@ -17,8 +17,8 @@ const TABS: Tab[] = [
   { label: "All Songs", path: "/songs", icon: ListMusic },
   { label: "Last 10 Shows", path: "/songs/recent", icon: Clock },
   { label: "This Year", path: "/songs/this-year", icon: Calendar },
-  { label: "Jam Charts", path: "/songs/jam-charts", icon: Flame },
-  { label: "All-Timers", path: "/songs/all-timers", icon: Flame, iconClassName: "text-orange-500" },
+  { label: "Jam Charts", path: "/songs/jam-charts", icon: Flame, iconClassName: "text-flame-jam" },
+  { label: "All-Timers", path: "/songs/all-timers", icon: Flame, iconClassName: "text-flame-all-timer" },
   { label: "Histories", path: "/songs/histories", icon: History },
 ];
 

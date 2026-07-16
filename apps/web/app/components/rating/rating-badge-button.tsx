@@ -7,6 +7,18 @@ import { cn } from "~/lib/utils";
 
 type RatingBadgeSize = "compact" | "regular";
 
+/**
+ * Chrome marking a badge the viewer has rated: a solid gold edge and outer
+ * glow. Deliberately no interior tint — the rating values are themselves
+ * color-coded, and a warm gold wash behind them both fights those hues and
+ * costs contrast (purple reads 5.19:1 over a 10% gold fill, 5.99:1 over the
+ * page). Shared by the collapsed badge and the popover that covers it, so the
+ * two can't drift apart. Assert on `data-rated` rather than these classes.
+ */
+const RATED_CHROME = "border border-rating-gold/50 shadow-[0_0_8px_hsl(var(--rating-gold)/0.2)]";
+/** Its counterpart: the dashed "not yet rated" affordance surface. */
+const UNRATED_CHROME = "glass-secondary border border-dashed border-glass-border";
+
 interface RatingBadgeButtonProps {
   rateableId: string;
   rateableType: "Show" | "Track";
@@ -108,9 +120,7 @@ export function RatingBadgeButton({
   const paddingClass =
     size === "compact" ? (localHasRated ? "px-1" : "px-2") : localHasRated ? "px-1.5 sm:px-2" : "px-2 sm:px-3";
 
-  const stateClass = localHasRated
-    ? "bg-amber-500/10 border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
-    : "glass-secondary border border-dashed border-glass-border hover:border-amber-500/30";
+  const stateClass = localHasRated ? RATED_CHROME : `${UNRATED_CHROME} hover:border-rating-gold/30`;
 
   // Badge is always the compact RatingComponent; tapping opens a Popover
   // with the 5-star picker (overlay rather than inline expansion). Same
@@ -120,6 +130,10 @@ export function RatingBadgeButton({
     <button
       type="button"
       onClick={(e) => e.stopPropagation()}
+      // Semantic hook for "the viewer has rated this", so callers and tests
+      // don't have to recognize the rated state by pattern-matching styling
+      // classes that are free to change.
+      data-rated={localHasRated}
       className={cn(
         layoutClass,
         paddingClass,
@@ -153,17 +167,16 @@ export function RatingBadgeButton({
          * its bottom edge sits over the badge, visually replacing the
          * collapsed star + count with the 5-star picker rather than
          * floating in empty space below. Styling mirrors the desktop
-         * inline-expanded state — amber tint + border + soft glow when
-         * the user has rated, glass / dashed-border when they haven't —
-         * so opening the picker reads as the same component, just
-         * floated on mobile.
+         * inline-expanded state — gold border + soft glow when the user
+         * has rated, glass / dashed-border when they haven't — so opening
+         * the picker reads as the same component, just floated on mobile.
          *
-         * The inline `background` style uses the raw `--popover` CSS
-         * variable directly because this Tailwind v4 theme registers
-         * `--color-*` tokens (used by Tailwind `bg-*` classes)
-         * separately from the older HSL-component `--popover` token
-         * shared with Radix — `bg-popover` / `bg-background` resolve to
-         * `transparent`. The amber tint layers on top via `bg-amber-500/10`.
+         * The inline `background` style names the page background directly
+         * rather than using a Tailwind `bg-*` class because this Tailwind v4
+         * theme registers `--color-*` tokens (used by Tailwind `bg-*` classes)
+         * separately from the older HSL-component `--background` token shared
+         * with Radix — `bg-popover` / `bg-background` resolve to
+         * `transparent`.
          */}
         <PopoverContent
           // Sized + colored to mirror the inline-expanded badge:
@@ -172,19 +185,16 @@ export function RatingBadgeButton({
           // least as tall as the underlying badge on desktop (~30px) so
           // it fully covers the badge with `align="center"` + `side="top"`.
           //
-          // Background is OPAQUE: rgb(33, 24, 11) = amber-500 (rgb 245,
-          // 158, 11) composited at 10% opacity over the dark page bg
-          // (--background ≈ rgb 9, 9, 11). Same visual color as the
-          // inline `bg-amber-500/10` reads against the row, without
-          // letting other cells show through.
+          // Background is OPAQUE so the cells underneath can't show through
+          // the picker; the badge itself is transparent to the row, so this
+          // matches it by naming the page background.
+          data-rated={localHasRated}
           className={cn(
             "w-auto rounded-md flex items-center gap-1 min-h-8",
             localHasRated ? "!p-1" : "!py-1 !px-2",
-            localHasRated
-              ? "border border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
-              : "glass-secondary border border-dashed border-glass-border",
+            localHasRated ? RATED_CHROME : UNRATED_CHROME,
           )}
-          style={localHasRated ? { backgroundColor: "rgb(33, 24, 11)" } : undefined}
+          style={localHasRated ? { backgroundColor: "hsl(var(--background))" } : undefined}
           align="center"
           side="top"
           sideOffset={-32}
