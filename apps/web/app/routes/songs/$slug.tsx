@@ -366,13 +366,13 @@ export default function SongPage() {
           </TabsTrigger>
           {hasJamCharts && (
             <TabsTrigger value="jam-charts">
-              <Flame className="h-4 w-4" />
+              <Flame className="h-4 w-4 text-flame-jam" />
               Jam Charts
             </TabsTrigger>
           )}
           {hasAllTimers && (
             <TabsTrigger value="all-timers">
-              <Flame className="h-4 w-4 text-orange-500" />
+              <Flame className="h-4 w-4 text-flame-all-timer" />
               All-Timers
             </TabsTrigger>
           )}

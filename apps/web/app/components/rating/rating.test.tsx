@@ -1,7 +1,17 @@
 import { setup } from "@test/test-utils";
 import { screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, test } from "vitest";
+import { PreferencesProvider } from "~/hooks/use-preferences";
+import { RATING_COLOR_GREEN, RATING_COLOR_PURPLE, ratingColor } from "~/lib/rating-colors";
 import { RatingComponent } from "./rating";
+
+/**
+ * Mounts under an explicit opt-in. Color coding ships off, so a bare `setup`
+ * renders uncolored and every coloring assertion has to opt in first.
+ */
+const withColorCoding = (ui: ReactElement) =>
+  setup(<PreferencesProvider colorCodeRatings={true}>{ui}</PreferencesProvider>);
 
 describe("RatingComponent", () => {
   // Baseline: an average rating + ratingsCount renders the star, the
@@ -64,5 +74,57 @@ describe("RatingComponent", () => {
     await setup(<RatingComponent rating={4.32} ratingsCount={12} userRating={0.5} />);
     expect(screen.getByTestId("user-rating-value")).toHaveTextContent("½");
     expect(screen.getByTestId("user-rating-value").textContent).not.toMatch(/0/);
+  });
+
+  // The whole point of the color scale: a strong show and a weak one must be
+  // tellable apart without reading the digits.
+  test("colors the average by where it falls on the scale", async () => {
+    const { unmount } = await withColorCoding(<RatingComponent rating={5} ratingsCount={12} />);
+    expect(screen.getByText("5.00")).toHaveStyle({ color: RATING_COLOR_GREEN });
+    unmount();
+
+    await withColorCoding(<RatingComponent rating={0.5} ratingsCount={12} />);
+    expect(screen.getByText("0.50")).toHaveStyle({ color: RATING_COLOR_PURPLE });
+  });
+
+  // The second half of the point: two differently-colored numbers in one badge
+  // is what tells a viewer they disagree with the crowd.
+  test("colors the viewer's own rating independently of the average", async () => {
+    await withColorCoding(<RatingComponent rating={4.62} ratingsCount={12} userRating={0.5} />);
+
+    expect(screen.getByText("4.62")).toHaveStyle({ color: ratingColor(4.62) });
+    expect(screen.getByTestId("user-rating-value")).toHaveStyle({ color: RATING_COLOR_PURPLE });
+  });
+
+  // Color coding ships off, so the untouched badge must look exactly as it did
+  // before the scale existed.
+  test("leaves both values uncolored by default", async () => {
+    await setup(<RatingComponent rating={5} ratingsCount={12} userRating={2} />);
+
+    expect(screen.getByText("5.00").style.color).toBe("");
+    expect(screen.getByTestId("user-rating-value").style.color).toBe("");
+  });
+
+  test("leaves both values uncolored when the viewer opts out", async () => {
+    await setup(
+      <PreferencesProvider colorCodeRatings={false}>
+        <RatingComponent rating={5} ratingsCount={12} userRating={2} />
+      </PreferencesProvider>,
+    );
+
+    expect(screen.getByText("5.00").style.color).toBe("");
+    expect(screen.getByTestId("user-rating-value").style.color).toBe("");
+  });
+
+  // The gold star is Don's, and it means "rating" regardless of the score —
+  // the scale colors the digits only. Checked with coloring on, since that's
+  // the only state where the star could be dragged along with the values.
+  test("leaves the star gold at both ends of the scale", async () => {
+    const { container, unmount } = await withColorCoding(<RatingComponent rating={5} ratingsCount={12} />);
+    expect(container.querySelector(".text-rating-gold")).toBeInTheDocument();
+    unmount();
+
+    const low = await withColorCoding(<RatingComponent rating={0.5} ratingsCount={12} />);
+    expect(low.container.querySelector(".text-rating-gold")).toBeInTheDocument();
   });
 });

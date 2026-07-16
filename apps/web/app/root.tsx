@@ -20,13 +20,24 @@ import { HeaderLayout } from "~/components/layout/header-layout";
 import { SearchProvider } from "~/components/search/search-provider";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
+import { PreferencesProvider } from "~/hooks/use-preferences";
 import { mergeDehydratedStates } from "~/lib/query-prefetch";
 import type { SessionUser } from "~/lib/session-user";
 import { toSessionUser } from "~/lib/session-user";
 import { QueryProvider } from "~/providers/query-provider";
 import { env } from "~/server/env";
 import { getRequestUser } from "~/server/request-user";
+import { services } from "~/server/services";
 import stylesheet from "./styles.css?url";
+
+export type RootPreferences = {
+  /**
+   * Tri-state, as stored: `null` means the viewer never chose, which
+   * `usePreferences()` resolves to the app default. Kept unresolved here so
+   * the default lives in exactly one place.
+   */
+  colorCodeRatings: boolean | null;
+};
 
 export type RootData = {
   env: ClientSideEnv;
@@ -37,6 +48,12 @@ export type RootData = {
    * individual flag values threaded down as props.
    */
   featureFlags: FeatureFlags;
+  /**
+   * Display preferences resolved once for the whole app so leaf components
+   * can read them via `usePreferences()` instead of having the values threaded
+   * through every intermediate component as props.
+   */
+  preferences: RootPreferences;
 };
 
 export type ClientSideEnv = {
@@ -68,10 +85,18 @@ export async function loader({ request }: Route.LoaderArgs): Promise<RootData> {
     sessionUser?.username ? { user: { username: sessionUser.username } } : undefined,
   );
 
+  // Display preferences live on the user row, so unlike the flags above this
+  // needs a lookup. Signed-out visitors skip it entirely and fall through to
+  // the defaults in `usePreferences()`.
+  const viewer = sessionUser?.email ? await services.users.findByEmail(sessionUser.email) : null;
+
   return {
     env: clientEnv,
     sessionUser,
     featureFlags,
+    preferences: {
+      colorCodeRatings: viewer?.colorCodeRatings ?? null,
+    },
   };
 }
 
@@ -101,11 +126,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <SupabaseProvider env={env}>
           <QueryProvider>
             <HydrationBoundary state={dehydratedState}>
-              <GlobalSearchProvider>
-                <SearchProvider>
-                  <HeaderLayout>{children}</HeaderLayout>
-                </SearchProvider>
-              </GlobalSearchProvider>
+              <PreferencesProvider colorCodeRatings={data?.preferences?.colorCodeRatings}>
+                <GlobalSearchProvider>
+                  <SearchProvider>
+                    <HeaderLayout>{children}</HeaderLayout>
+                  </SearchProvider>
+                </GlobalSearchProvider>
+              </PreferencesProvider>
             </HydrationBoundary>
           </QueryProvider>
         </SupabaseProvider>

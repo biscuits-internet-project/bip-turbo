@@ -57,7 +57,7 @@ describe("TrackRatingCell", () => {
     );
 
     const button = container.querySelector("button");
-    expect(button?.className).toContain("border-amber-500");
+    expect(button).toHaveAttribute("data-rated", "true");
   });
 
   // When the user has NOT rated the track, the cell has a dashed border
@@ -164,7 +164,7 @@ describe("TrackRatingCell", () => {
 
     // Initially golden
     let button = container.querySelector("button");
-    expect(button?.className).toContain("border-amber-500");
+    expect(button).toHaveAttribute("data-rated", "true");
 
     rerender(
       <MemoryRouter>
@@ -180,10 +180,8 @@ describe("TrackRatingCell", () => {
     );
 
     // Should now be dashed (no user rating), not golden.
-    // Check for border-amber-500/50 (the active golden border class)
-    // not just border-amber-500 (which also matches hover:border-amber-500/30).
     button = container.querySelector("button");
     expect(button?.className).toContain("border-dashed");
-    expect(button?.className).not.toContain("bg-amber-500");
+    expect(button).toHaveAttribute("data-rated", "false");
   });
 });

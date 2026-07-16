@@ -4,14 +4,16 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Switch } from "~/components/ui/switch";
 import { useFeatureFlags } from "~/hooks/use-feature-flags";
+import { PREFERENCES_DEFAULT } from "~/hooks/use-preferences";
 
 /**
- * Rating-display preferences for the viewer's own profile. The calibrated-rating
- * opt-in renders only when `ratings.toggle-visible` makes it available to this
- * user; the author comparison overlay only when `ratings.compare-visible` does;
- * the whole card hides when neither is on. Each toggle auto-saves on change
- * (optimistic, reverting on failure) to /api/users, which re-checks the flags
- * before persisting, with no separate save step.
+ * Rating-display preferences for the viewer's own profile. Color coding is
+ * available to everyone, so it always renders; the calibrated-rating opt-in
+ * renders only when `ratings.toggle-visible` makes it available to this user,
+ * and the author comparison overlay only when `ratings.compare-visible` does.
+ * Each toggle auto-saves on change (optimistic, reverting on failure) to
+ * /api/users, which re-checks the flags before persisting, with no separate
+ * save step.
  *
  * Takes only the viewer's saved preferences as props; the gating feature flags are
  * read from `useFeatureFlags()` so it's clear at this use site that flags drive
@@ -20,21 +22,22 @@ import { useFeatureFlags } from "~/hooks/use-feature-flags";
 export function RatingDisplaySettings({
   showCalibratedRatings,
   showRatingComparisonDebug,
+  colorCodeRatings,
 }: {
   showCalibratedRatings: boolean | null;
   showRatingComparisonDebug: boolean | null;
+  colorCodeRatings: boolean | null;
 }) {
   const { toggleVisible, compareVisible, defaultCalibrated } = useFeatureFlags();
   // Each switch reflects the user's explicit choice, falling back to the app
   // default when they've never set one (a null pref resolves to the default).
   const [calibrated, setCalibrated] = useState(showCalibratedRatings ?? defaultCalibrated);
   const [compare, setCompare] = useState(showRatingComparisonDebug ?? false);
+  const [colorCoded, setColorCoded] = useState(colorCodeRatings ?? PREFERENCES_DEFAULT.colorCodeRatings);
   const [savingField, setSavingField] = useState<string | null>(null);
 
-  if (!toggleVisible && !compareVisible) return null;
-
   async function save(
-    field: "showCalibratedRatings" | "showRatingComparisonDebug",
+    field: "showCalibratedRatings" | "showRatingComparisonDebug" | "colorCodeRatings",
     value: boolean,
     apply: (v: boolean) => void,
   ) {
@@ -60,6 +63,22 @@ export function RatingDisplaySettings({
         <CardTitle className="text-content-text-primary">Rating display</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-content-text-primary font-medium">Color-code rating values</div>
+            <p className="text-sm text-content-text-tertiary">
+              Tint rating numbers from purple to green so you can spot strong and weak scores, and see where you differ
+              from the crowd, without reading them.
+            </p>
+          </div>
+          <Switch
+            checked={colorCoded}
+            disabled={savingField === "colorCodeRatings"}
+            onCheckedChange={(v) => save("colorCodeRatings", v, setColorCoded)}
+            aria-label="Color-code rating values"
+          />
+        </div>
+
         {toggleVisible && (
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">

@@ -1,8 +1,10 @@
 import type { RatingValueBucket } from "@bip/core";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
+import { usePreferences } from "~/hooks/use-preferences";
 import { CHART_BAR_CURSOR, CHART_COLORS } from "~/lib/chart-colors";
-import { ALL_YEARS_SERIES, buildHistogramData, histogramYAxisConfig } from "~/lib/rating-charts";
+import { ALL_YEARS_SERIES, buildHistogramData, histogramYAxisConfig, RATING_BUCKETS } from "~/lib/rating-charts";
+import { ratingColor } from "~/lib/rating-colors";
 
 interface RatingDistributionChartProps {
   buckets: RatingValueBucket[];
@@ -60,7 +62,12 @@ export function RatingDistributionChart({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="12%">
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} opacity={0.3} />
-            <XAxis dataKey="label" stroke={CHART_COLORS.axis} fontSize={compact ? 10 : 12} />
+            <XAxis
+              dataKey="label"
+              stroke={CHART_COLORS.axis}
+              fontSize={compact ? 10 : 12}
+              tick={<RatingAxisTick fontSize={compact ? 10 : 12} />}
+            />
             <YAxis
               stroke={CHART_COLORS.axis}
               fontSize={compact ? 10 : 12}
@@ -87,6 +94,35 @@ export function RatingDistributionChart({
         </ResponsiveContainer>
       </div>
     </div>
+  );
+}
+
+interface RatingAxisTickProps {
+  /** Injected by recharts when this element is passed as `tick`. */
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number; index?: number };
+  fontSize?: number;
+}
+
+/**
+ * X-axis tick that renders each star value in the color that value carries
+ * everywhere else, so the axis doubles as a legend for the rating color scale
+ * without spending any layout on one.
+ *
+ * Recovers the numeric rating from `payload.index` rather than the tick label,
+ * because the axis is keyed on the formatted glyph ("3½") and the color is a
+ * function of the number. The histogram always renders all of RATING_BUCKETS,
+ * zero-filled, so row index and bucket index line up.
+ */
+export function RatingAxisTick({ x, y, payload, fontSize }: RatingAxisTickProps) {
+  const { colorCodeRatings } = usePreferences();
+  const value = payload?.index === undefined ? undefined : RATING_BUCKETS[payload.index];
+  const fill = colorCodeRatings && value !== undefined ? ratingColor(value) : CHART_COLORS.axis;
+  return (
+    <text x={x} y={y} dy={10} textAnchor="middle" fontSize={fontSize} fill={fill}>
+      {payload?.value}
+    </text>
   );
 }
 

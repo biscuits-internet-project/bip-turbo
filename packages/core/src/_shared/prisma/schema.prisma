@@ -765,6 +765,7 @@ model User {
   avatarFileUrl       String?      @map("avatar_file_url") @db.VarChar
   showCalibratedRatings     Boolean? @map("show_adjusted_rating")
   showRatingComparisonDebug Boolean? @map("show_rating_compare")
+  colorCodeRatings          Boolean? @map("color_code_ratings")
   avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   attendances         Attendance[]
   blogPosts           BlogPost[]

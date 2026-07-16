@@ -4,7 +4,7 @@ import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
 import { useState } from "react";
 import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
 import { Link, useNavigate } from "react-router-dom";
-import { formatHalfStep } from "~/components/rating/rating";
+import { formatHalfStep, StarValue } from "~/components/rating/rating";
 import { RatingCharts } from "~/components/rating/rating-charts";
 import { RatingDisplaySettings } from "~/components/rating/rating-display-settings";
 import { formatSetLabel } from "~/components/setlist/set-label";
@@ -416,6 +416,7 @@ export default function UserProfile() {
         <RatingDisplaySettings
           showCalibratedRatings={user.showCalibratedRatings}
           showRatingComparisonDebug={user.showRatingComparisonDebug}
+          colorCodeRatings={user.colorCodeRatings}
         />
       )}
 
@@ -769,15 +770,6 @@ function ModifiedDate({ createdAt }: { createdAt: Date | string }) {
   );
 }
 
-function StarValue({ value }: { value: number }) {
-  return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap">
-      <Star className="h-3 w-3 sm:h-4 sm:w-4 text-rating-gold" />
-      <span className="font-medium text-xs sm:text-sm text-content-text-primary">{formatHalfStep(value)}</span>
-    </span>
-  );
-}
-
 // Show date cell with venue line below on sm+ viewports. Uses plain media
 // queries (not the @container/datecell variant in ShowDate) so the column
 // width and the date-format swap don't fight each other inside a table
@@ -846,7 +838,7 @@ function ShowRatingsTable({ rows, sort, direction, onSort }: ShowRatingsTablePro
                   <DateVenueLink date={row.show.date} slug={row.show.slug} venueLine={venueLine} />
                 </td>
                 <td className={tableCellClass}>
-                  <StarValue value={row.value} />
+                  <StarValue value={row.value} label={formatHalfStep(row.value)} />
                 </td>
                 <td className={`${tableCellClass} text-content-text-tertiary whitespace-nowrap`}>
                   <ModifiedDate createdAt={row.createdAt} />
@@ -916,7 +908,7 @@ function TrackRatingsTable({ rows, sort, direction, onSort }: TrackRatingsTableP
                 </Link>
               </td>
               <td className={tableCellClass}>
-                <StarValue value={row.value} />
+                <StarValue value={row.value} label={formatHalfStep(row.value)} />
               </td>
               <td className={`${tableCellClass} text-content-text-tertiary whitespace-nowrap`}>
                 <ModifiedDate createdAt={row.createdAt} />

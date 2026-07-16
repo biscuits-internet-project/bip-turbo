@@ -11,6 +11,7 @@ export const userSchema = z.object({
   // Rating-display prefs (tri-state: null = no explicit choice → app default).
   showCalibratedRatings: z.boolean().nullable(),
   showRatingComparisonDebug: z.boolean().nullable(),
+  colorCodeRatings: z.boolean().nullable(),
 });
 
 export const userMinimalSchema = userSchema

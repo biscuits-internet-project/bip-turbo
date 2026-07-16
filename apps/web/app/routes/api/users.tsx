@@ -11,6 +11,7 @@ const updateUserSchema = z.object({
   // Toggles arrive as "true"/"false" strings; persistence is flag-gated below.
   showCalibratedRatings: z.enum(["true", "false"]).optional(),
   showRatingComparisonDebug: z.enum(["true", "false"]).optional(),
+  colorCodeRatings: z.enum(["true", "false"]).optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -70,7 +71,12 @@ export async function action({ request }: ActionFunctionArgs) {
     // Build the update explicitly: persist a rating pref only if the matching flag
     // makes that toggle visible for this user (so an ineligible user can't set it via
     // a crafted POST), and coerce the "true"/"false" strings to booleans.
-    const update: { username?: string; showCalibratedRatings?: boolean; showRatingComparisonDebug?: boolean } = {};
+    const update: {
+      username?: string;
+      showCalibratedRatings?: boolean;
+      showRatingComparisonDebug?: boolean;
+      colorCodeRatings?: boolean;
+    } = {};
     if (validatedData.username) update.username = validatedData.username;
     const flags = await getFeatureFlags({ user: { id: localUser.id, username: localUser.username } });
     if (flags.toggleVisible && validatedData.showCalibratedRatings !== undefined) {
@@ -78,6 +84,10 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     if (flags.compareVisible && validatedData.showRatingComparisonDebug !== undefined) {
       update.showRatingComparisonDebug = validatedData.showRatingComparisonDebug === "true";
+    }
+    // Color coding is available to everyone, so no flag guards this one.
+    if (validatedData.colorCodeRatings !== undefined) {
+      update.colorCodeRatings = validatedData.colorCodeRatings === "true";
     }
 
     const updatedUser = await services.users.update(localUser.id, update);

@@ -56,6 +56,14 @@
 
   /* Rating Colors */
   --color-rating-gold: hsl(38 95% 62%);
+
+  /* Track marker flames. Color is the only thing distinguishing a jam chart
+     from an all-timer, and these two are close in hue (38 vs 25), so they read
+     as a warm family rather than as opposites: legible apart side by side, but
+     near-identical under red-green color blindness. If that distinction ever
+     needs to carry more weight, separate the hues rather than the lightness. */
+  --color-flame-jam: var(--color-rating-gold);
+  --color-flame-all-timer: hsl(24.6 95% 53.1%);
 }
 
 /* Radix Popover/Select sets `body[data-scroll-locked]` and adds a
