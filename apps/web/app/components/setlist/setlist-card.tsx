@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { useSession } from "~/hooks/use-session";
 import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { formatVenueLocation } from "~/lib/format-venue";
+import { ROW_CHIP_HOVER } from "~/lib/interaction-styles";
 import { deriveShowLineupNotes } from "~/lib/lineup-notes";
 import { cn } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
@@ -23,6 +24,43 @@ import { SetlistViewControl, type SetlistViewSummary } from "./setlist-view-cont
 import { ShowExternalBadges, type ShowExternalSources } from "./show-external-badges";
 
 export type SetlistView = "setlist" | "gap-chart" | "personal";
+
+/**
+ * Chrome for a show the viewer marked attended: a green fill, edge and glow.
+ *
+ * The fill earns its place beyond looks — `ROW_CHIP_HOVER` brightens and
+ * saturates, and both are filters, so without a background they have almost
+ * nothing to act on and the hover reads as broken.
+ *
+ * Every green here resolves from `green-500`: fill and border via Tailwind's
+ * `--color-green-500`, the glow via the bare `--green-500`. The glow used to
+ * hardcode stock Tailwind green, which never matched the border it sat on.
+ */
+const ATTENDED_CHROME =
+  "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_hsl(var(--green-500)/0.2)] hover:bg-green-500/20 hover:border-green-500/80";
+
+/**
+ * Chrome for a show not yet marked attended: the same frosted surface
+ * `glass-secondary` paints, but reached through the raw tokens instead of that
+ * class, so hover can answer in green the way the attended state does.
+ *
+ * `glass-secondary` sets `background-color` AND `border` with `!important`,
+ * which silently defeats any hover utility beside it — this button carried a
+ * `hover:border-green-500/30` that has never once rendered. Naming the same
+ * tokens directly reproduces the surface exactly while leaving hover free.
+ *
+ * The border is solid rather than dashed on purpose: the class list here used
+ * to say `border-dashed`, but `glass-secondary`'s `!important` overrode it, so
+ * solid is what has always shipped and what people recognise.
+ */
+const UNATTENDED_CHROME = [
+  "bg-[var(--glass-bg-secondary)] border border-[var(--glass-border)]",
+  // The blur token is a whole filter function, not a length, so it can't feed
+  // Tailwind's `backdrop-blur-[…]`; set the property directly to avoid
+  // restating 12px here.
+  "[backdrop-filter:var(--backdrop-blur)]",
+  "hover:bg-green-500/10 hover:border-green-500/50",
+].join(" ");
 
 interface SetlistCardProps {
   setlist: Setlist;
@@ -192,6 +230,45 @@ function SetlistCardComponent({
     );
   };
 
+  // Sits on the header's first line, beside the show date, rather than next to
+  // the rating badge. Attendance and rating are different questions, and putting
+  // them shoulder to shoulder made the row a contest between two bordered chips —
+  // worst on a profile, where every show is attended. Here the badge owns the
+  // right edge alone.
+  const attendanceButton = (
+    <button
+      type="button"
+      onClick={toggleAttendance}
+      disabled={attendanceMutation.isPending}
+      // Semantic hook for "the viewer marked this show attended", so tests don't
+      // have to recognize the state by pattern-matching styling classes that are
+      // free to change. Mirrors `data-rated` on the rating badge.
+      data-attended={isAttending}
+      className={cn(
+        "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md",
+        "shrink-0 whitespace-nowrap",
+        ROW_CHIP_HOVER,
+        isAttending ? ATTENDED_CHROME : UNATTENDED_CHROME,
+        isAttendanceAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
+        attendanceMutation.isPending && "opacity-50",
+      )}
+    >
+      <Check
+        className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", isAttending ? "text-green-500" : "text-content-text-tertiary")}
+      />
+      {/*
+       * The label stays neutral in both states. It was the single heaviest
+       * element in the row — brightest colour and most ink — which put a fact
+       * the green check already states above the rating it sits beside. Green
+       * now lives only on the check and the chrome, which also leaves the
+       * button speaking one green rather than two.
+       */}
+      <span className="text-sm font-medium hidden sm:inline text-content-text-tertiary">
+        {isAttending ? "Saw it" : "Saw it?"}
+      </span>
+    </button>
+  );
+
   return (
     <Card className="relative overflow-hidden">
       <CardHeader
@@ -218,10 +295,29 @@ function SetlistCardComponent({
             <div className="flex items-center gap-2 text-lg md:text-2xl font-medium">
               <Link
                 to={setlist.show.slug ? `/shows/${setlist.show.slug}` : `/shows`}
-                className="text-brand-primary hover:text-brand-secondary transition-colors"
+                // Reserve a column wide enough for the longest date this renders
+                // (`12/30/2025` — the header has no @container/datecell, so it's
+                // always the full M/D/YYYY), so the attendance button beside it
+                // lands on the same vertical line in every row instead of sliding
+                // with the date's length.
+                //
+                // `ch` rather than a px/rem value: this text renders in the
+                // system font stack, so its metrics differ per platform, and it
+                // scales text-lg → text-2xl at the md breakpoint. A fixed length
+                // would need re-measuring on every OS and duplicating per
+                // breakpoint; `ch` is defined against the font actually in use,
+                // so one value covers both. 9ch clears the widest date with a few
+                // px to spare at both sizes.
+                //
+                // `min-w`, not `w`: an unexpectedly wide date pushes the row out
+                // rather than overflowing. And not a container query — ShowDate
+                // documents that `container-type: inline-size` collapses it and
+                // breaks the date character-by-character.
+                className="text-brand-primary hover:text-brand-secondary transition-colors shrink-0 min-w-[9ch]"
               >
                 <ShowDate date={setlist.show.date} />
               </Link>
+              {user && attendanceButton}
               <AnniversaryBadge showDate={setlist.show.date} />
               {notForStats && (
                 <Badge
@@ -239,66 +335,18 @@ function SetlistCardComponent({
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            {user && (
-              <div className="flex items-center gap-2">
-                {/* Attendance badge - clickable to toggle */}
-                <button
-                  type="button"
-                  onClick={toggleAttendance}
-                  disabled={attendanceMutation.isPending}
-                  className={cn(
-                    "flex items-center justify-center gap-1 px-2 h-6 sm:px-3 sm:h-8 rounded-md transition-all",
-                    "shrink-0 whitespace-nowrap",
-                    "hover:brightness-110 cursor-pointer",
-                    isAttending
-                      ? "bg-green-500/10 border border-green-500/50 shadow-[0_0_8px_rgba(34,197,94,0.2)]"
-                      : "glass-secondary border border-dashed border-glass-border hover:border-green-500/30",
-                    isAttendanceAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
-                    attendanceMutation.isPending && "opacity-50",
-                  )}
-                >
-                  <Check
-                    className={cn(
-                      "h-3.5 w-3.5 sm:h-4 sm:w-4",
-                      isAttending ? "text-green-500" : "text-content-text-tertiary",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "text-sm font-medium hidden sm:inline",
-                      isAttending ? "text-green-400" : "text-content-text-secondary",
-                    )}
-                  >
-                    {isAttending ? "Saw it" : "Saw it?"}
-                  </span>
-                </button>
-
-                <RatingBadgeButton
-                  rateableId={setlist.show.id}
-                  rateableType="Show"
-                  showSlug={setlist.show.slug}
-                  initialRating={displayedRating}
-                  ratingsCount={displayedCount}
-                  userRating={resolvedUserRating}
-                  isAuthenticated
-                />
-                {summaryEl}
-              </div>
-            )}
-            {!user && (
-              <div className="flex items-center gap-2">
-                <RatingBadgeButton
-                  rateableId={setlist.show.id}
-                  rateableType="Show"
-                  showSlug={setlist.show.slug}
-                  initialRating={displayedRating}
-                  ratingsCount={displayedCount}
-                  userRating={null}
-                  isAuthenticated={false}
-                />
-                {summaryEl}
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <RatingBadgeButton
+                rateableId={setlist.show.id}
+                rateableType="Show"
+                showSlug={setlist.show.slug}
+                initialRating={displayedRating}
+                ratingsCount={displayedCount}
+                userRating={user ? resolvedUserRating : null}
+                isAuthenticated={!!user}
+              />
+              {summaryEl}
+            </div>
             <div className="pr-2 sm:pr-3">
               <ShowExternalBadges
                 sources={externalSources ?? {}}

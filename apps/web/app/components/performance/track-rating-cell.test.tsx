@@ -62,7 +62,7 @@ describe("TrackRatingCell", () => {
 
   // When the user has NOT rated the track, the cell has a dashed border
   // (no golden highlight).
-  test("shows dashed border when userRating is null", async () => {
+  test("marks itself unrated when userRating is null", async () => {
     const { container } = await setupWithRouter(
       <TrackRatingCell
         trackId="t1"
@@ -75,7 +75,7 @@ describe("TrackRatingCell", () => {
     );
 
     const button = container.querySelector("button");
-    expect(button?.className).toContain("border-dashed");
+    expect(button).toHaveAttribute("data-rated", "false");
   });
 
   // When React reuses a TrackRatingCell component at the same DOM position
@@ -150,7 +150,7 @@ describe("TrackRatingCell", () => {
 
   // When the component is reused at the same DOM position, the golden
   // border state must track the new userRating prop, not the old one.
-  test("updates golden border state when userRating prop changes", async () => {
+  test("updates its rated state when the userRating prop changes", async () => {
     const { container, rerender } = await setupWithRouter(
       <TrackRatingCell
         trackId="t1"
@@ -179,9 +179,8 @@ describe("TrackRatingCell", () => {
       </MemoryRouter>,
     );
 
-    // Should now be dashed (no user rating), not golden.
+    // Should now read as unrated (no user rating).
     button = container.querySelector("button");
-    expect(button?.className).toContain("border-dashed");
     expect(button).toHaveAttribute("data-rated", "false");
   });
 });

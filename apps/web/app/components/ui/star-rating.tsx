@@ -4,7 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
+import { usePreferences } from "~/hooks/use-preferences";
 import { useSession } from "~/hooks/use-session";
+import { ratingColor } from "~/lib/rating-colors";
 import { cn } from "~/lib/utils";
 import type { ShowUserDataResponse } from "~/server/show-user-data";
 
@@ -40,6 +42,7 @@ export function StarRating({
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { colorCodeRatings } = usePreferences();
   const [rating, setRating] = useState<RatingResponse | null>(
     initialRating !== undefined ? { userRating: initialRating, averageRating: null } : null,
   );
@@ -322,6 +325,7 @@ export function StarRating({
             <StarIcon
               filled={filled}
               half={half}
+              color={starColor(half ? star - 0.5 : star, colorCodeRatings)}
               isAnimating={isAnimating && (filled || half)}
               delay={animationDelay}
             />
@@ -332,21 +336,36 @@ export function StarRating({
   );
 }
 
+/**
+ * Fill color for the star at `value`. With the scale on, each star wears the
+ * color that rating would render in, so the row reads purple → neutral → green
+ * as it fills and the picker previews the scale instead of just measuring it.
+ * With the scale off, every star is the usual gold.
+ */
+function starColor(value: number, colorCodeRatings: boolean): string {
+  return colorCodeRatings ? ratingColor(value) : "hsl(var(--rating-gold))";
+}
+
 const StarIcon = ({
   filled,
   half,
+  color,
   isAnimating,
   delay,
 }: {
   filled: boolean;
   half?: boolean;
+  color: string;
   isAnimating?: boolean;
   delay?: number;
 }) => (
   <div className="relative">
-    {/* Empty star (background) */}
+    {/* Unearned star, sitting under the fill. Dim rather than a mid grey: the
+        fill's colour passes through near-neutral at the middle of the scale, and
+        against the old grey a filled 3.5 read at 1.36:1 — indistinguishable from
+        an empty one. */}
     <svg
-      className={cn("w-4 h-4", filled || half ? "text-content-text-tertiary" : "text-content-text-tertiary")}
+      className="w-4 h-4 text-rating-dim"
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
       fill="currentColor"
@@ -369,7 +388,7 @@ const StarIcon = ({
           className={cn("w-4 h-4", isAnimating && "animate-star-glow")}
           style={{
             animationDelay: delay ? `${delay}ms` : undefined,
-            color: "hsl(var(--rating-gold))",
+            color,
           }}
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"

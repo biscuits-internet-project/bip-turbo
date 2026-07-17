@@ -50,12 +50,12 @@ describe("AnniversaryBadge", () => {
   });
 
   // Uses amber-400 text color
-  test("applies amber-400 color", async () => {
+  test("shares the rating star's gold", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-14"));
     const { container } = await setupWithRouter(<AnniversaryBadge showDate="2021-04-14" />);
     const badge = container.firstChild as HTMLElement;
-    expect(badge.className).toContain("text-amber-400");
+    expect(badge.className).toContain("text-rating-gold");
     vi.useRealTimers();
   });
 

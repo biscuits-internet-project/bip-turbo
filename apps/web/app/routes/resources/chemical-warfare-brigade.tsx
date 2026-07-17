@@ -1,10 +1,11 @@
 import type React from "react";
 import { Link } from "react-router-dom";
 import { SetlistList } from "~/components/setlist/setlist-list";
+import { FaviconLink } from "~/components/setlist/show-external-badges";
 import { Card, CardHeader } from "~/components/ui/card";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
-import { EXTERNAL_FAVICON_LINK_CLASS, EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
+import { EXTERNAL_SOURCE_DOMAINS } from "~/lib/favicon";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
 import { slugifyAnchor } from "~/lib/utils";
@@ -765,36 +766,16 @@ const ChemicalWarfareBrigade: React.FC = () => {
                       </div>
                       {(perf.archiveUrl || perf.relistenUrl) && (
                         <div className="flex items-center gap-2 pr-2 sm:pr-3">
-                          {perf.archiveUrl && (
-                            <a
-                              href={perf.archiveUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Available on archive.org"
-                              className={EXTERNAL_FAVICON_LINK_CLASS}
-                            >
-                              <img
-                                src={faviconSrc(EXTERNAL_SOURCE_DOMAINS.archive)}
-                                alt="Available on archive.org"
-                                className="h-5 w-5 shrink-0"
-                              />
-                            </a>
-                          )}
-                          {perf.relistenUrl && (
-                            <a
-                              href={perf.relistenUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Available on Relisten"
-                              className={EXTERNAL_FAVICON_LINK_CLASS}
-                            >
-                              <img
-                                src={faviconSrc(EXTERNAL_SOURCE_DOMAINS.relisten)}
-                                alt="Available on Relisten"
-                                className="h-5 w-5 shrink-0"
-                              />
-                            </a>
-                          )}
+                          <FaviconLink
+                            domain={EXTERNAL_SOURCE_DOMAINS.archive}
+                            href={perf.archiveUrl}
+                            label="Available on archive.org"
+                          />
+                          <FaviconLink
+                            domain={EXTERNAL_SOURCE_DOMAINS.relisten}
+                            href={perf.relistenUrl}
+                            label="Available on Relisten"
+                          />
                         </div>
                       )}
                     </div>

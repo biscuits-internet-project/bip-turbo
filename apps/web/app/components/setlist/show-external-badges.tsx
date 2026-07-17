@@ -1,6 +1,12 @@
 import { Camera } from "lucide-react";
 import { Link } from "react-router-dom";
-import { EXTERNAL_FAVICON_LINK_CLASS, EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
+import {
+  EXTERNAL_FAVICON_IMG_CLASS,
+  EXTERNAL_FAVICON_LINK_CLASS,
+  EXTERNAL_SOURCE_DOMAINS,
+  faviconBoost,
+  faviconSrc,
+} from "~/lib/favicon";
 import { cn } from "~/lib/utils";
 
 /**
@@ -42,9 +48,10 @@ interface ShowExternalBadgesProps {
 interface FaviconLinkProps {
   /** Bare host (e.g. "nugs.net") used to resolve the favicon. */
   domain: string;
-  /** Fully-qualified link target. Undefined collapses the badge to nothing so
-   *  callers can pass the raw optional URL without a surrounding `&&` gate. */
-  href: string | undefined;
+  /** Fully-qualified link target. Null or undefined collapses the badge to
+   *  nothing so callers can pass a raw optional URL, from either a loader
+   *  (nullable) or an optional prop, without a surrounding `&&` gate. */
+  href: string | null | undefined;
   /** Hover tooltip and screen-reader label. */
   label: string;
 }
@@ -62,15 +69,22 @@ interface PhotosBadgeProps {
 const BADGE_ICON_CLASS = "h-5 w-5 shrink-0";
 
 /**
- * A single favicon-as-link inside the badge strip. Owns its own absence —
- * returns null when the URL isn't available so the parent strip can pass
- * optional URLs in directly without per-field `&&` gates.
+ * A single favicon-as-link. Owns its own absence — returns null when the URL
+ * isn't available so callers can pass optional URLs in directly without
+ * per-field `&&` gates. Exported because the same affordance appears outside
+ * the badge strip (resource pages), and the per-domain brightness tuning it
+ * carries has to stay identical everywhere a service logo is shown.
  */
-function FaviconLink({ domain, href, label }: FaviconLinkProps) {
+export function FaviconLink({ domain, href, label }: FaviconLinkProps) {
   if (!href) return null;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" title={label} className={EXTERNAL_FAVICON_LINK_CLASS}>
-      <img src={faviconSrc(domain)} alt={label} className={BADGE_ICON_CLASS} />
+      <img
+        src={faviconSrc(domain)}
+        alt={label}
+        className={cn(BADGE_ICON_CLASS, EXTERNAL_FAVICON_IMG_CLASS)}
+        style={faviconBoost(domain)}
+      />
     </a>
   );
 }
@@ -78,11 +92,24 @@ function FaviconLink({ domain, href, label }: FaviconLinkProps) {
 /**
  * Camera icon + count, linking to the show's #photos anchor. Owns its own
  * absence so the parent can pass raw optional values without `&&` gates.
+ *
+ * Carries an explicit muted color because it's the one badge drawn as a stroked
+ * icon rather than a favicon image: the strip's desaturation only reaches the
+ * images, so left on the default text color this would read as the boldest
+ * thing in a row of greys.
+ *
+ * Tuned a step brighter than the favicons' tinted fill rather than matched to
+ * it. An outline covers far fewer pixels than a filled tile, so at an equal
+ * value it reads lighter — the extra step buys equal presence, not equal color.
  */
 function PhotosBadge({ href, count }: PhotosBadgeProps) {
   if (!href || !count || count <= 0) return null;
   return (
-    <Link to={href} title={`${count} photos`} className={cn(EXTERNAL_FAVICON_LINK_CLASS, "gap-1")}>
+    <Link
+      to={href}
+      title={`${count} photos`}
+      className={cn(EXTERNAL_FAVICON_LINK_CLASS, "gap-1 text-content-text-secondary")}
+    >
       <Camera className={BADGE_ICON_CLASS} />
       {/* Count crowds the icon strip on mobile; show it from `sm` up. */}
       <span className="hidden sm:inline text-sm">{count}</span>

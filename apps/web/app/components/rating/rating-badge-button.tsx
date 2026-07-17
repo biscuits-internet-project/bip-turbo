@@ -3,21 +3,41 @@ import { RatingComponent } from "~/components/rating/rating";
 import { LoginPromptPopover } from "~/components/ui/login-prompt-popover";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import { StarRating } from "~/components/ui/star-rating";
+import { usePreferences } from "~/hooks/use-preferences";
+import { ROW_CHIP_HOVER } from "~/lib/interaction-styles";
 import { cn } from "~/lib/utils";
 
 type RatingBadgeSize = "compact" | "regular";
 
 /**
- * Chrome marking a badge the viewer has rated: a solid gold edge and outer
- * glow. Deliberately no interior tint — the rating values are themselves
- * color-coded, and a warm gold wash behind them both fights those hues and
- * costs contrast (purple reads 5.19:1 over a 10% gold fill, 5.99:1 over the
- * page). Shared by the collapsed badge and the popover that covers it, so the
- * two can't drift apart. Assert on `data-rated` rather than these classes.
+ * The badge's surface when the color scale is off. Note `glass-secondary` sets
+ * `border` with `!important`, which defeats any border utility OR inline border
+ * style placed alongside it — the chrome options here are alternatives for that
+ * reason, never combined.
  */
-const RATED_CHROME = "border border-rating-gold/50 shadow-[0_0_8px_hsl(var(--rating-gold)/0.2)]";
-/** Its counterpart: the dashed "not yet rated" affordance surface. */
-const UNRATED_CHROME = "glass-secondary border border-dashed border-glass-border";
+const BADGE_CHROME = "glass-secondary";
+
+/**
+ * The gold edge marking a badge the viewer has rated, worn only when the color
+ * scale is off — with the scale on, the tinted score says it already and the
+ * badge wears a neutral hairline instead (see `SCALE_CHROME`).
+ *
+ * Assert on `data-rated`, never on these classes.
+ */
+const RATED_GOLD_CHROME =
+  "border border-rating-gold/50 shadow-[0_0_8px_hsl(var(--rating-gold)/0.2)] hover:border-rating-gold/80 hover:bg-rating-gold/10";
+
+/**
+ * The badge edge worn when the scale is on: a neutral hairline that gives the
+ * badge a shape without spending a color. The score and star are already tinted,
+ * so anything colored here is a third voice saying what they say — and gold
+ * specifically then competes with the tint rather than framing it.
+ *
+ * Deliberately not `glass-secondary`: that sets `border` with `!important` and
+ * would silently eat this.
+ */
+const SCALE_CHROME =
+  "border border-content-text-secondary/28 hover:border-content-text-secondary/60 hover:bg-content-text-secondary/10";
 
 interface RatingBadgeButtonProps {
   rateableId: string;
@@ -77,6 +97,7 @@ export function RatingBadgeButton({
   const [localUserRating, setLocalUserRating] = useState<number | null>(userRating ?? null);
   const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localHasRated = localUserRating != null;
+  const { colorCodeRatings } = usePreferences();
 
   // Sync display + rated state when props change. Handles two cases:
   // (1) async data arriving after first render (e.g. useTrackUserRatings
@@ -113,14 +134,25 @@ export function RatingBadgeButton({
   const layoutClass =
     size === "compact"
       ? "inline-flex items-center justify-center gap-1 py-1 rounded-md"
-      : "flex items-center justify-center gap-1 h-6 sm:h-8 rounded-md transition-all";
+      : "flex items-center justify-center gap-1 h-6 sm:h-8 rounded-md";
 
   // Padding tightens when the personal score renders to compensate for the
   // busier row (divider + extra value).
   const paddingClass =
     size === "compact" ? (localHasRated ? "px-1" : "px-2") : localHasRated ? "px-1.5 sm:px-2" : "px-2 sm:px-3";
 
-  const stateClass = localHasRated ? RATED_CHROME : `${UNRATED_CHROME} hover:border-rating-gold/30`;
+  // Three surfaces, never layered — see BADGE_CHROME for why they can't be.
+  // Scale on: a neutral hairline, since the score carries the color. Scale off:
+  // gold once rated, glass until then.
+  const stateClass = colorCodeRatings ? SCALE_CHROME : localHasRated ? RATED_GOLD_CHROME : BADGE_CHROME;
+
+  // The picker has to be opaque or the rows under it read through. Only
+  // `glass-secondary` brings its own fill (plus a backdrop blur); the gold and
+  // scale chromes are border-only, so those cases need the page color spelled
+  // out. The badge itself stays transparent to its row either way.
+  const popoverStyle: React.CSSProperties = {
+    ...(stateClass === BADGE_CHROME ? {} : { backgroundColor: "hsl(var(--background))" }),
+  };
 
   // Badge is always the compact RatingComponent; tapping opens a Popover
   // with the 5-star picker (overlay rather than inline expansion). Same
@@ -137,7 +169,7 @@ export function RatingBadgeButton({
       className={cn(
         layoutClass,
         paddingClass,
-        "origin-center hover:brightness-110 cursor-pointer",
+        ROW_CHIP_HOVER,
         stateClass,
         isAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
       )}
@@ -166,35 +198,23 @@ export function RatingBadgeButton({
          * `side="top"` + negative sideOffset positions the popover so
          * its bottom edge sits over the badge, visually replacing the
          * collapsed star + count with the 5-star picker rather than
-         * floating in empty space below. Styling mirrors the desktop
-         * inline-expanded state — gold border + soft glow when the user
-         * has rated, glass / dashed-border when they haven't — so opening
-         * the picker reads as the same component, just floated on mobile.
-         *
-         * The inline `background` style names the page background directly
-         * rather than using a Tailwind `bg-*` class because this Tailwind v4
-         * theme registers `--color-*` tokens (used by Tailwind `bg-*` classes)
-         * separately from the older HSL-component `--background` token shared
-         * with Radix — `bg-popover` / `bg-background` resolve to
-         * `transparent`.
+         * floating in empty space below. Wears the same chrome as the badge
+         * it covers, so opening the picker reads as the same component just
+         * floated on mobile — and `glass-secondary`'s backdrop blur keeps the
+         * rows beneath from reading through the picker.
          */}
         <PopoverContent
-          // Sized + colored to mirror the inline-expanded badge:
-          // same py-1 + px padding, same border + glow as the rated
-          // state. `min-h-8` + `sideOffset={-32}` makes the popover at
-          // least as tall as the underlying badge on desktop (~30px) so
-          // it fully covers the badge with `align="center"` + `side="top"`.
-          //
-          // Background is OPAQUE so the cells underneath can't show through
-          // the picker; the badge itself is transparent to the row, so this
-          // matches it by naming the page background.
+          // `min-h-8` + `sideOffset={-32}` makes the popover at least as tall
+          // as the underlying badge on desktop (~30px) so it fully covers the
+          // badge with `align="center"` + `side="top"`. Padding still tracks
+          // the rated state because that changes the badge's width underneath.
           data-rated={localHasRated}
           className={cn(
             "w-auto rounded-md flex items-center gap-1 min-h-8",
             localHasRated ? "!p-1" : "!py-1 !px-2",
-            localHasRated ? RATED_CHROME : UNRATED_CHROME,
+            stateClass,
           )}
-          style={localHasRated ? { backgroundColor: "hsl(var(--background))" } : undefined}
+          style={popoverStyle}
           align="center"
           side="top"
           sideOffset={-32}
