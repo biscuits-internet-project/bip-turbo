@@ -1,4 +1,7 @@
+import { Link } from "react-router-dom";
 import { Card, CardContent } from "~/components/ui/card";
+import { useFeatureFlags } from "~/hooks/use-feature-flags";
+import { useSession } from "~/hooks/use-session";
 
 export function meta() {
   return [
@@ -32,9 +35,17 @@ function PostLink({ href, children }: { href: string; children: React.ReactNode 
  * Public explainer for the Calibrated Show Rating. Always reachable by direct URL
  * (the `ratings.explainer-nav-link` flag gates only the nav link, not this page).
  * Written to be accurate enough to share with the phish.net ratings author whose
- * series it builds on. Static content, no loader.
+ * series it builds on. No loader; the only dynamic bit is the "profile settings"
+ * link, shown when the `ratings.toggle-visible` flag makes the opt-in available to
+ * this signed-in viewer.
  */
 export default function ShowRatingAlgorithm() {
+  const { toggleVisible } = useFeatureFlags();
+  const { user } = useSession();
+  // Link straight to the viewer's profile (where the opt-in toggle lives) only
+  // when they can actually enable it: the flag is on and we know their username.
+  const settingsHref = toggleVisible && user?.username ? `/users/${user.username}` : null;
+
   return (
     <div className="space-y-6 md:space-y-8">
       <div>
@@ -54,8 +65,15 @@ export default function ShowRatingAlgorithm() {
               <p className="text-content-text-secondary">
                 The <strong className="text-content-text-primary">Calibrated Show Rating</strong> is an opt-in
                 alternative that tries to measure the same thing, how good the show was, while being much harder to
-                skew. Everyone sees the community average by default; you can switch on the Calibrated Show Rating in
-                your profile settings.
+                skew. Everyone sees the community average by default; you can switch on the Calibrated Show Rating in{" "}
+                {settingsHref ? (
+                  <Link to={settingsHref} className="text-brand-primary hover:underline">
+                    your profile settings
+                  </Link>
+                ) : (
+                  "your profile settings"
+                )}
+                .
               </p>
               <p className="text-content-text-secondary">
                 This work is directly inspired by Paul Jakus's four-part series on rating shows for phish.net:{" "}
