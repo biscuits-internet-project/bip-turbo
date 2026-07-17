@@ -281,6 +281,21 @@ export function createGapColumn<T extends TrackLight>(opts: {
   ) as ColumnDef<T, unknown>;
 }
 
+const DURATION_COLUMN_ID = "duration";
+
+/**
+ * Drops the Time column for a viewer who turned setlist times off. Applied by
+ * the table components rather than the column factories so the factories stay
+ * a pure description of the view, and so both gap-chart tables honor the
+ * preference the same way.
+ */
+export function applyTimePreference<T>(
+  columns: ColumnDef<T, unknown>[],
+  showSetlistTimes: boolean,
+): ColumnDef<T, unknown>[] {
+  return showSetlistTimes ? columns : columns.filter((column) => column.id !== DURATION_COLUMN_ID);
+}
+
 /**
  * "Time" column for the gap-chart views: each track's duration, with
  * archive-sourced values shown as estimates. Reused by both the catalog and
@@ -291,7 +306,7 @@ export function createGapColumn<T extends TrackLight>(opts: {
 export function createDurationColumn<T extends TrackLight>(): ColumnDef<T, unknown> {
   const columnHelper = createColumnHelper<T>();
   return columnHelper.accessor((row) => row.duration ?? Number.NEGATIVE_INFINITY, {
-    id: "duration",
+    id: DURATION_COLUMN_ID,
     header: ({ column }) => <SortableHeader column={column} label="Time" />,
     // Wide enough for the h:mm:ss form ("1:04:18"). Hidden on mobile — the
     // gap-chart already runs out of width there.

@@ -4,7 +4,13 @@ import { describe, expect, test } from "vitest";
 import { PREFERENCES_DEFAULT, PreferencesProvider, usePreferences } from "./use-preferences";
 
 function Harness() {
-  return <div data-testid="color">{String(usePreferences().colorCodeRatings)}</div>;
+  const { colorCodeRatings, showSetlistTimes } = usePreferences();
+  return (
+    <>
+      <div data-testid="color">{String(colorCodeRatings)}</div>
+      <div data-testid="times">{String(showSetlistTimes)}</div>
+    </>
+  );
 }
 
 describe("usePreferences", () => {
@@ -22,7 +28,7 @@ describe("usePreferences", () => {
   // against the constant so flipping the default doesn't need a test edit.
   test("resolves an unset preference to the app default", async () => {
     await setup(
-      <PreferencesProvider colorCodeRatings={null}>
+      <PreferencesProvider showSetlistTimes={null} colorCodeRatings={null}>
         <Harness />
       </PreferencesProvider>,
     );
@@ -33,7 +39,7 @@ describe("usePreferences", () => {
   // whole reason the stored value is tri-state.
   test("honors an explicit opt-out", async () => {
     await setup(
-      <PreferencesProvider colorCodeRatings={false}>
+      <PreferencesProvider showSetlistTimes={null} colorCodeRatings={false}>
         <Harness />
       </PreferencesProvider>,
     );
@@ -42,7 +48,7 @@ describe("usePreferences", () => {
 
   test("honors an explicit opt-in", async () => {
     await setup(
-      <PreferencesProvider colorCodeRatings={true}>
+      <PreferencesProvider showSetlistTimes={null} colorCodeRatings={true}>
         <Harness />
       </PreferencesProvider>,
     );
@@ -53,5 +59,29 @@ describe("usePreferences", () => {
   // work it belongs to is opened up, so a stray flip should fail loudly here.
   test("ships with color coding off", () => {
     expect(PREFERENCES_DEFAULT.colorCodeRatings).toBe(false);
+  });
+
+  // Setlist times are what the setlist has always shown, so the default has to
+  // stay on: only a viewer who asks for a cleaner setlist loses them.
+  test("ships with setlist times on", () => {
+    expect(PREFERENCES_DEFAULT.showSetlistTimes).toBe(true);
+  });
+
+  test("resolves an unset setlist-times preference to the app default", async () => {
+    await setup(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={null}>
+        <Harness />
+      </PreferencesProvider>,
+    );
+    expect(screen.getByTestId("times").textContent).toBe(String(PREFERENCES_DEFAULT.showSetlistTimes));
+  });
+
+  test("honors an explicit setlist-times opt-out", async () => {
+    await setup(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={false}>
+        <Harness />
+      </PreferencesProvider>,
+    );
+    expect(screen.getByTestId("times").textContent).toBe("false");
   });
 });

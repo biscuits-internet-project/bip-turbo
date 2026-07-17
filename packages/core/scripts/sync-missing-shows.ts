@@ -273,10 +273,13 @@ export interface McpSyncUser {
   username: string | null;
   avatarFileId: string | null;
   avatarFileUrl: string | null;
-  // Rating-display opt-in prefs, mirrored from prod so adoption can be inspected locally.
+  // Display prefs, mirrored from prod so adoption can be inspected locally.
   showCalibratedRatings: boolean | null;
   showRatingComparisonDebug: boolean | null;
   colorCodeRatings: boolean | null;
+  // Optional until the setlist-times deploy lands on prod: an older prod omits
+  // it, and the sync then leaves the local value alone rather than clearing it.
+  showSetlistTimes?: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1702,6 +1705,7 @@ export async function syncUserActivity(
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
+              showSetlistTimes: u.showSetlistTimes,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1719,6 +1723,7 @@ export async function syncUserActivity(
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
+              showSetlistTimes: u.showSetlistTimes,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1735,6 +1740,7 @@ export async function syncUserActivity(
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
+              showSetlistTimes: u.showSetlistTimes,
               createdAt: new Date(u.createdAt),
               updatedAt: new Date(u.updatedAt),
             },

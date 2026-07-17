@@ -1,10 +1,12 @@
 import { countSortedBefore, type TrackLight } from "@bip/domain";
 import { useMemo } from "react";
 import { DataTable } from "~/components/ui/data-table";
+import { usePreferences } from "~/hooks/use-preferences";
 import { useSession } from "~/hooks/use-session";
 import { useSongPlayDates } from "~/hooks/use-song-play-dates";
 import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { createSetlistColumns, type SetlistTableRow } from "./setlist-columns";
+import { applyTimePreference } from "./setlist-common-columns";
 
 interface SetlistTableProps {
   tracks: TrackLight[];
@@ -34,6 +36,7 @@ interface SetlistTableProps {
  */
 export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) {
   const { user } = useSession();
+  const { showSetlistTimes } = usePreferences();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
   const { userRatingMap, averageRatingMap } = useTrackUserRatings(trackIds);
@@ -47,8 +50,12 @@ export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) 
   }, [tracks, songPlayDates, isPlayDatesLoading, showDate]);
 
   const columns = useMemo(
-    () => createSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
-    [showSlug, averageRatingMap, userRatingMap, isAuthenticated],
+    () =>
+      applyTimePreference(
+        createSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
+        showSetlistTimes,
+      ),
+    [showSlug, averageRatingMap, userRatingMap, isAuthenticated, showSetlistTimes],
   );
   return (
     <DataTable

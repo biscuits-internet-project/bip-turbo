@@ -13,6 +13,7 @@ vi.mock("~/components/track/noteworthy-marker", () => ({
   NoteworthyMarker: () => null,
 }));
 
+import { PreferencesProvider } from "~/hooks/use-preferences";
 import { SetlistFlow } from "./setlist-flow";
 
 function durTrack(
@@ -159,6 +160,41 @@ describe("SetlistFlow", () => {
     );
     expect(screen.queryByText("Total")).not.toBeInTheDocument();
     expect(screen.queryByText(/Partial/)).not.toBeInTheDocument();
+  });
+
+  // Opting out has to clear every time on the setlist — the per-set headings,
+  // the Total, and the partial-timing note that only exists to caveat them —
+  // while leaving the songs and set labels alone.
+  test("drops every time for a viewer who turned setlist times off", async () => {
+    await setupWithRouter(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={false}>
+        <SetlistFlow
+          setlist={flowSetlist([
+            {
+              label: "S1",
+              tracks: [durTrack("a", "Helicopters", 522, "S1", 1), durTrack("b", "Spaga", null, "S1", 2)],
+            },
+            { label: "S2", tracks: [durTrack("c", "Basis for a Day", 410, "S2", 1)] },
+          ])}
+        />
+      </PreferencesProvider>,
+    );
+    expect(screen.queryByText("8:42")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Partial/)).not.toBeInTheDocument();
+    expect(screen.getByText("Set 1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Helicopters" })).toBeInTheDocument();
+  });
+
+  // The rest of the suite renders with no provider; this pins that the shipped
+  // default (and an explicit opt-in) actually keeps the times.
+  test("keeps the times for a viewer who never chose", async () => {
+    await setupWithRouter(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={null}>
+        <SetlistFlow setlist={flowSetlist([{ label: "S1", tracks: [durTrack("a", "Helicopters", 522, "S1", 1)] }])} />
+      </PreferencesProvider>,
+    );
+    expect(screen.getByText("8:42")).toBeInTheDocument();
   });
 
   // A lone encore reads "Encore" (no number).

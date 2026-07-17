@@ -11,7 +11,11 @@ import { RatingComponent } from "./rating";
  * renders uncolored and every coloring assertion has to opt in first.
  */
 const withColorCoding = (ui: ReactElement) =>
-  setup(<PreferencesProvider colorCodeRatings={true}>{ui}</PreferencesProvider>);
+  setup(
+    <PreferencesProvider colorCodeRatings={true} showSetlistTimes={null}>
+      {ui}
+    </PreferencesProvider>,
+  );
 
 describe("RatingComponent", () => {
   // Baseline: an average rating + ratingsCount renders the star, the
@@ -107,7 +111,7 @@ describe("RatingComponent", () => {
 
   test("leaves both values uncolored when the viewer opts out", async () => {
     await setup(
-      <PreferencesProvider colorCodeRatings={false}>
+      <PreferencesProvider colorCodeRatings={false} showSetlistTimes={null}>
         <RatingComponent rating={5} ratingsCount={12} userRating={2} />
       </PreferencesProvider>,
     );
