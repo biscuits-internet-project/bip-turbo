@@ -165,6 +165,45 @@ describe("RaterWeightService recompute settings", () => {
   });
 });
 
+describe("RaterWeightService.rankedShows", () => {
+  // Two shows with the same average_rating render best-first, so the score alone
+  // is a non-unique sort key. The simple path must carry a deterministic tiebreak
+  // into the SQL ORDER BY (ratings_count DESC, then the canonical show ordering).
+  test("simple mode orders by rating then a deterministic tiebreak", async () => {
+    const queryRaw = vi.fn().mockResolvedValue([]);
+    const db = { ratingSettings: { findFirst: vi.fn() }, $queryRaw: queryRaw } as never;
+    await new RaterWeightService(db).rankedShows("simple", 5);
+    const templateStrings: string[] = queryRaw.mock.calls[0][0];
+    expect(templateStrings.join("")).toContain("ORDER BY s.average_rating DESC, s.ratings_count DESC,");
+  });
+
+  // The calibrated path sorts in JS, so equal shrunk scores must resolve through
+  // an explicit comparator. Feeding the same rows in different input orders must
+  // yield one stable order: more-rated first, then newest-date first.
+  test("calibrated mode breaks equal scores by ratings_count then date (stable across input order)", async () => {
+    // Anchor 4 with raw == anchor makes shrinkToward return exactly 4 for every
+    // count, so all three shows tie on score and only the tiebreak decides order.
+    const rows = [
+      { id: "older-30", date: "2008-01-01", dayOrder: null, raw: 4, ratings: 30 },
+      { id: "fewer-20", date: "2005-01-01", dayOrder: null, raw: 4, ratings: 20 },
+      { id: "newer-30", date: "2010-01-01", dayOrder: null, raw: 4, ratings: 30 },
+    ];
+    const expected = ["newer-30", "older-30", "fewer-20"];
+
+    async function rank(inputOrder: typeof rows) {
+      const db = {
+        ratingSettings: { findFirst: vi.fn().mockResolvedValue({ showShrinkAnchor: 4 }) },
+        $queryRaw: vi.fn().mockResolvedValue(inputOrder),
+      } as never;
+      const ranked = await new RaterWeightService(db).rankedShows("calibrated", 5);
+      return ranked.map((s) => s.id);
+    }
+
+    expect(await rank(rows)).toEqual(expected);
+    expect(await rank([...rows].reverse())).toEqual(expected);
+  });
+});
+
 describe("RaterWeightService.recomputeRateable", () => {
   // A Marlon-era show rated 5 by a full-range credible rater (entropy 2 → full
   // weight) and 0.5 by a zero-entropy bomber.

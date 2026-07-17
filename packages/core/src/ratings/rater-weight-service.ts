@@ -1,6 +1,7 @@
-import { drummerEraForDate, shrinkToward } from "@bip/domain";
+import { compareByShowDate, drummerEraForDate, shrinkToward } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
+import { showOrderBySql } from "../_shared/show-ordering";
 import { aliasKey, mostRecentPerKey } from "./rater-aliases";
 import {
   bucketRatingValues,
@@ -327,24 +328,41 @@ export class RaterWeightService {
    * derives the year-picker counts from it, so the counts always match the list.
    */
   async rankedShows(mode: "simple" | "calibrated", minRatings: number): Promise<Array<{ id: string; date: string }>> {
+    // Tied scores must resolve to a stable order (they render best-first and the
+    // score alone is non-unique — e.g. two 85/18 shows both average 4.7222…).
+    // Tiebreak by ratings_count DESC (more-rated ranks higher among equals), then
+    // by the canonical show ordering DESC as a fully deterministic final key.
     if (mode === "simple") {
       return this.db.$queryRaw<Array<{ id: string; date: string }>>`
         SELECT s.id, s.date
         FROM shows s
         WHERE s.average_rating IS NOT NULL AND s.ratings_count >= ${minRatings}
-        ORDER BY s.average_rating DESC
+        ORDER BY s.average_rating DESC, s.ratings_count DESC, ${showOrderBySql("s", "DESC")}
       `;
     }
 
     const anchor = await this.shrinkAnchor();
-    const rows = await this.db.$queryRaw<Array<{ id: string; date: string; raw: number; ratings: number }>>`
-      SELECT s.id, s.date, s.weighted_rating AS raw, s.ratings_count AS ratings
+    const rows = await this.db.$queryRaw<
+      Array<{ id: string; date: string; dayOrder: number | null; raw: number; ratings: number }>
+    >`
+      SELECT s.id, s.date, s.day_order AS "dayOrder", s.weighted_rating AS raw, s.ratings_count AS ratings
       FROM shows s
       WHERE s.weighted_rating IS NOT NULL AND s.ratings_count >= ${minRatings}
     `;
     return rows
-      .map((r) => ({ id: r.id, date: r.date, score: shrinkToward(r.raw, anchor, r.ratings, SHRINK_K) }))
-      .sort((a, b) => b.score - a.score)
+      .map((r) => ({
+        id: r.id,
+        date: r.date,
+        dayOrder: r.dayOrder,
+        ratings: r.ratings,
+        score: shrinkToward(r.raw, anchor, r.ratings, SHRINK_K),
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.ratings !== a.ratings) return b.ratings - a.ratings;
+        // DESC of the canonical ASC comparator, mirroring showOrderBySql(…, "DESC").
+        return -compareByShowDate({ show: a }, { show: b });
+      })
       .map(({ id, date }) => ({ id, date }));
   }
 
