@@ -1,5 +1,27 @@
 import { describe, expect, test } from "vitest";
-import { parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
+import { matchesTriState, parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
+
+describe("matchesTriState", () => {
+  // Positive keeps only items that have the thing.
+  test("positive keeps items with the attribute, drops those without", () => {
+    expect(matchesTriState("positive", true)).toBe(true);
+    expect(matchesTriState("positive", false)).toBe(false);
+  });
+
+  // Negative is the inverse — keeps only items that lack the thing.
+  test("negative keeps items without the attribute, drops those with", () => {
+    expect(matchesTriState("negative", false)).toBe(true);
+    expect(matchesTriState("negative", true)).toBe(false);
+  });
+
+  // Empty and undefined are both the no-filter state — everything passes.
+  test("empty and undefined keep everything", () => {
+    expect(matchesTriState("empty", true)).toBe(true);
+    expect(matchesTriState("empty", false)).toBe(true);
+    expect(matchesTriState(undefined, true)).toBe(true);
+    expect(matchesTriState(undefined, false)).toBe(true);
+  });
+});
 
 describe("parseTriState", () => {
   // Missing key in URLSearchParams.get() returns null — that's the empty state.

@@ -13,13 +13,14 @@ function paramsOf(href: string) {
 describe("ShowFiltersNav", () => {
   // Every filter toggle renders regardless of which params are currently
   // active — users need to see the full menu to discover filters.
-  test("renders all four toggles", async () => {
+  test("renders all five toggles", async () => {
     await setupWithRouter(<ShowFiltersNav basePath="/shows/year/2024" currentURLParameters={new URLSearchParams()} />);
 
     expect(screen.getByRole("link", { name: /photos/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /nugs/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /youtube/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /archive/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /relisten/i })).toBeInTheDocument();
   });
 
   // First click on an empty filter advances to positive — the URL gains

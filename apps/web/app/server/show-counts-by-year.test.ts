@@ -5,12 +5,14 @@ import { computeShowCountsByYear } from "./show-counts-by-year";
 // per-test mocks so each assertion can shape both catalogs independently.
 const getReleaseUrlsByDate = vi.fn();
 const getPrimaryUrlsByDate = vi.fn();
+const getRelistenUrlsByDate = vi.fn();
 const getShowDatesWithFlags = vi.fn();
 
 vi.mock("~/server/services", () => ({
   services: {
     nugs: { getReleaseUrlsByDate: () => getReleaseUrlsByDate() },
     archiveDotOrg: { getPrimaryUrlsByDate: () => getPrimaryUrlsByDate() },
+    relisten: { getUrlsByDate: () => getRelistenUrlsByDate() },
     shows: { getShowDatesWithFlags: () => getShowDatesWithFlags() },
   },
 }));
@@ -20,6 +22,7 @@ describe("computeShowCountsByYear", () => {
     vi.clearAllMocks();
     getReleaseUrlsByDate.mockResolvedValue({});
     getPrimaryUrlsByDate.mockResolvedValue({});
+    getRelistenUrlsByDate.mockResolvedValue({});
     getShowDatesWithFlags.mockResolvedValue([]);
   });
 
@@ -97,6 +100,41 @@ describe("computeShowCountsByYear", () => {
 
     expect(getReleaseUrlsByDate).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ 2019: 1, 2023: 1 });
+  });
+
+  // Positive relisten intersects show dates with the relisten catalog, which
+  // keys a single url per date (unlike nugs' url array).
+  test("relisten=positive counts only shows present in the relisten catalog", async () => {
+    getShowDatesWithFlags.mockResolvedValue([
+      { date: "2001-03-17", hasPhotos: false, hasYoutube: false },
+      { date: "2009-08-10", hasPhotos: false, hasYoutube: false },
+      { date: "2023-06-15", hasPhotos: false, hasYoutube: false },
+    ]);
+    getRelistenUrlsByDate.mockResolvedValue({
+      "2001-03-17": "https://relisten.net/db/2001-03-17",
+      "2023-06-15": "https://relisten.net/db/2023-06-15",
+    });
+
+    const result = await computeShowCountsByYear({ relisten: "positive" });
+
+    expect(getRelistenUrlsByDate).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ 2001: 1, 2023: 1 });
+  });
+
+  // Negative relisten needs the catalog too — deciding "not in relisten"
+  // requires knowing which dates are in it.
+  test("relisten=negative counts only shows missing from the relisten catalog", async () => {
+    getShowDatesWithFlags.mockResolvedValue([
+      { date: "2001-03-17", hasPhotos: false, hasYoutube: false },
+      { date: "2009-08-10", hasPhotos: false, hasYoutube: false },
+    ]);
+    getRelistenUrlsByDate.mockResolvedValue({
+      "2001-03-17": "https://relisten.net/db/2001-03-17",
+    });
+
+    const result = await computeShowCountsByYear({ relisten: "negative" });
+
+    expect(result).toEqual({ 2009: 1 });
   });
 
   // Mixed positive + negative: the user's headline use case at the year-bucket

@@ -72,6 +72,32 @@ describe("applyExternalSourceFilters", () => {
     expect(result.map((s: { show: { id: string } }) => s.show.id)).toEqual(["basis"]);
   });
 
+  // Positive relisten keeps only shows with a relisten url.
+  test("relisten=positive keeps only shows with a relisten url", () => {
+    const setlists = [setlist("astronaut"), setlist("basis")];
+    const externalSources: Record<string, ShowExternalSources> = {
+      astronaut: sources({ relistenUrl: "https://relisten.net/db/2001" }),
+      basis: sources({}),
+    };
+
+    const result = applyExternalSourceFilters(setlists, externalSources, { relisten: "positive" });
+
+    expect(result.map((s: { show: { id: string } }) => s.show.id)).toEqual(["astronaut"]);
+  });
+
+  // Negative relisten keeps only shows without a relisten url.
+  test("relisten=negative keeps only shows without a relisten url", () => {
+    const setlists = [setlist("astronaut"), setlist("basis")];
+    const externalSources: Record<string, ShowExternalSources> = {
+      astronaut: sources({ relistenUrl: "https://relisten.net/db/2001" }),
+      basis: sources({}),
+    };
+
+    const result = applyExternalSourceFilters(setlists, externalSources, { relisten: "negative" });
+
+    expect(result.map((s: { show: { id: string } }) => s.show.id)).toEqual(["basis"]);
+  });
+
   // Positive archive — same shape as positive nugs but for archive.org links.
   test("archive=positive keeps only shows with an archive url", () => {
     const setlists = [setlist("astronaut"), setlist("basis")];

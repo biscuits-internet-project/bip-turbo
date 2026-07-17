@@ -53,6 +53,19 @@ export function triStateToBoolean(state: TriState): boolean | undefined {
   return state === "positive";
 }
 
+/**
+ * Keep-predicate for a single tri-state media/source filter: positive keeps
+ * items that HAVE the thing, negative keeps items that LACK it, empty keeps
+ * everything. The one place the positive/negative match lives so the DB-query
+ * filters, their in-memory equivalents (media counts, external sources), and
+ * the per-year counts helper can't drift apart.
+ */
+export function matchesTriState(state: TriState | undefined, has: boolean): boolean {
+  if (state === "positive") return has;
+  if (state === "negative") return !has;
+  return true;
+}
+
 /** True when at least one flag is in a non-empty state. */
 export function isAnyTriStateActive(flags: Record<string, TriState | undefined>): boolean {
   for (const key in flags) {

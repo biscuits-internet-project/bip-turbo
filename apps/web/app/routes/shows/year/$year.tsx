@@ -19,9 +19,10 @@ import { logger } from "~/lib/logger";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getShowsMeta } from "~/lib/seo";
-import { parseTriState, type TriState, triStateToBoolean } from "~/lib/tri-state-filter";
+import { parseTriState, type TriState } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
 import { applyExternalSourceFilters } from "~/server/apply-external-source-filters";
+import { applyMediaCountFilters } from "~/server/apply-media-count-filters";
 import { services } from "~/server/services";
 import { computeShowCountsByYear } from "~/server/show-counts-by-year";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -34,7 +35,7 @@ interface LoaderData {
   externalSources: Record<string, ShowExternalSources>;
   showCountsByYear: Record<number, number>;
   monthCounts: Record<number, number>;
-  filters: { photos: TriState; youtube: TriState; nugs: TriState; archive: TriState };
+  filters: { photos: TriState; youtube: TriState; nugs: TriState; archive: TriState; relisten: TriState };
   dehydratedState: DehydratedState;
 }
 
@@ -81,6 +82,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     youtube: parseTriState(url.searchParams.get("youtube")),
     nugs: parseTriState(url.searchParams.get("nugs")),
     archive: parseTriState(url.searchParams.get("archive")),
+    relisten: parseTriState(url.searchParams.get("relisten")),
   };
   const emptyCounts: Record<number, number> = {};
 
@@ -115,35 +117,28 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     };
   }
 
-  // Cache year-based listings - these are stable and cacheable. Filter flags are part of the
-  // cache key so each combination is memoized independently.
+  // Cache one unfiltered set per (year, sort). All five media/source filters
+  // are applied in memory below, so the tri-state combinations share a single
+  // cached year blob instead of each caching a near-full-year payload.
   const currentYear = new Date().getFullYear();
   const sortDirection = yearInt === currentYear ? "desc" : "asc";
 
-  const yearCacheKey = CacheKeys.shows.list({
-    year: yearInt,
-    sort: sortDirection,
-    photos: filters.photos,
-    youtube: filters.youtube,
-  });
+  const yearCacheKey = CacheKeys.shows.list({ year: yearInt, sort: sortDirection });
 
   setlists = await services.cache.getOrSet(yearCacheKey, async () => {
     logger.info(`Loading shows from DB for year: ${yearInt}`);
     return await services.setlists.findMany({
-      filters: {
-        year: yearInt,
-        hasPhotos: triStateToBoolean(filters.photos),
-        hasYoutube: triStateToBoolean(filters.youtube),
-      },
+      filters: { year: yearInt },
       sort: [{ field: "date", direction: sortDirection }],
     });
   });
 
   const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
-  const filteredSetlists = applyExternalSourceFilters(setlists, externalSources, {
-    nugs: filters.nugs,
-    archive: filters.archive,
-  });
+  const filteredSetlists = applyExternalSourceFilters(
+    applyMediaCountFilters(setlists, { photos: filters.photos, youtube: filters.youtube }),
+    externalSources,
+    { nugs: filters.nugs, archive: filters.archive, relisten: filters.relisten },
+  );
 
   const showCountsByYear = await computeShowCountsByYear(filters);
 

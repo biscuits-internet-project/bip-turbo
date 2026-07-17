@@ -47,7 +47,9 @@ export function TriStateFilterButton({ state, label, icon, href }: TriStateFilte
       )}
     >
       <FilterIcon state={state}>{icon}</FilterIcon>
-      {label}
+      {/* Label hides below sm so the mobile strip fits all filters on one
+          icon-only row; the aria-label above keeps the name for assistive tech. */}
+      <span className="hidden sm:inline">{label}</span>
     </Link>
   );
 }
