@@ -5,17 +5,18 @@ import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
 
 /**
- * The URL param names for the four external-source filters. Order matches
- * the badge strip in SetlistCard so filter buttons and the per-row
- * indicators read the same way.
+ * The URL param names for the five media filters. Order matches the badge
+ * strip in SetlistCard so filter buttons and the per-row indicators read the
+ * same way.
  */
-const FILTER_KEYS = ["nugs", "youtube", "archive", "photos"] as const;
+const FILTER_KEYS = ["nugs", "youtube", "archive", "relisten", "photos"] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
 const FILTER_LABELS: Record<FilterKey, string> = {
   nugs: "Nugs",
   youtube: "YouTube",
   archive: "Archive",
+  relisten: "Relisten",
   photos: "Photos",
 };
 
@@ -24,6 +25,7 @@ const FILTER_FAVICON_DOMAINS: Record<FilterKey, string | null> = {
   nugs: EXTERNAL_SOURCE_DOMAINS.nugs,
   youtube: EXTERNAL_SOURCE_DOMAINS.youtube,
   archive: EXTERNAL_SOURCE_DOMAINS.archive,
+  relisten: EXTERNAL_SOURCE_DOMAINS.relisten,
   photos: null,
 };
 
@@ -46,7 +48,7 @@ export function ShowFiltersNav({ basePath, currentURLParameters }: ShowFiltersNa
       <h2 className="text-[10px] font-semibold text-content-text-tertiary uppercase tracking-wide mb-1.5 text-center">
         Filter by Media
       </h2>
-      <div className="grid grid-cols-4 sm:grid-cols-2 gap-1">
+      <div className="grid grid-cols-5 sm:grid-cols-3 gap-1">
         {FILTER_KEYS.map((key) => {
           const state = parseTriState(currentURLParameters.get(key));
           const next = new URLSearchParams(currentURLParameters);
