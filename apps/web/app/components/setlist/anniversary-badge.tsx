@@ -27,7 +27,10 @@ export function AnniversaryBadge({ showDate }: AnniversaryBadgeProps) {
   const tier = getTier(years);
   const Icon = anniversaryIcons[tier];
   return (
-    <span className="flex items-center gap-1 text-sm font-medium text-amber-400">
+    // Shares the rating star's gold rather than carrying its own near-identical
+    // amber: the two sit inches apart in a setlist row, and two golds that
+    // almost match read as an accident rather than as an accent.
+    <span className="flex items-center gap-1 text-sm font-medium text-rating-gold">
       <Icon className="h-4 w-4" />
       {years}
       {getOrdinalSuffix(years)} Anniversary

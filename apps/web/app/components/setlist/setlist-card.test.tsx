@@ -2,10 +2,12 @@ import type { Setlist } from "@bip/domain";
 import { expectMockedShallowComponent, mockShallowComponent, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock hooks used internally by SetlistCard
 import { useSession } from "~/hooks/use-session";
+import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 
 vi.mock("~/hooks/use-session", () => ({
   useSession: vi.fn(() => ({ user: null, supabase: null, loading: false })),
@@ -126,6 +128,9 @@ describe("SetlistCard", () => {
       supabase: null as never,
       loading: false,
     } as never);
+    // Same reasoning for the attendance mutation: the attendance tests swap in
+    // per-test mutate spies, so restore the inert default for everyone else.
+    vi.mocked(useAttendanceMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   });
 
   // Passes the show date to AnniversaryBadge so it can decide whether to render
@@ -343,10 +348,10 @@ describe("SetlistCard", () => {
     expect(ratingButton).toHaveAttribute("data-rated", "true");
   });
 
-  // The dashed (unrated) state is the default when the viewer is logged in
-  // but hasn't rated the show. Pinned because the resolver short-circuits on
-  // null and the rated-state derivation must follow.
-  test("rating badge shows dashed border when userRating is null and viewer is logged in", async () => {
+  // Unrated is the default when the viewer is logged in but hasn't rated the
+  // show. Pinned because the resolver short-circuits on null and the
+  // rated-state derivation must follow.
+  test("rating badge is unrated when userRating is null and viewer is logged in", async () => {
     vi.mocked(useSession).mockReturnValue({
       user: { id: "user-1" } as never,
       supabase: null as never,
@@ -359,7 +364,175 @@ describe("SetlistCard", () => {
     const ratingButton = Array.from(buttons).find((btn) => btn.dataset.rated !== undefined);
     expect(ratingButton).toBeDefined();
     expect(ratingButton).toHaveAttribute("data-rated", "false");
-    expect(ratingButton?.className).toContain("border-dashed");
+  });
+
+  // Attendance button. The whole feature lives in SetlistCard (unlike rating,
+  // which is extracted into RatingBadgeButton and tested there), so the
+  // attended/unattended rendering, the optimistic toggle, and the revert-on-
+  // error path are only covered here. Assert on `data-attended` rather than the
+  // chrome classes, which are free to change.
+  describe("attendance button", () => {
+    function mockLoggedIn() {
+      vi.mocked(useSession).mockReturnValue({
+        user: { id: "user-1" } as never,
+        supabase: null as never,
+        loading: false,
+      } as never);
+    }
+
+    function makeAttendance() {
+      return { id: "attendance-1", showId: "show-1", userId: "user-1" } as never;
+    }
+
+    const getAttendanceButton = () => screen.getByRole("button", { name: /saw it/i });
+
+    // Marking attendance is a logged-in-only affordance; logged-out viewers
+    // get no button at all rather than one that prompts to sign in.
+    test("is not rendered for a logged-out viewer", async () => {
+      await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+      expect(screen.queryByRole("button", { name: /saw it/i })).not.toBeInTheDocument();
+    });
+
+    // The trailing "?" is the affordance: "Saw it?" asks, "Saw it" confirms.
+    test("renders the unattended prompt when the viewer has not marked the show", async () => {
+      mockLoggedIn();
+      await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+      const button = getAttendanceButton();
+      expect(button).toHaveAttribute("data-attended", "false");
+      expect(button).toHaveTextContent("Saw it?");
+    });
+
+    test("renders the attended state when userAttendance is present", async () => {
+      mockLoggedIn();
+      await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={makeAttendance()} userRating={null} showRating={null} />,
+      );
+      const button = getAttendanceButton();
+      expect(button).toHaveAttribute("data-attended", "true");
+      expect(button).toHaveTextContent("Saw it");
+      expect(button).not.toHaveTextContent("Saw it?");
+    });
+
+    // The button flips before the server answers. `mutate` here never invokes
+    // its callbacks, so a button that only updated in onSuccess would fail.
+    test("flips to attended optimistically before the mutation resolves", async () => {
+      mockLoggedIn();
+      const mutate = vi.fn();
+      vi.mocked(useAttendanceMutation).mockReturnValue({ mutate, isPending: false } as never);
+      const { user } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+
+      await user.click(getAttendanceButton());
+
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "true");
+      // currentAttendance must be the value captured BEFORE the optimistic
+      // update, or the mutation would toggle the wrong direction.
+      expect(mutate).toHaveBeenCalledWith({ showId: "show-1", currentAttendance: null }, expect.anything());
+    });
+
+    // Un-marking passes the existing attendance through so the server knows
+    // which row to delete.
+    test("clicking an attended show unmarks it and passes the current attendance", async () => {
+      mockLoggedIn();
+      const mutate = vi.fn();
+      vi.mocked(useAttendanceMutation).mockReturnValue({ mutate, isPending: false } as never);
+      const attendance = makeAttendance();
+      const { user } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={attendance} userRating={null} showRating={null} />,
+      );
+
+      await user.click(getAttendanceButton());
+
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "false");
+      expect(mutate).toHaveBeenCalledWith({ showId: "show-1", currentAttendance: attendance }, expect.anything());
+    });
+
+    // A failed toggle must not leave the button lying about attendance.
+    test("reverts to unattended when the mutation fails", async () => {
+      mockLoggedIn();
+      const mutate = vi.fn((_variables, callbacks) => callbacks.onError(new Error("network")));
+      vi.mocked(useAttendanceMutation).mockReturnValue({ mutate, isPending: false } as never);
+      const { user } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+
+      await user.click(getAttendanceButton());
+
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "false");
+    });
+
+    // Reverting an un-mark restores the original attendance rather than
+    // clearing it — the failure case the captured `previousAttendance` exists for.
+    test("reverts to attended when un-marking fails", async () => {
+      mockLoggedIn();
+      const mutate = vi.fn((_variables, callbacks) => callbacks.onError(new Error("network")));
+      vi.mocked(useAttendanceMutation).mockReturnValue({ mutate, isPending: false } as never);
+      const { user } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={makeAttendance()} userRating={null} showRating={null} />,
+      );
+
+      await user.click(getAttendanceButton());
+
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "true");
+    });
+
+    // The server's answer wins over the optimistic guess.
+    test("settles on the attendance returned by a successful mutation", async () => {
+      mockLoggedIn();
+      const serverAttendance = { id: "attendance-server", showId: "show-1", userId: "user-1" } as never;
+      const mutate = vi.fn((_variables, callbacks) =>
+        callbacks.onSuccess({ attendance: serverAttendance, isAttending: true }),
+      );
+      vi.mocked(useAttendanceMutation).mockReturnValue({ mutate, isPending: false } as never);
+      const { user } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+
+      await user.click(getAttendanceButton());
+
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "true");
+    });
+
+    // A toggle already in flight must not fire a second mutation. The button is
+    // disabled while pending AND toggleAttendance early-returns; this pins the
+    // user-facing contract rather than either mechanism.
+    test("ignores clicks while a toggle is already pending", async () => {
+      mockLoggedIn();
+      const mutate = vi.fn();
+      vi.mocked(useAttendanceMutation).mockReturnValue({ mutate, isPending: true } as never);
+      const { user } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+
+      await user.click(getAttendanceButton());
+
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    // Attendance is mirrored into local state, so a prop arriving later (the
+    // route's user-data query resolving after first paint) must still land.
+    test("picks up attendance arriving from props after mount", async () => {
+      mockLoggedIn();
+      const { rerender } = await setupWithRouter(
+        <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+      );
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "false");
+
+      // rerender replaces the whole tree, so the router wrapper that
+      // setupWithRouter added must be repeated here.
+      rerender(
+        <MemoryRouter>
+          <SetlistCard setlist={makeSetlist()} userAttendance={makeAttendance()} userRating={null} showRating={null} />
+        </MemoryRouter>,
+      );
+
+      expect(getAttendanceButton()).toHaveAttribute("data-attended", "true");
+    });
   });
 
   // Clicking "gap chart" swaps to the table view. Existence of the

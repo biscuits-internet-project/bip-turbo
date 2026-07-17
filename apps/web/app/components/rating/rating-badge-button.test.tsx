@@ -64,9 +64,10 @@ describe("RatingBadgeButton", () => {
     expect(screen.getByText("Rate")).toBeInTheDocument();
   });
 
-  // Visual rated/unrated state: amber border + bg when the user has rated,
-  // dashed glass border otherwise. Same contract for both size variants.
-  test("shows amber border when userRating is provided", async () => {
+  // Rated/unrated is carried by data-rated and by the viewer's own score
+  // rendering to the right of the divider — not by chrome. Same contract for
+  // both size variants.
+  test("marks itself rated when userRating is provided", async () => {
     const { container } = await setupWithRouter(
       <RatingBadgeButton
         rateableId="t1"
@@ -83,7 +84,7 @@ describe("RatingBadgeButton", () => {
     expect(button).toHaveAttribute("data-rated", "true");
   });
 
-  test("shows dashed border when userRating is null", async () => {
+  test("marks itself unrated when userRating is null", async () => {
     const { container } = await setupWithRouter(
       <RatingBadgeButton
         rateableId="t1"
@@ -97,7 +98,7 @@ describe("RatingBadgeButton", () => {
     );
 
     const button = container.querySelector("button");
-    expect(button?.className).toContain("border-dashed");
+    expect(button).toHaveAttribute("data-rated", "false");
   });
 
   // Component must track new props when React reuses the same DOM position
@@ -173,7 +174,7 @@ describe("RatingBadgeButton", () => {
 
   // The amber/dashed state must follow the latest userRating prop, not a
   // cached value from a prior row at the same DOM position.
-  test("updates amber/dashed state when userRating prop changes", async () => {
+  test("updates its rated state when the userRating prop changes", async () => {
     const { container, rerender } = await setupWithRouter(
       <RatingBadgeButton
         rateableId="t1"
@@ -204,7 +205,6 @@ describe("RatingBadgeButton", () => {
     );
 
     button = container.querySelector("button");
-    expect(button?.className).toContain("border-dashed");
     expect(button).toHaveAttribute("data-rated", "false");
   });
 
@@ -294,7 +294,7 @@ describe("RatingBadgeButton", () => {
   // the badge drops its amber chrome and the re-opened editor seeds with
   // an empty state — same local-capture path as a fresh submission, just
   // with a null value.
-  test("captures a cleared rating and drops the gold edge", async () => {
+  test("captures a cleared rating and returns to the unrated state", async () => {
     const user = userEvent.setup();
     const { container } = await setupWithRouter(
       <RatingBadgeButton
@@ -309,7 +309,7 @@ describe("RatingBadgeButton", () => {
       />,
     );
 
-    // Initial rated state — gold edge.
+    // Initial rated state.
     let button = container.querySelector("button") as HTMLButtonElement;
     expect(button).toHaveAttribute("data-rated", "true");
 
@@ -321,10 +321,9 @@ describe("RatingBadgeButton", () => {
       lastProps.onAverageRatingChange(3.8, 4);
     });
 
-    // Editor collapsed; the badge re-renders without the gold edge.
+    // Editor collapsed; the badge re-renders as unrated.
     button = container.querySelector("button") as HTMLButtonElement;
     expect(button).toHaveAttribute("data-rated", "false");
-    expect(button.className).toContain("border-dashed");
 
     // Re-opening seeds the editor with null, not the stale prop.
     await user.click(button);

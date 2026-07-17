@@ -56,6 +56,10 @@
 
   /* Rating Colors */
   --color-rating-gold: hsl(38 95% 62%);
+  /* Unearned stars in the picker. Dark enough that a filled star still reads as
+     filled at the middle of the colour scale, where its tint is a near-neutral
+     grey — against the old tertiary grey that was only 1.36:1. */
+  --color-rating-dim: hsl(240 5% 35%);
 
   /* Track marker flames. Color is the only thing distinguishing a jam chart
      from an all-timer, and these two are close in hue (38 vs 25), so they read
@@ -180,7 +184,6 @@ html body[data-scroll-locked] {
     --info: 205 100% 70%; /* Info blue */
     --info-bg: 205 50% 12%; /* Info background */
     --rating-gold: 38 95% 62%; /* Star ratings - yellowy orange */
-    --rating-dim: 240 5% 35%; /* Inactive ratings */
 
     /* Chart & Data Visualization - Purple Primary, Green Secondary */
     --chart-primary: 263 85% 60%; /* Purple primary chart */

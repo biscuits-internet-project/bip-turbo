@@ -35,20 +35,23 @@ function ratingColorStyle(value: number, enabled: boolean): { color: string } | 
 }
 
 /**
- * Gold star followed by a rating value on the color scale. `label` carries the
+ * Star followed by a rating value on the color scale. `label` carries the
  * formatted text because callers format differently (a community average wants
  * 2 decimals, a personal score wants the ½ glyph) while the color always comes
  * from the underlying number.
+ *
+ * The star takes the value's color alongside it when the scale is on, so the
+ * badge reads as one tinted unit rather than a gold mark competing with a
+ * colored number. With the scale off it falls back to gold, which is then the
+ * badge's only color.
  */
 export function StarValue({ value, label }: { value: number; label: string }) {
   const { colorCodeRatings } = usePreferences();
+  const tint = ratingColorStyle(value, colorCodeRatings);
   return (
     <span className="inline-flex items-center whitespace-nowrap">
-      <Star className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-rating-gold mr-0.5 sm:mr-1" />
-      <span
-        className="font-medium text-xs sm:text-sm text-content-text-primary"
-        style={ratingColorStyle(value, colorCodeRatings)}
-      >
+      <Star className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-rating-gold mr-0.5 sm:mr-1" style={tint} />
+      <span className="font-medium text-xs sm:text-sm text-content-text-primary" style={tint}>
         {label}
       </span>
     </span>
