@@ -270,7 +270,7 @@ export function DataTable<TData, TValue>({
                 placeholder={searchPlaceholder}
                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
                 onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
-                className="w-auto min-w-[200px] sm:min-w-[350px] max-w-2xl pr-8 h-[42px] bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
+                className="w-auto min-w-[200px] sm:min-w-[350px] max-w-2xl pr-8 h-[42px] border text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
               />
               {searchActions}
             </div>
@@ -336,7 +336,7 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className={`border-t border-glass-border/30 hover:bg-hover-glass ${rowClassName?.(row.original, index) ?? ""}`}
+                  className={`border-t ${rowClassName?.(row.original, index) ?? ""}`}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell

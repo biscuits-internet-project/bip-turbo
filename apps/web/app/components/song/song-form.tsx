@@ -6,8 +6,8 @@ import { useNavigate, useSubmit } from "react-router-dom";
 import { z } from "zod";
 import { AuthorSearch } from "~/components/author/author-search";
 import { Button } from "~/components/ui/button";
+import { CompactSelect } from "~/components/ui/compact-select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
-import { GlassSelect } from "~/components/ui/glass-select";
 import { Input } from "~/components/ui/input";
 import { MultiEntityPicker, type MultiEntityRow } from "~/components/ui/multi-entity-picker";
 import { Textarea } from "~/components/ui/textarea";
@@ -139,7 +139,7 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
             <FormItem>
               <FormLabel className="text-content-text-secondary">Type</FormLabel>
               <FormControl>
-                <GlassSelect
+                <CompactSelect
                   value={field.value || "original"}
                   onValueChange={field.onChange}
                   options={[

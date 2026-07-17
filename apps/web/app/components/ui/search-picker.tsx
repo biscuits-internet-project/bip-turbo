@@ -211,7 +211,7 @@ export function SearchPicker<T>({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "justify-between bg-glass-bg border border-glass-border text-white hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20",
+            "justify-between border text-white focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20",
             className,
           )}
         >
@@ -219,7 +219,7 @@ export function SearchPicker<T>({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 bg-glass-bg backdrop-blur-md border border-glass-border" align="start">
+      <PopoverContent className="p-0 backdrop-blur-md border" align="start">
         <Command className="bg-transparent" shouldFilter={false}>
           <CommandInput
             placeholder={searchPlaceholder}
@@ -238,7 +238,7 @@ export function SearchPicker<T>({
                     onItemChange?.(null);
                     setOpen(false);
                   }}
-                  className="text-content-text-primary hover:bg-hover-glass"
+                  className="text-content-text-primary"
                 >
                   <Check className={cn("mr-2 h-4 w-4", value == null ? "opacity-100" : "opacity-0")} />
                   {noneLabel}
@@ -249,7 +249,7 @@ export function SearchPicker<T>({
                 <CommandItem
                   value={`__create__:${searchQuery}`}
                   onSelect={handleCreate}
-                  className="text-brand-primary hover:bg-hover-glass font-medium"
+                  className="text-brand-primary font-medium"
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   {allowCreate.label(searchQuery)}
@@ -268,7 +268,7 @@ export function SearchPicker<T>({
                       setCurrentItem(item);
                       setOpen(false);
                     }}
-                    className="text-content-text-primary hover:bg-hover-glass"
+                    className="text-content-text-primary"
                   >
                     <Check className={cn("mr-2 h-4 w-4", value === id ? "opacity-100" : "opacity-0")} />
                     {itemLabel(item)}

@@ -132,13 +132,11 @@ export function TrackRatingOverlay({ track, children, showRating = true, trigger
       {showRating && data?.distribution && <RatingDistributionChart compact buckets={data.distribution} />}
 
       {(data?.track.note ?? track.note) && (
-        <div className="text-xs text-content-text-secondary border-t border-glass-border pt-2 mt-2">
-          {data?.track.note ?? track.note}
-        </div>
+        <div className="text-xs text-content-text-secondary border-t pt-2 mt-2">{data?.track.note ?? track.note}</div>
       )}
 
       {showRating && user && (
-        <div className="border-t border-glass-border pt-3 mt-3">
+        <div className="border-t pt-3 mt-3">
           <div className="flex items-center justify-between">
             <span className="text-sm text-content-text-secondary">Your Rating:</span>
             <StarRating
@@ -173,7 +171,7 @@ export function TrackRatingOverlay({ track, children, showRating = true, trigger
 
   // Shared content styling between the hover-card and popover variants
   // so the panel looks identical regardless of trigger mode.
-  const contentClassName = "w-80 p-4 bg-black/90 backdrop-blur-md border-glass-border shadow-xl";
+  const contentClassName = "w-80 p-4 bg-black/90 backdrop-blur-md shadow-xl";
 
   if (trigger === "click") {
     return (

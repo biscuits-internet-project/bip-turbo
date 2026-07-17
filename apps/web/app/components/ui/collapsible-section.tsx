@@ -128,7 +128,7 @@ export function CollapsibleSection({
             "w-full flex flex-row items-center justify-between gap-2 text-left font-[inherit] cursor-pointer",
             !collapsibleOnDesktop && forceOpen.cursor,
             collapseOnLandscape && "short:!cursor-pointer",
-            dividerWhenClosed && !open && "border-b border-glass-border pb-3",
+            dividerWhenClosed && !open && "border-b pb-3",
             headerClassName,
           )}
         >
@@ -140,7 +140,7 @@ export function CollapsibleSection({
             {count !== undefined && (
               <span
                 aria-hidden
-                className="shrink-0 rounded-full bg-glass-bg px-2 py-0.5 text-sm font-normal text-content-text-tertiary"
+                className="shrink-0 rounded-full px-2 py-0.5 text-sm font-normal text-content-text-tertiary"
               >
                 {count}
               </span>

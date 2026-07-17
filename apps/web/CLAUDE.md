@@ -31,7 +31,7 @@ If a route component references a runtime value from a `.ts` helper under `app/r
 
 Before writing markup, grep the className you're about to type. If it's already somewhere, you owe an extraction.
 
-- **Use existing primitives.** Bare `<input>`/`<textarea>` → [Input](app/components/ui/input.tsx)/[Textarea](app/components/ui/textarea.tsx). Hand-rolled selects → [GlassSelect](app/components/ui/glass-select.tsx) (finite options) or [SearchPicker](app/components/ui/search-picker.tsx) (async search). Don't inline `bg-*`/`hover:bg-*` on [Button](app/components/ui/button.tsx) when a `variant` covers the intent.
+- **Use existing primitives.** Bare `<input>`/`<textarea>` → [Input](app/components/ui/input.tsx)/[Textarea](app/components/ui/textarea.tsx). Hand-rolled selects → [CompactSelect](app/components/ui/compact-select.tsx) (finite options) or [SearchPicker](app/components/ui/search-picker.tsx) (async search). Don't inline `bg-*`/`hover:bg-*` on [Button](app/components/ui/button.tsx) when a `variant` covers the intent.
 - **2+ duplications → className constant** in [form-styles.ts](app/lib/form-styles.ts) (form chrome) or a domain module. See `formInputClass`, `formLabelClass`.
 - **2+ Button (or Badge / Card / …) className overrides → add a `variant`** to the existing CVA. See `variant="brand"`. Don't create `<MyButton>`.
 - **No thin wrappers to hide a className.** `<PremiumCard>` for `<Card className="card-premium">` is indirection, not abstraction. Use a constant or variant.
@@ -43,11 +43,29 @@ Before writing markup, grep the className you're about to type. If it's already 
 A surface's background is chosen by a named role, not by pasting a CSS class. The whole menu is small on purpose; enforced by [app/lib/surface-system.test.ts](app/lib/surface-system.test.ts).
 
 - **Content blocks → `<Card variant>`** ([components/ui/card.tsx](app/components/ui/card.tsx)). `elevated` (default — gradient/border/shadow, the dominant content card and any prominent standalone card, including data/chart cards), `panel` (flat frosted, low-emphasis: small tiles in a grid like stat boxes, and inline secondary text such as notes/lyrics), `plain` (bare shadcn `bg-card`; also the escape hatch for a card with its own custom `bg-*`, e.g. the auth cards). A bare `<Card>` is `elevated`. For a block that must stay a `<div>`/`<a>` (grid item, `asChild`), use `cardVariants({ variant, className })` — never the raw `card-premium`/`glass-content` class. Rule of thumb: if it sits next to elevated cards, it's elevated.
-- **Form fields → `formInputClass`** ([lib/form-styles.ts](app/lib/form-styles.ts)) on every `Input`/`Textarea`/`SelectTrigger` in a content form (admin, contact, review, blog). Two deliberate exceptions: **auth** forms (login/register/password reset) use `authInputClass` (frosted `.auth-input`, matching the translucent auth card), and compact **filter-bar** controls use the glass-select tokens (`glassSelectTriggerClass`) because they sit on glass chrome.
+- **Form fields → `formInputClass`** ([lib/form-styles.ts](app/lib/form-styles.ts)) on every `Input`/`Textarea`/`SelectTrigger` in a content form (admin, contact, review, blog). Two deliberate exceptions: **auth** forms (login/register/password reset) use `authInputClass` (frosted `.auth-input`, matching the translucent auth card), and compact **filter-bar** controls use `compactSelectTriggerClass`, which sizes a trigger for a filter bar rather than a content form.
 - **Chrome / overlays → `glass`** (dialogs, popovers, command palette, drawers, header). `glass-secondary` is the dashed "unrated / incomplete" affordance surface.
-- **Composable tokens** (`bg-glass-bg`, `border-glass-border`, `hover:bg-hover-glass`) are fine inline for borders/rows/hover states — they're tokens, not whole surfaces.
 
 Don't reintroduce `card-premium` or `glass-content` in markup (they only back the Card variants now), and don't add a new whole-surface class when a variant/constant covers the intent.
+
+## There is no `bg-glass-*` / `border-glass-*` / `bg-hover-glass` utility
+
+The `--glass-bg` / `--glass-border` / `--hover-glass` tokens are plain `:root`
+custom properties. They are **not** registered in the `@theme` block in
+[styles.css](app/styles.css), so Tailwind never generates a utility for them and
+`bg-glass-bg`, `border-glass-border`, `hover:bg-hover-glass` and friends silently
+do nothing. They are inert, and they accumulate easily because nothing errors.
+
+To use a glass token from CSS, reference it directly as `var(--glass-bg)`, not
+`hsl(var(--glass-bg))`. These tokens are already complete `hsla()` colors, so
+wrapping them in `hsl()` nests to `hsl(hsla(...))`, which is invalid and gets
+dropped. Only bare-triplet tokens (`--brand-primary: 263 85% 60%`) take the
+`hsl(var(--x))` form.
+
+For a glass surface in markup use the `.glass` / `.glass-secondary` /
+`.glass-content` classes, or `<Card variant>`. If you genuinely need a composable
+glass utility, register the token in `@theme` first, and the class will work
+everywhere.
 
 ## Package-Specific Commands
 

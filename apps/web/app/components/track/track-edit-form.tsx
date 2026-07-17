@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { SongSearch } from "~/components/song/song-search";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import { GlassSelect } from "~/components/ui/glass-select";
+import { CompactSelect } from "~/components/ui/compact-select";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { formInputClass, formLabelClass } from "~/lib/form-styles";
@@ -57,7 +57,7 @@ export function TrackEditForm({
           <label htmlFor="track-set" className={formLabelClass}>
             Set
           </label>
-          <GlassSelect
+          <CompactSelect
             id="track-set"
             value={formData.set}
             onValueChange={(value) => onFormDataChange((prev) => ({ ...prev, set: value }))}
@@ -70,7 +70,7 @@ export function TrackEditForm({
           <label htmlFor="track-segue" className={formLabelClass}>
             Segue
           </label>
-          <GlassSelect
+          <CompactSelect
             id="track-segue"
             value={formData.segue}
             onValueChange={(value) => onFormDataChange((prev) => ({ ...prev, segue: value }))}

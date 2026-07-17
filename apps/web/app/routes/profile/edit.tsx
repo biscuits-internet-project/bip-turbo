@@ -163,7 +163,7 @@ export default function ProfileEdit() {
               <div className="flex items-start gap-6">
                 {/* Current Avatar Preview */}
                 <div className="flex-shrink-0">
-                  <div className="relative w-24 h-24 rounded-full overflow-hidden bg-glass-bg border-2 border-glass-border flex items-center justify-center">
+                  <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 flex items-center justify-center">
                     {avatarPreview ? (
                       <img
                         src={avatarPreview}
@@ -211,7 +211,7 @@ export default function ProfileEdit() {
                 minLength={3}
                 maxLength={50}
                 defaultValue={user.username}
-                className="bg-glass-bg border-glass-border text-content-text-primary placeholder:text-content-text-tertiary"
+                className="text-content-text-primary placeholder:text-content-text-tertiary"
                 placeholder="Enter your username"
               />
               <p className="text-sm text-content-text-tertiary">
@@ -229,7 +229,7 @@ export default function ProfileEdit() {
                 type="email"
                 value={user.email}
                 disabled
-                className="bg-glass-bg/50 border-glass-border text-content-text-secondary cursor-not-allowed"
+                className="text-content-text-secondary cursor-not-allowed"
               />
               <p className="text-sm text-content-text-tertiary">
                 Email address cannot be changed. Contact support if you need to update this.

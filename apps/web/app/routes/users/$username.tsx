@@ -315,7 +315,7 @@ export default function UserProfile() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0 mb-6">
             <div className="flex items-center gap-4 sm:gap-6">
               {/* Avatar — smaller on mobile so the username fits beside it. */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-glass-bg border-2 border-glass-border flex items-center justify-center flex-shrink-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 flex items-center justify-center flex-shrink-0">
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt={`${user.username}'s avatar`} className="w-full h-full object-cover" />
                 ) : (
@@ -440,7 +440,7 @@ export default function UserProfile() {
             id="user-profile-tab-select"
             value={activeTab}
             onChange={(event) => navigate(`?tab=${event.target.value}`, { preventScrollReset: true })}
-            className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
+            className="w-full h-11 px-3 rounded-md border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
           >
             <option value="shows">Shows Attended ({attendanceCount})</option>
             <option value="reviews">Reviews ({reviewCount})</option>
@@ -800,7 +800,7 @@ function DateVenueLink({ date, slug, venueLine }: { date: string; slug: string |
   );
 }
 
-const tableCellClass = "px-2 py-2 sm:px-3 sm:py-2.5 align-top border-t border-glass-border/30";
+const tableCellClass = "px-2 py-2 sm:px-3 sm:py-2.5 align-top border-t";
 const tableHeadClass = "px-2 py-2 sm:px-3 sm:py-2.5 text-xs sm:text-sm text-content-text-secondary text-left align-top";
 
 interface ShowRatingsTableProps {
@@ -837,7 +837,7 @@ function ShowRatingsTable({ rows, sort, direction, onSort }: ShowRatingsTablePro
               ? [row.show.venue.name, formatVenueLocation(row.show.venue)].filter(Boolean).join(", ")
               : null;
             return (
-              <tr key={row.id} className="hover:bg-hover-glass">
+              <tr key={row.id}>
                 <td className={tableCellClass}>
                   <DateVenueLink date={row.show.date} slug={row.show.slug} venueLine={venueLine} />
                 </td>
@@ -889,7 +889,7 @@ function TrackRatingsTable({ rows, sort, direction, onSort }: TrackRatingsTableP
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-hover-glass">
+            <tr key={row.id}>
               <td className={tableCellClass}>
                 <DateVenueLink
                   date={row.track.show.date}

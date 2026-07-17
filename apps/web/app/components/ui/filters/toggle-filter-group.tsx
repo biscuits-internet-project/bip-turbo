@@ -15,7 +15,7 @@ export function ToggleFilterGroup({ filters, activeFilters, onToggle }: ToggleFi
           className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
             activeFilters.has(filter.key)
               ? "bg-brand-primary border-brand-primary text-white"
-              : "bg-transparent border-glass-border text-content-text-secondary hover:border-brand-primary/60"
+              : "bg-transparent text-content-text-secondary hover:border-brand-primary/60"
           }`}
         >
           {filter.label}

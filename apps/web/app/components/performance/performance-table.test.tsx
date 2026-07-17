@@ -194,10 +194,9 @@ describe("PerformanceTable", () => {
     expect(attendedRow?.className).toContain("!border-l-green-500");
     expect(attendedRow?.className).toContain("!border-l-2");
 
-    // Non-attended rows should have neither class
-    const nonAttendedRow = rows.find(
-      (row) => row.className.includes("hover:bg-hover-glass") && !row.className.includes("bg-green-500"),
-    );
+    // Non-attended rows should have neither class. Body rows are the ones with
+    // data cells, which excludes the header row.
+    const nonAttendedRow = rows.find((row) => row.querySelector("td") && !row.className.includes("bg-green-500"));
     expect(nonAttendedRow).toBeDefined();
     expect(nonAttendedRow?.className).not.toContain("!border-l-green-500");
   });

@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { GlassSelect } from "~/components/ui/glass-select";
+import { CompactSelect } from "~/components/ui/compact-select";
 import { formLabelClass } from "~/lib/form-styles";
 import { formatDateMedium } from "~/lib/utils";
 import type { EarlierPerformance } from "./use-track-api";
@@ -43,7 +43,7 @@ export function TrackCompletionsEditor({ options, value, onChange }: TrackComple
                 return (
                   <li
                     key={trackId}
-                    className="flex items-center gap-1 rounded-full border border-glass-border/50 bg-glass-bg py-0.5 pl-2.5 pr-1 text-sm text-content-text-secondary"
+                    className="flex items-center gap-1 rounded-full border py-0.5 pl-2.5 pr-1 text-sm text-content-text-secondary"
                   >
                     {option ? formatDateMedium(option.showDate) : trackId}
                     <Button
@@ -62,7 +62,7 @@ export function TrackCompletionsEditor({ options, value, onChange }: TrackComple
             </ul>
           )}
           {available.length > 0 && (
-            <GlassSelect
+            <CompactSelect
               value=""
               onValueChange={add}
               options={available.map((option) => ({ value: option.trackId, label: formatDateMedium(option.showDate) }))}

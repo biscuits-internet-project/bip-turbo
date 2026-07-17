@@ -43,7 +43,7 @@ export function ShowLineupNote({ notes }: { notes: ShowLineupNotes }) {
   const guestGroups = groupWholeShowGuests(guests);
 
   return (
-    <div className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1 space-y-0.5">
+    <div className="mb-4 text-sm text-content-text-secondary italic border-l pl-3 py-1 space-y-0.5">
       {milestones.map((milestone) => (
         <div key={`milestone-${milestone.slug}-${milestone.ordinal}`}>
           {milestone.ordinal} show with <MusicianLink name={milestone.name} slug={milestone.slug} /> on drums

@@ -46,7 +46,7 @@ export default function SongsLayout() {
               </AdminOnly>
             }
           />
-          <div className="w-full hidden sm:flex justify-start border-b border-glass-border/30 mb-6">
+          <div className="w-full hidden sm:flex justify-start border-b mb-6">
             {TABS.map((tab) => {
               const isActive = pathname === tab.path;
               const Icon = tab.icon;
@@ -76,7 +76,7 @@ export default function SongsLayout() {
               id="songs-view-select"
               value={pathname}
               onChange={(event) => navigate(event.target.value)}
-              className="w-full h-11 px-3 rounded-md bg-glass-bg border border-glass-border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
+              className="w-full h-11 px-3 rounded-md border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
             >
               {TABS.map((tab) => (
                 <option key={tab.path} value={tab.path}>

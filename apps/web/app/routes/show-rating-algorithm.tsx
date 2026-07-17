@@ -199,12 +199,12 @@ export default function ShowRatingAlgorithm() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-glass-border/30 border-t">
+                  <tr className="border-t">
                     <td className="px-3 py-1.5 text-content-text-secondary">Community average</td>
                     <td className="px-3 py-1.5 text-content-text-primary">0.54</td>
                     <td className="px-3 py-1.5 text-content-text-primary">0.53</td>
                   </tr>
-                  <tr className="border-glass-border/30 border-t">
+                  <tr className="border-t">
                     <td className="px-3 py-1.5 text-content-text-secondary">Calibrated Show Rating</td>
                     <td className="px-3 py-1.5 text-content-text-primary font-semibold">0.58</td>
                     <td className="px-3 py-1.5 text-content-text-primary font-semibold">0.56</td>

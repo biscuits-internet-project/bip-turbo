@@ -59,7 +59,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
   return (
     <>
       <Card className="overflow-hidden transition-all duration-300 hover:border-brand-primary/60">
-        <CardHeader className="border-b border-glass-border/50 px-6 py-4">
+        <CardHeader className="border-b px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full glass-content flex items-center justify-center text-brand-primary font-medium">
@@ -77,7 +77,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
                   size="icon"
                   onClick={() => setIsEditing(!isEditing)}
                   disabled={isLoading}
-                  className="text-content-text-secondary hover:text-brand-primary hover:bg-hover-glass transition-colors"
+                  className="text-content-text-secondary hover:text-brand-primary transition-colors"
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>
@@ -86,7 +86,7 @@ export function ReviewCard({ review, currentUserId, onDelete, onUpdate }: Review
                   size="icon"
                   onClick={() => setShowDeleteDialog(true)}
                   disabled={isLoading}
-                  className="text-content-text-secondary hover:text-brand-primary hover:bg-hover-glass transition-colors"
+                  className="text-content-text-secondary hover:text-brand-primary transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
