@@ -121,7 +121,7 @@ jobs:
       # a public run log is safe. 1440 lines ≈ a full day of RSS/heap timeline.
       - name: App memory timeline
         if: inputs.action == 'memory-timeline'
-        run: kamal app logs --lines 20000 2>&1 | grep -F '"process memory"' | tail -1440 || echo "No memory lines found"
+        run: kamal app logs --since 24h --lines 20000 2>&1 | grep -F '"process memory"' | tail -1440 || echo "No memory lines found"
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
 
