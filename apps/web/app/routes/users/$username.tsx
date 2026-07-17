@@ -1,9 +1,8 @@
 import type { RatingWithShow, RatingWithTrack, ShowRatingsSort, TrackRatingsSort } from "@bip/core";
 import { CacheKeys, compareByShowDate } from "@bip/domain";
 import { CalendarDays, Edit, MessageSquare, Star, Users } from "lucide-react";
-import { useState } from "react";
-import type { LoaderFunctionArgs, MetaFunction } from "react-router-dom";
-import { Link, useNavigate } from "react-router-dom";
+import type { LoaderFunctionArgs, MetaFunction, ShouldRevalidateFunction } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatHalfStep, StarValue } from "~/components/rating/rating";
 import { RatingCharts } from "~/components/rating/rating-charts";
 import { RatingDisplaySettings } from "~/components/rating/rating-display-settings";
@@ -53,11 +52,16 @@ function parseDirection(raw: string | null): "asc" | "desc" {
 const ATTENDED_SHOWS_PAGE_SIZE = 50;
 const RATINGS_PAGE_SIZE = 100;
 
-const TAB_VALUES = ["shows", "reviews", "show-ratings", "track-ratings", "blog"] as const;
+const TAB_VALUES = ["settings", "shows", "reviews", "show-ratings", "track-ratings", "blog"] as const;
 type TabValue = (typeof TAB_VALUES)[number];
 
-function parseTab(raw: string | null): TabValue {
-  return (TAB_VALUES as readonly string[]).includes(raw ?? "") ? (raw as TabValue) : "shows";
+// The Settings tab only exists on your own profile (display preferences are
+// personal), and it's where an own-profile visit lands by default. Other
+// profiles default to the Shows Attended activity list.
+export function parseTab(raw: string | null, isOwnProfile: boolean): TabValue {
+  if (raw === "settings") return isOwnProfile ? "settings" : "shows";
+  if ((TAB_VALUES as readonly string[]).includes(raw ?? "")) return raw as TabValue;
+  return isOwnProfile ? "settings" : "shows";
 }
 
 async function loadUserProfile({ params, request, context }: LoaderFunctionArgs & { context: PublicContext }) {
@@ -69,7 +73,6 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
   const url = new URL(request.url);
   const rawPage = Number.parseInt(url.searchParams.get("page") ?? "1", 10);
   const pageParam = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-  const activeTab = parseTab(url.searchParams.get("tab"));
   const showRatingsSort = parseShowRatingsSort(url.searchParams.get("sort"));
   const trackRatingsSort = parseTrackRatingsSort(url.searchParams.get("sort"));
   const ratingsDirection = parseDirection(url.searchParams.get("dir"));
@@ -81,6 +84,11 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
   if (!user) {
     throw new Response("User not found", { status: 404 });
   }
+
+  // Own-profile drives both the Settings tab's existence and the default
+  // active tab, so resolve it before parsing `?tab=`.
+  const isOwnProfile = sessionUser?.email === user.email;
+  const activeTab = parseTab(url.searchParams.get("tab"), isOwnProfile);
 
   // Always fetch: counts (drive tab labels) + user stats (header badges) +
   // attendance summary (count + first/last show for header). Only fetch the
@@ -222,13 +230,25 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     userStat,
     firstShow,
     lastShow,
-    isOwnProfile: sessionUser?.email === user.email,
+    isOwnProfile,
   };
 }
 
 export type LoaderData = Awaited<ReturnType<typeof loadUserProfile>>;
 
 export const loader = publicLoader<LoaderData>(loadUserProfile);
+
+// Toggling the Charts/Table sub-tab only changes `?view=`, which the loader
+// ignores — skip revalidation so it never refetches the (heavy) ratings query.
+// Any loader-relevant param (tab/page/sort/dir) still revalidates normally.
+export const shouldRevalidate: ShouldRevalidateFunction = ({ currentUrl, nextUrl, defaultShouldRevalidate }) => {
+  if (currentUrl.pathname !== nextUrl.pathname) return defaultShouldRevalidate;
+  const loaderParams = ["tab", "page", "sort", "dir"];
+  const loaderParamChanged = loaderParams.some(
+    (key) => currentUrl.searchParams.get(key) !== nextUrl.searchParams.get(key),
+  );
+  return loaderParamChanged ? defaultShouldRevalidate : false;
+};
 
 export const meta: MetaFunction = ({ data }) => {
   const typed = data as LoaderData | undefined;
@@ -274,6 +294,23 @@ export default function UserProfile() {
   } = useSerializedLoaderData<LoaderData>();
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Table vs. Charts is a URL sub-tab (`?view=`) shared by both ratings tabs,
+  // so it survives refresh and is shareable. `shouldRevalidate` keeps the
+  // loader from refetching when only this param moves.
+  const ratingsView: "table" | "charts" = searchParams.get("view") === "table" ? "table" : "charts";
+  const handleViewChange = (view: "table" | "charts") => {
+    const params = new URLSearchParams(searchParams);
+    params.set("view", view);
+    navigate(`?${params.toString()}`, { preventScrollReset: true });
+  };
+
+  // Carry the current view onto ratings-tab navigations so the Charts/Table
+  // choice stays sticky when switching between the two ratings tabs.
+  const viewSuffix = ratingsView === "table" ? "&view=table" : "";
+  const tabHref = (value: TabValue) =>
+    value === "show-ratings" || value === "track-ratings" ? `?tab=${value}${viewSuffix}` : `?tab=${value}`;
 
   // Same handler for every paginated tab — page param is shared across
   // tabs, but we always preserve the active tab so refreshes land back
@@ -283,7 +320,7 @@ export default function UserProfile() {
   const handlePageChange = (nextPage: number) => {
     const sortSuffix =
       activeTab === "show-ratings" || activeTab === "track-ratings"
-        ? `&sort=${activeTab === "show-ratings" ? showRatingsSort : trackRatingsSort}&dir=${ratingsDirection}`
+        ? `&sort=${activeTab === "show-ratings" ? showRatingsSort : trackRatingsSort}&dir=${ratingsDirection}${viewSuffix}`
         : "";
     navigate(`?tab=${activeTab}&page=${nextPage}${sortSuffix}`, { preventScrollReset: true });
   };
@@ -293,16 +330,11 @@ export default function UserProfile() {
   // they want. Both tabs share the handler shape; only the URL fragment
   // changes per tab.
   const handleShowRatingsSortChange = (sort: ShowRatingsSort, direction: "asc" | "desc") => {
-    navigate(`?tab=show-ratings&sort=${sort}&dir=${direction}`, { preventScrollReset: true });
+    navigate(`?tab=show-ratings&sort=${sort}&dir=${direction}${viewSuffix}`, { preventScrollReset: true });
   };
   const handleTrackRatingsSortChange = (sort: TrackRatingsSort, direction: "asc" | "desc") => {
-    navigate(`?tab=track-ratings&sort=${sort}&dir=${direction}`, { preventScrollReset: true });
+    navigate(`?tab=track-ratings&sort=${sort}&dir=${direction}${viewSuffix}`, { preventScrollReset: true });
   };
-
-  // Table vs. Charts is a per-view client toggle, shared by both ratings
-  // tabs — it must not touch the URL or the loader would refetch the table
-  // rows on every switch.
-  const [ratingsView, setRatingsView] = useState<"table" | "charts">("charts");
 
   return (
     <div className="w-full space-y-6">
@@ -411,25 +443,12 @@ export default function UserProfile() {
         </CardContent>
       </Card>
 
-      {/* Display preferences — only on your own profile. Individual rating
-          toggles self-hide behind their feature flags. */}
-      {isOwnProfile && (
-        <>
-          <RatingDisplaySettings
-            showCalibratedRatings={user.showCalibratedRatings}
-            showRatingComparisonDebug={user.showRatingComparisonDebug}
-            colorCodeRatings={user.colorCodeRatings}
-          />
-          <SetlistDisplaySettings showSetlistTimes={user.showSetlistTimes} />
-        </>
-      )}
-
       {/* Content Tabs — mobile shows a <select> dropdown (sm:hidden), sm+
           renders the horizontal tab strip. Mirrors the song-detail page so
           the long "Song Version Ratings" label doesn't clip on phones. */}
       <Tabs
         value={activeTab}
-        onValueChange={(value) => navigate(`?tab=${value}`, { preventScrollReset: true })}
+        onValueChange={(value) => navigate(tabHref(value as TabValue), { preventScrollReset: true })}
         className="w-full"
       >
         <div className="sm:hidden mb-4">
@@ -439,9 +458,10 @@ export default function UserProfile() {
           <select
             id="user-profile-tab-select"
             value={activeTab}
-            onChange={(event) => navigate(`?tab=${event.target.value}`, { preventScrollReset: true })}
+            onChange={(event) => navigate(tabHref(event.target.value as TabValue), { preventScrollReset: true })}
             className="w-full h-11 px-3 rounded-md border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
           >
+            {isOwnProfile && <option value="settings">Settings</option>}
             <option value="shows">Shows Attended ({attendanceCount})</option>
             <option value="reviews">Reviews ({reviewCount})</option>
             <option value="show-ratings">Show Ratings ({showRatingsCount})</option>
@@ -450,34 +470,54 @@ export default function UserProfile() {
           </select>
         </div>
         <TabsList className="mb-6 hidden sm:flex">
+          {isOwnProfile && (
+            <TabsTrigger value="settings" asChild>
+              <Link to={tabHref("settings")} preventScrollReset>
+                Settings
+              </Link>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="shows" asChild>
-            <Link to="?tab=shows" preventScrollReset>
+            <Link to={tabHref("shows")} preventScrollReset>
               Shows Attended ({attendanceCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="reviews" asChild>
-            <Link to="?tab=reviews" preventScrollReset>
+            <Link to={tabHref("reviews")} preventScrollReset>
               Reviews ({reviewCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="show-ratings" asChild>
-            <Link to="?tab=show-ratings" preventScrollReset>
+            <Link to={tabHref("show-ratings")} preventScrollReset>
               Show Ratings ({showRatingsCount})
             </Link>
           </TabsTrigger>
           <TabsTrigger value="track-ratings" asChild>
-            <Link to="?tab=track-ratings" preventScrollReset>
+            <Link to={tabHref("track-ratings")} preventScrollReset>
               Song Version Ratings ({trackRatingsCount})
             </Link>
           </TabsTrigger>
           {blogPosts.length > 0 && (
             <TabsTrigger value="blog" asChild>
-              <Link to="?tab=blog" preventScrollReset>
+              <Link to={tabHref("blog")} preventScrollReset>
                 Blog Posts ({blogPosts.length})
               </Link>
             </TabsTrigger>
           )}
         </TabsList>
+
+        {/* Settings Tab — display preferences, own profile only. Individual
+            rating toggles self-hide behind their feature flags. */}
+        {isOwnProfile && (
+          <TabsContent value="settings" className="space-y-4">
+            <RatingDisplaySettings
+              showCalibratedRatings={user.showCalibratedRatings}
+              showRatingComparisonDebug={user.showRatingComparisonDebug}
+              colorCodeRatings={user.colorCodeRatings}
+            />
+            <SetlistDisplaySettings showSetlistTimes={user.showSetlistTimes} />
+          </TabsContent>
+        )}
 
         {/* Reviews Tab */}
         <TabsContent value="reviews" className="space-y-4">
@@ -538,7 +578,7 @@ export default function UserProfile() {
         <TabsContent value="show-ratings" className="space-y-4">
           {showRatings.length > 0 ? (
             <>
-              <RatingsViewToggle view={ratingsView} onChange={setRatingsView} label="Show ratings view" />
+              <RatingsViewToggle view={ratingsView} onChange={handleViewChange} label="Show ratings view" />
               {ratingsView === "charts" ? (
                 <RatingCharts buckets={showRatingBuckets} kind="show" />
               ) : (
@@ -591,7 +631,7 @@ export default function UserProfile() {
         <TabsContent value="track-ratings" className="space-y-4">
           {trackRatings.length > 0 ? (
             <>
-              <RatingsViewToggle view={ratingsView} onChange={setRatingsView} label="Song version ratings view" />
+              <RatingsViewToggle view={ratingsView} onChange={handleViewChange} label="Song version ratings view" />
               {ratingsView === "charts" ? (
                 <RatingCharts buckets={trackRatingBuckets} kind="track" />
               ) : (

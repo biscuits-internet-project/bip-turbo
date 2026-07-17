@@ -102,7 +102,7 @@ vi.mock("~/components/rating/rating-charts", () => ({
 }));
 
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
-import UserProfile from "./$username";
+import UserProfile, { parseTab, shouldRevalidate } from "./$username";
 
 // Minimal rating rows so the rating tabs render their table (the tab is empty,
 // not paginated, when the list is empty). Disco Biscuits song per convention.
@@ -144,34 +144,62 @@ describe("UserProfile", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValue(baseLoaderData);
   });
 
-  // The Shows Attended tab is the user's primary activity record and should
-  // be the first thing seen on the profile page.
-  test("Shows Attended is the leftmost tab", () => {
+  // On your own profile the Settings tab (display preferences) leads the
+  // strip — it replaces the settings cards that used to stack above the tabs.
+  test("Settings is the leftmost tab on your own profile", () => {
     renderProfile();
 
     const tabs = screen.getAllByRole("tab");
-    expect(tabs[0]).toHaveTextContent(/shows attended/i);
+    expect(tabs[0]).toHaveTextContent(/settings/i);
   });
 
-  // Tab order matters — keep Reviews/Ratings/Blog after Shows so the most
-  // common landing surface is at the start.
-  test("tabs render in order: Shows Attended, Reviews, Show Ratings, Song Version Ratings", () => {
+  // Tab order matters — Settings leads on your own profile, then the activity
+  // surfaces (Shows, Reviews, Ratings, Blog).
+  test("tabs render in order: Settings, Shows Attended, Reviews, Show Ratings, Song Version Ratings", () => {
     renderProfile();
 
     const tabs = screen.getAllByRole("tab");
-    expect(tabs[0]).toHaveTextContent(/shows attended/i);
-    expect(tabs[1]).toHaveTextContent(/reviews/i);
-    expect(tabs[2]).toHaveTextContent(/show ratings/i);
-    expect(tabs[3]).toHaveTextContent(/song version ratings/i);
+    expect(tabs[0]).toHaveTextContent(/settings/i);
+    expect(tabs[1]).toHaveTextContent(/shows attended/i);
+    expect(tabs[2]).toHaveTextContent(/reviews/i);
+    expect(tabs[3]).toHaveTextContent(/show ratings/i);
+    expect(tabs[4]).toHaveTextContent(/song version ratings/i);
   });
 
-  // Default selection is "shows" — landing on a profile shows the attended
-  // setlist list, not the (often empty) reviews tab.
-  test("Shows Attended tab is selected by default", () => {
+  // The display-preference cards live under the Settings tab now, not stacked
+  // above the strip. They only render when the Settings tab is active.
+  test("Settings tab holds the display-preference cards on your own profile", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValue({ ...baseLoaderData, activeTab: "settings" });
+
+    renderProfile("/users/evan?tab=settings");
+
+    expect(screen.getByText(/rating display/i)).toBeInTheDocument();
+    expect(screen.getByText(/setlist display/i)).toBeInTheDocument();
+  });
+
+  // Regression guard: the settings cards must not leak above the tab strip on
+  // the default (Shows) landing — they belong to the Settings tab only.
+  test("does not render the settings cards above the tab strip", () => {
     renderProfile();
 
-    const showsTab = screen.getByRole("tab", { name: /shows attended/i });
-    expect(showsTab.getAttribute("data-state")).toBe("active");
+    expect(screen.queryByText(/rating display/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/setlist display/i)).not.toBeInTheDocument();
+  });
+
+  // Settings are personal, so another user's profile has no Settings tab and
+  // leads with their Shows Attended activity.
+  test("no Settings tab when viewing another user's profile; Shows Attended leads", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValue({
+      ...baseLoaderData,
+      isOwnProfile: false,
+      user: { ...baseLoaderData.user, username: "barberj" },
+    });
+
+    renderProfile("/users/barberj");
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs[0]).toHaveTextContent(/shows attended/i);
+    expect(screen.queryByRole("tab", { name: /^settings/i })).not.toBeInTheDocument();
   });
 
   // Active tab is driven by the loader-provided `activeTab` (parsed from
@@ -201,6 +229,7 @@ describe("UserProfile", () => {
     renderProfile();
 
     const expectedTargets: Array<[RegExp, string]> = [
+      [/^settings/i, "?tab=settings"],
       [/shows attended/i, "?tab=shows"],
       [/^reviews/i, "?tab=reviews"],
       [/^show ratings/i, "?tab=show-ratings"],
@@ -327,6 +356,38 @@ describe("UserProfile", () => {
     expect(screen.getAllByText(/Showing 101 to 200 of 7784 results/)).toHaveLength(2);
   });
 
+  // The Charts/Table sub-tab is URL-driven (`?view=`), so a shared or
+  // refreshed link lands on the same view. `view=table` renders the table
+  // immediately, no click needed.
+  test("renders the ratings table directly when ?view=table is in the URL", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValue({
+      ...baseLoaderData,
+      activeTab: "show-ratings",
+      showRatings: [showRatingRow],
+      ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 1 },
+    });
+
+    renderProfile("/users/evan?tab=show-ratings&view=table");
+
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByTestId("RatingCharts")).not.toBeInTheDocument();
+  });
+
+  // Absent `view` (or `view=charts`) defaults to the Charts view.
+  test("defaults to the Charts view when no view param is present", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValue({
+      ...baseLoaderData,
+      activeTab: "show-ratings",
+      showRatings: [showRatingRow],
+      ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 1 },
+    });
+
+    renderProfile("/users/evan?tab=show-ratings");
+
+    expect(screen.getByTestId("RatingCharts")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   // Pagination chrome stays hidden on the rating tabs when the user has
   // fewer ratings than a single page — avoids noisy "Page 1 of 1" UI for
   // the typical user who has <100 ratings.
@@ -377,5 +438,53 @@ describe("UserProfile", () => {
     renderProfile();
 
     expect(screen.getByText(/barberj hasn't marked any shows/i)).toBeInTheDocument();
+  });
+});
+
+describe("parseTab", () => {
+  // Own profile leads with (and defaults to) the Settings tab.
+  test("defaults to settings on your own profile", () => {
+    expect(parseTab(null, true)).toBe("settings");
+  });
+
+  // Other profiles have no Settings tab, so they default to Shows Attended.
+  test("defaults to shows on another user's profile", () => {
+    expect(parseTab(null, false)).toBe("shows");
+  });
+
+  // A ?tab=settings link to someone else's profile can't select the
+  // (non-existent) Settings tab — it falls back to the default.
+  test("rejects settings on another user's profile", () => {
+    expect(parseTab("settings", false)).toBe("shows");
+  });
+
+  // A valid non-settings tab is honored regardless of ownership.
+  test("honors an explicit tab param", () => {
+    expect(parseTab("track-ratings", true)).toBe("track-ratings");
+    expect(parseTab("track-ratings", false)).toBe("track-ratings");
+  });
+});
+
+describe("shouldRevalidate", () => {
+  const run = (current: string, next: string) =>
+    shouldRevalidate({
+      currentUrl: new URL(`https://x.test${current}`),
+      nextUrl: new URL(`https://x.test${next}`),
+      defaultShouldRevalidate: true,
+      // biome-ignore lint/suspicious/noExplicitAny: only the three fields above are read.
+    } as any);
+
+  // Toggling Charts/Table changes only `view`, which the loader ignores — so
+  // it must not refetch the (heavy) ratings query.
+  test("skips revalidation when only the view sub-tab changes", () => {
+    expect(run("/users/evan?tab=show-ratings", "/users/evan?tab=show-ratings&view=table")).toBe(false);
+  });
+
+  // A tab / page / sort / dir change is loader-relevant and must revalidate.
+  test("revalidates when a loader-relevant param changes", () => {
+    expect(run("/users/evan?tab=show-ratings", "/users/evan?tab=track-ratings")).toBe(true);
+    expect(run("/users/evan?tab=show-ratings&page=1", "/users/evan?tab=show-ratings&page=2")).toBe(true);
+    expect(run("/users/evan?tab=show-ratings&sort=date", "/users/evan?tab=show-ratings&sort=rating")).toBe(true);
+    expect(run("/users/evan?tab=show-ratings&dir=desc", "/users/evan?tab=show-ratings&dir=asc")).toBe(true);
   });
 });
