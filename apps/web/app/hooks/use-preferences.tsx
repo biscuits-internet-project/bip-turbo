@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo } from "react";
 
 export type Preferences = {
   colorCodeRatings: boolean;
+  showSetlistTimes: boolean;
 };
 
 /**
@@ -11,13 +12,15 @@ export type Preferences = {
  * behaves the same in both cases.
  *
  * Color coding is off until the rating work it belongs to is opened up more
- * broadly. Flipping this constant switches it on for everyone who hasn't made
- * an explicit choice, and leaves explicit choices on either side intact — which
- * is why the stored preference stays tri-state rather than defaulting in the
- * database.
+ * broadly. Setlist times are on, matching how the setlist has always rendered:
+ * only a viewer who asks for a cleaner setlist loses them. Flipping either
+ * constant moves everyone who hasn't made an explicit choice, and leaves
+ * explicit choices on either side intact — which is why the stored preferences
+ * stay tri-state rather than defaulting in the database.
  */
 export const PREFERENCES_DEFAULT: Preferences = {
   colorCodeRatings: false,
+  showSetlistTimes: true,
 };
 
 const PreferencesContext = createContext<Preferences>(PREFERENCES_DEFAULT);
@@ -34,14 +37,19 @@ const PreferencesContext = createContext<Preferences>(PREFERENCES_DEFAULT);
  */
 export function PreferencesProvider({
   colorCodeRatings,
+  showSetlistTimes,
   children,
 }: {
   colorCodeRatings: boolean | null | undefined;
+  showSetlistTimes: boolean | null | undefined;
   children: React.ReactNode;
 }) {
   const value = useMemo<Preferences>(
-    () => ({ colorCodeRatings: colorCodeRatings ?? PREFERENCES_DEFAULT.colorCodeRatings }),
-    [colorCodeRatings],
+    () => ({
+      colorCodeRatings: colorCodeRatings ?? PREFERENCES_DEFAULT.colorCodeRatings,
+      showSetlistTimes: showSetlistTimes ?? PREFERENCES_DEFAULT.showSetlistTimes,
+    }),
+    [colorCodeRatings, showSetlistTimes],
   );
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }

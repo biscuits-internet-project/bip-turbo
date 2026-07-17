@@ -2,6 +2,7 @@ import type { Setlist } from "@bip/domain";
 import { formatDuration } from "@bip/domain";
 import { Link } from "react-router-dom";
 import { NoteworthyMarker } from "~/components/track/noteworthy-marker";
+import { usePreferences } from "~/hooks/use-preferences";
 import { cn } from "~/lib/utils";
 import { buildShowFootnotes } from "./footnotes";
 import { countSetlistEncores } from "./set-label";
@@ -14,8 +15,12 @@ import { TrackRatingOverlay } from "./track-rating-overlay";
  * annotations. Extracted from SetlistCard so this (the bulk of the card body)
  * can be rendered and tested on its own, apart from the rating/attendance/
  * view-toggle machinery around it.
+ *
+ * Running times are the viewer's `showSetlistTimes` preference; opting out
+ * leaves the setlist as a plain list of songs, footnotes and all.
  */
 export function SetlistFlow({ setlist }: { setlist: Setlist }) {
+  const { showSetlistTimes } = usePreferences();
   const allTracks = setlist.sets.flatMap((set) => set.tracks);
   const { trackFootnoteIndices, orderedFootnotes } = buildShowFootnotes(setlist);
 
@@ -39,7 +44,7 @@ export function SetlistFlow({ setlist }: { setlist: Setlist }) {
                 <span className="text-base font-medium text-content-text-tertiary">
                   {formatSetHeading(set.label, encoresInSet, isSoleRegularSet)}
                 </span>
-                {setDuration.known > 0 && (
+                {showSetlistTimes && setDuration.known > 0 && (
                   <span
                     className="text-sm text-content-text-tertiary tabular-nums"
                     title={
@@ -92,7 +97,7 @@ export function SetlistFlow({ setlist }: { setlist: Setlist }) {
         })}
       </div>
 
-      {showDuration.known > 0 && !isSoleSet && (
+      {showSetlistTimes && showDuration.known > 0 && !isSoleSet && (
         <div className="mt-4 text-sm text-content-text-secondary">
           <span className="font-medium text-content-text-tertiary">Total</span>{" "}
           <span className="tabular-nums">
@@ -101,7 +106,7 @@ export function SetlistFlow({ setlist }: { setlist: Setlist }) {
           </span>
         </div>
       )}
-      {showDuration.known > 0 && showDuration.missing > 0 && (
+      {showSetlistTimes && showDuration.known > 0 && showDuration.missing > 0 && (
         <div className={cn(isSoleSet ? "mt-4" : "mt-1", "text-xs text-content-text-tertiary")}>
           * Partial: {showDuration.missing} track{showDuration.missing > 1 ? "s" : ""} not yet timed
         </div>

@@ -25,6 +25,7 @@ vi.mock("~/components/performance/track-rating-cell", () => ({
   TrackRatingCell: (props: object) => mockShallowComponent("TrackRatingCell", props),
 }));
 
+const { PreferencesProvider } = await import("~/hooks/use-preferences");
 const { useSession } = await import("~/hooks/use-session");
 const { useTrackUserRatings } = await import("~/hooks/use-track-user-ratings");
 const { useSongPlayDates } = await import("~/hooks/use-song-play-dates");
@@ -213,5 +214,51 @@ describe("SetlistTable", () => {
     const cells = screen.getAllByRole("cell");
     expect(cells[7].textContent).toBe("3");
     expect(cells[16].textContent).toBe("0");
+  });
+
+  // The gap chart is the only other place a setlist shows times, so the
+  // preference has to reach it too — otherwise a viewer who turned times off
+  // still meets them one toggle away.
+  test("drops the Time column for a viewer who turned setlist times off", async () => {
+    await setupWithRouter(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={false}>
+        <SetlistTable
+          showSlug="2024-07-19-camden"
+          showDate="2024-07-19"
+          tracks={[
+            makeTrack({
+              songId: "a",
+              position: 1,
+              duration: 522,
+              song: { id: "a", title: "Above the Waves", slug: "above-the-waves" },
+            }),
+          ]}
+        />
+      </PreferencesProvider>,
+    );
+    expect(screen.queryByRole("columnheader", { name: /Time/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("8:42")).not.toBeInTheDocument();
+    // The rest of the chart is untouched.
+    expect(screen.getByRole("link", { name: "Above the Waves" })).toBeInTheDocument();
+  });
+
+  test("keeps the Time column for a viewer who never chose", async () => {
+    await setupWithRouter(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={null}>
+        <SetlistTable
+          showSlug="2024-07-19-camden"
+          showDate="2024-07-19"
+          tracks={[
+            makeTrack({
+              songId: "a",
+              position: 1,
+              duration: 522,
+              song: { id: "a", title: "Above the Waves", slug: "above-the-waves" },
+            }),
+          ]}
+        />
+      </PreferencesProvider>,
+    );
+    expect(screen.getByText("8:42")).toBeInTheDocument();
   });
 });

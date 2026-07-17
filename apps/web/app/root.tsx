@@ -37,6 +37,7 @@ export type RootPreferences = {
    * the default lives in exactly one place.
    */
   colorCodeRatings: boolean | null;
+  showSetlistTimes: boolean | null;
 };
 
 export type RootData = {
@@ -96,6 +97,7 @@ export async function loader({ request }: Route.LoaderArgs): Promise<RootData> {
     featureFlags,
     preferences: {
       colorCodeRatings: viewer?.colorCodeRatings ?? null,
+      showSetlistTimes: viewer?.showSetlistTimes ?? null,
     },
   };
 }
@@ -126,7 +128,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <SupabaseProvider env={env}>
           <QueryProvider>
             <HydrationBoundary state={dehydratedState}>
-              <PreferencesProvider colorCodeRatings={data?.preferences?.colorCodeRatings}>
+              <PreferencesProvider
+                colorCodeRatings={data?.preferences?.colorCodeRatings}
+                showSetlistTimes={data?.preferences?.showSetlistTimes}
+              >
                 <GlobalSearchProvider>
                   <SearchProvider>
                     <HeaderLayout>{children}</HeaderLayout>

@@ -2,10 +2,12 @@ import { average, median, type TrackLight } from "@bip/domain";
 import { useEffect, useMemo } from "react";
 import { DataTable } from "~/components/ui/data-table";
 import { usePersonalSongHistory } from "~/hooks/use-personal-song-history";
+import { usePreferences } from "~/hooks/use-preferences";
 import { useSession } from "~/hooks/use-session";
 import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { computePersonalRow, eligiblePersonalGaps, type PersonalSetlistRow } from "~/lib/personal-setlist-columns";
 import { createPersonalSetlistColumns, type PersonalSetlistTableRow } from "./setlist-columns-personal";
+import { applyTimePreference } from "./setlist-common-columns";
 
 interface SetlistTablePersonalProps {
   tracks: TrackLight[];
@@ -28,6 +30,7 @@ interface SetlistTablePersonalProps {
 export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChange }: SetlistTablePersonalProps) {
   const { data, isLoading } = usePersonalSongHistory();
   const { user } = useSession();
+  const { showSetlistTimes } = usePreferences();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
   const { userRatingMap, averageRatingMap } = useTrackUserRatings(trackIds);
@@ -51,8 +54,12 @@ export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChan
   }, [tracks, data, setlistTracks, showDate]);
 
   const columns = useMemo(
-    () => createPersonalSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
-    [showSlug, averageRatingMap, userRatingMap, isAuthenticated],
+    () =>
+      applyTimePreference(
+        createPersonalSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
+        showSetlistTimes,
+      ),
+    [showSlug, averageRatingMap, userRatingMap, isAuthenticated, showSetlistTimes],
   );
 
   // Hoist the summary up to the parent so it can render alongside the

@@ -8,6 +8,7 @@ import { formatHalfStep, StarValue } from "~/components/rating/rating";
 import { RatingCharts } from "~/components/rating/rating-charts";
 import { RatingDisplaySettings } from "~/components/rating/rating-display-settings";
 import { formatSetLabel } from "~/components/setlist/set-label";
+import { SetlistDisplaySettings } from "~/components/setlist/setlist-display-settings";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Badge } from "~/components/ui/badge";
@@ -410,14 +411,17 @@ export default function UserProfile() {
         </CardContent>
       </Card>
 
-      {/* Rating-display preferences — only on your own profile, and only when a
-          feature flag makes a toggle available (the component self-hides otherwise). */}
+      {/* Display preferences — only on your own profile. Individual rating
+          toggles self-hide behind their feature flags. */}
       {isOwnProfile && (
-        <RatingDisplaySettings
-          showCalibratedRatings={user.showCalibratedRatings}
-          showRatingComparisonDebug={user.showRatingComparisonDebug}
-          colorCodeRatings={user.colorCodeRatings}
-        />
+        <>
+          <RatingDisplaySettings
+            showCalibratedRatings={user.showCalibratedRatings}
+            showRatingComparisonDebug={user.showRatingComparisonDebug}
+            colorCodeRatings={user.colorCodeRatings}
+          />
+          <SetlistDisplaySettings showSetlistTimes={user.showSetlistTimes} />
+        </>
       )}
 
       {/* Content Tabs — mobile shows a <select> dropdown (sm:hidden), sm+

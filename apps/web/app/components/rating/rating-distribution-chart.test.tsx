@@ -56,7 +56,7 @@ describe("RatingDistributionChart", () => {
 describe("RatingAxisTick", () => {
   const renderTick = (index: number, label: string, colorCodeRatings: boolean | null = true) =>
     setup(
-      <PreferencesProvider colorCodeRatings={colorCodeRatings}>
+      <PreferencesProvider colorCodeRatings={colorCodeRatings} showSetlistTimes={null}>
         <svg role="img" aria-label="axis">
           <RatingAxisTick x={10} y={20} fontSize={12} payload={{ value: label, index }} />
         </svg>

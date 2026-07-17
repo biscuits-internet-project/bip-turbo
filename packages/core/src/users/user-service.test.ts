@@ -169,6 +169,7 @@ describe("UserService.listForSync", () => {
       showCalibratedRatings: true,
       showRatingComparisonDebug: true,
       colorCodeRatings: true,
+      showSetlistTimes: true,
       createdAt: true,
       updatedAt: true,
     });
