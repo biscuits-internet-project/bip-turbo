@@ -97,7 +97,7 @@ export function ContactDialog({ children }: ContactDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass border-glass-border max-w-md">
+      <DialogContent className="glass max-w-md">
         <DialogHeader>
           <DialogTitle className="text-content-text-primary text-xl">Get in Touch</DialogTitle>
           <DialogDescription className="text-content-text-secondary">

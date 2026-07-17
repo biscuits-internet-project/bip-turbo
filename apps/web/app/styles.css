@@ -166,13 +166,10 @@ html body[data-scroll-locked] {
 
     /* Interactive States - Purple Primary, Green Accents */
     --hover-accent: 263 85% 60%; /* Purple hover state (darker) */
-    --hover-accent-green: 145 85% 60%; /* Green hover state */
     --hover-subtle: 240 6% 12%; /* Subtle hover background */
     --hover-glass: 263 25% 18%; /* Glass hover effect */
     --focus-ring: 267 90% 70%; /* Purple focus ring (lighter) */
-    --focus-ring-green: 145 80% 55%; /* Green focus ring */
     --active-state: 259 85% 50%; /* Purple active/pressed state */
-    --active-state-green: 146 85% 45%; /* Green active state */
 
     /* Status & Feedback - Harmonized with Brand */
     --success: 145 80% 55%; /* Brand green for success */
@@ -196,17 +193,11 @@ html body[data-scroll-locked] {
 
     /* Component-Specific - Glass-morphism Enhanced */
     --card-overlay: 240 10% 3.9%; /* Card background */
-    --card-glass: hsla(263, 15%, 10%, 0.6); /* Glass card background with transparency */
-    --card-glass-border: hsla(263, 35%, 60%, 0.18); /* Glass card border - lighter and more subtle */
     --nav-link-hover: 263 85% 60%; /* Navigation hover (was primary) */
-    --nav-glass: hsla(263, 20%, 8%, 0.6); /* Navigation glass background with transparency */
     --search-bg: 240 6% 10%; /* Search input background */
-    --search-glass: hsla(263, 15%, 12%, 0.6); /* Glass search background with transparency */
     --filter-active: 263 85% 60%; /* Active filter - purple */
     --filter-active-secondary: 145 80% 55%; /* Secondary active filter - green */
     --table-header: 240 6% 8%; /* Table header background */
-    --table-row-hover: 240 6% 12%; /* Table row hover */
-    --table-glass: hsla(263, 10%, 8%, 0.6); /* Glass table background with transparency */
     --divider: 240 6% 20%; /* Dividers and separators */
     --divider-accent: 263 30% 25%; /* Accent dividers */
 
@@ -214,7 +205,6 @@ html body[data-scroll-locked] {
     --glass-bg: hsla(263, 15%, 8%, 0.6); /* Primary glass background with transparency */
     --glass-bg-secondary: hsla(240, 8%, 12%, 0.5); /* Secondary glass background with transparency */
     --glass-border: hsla(263, 40%, 65%, 0.2); /* Glass borders - lighter and more subtle purple */
-    --glass-border-accent: hsla(145, 50%, 60%, 0.25); /* Green accent glass borders - lighter and more subtle green */
     --glass-shadow: hsla(263, 50%, 5%, 0.3); /* Glass shadow color with transparency */
     --backdrop-blur: blur(12px); /* Standard backdrop blur */
     --backdrop-blur-heavy: blur(20px); /* Heavy backdrop blur */
@@ -235,14 +225,12 @@ html body[data-scroll-locked] {
     /* Light mode glass effects */
     --glass-bg: hsla(263, 20%, 95%, 0.8); /* Light glass background */
     --glass-border: hsla(263, 60%, 70%, 0.6); /* Purple border for light */
-    --glass-border-accent: hsla(145, 60%, 55%, 0.6); /* Green border for light */
     --content-glass: hsla(263, 15%, 92%, 0.9); /* Light content glass */
     --content-glass-border: hsla(263, 50%, 60%, 0.8); /* Light content border */
 
     /* Light mode interactive states */
     --hover-glass: hsla(263, 20%, 88%, 0.9); /* Light hover */
     --hover-accent: 267 80% 60%; /* Purple hover */
-    --hover-accent-green: 145 75% 50%; /* Green hover */
   }
 
   .dark {
@@ -253,7 +241,6 @@ html body[data-scroll-locked] {
     /* Slightly enhanced purple glow for dark mode */
     --brand-glow: 263 90% 70%; /* Brighter purple glow in dark */
     --glass-border: hsla(263, 40%, 65%, 0.2); /* Lighter and more subtle purple borders for dark mode */
-    --glass-border-accent: hsla(145, 50%, 60%, 0.25); /* Lighter and more subtle green borders for dark mode */
   }
 
   /* Override the Tailwind background utility */
@@ -316,7 +303,6 @@ html body[data-scroll-locked] {
   /* Ensure all cards and content are above background */
   .glass-content,
   .card-premium,
-  [class*="glass-"],
   main,
   header,
   nav {
@@ -607,178 +593,6 @@ html body[data-scroll-locked] {
   .btn-secondary:focus {
     outline: 2px solid hsl(var(--focus-ring));
     outline-offset: 2px;
-  }
-
-  .btn-accent {
-    background-color: hsl(var(--brand-tertiary));
-    color: hsl(var(--content-text-primary));
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.5rem;
-    font-weight: 500;
-    transition: all 200ms;
-  }
-
-  .btn-accent:hover {
-    background-color: hsl(var(--hover-accent-green));
-    box-shadow:
-      0 10px 15px -3px rgb(0 0 0 / 0.1),
-      0 4px 6px -4px rgb(0 0 0 / 0.1);
-  }
-
-  .btn-accent:focus {
-    outline: 2px solid hsl(var(--focus-ring-green));
-    outline-offset: 2px;
-  }
-
-  .btn-accent:active {
-    background-color: hsl(var(--active-state-green));
-    transform: scale(0.95);
-  }
-
-  /* Show/Concert List - Enhanced */
-  .show-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .show-item {
-    background-color: hsl(var(--glass-bg));
-    border: 1px solid hsl(var(--glass-border));
-    backdrop-filter: var(--backdrop-blur);
-    -webkit-backdrop-filter: var(--backdrop-blur);
-    border-radius: 0.75rem;
-    box-shadow:
-      0 20px 25px -5px rgb(0 0 0 / 0.1),
-      0 8px 10px -6px rgb(0 0 0 / 0.1),
-      0 8px 32px hsl(var(--glass-shadow) / 0.3);
-    padding: 1.5rem;
-    transition: all 300ms;
-  }
-
-  .show-item:hover {
-    border-color: hsl(var(--glass-border-accent));
-    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  }
-
-  .show-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
-  }
-
-  .show-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: hsl(var(--brand-primary));
-  }
-
-  .show-date {
-    font-size: 0.875rem;
-    color: hsl(var(--content-text-secondary));
-  }
-
-  .show-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  /* Search and Filters - Glass Enhanced */
-  .search-bar {
-    margin-bottom: 2rem;
-  }
-
-  .search-input {
-    background-color: hsl(var(--glass-bg));
-    border: 1px solid hsl(var(--glass-border));
-    backdrop-filter: var(--backdrop-blur);
-    -webkit-backdrop-filter: var(--backdrop-blur);
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    color: hsl(var(--content-text-primary));
-    transition: all 200ms;
-  }
-
-  .search-input::placeholder {
-    color: hsl(var(--content-text-tertiary));
-  }
-
-  .search-input:focus {
-    outline: none;
-  }
-
-  .search-input:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 1px hsl(var(--ring) / 0.2);
-  }
-
-  /* Year/Month Navigation - Premium Style */
-  .date-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 2rem;
-  }
-
-  .date-nav-item {
-    background-color: hsl(var(--glass-bg));
-    border: 1px solid hsl(var(--glass-border));
-    backdrop-filter: var(--backdrop-blur);
-    -webkit-backdrop-filter: var(--backdrop-blur);
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: hsl(var(--content-text-secondary));
-    transition: all 200ms;
-    cursor: pointer;
-  }
-
-  .date-nav-item:hover {
-    background-color: hsl(var(--hover-glass));
-    color: hsl(var(--brand-primary));
-    border-color: hsl(var(--glass-border-accent));
-  }
-
-  .date-nav-item.active {
-    background-color: hsl(var(--brand-primary));
-    color: hsl(var(--content-text-primary));
-    border-color: hsl(var(--brand-primary));
-  }
-
-  /* Table Enhancements */
-  .table-premium {
-    background-color: hsl(var(--glass-bg));
-    border: 1px solid hsl(var(--glass-border));
-    backdrop-filter: var(--backdrop-blur);
-    -webkit-backdrop-filter: var(--backdrop-blur);
-    border-radius: 0.75rem;
-    overflow: hidden;
-  }
-
-  .table-premium thead {
-    background-color: hsl(var(--table-glass));
-  }
-
-  .table-premium th {
-    padding: 1rem 1.5rem;
-    text-align: left;
-    font-weight: 500;
-    color: hsl(var(--content-text-secondary));
-    border-bottom: 1px solid hsl(var(--divider));
-  }
-
-  .table-premium td {
-    padding: 1rem 1.5rem;
-    color: hsl(var(--content-text-primary));
-    border-bottom: 1px solid hsl(var(--divider));
-  }
-
-  .table-premium tr:hover {
-    background-color: hsl(var(--table-row-hover));
   }
 
   /* Retro-Futuristic Font Classes */

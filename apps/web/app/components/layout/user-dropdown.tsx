@@ -30,9 +30,9 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
           variant="ghost"
           className={cn(
             "relative h-9 w-9 rounded-full p-0 transition-all duration-200",
-            "hover:bg-hover-glass hover:ring-2 hover:ring-brand-primary/30",
-            "focus:bg-hover-glass focus:ring-2 focus:ring-brand-primary/50",
-            "data-[state=open]:bg-hover-glass data-[state=open]:ring-2 data-[state=open]:ring-brand-primary/50",
+            "hover:ring-2 hover:ring-brand-primary/30",
+            "focus:ring-2 focus:ring-brand-primary/50",
+            "data-[state=open]:ring-2 data-[state=open]:ring-brand-primary/50",
             className,
           )}
         >
@@ -49,7 +49,7 @@ export function UserDropdown({ user, className }: UserDropdownProps) {
         className={cn(
           "w-64 p-2",
           "rounded-xl border-0",
-          "bg-content-bg-primary/95 border border-content-glass-border",
+          "bg-content-bg-primary/95 border",
           "backdrop-blur-md",
           "shadow-2xl shadow-brand-primary/10",
           "animate-in fade-in-0 zoom-in-95 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-200",

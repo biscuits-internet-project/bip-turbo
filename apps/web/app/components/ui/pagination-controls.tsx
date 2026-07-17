@@ -97,7 +97,7 @@ export function PaginationControls({
               defaultValue={page}
               key={page}
               onKeyDown={handlePageInputKeyDown}
-              className="w-12 rounded border border-glass-border bg-glass-bg px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-12 rounded border px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             of {totalPages}
           </span>

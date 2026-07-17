@@ -62,7 +62,7 @@ export function MultiEntityPicker<R extends MultiEntityRow>({
             // group; collapses to a single inline row on sm+.
             <li
               key={row.uid}
-              className="flex flex-wrap items-center gap-1.5 rounded-md border border-glass-border/30 p-2 sm:rounded-none sm:border-0 sm:p-0"
+              className="flex flex-wrap items-center gap-1.5 rounded-md border p-2 sm:rounded-none sm:border-0 sm:p-0"
             >
               {renderRow(row)}
               <Button

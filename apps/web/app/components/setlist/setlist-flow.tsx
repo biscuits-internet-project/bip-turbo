@@ -113,7 +113,7 @@ export function SetlistFlow({ setlist }: { setlist: Setlist }) {
       )}
 
       {orderedFootnotes.length > 0 && (
-        <div className="mt-6 pt-4 border-t border-glass-border/30 space-y-2">
+        <div className="mt-6 pt-4 border-t space-y-2">
           {orderedFootnotes.map((footnote) => (
             <div key={`footnote-${footnote.index}`} className="text-sm text-content-text-secondary">
               <sup className="text-brand-secondary">{footnote.index}</sup> {footnote.content}

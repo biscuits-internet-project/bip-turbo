@@ -285,7 +285,7 @@ function SetlistCardComponent({
             : undefined
         }
         className={cn(
-          "relative z-10 px-3 md:px-6 border-b border-glass-border/30",
+          "relative z-10 px-3 md:px-6 border-b",
           collapsible ? "py-1 md:py-1 cursor-pointer" : "py-3 md:py-5",
           notForStats && "opacity-60 text-content-text-tertiary",
         )}
@@ -380,7 +380,7 @@ function SetlistCardComponent({
               />
               {setlist.show.notes && (
                 <div
-                  className="mb-4 text-sm text-content-text-secondary italic border-l border-glass-border pl-3 py-1"
+                  className="mb-4 text-sm text-content-text-secondary italic border-l pl-3 py-1"
                   dangerouslySetInnerHTML={{ __html: setlist.show.notes }}
                 />
               )}

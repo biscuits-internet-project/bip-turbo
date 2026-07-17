@@ -156,14 +156,14 @@ function DebutYearTable({ distribution }: { distribution: DistributionRow[] }) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-left text-content-text-tertiary border-b border-glass-border/30">
+        <tr className="text-left text-content-text-tertiary border-b">
           <th className="font-medium py-2 pr-4">Year</th>
           <th className="font-medium py-2">Songs</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.year} className="border-b border-glass-border/20 last:border-0 align-top">
+          <tr key={row.year} className="border-b last:border-0 align-top">
             <td className="py-2 pr-4 text-content-text-primary whitespace-nowrap">{row.year}</td>
             <td className="py-2 text-content-text-secondary">
               {row.songs.map((song, index) => (

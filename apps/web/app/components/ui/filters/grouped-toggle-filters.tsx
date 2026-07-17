@@ -37,9 +37,7 @@ export function GroupedToggleFilters({ filters, activeFilters, onToggle }: Group
               <button
                 type="button"
                 className={`${triggerBase} ${
-                  active
-                    ? "bg-brand-primary/15 border-brand-primary text-white"
-                    : "bg-glass-bg border-glass-border text-content-text-secondary hover:bg-glass-bg/80"
+                  active ? "bg-brand-primary/15 border-brand-primary text-white" : "text-content-text-secondary"
                 }`}
               >
                 {group.label}
@@ -51,10 +49,7 @@ export function GroupedToggleFilters({ filters, activeFilters, onToggle }: Group
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
               </button>
             </PopoverTrigger>
-            <PopoverContent
-              align="start"
-              className="w-auto max-w-xs p-3 bg-glass-bg border-glass-border backdrop-blur-md"
-            >
+            <PopoverContent align="start" className="w-auto max-w-xs p-3 backdrop-blur-md">
               <ToggleFilterGroup filters={groupFilters} activeFilters={activeFilters} onToggle={onToggle} />
             </PopoverContent>
           </Popover>

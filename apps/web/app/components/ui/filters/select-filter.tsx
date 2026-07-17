@@ -1,4 +1,8 @@
-import { glassSelectContentClass, glassSelectItemClass, glassSelectTriggerClass } from "~/components/ui/glass-select";
+import {
+  compactSelectContentClass,
+  compactSelectItemClass,
+  compactSelectTriggerClass,
+} from "~/components/ui/compact-select";
 import {
   Select,
   SelectContent,
@@ -45,12 +49,12 @@ export function SelectFilter({
         {label}
       </label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger id={id} className={`${width ?? ""} ${glassSelectTriggerClass}`}>
+        <SelectTrigger id={id} className={`${width ?? ""} ${compactSelectTriggerClass}`}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent className={glassSelectContentClass}>
+        <SelectContent className={compactSelectContentClass}>
           {options?.map((option) => (
-            <SelectItem key={option.value} value={option.value} className={glassSelectItemClass}>
+            <SelectItem key={option.value} value={option.value} className={compactSelectItemClass}>
               {option.label}
             </SelectItem>
           ))}
@@ -58,7 +62,7 @@ export function SelectFilter({
             <SelectGroup key={group.label}>
               <SelectLabel className={groupLabelClass}>{group.label}</SelectLabel>
               {group.options.map((option) => (
-                <SelectItem key={option.value} value={option.value} className={glassSelectItemClass}>
+                <SelectItem key={option.value} value={option.value} className={compactSelectItemClass}>
                   {option.label}
                 </SelectItem>
               ))}

@@ -7,8 +7,8 @@ import { z } from "zod";
 import { ShowYoutubeManager } from "~/components/show/show-youtube-manager";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
+import { CompactSelect } from "~/components/ui/compact-select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
-import { GlassSelect } from "~/components/ui/glass-select";
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
@@ -123,7 +123,7 @@ export function ShowForm({
             <FormItem>
               <FormLabel className="text-content-text-secondary">Band</FormLabel>
               <FormControl>
-                <GlassSelect
+                <CompactSelect
                   value={field.value}
                   onValueChange={field.onChange}
                   placeholder="Select a band"

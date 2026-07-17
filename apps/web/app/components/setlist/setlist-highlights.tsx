@@ -46,9 +46,7 @@ export function SetlistHighlights({ setlist }: SetlistHighlightsProps) {
                     </Link>
                   </span>
                   {hasNote(track) && (
-                    <p className="text-xs text-content-text-secondary mt-0.5 pl-2 border-l-2 border-glass-border">
-                      {track.note?.trim()}
-                    </p>
+                    <p className="text-xs text-content-text-secondary mt-0.5 pl-2 border-l-2">{track.note?.trim()}</p>
                   )}
                 </div>
               </div>

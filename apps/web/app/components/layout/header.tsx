@@ -84,7 +84,7 @@ export function Header() {
                 // rated" on a single line. Phone-landscape overrides drop
                 // padding + text size so the bar fits comfortably alongside
                 // the search box on a rotated phone.
-                className="flex items-center rounded-md px-4 py-2 text-lg font-semibold text-content-text-primary whitespace-nowrap transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass short:!px-2 short:!py-1 short:!text-sm"
+                className="flex items-center rounded-md px-4 py-2 text-lg font-semibold text-content-text-primary whitespace-nowrap transition-all duration-200 hover:text-brand-primary short:!px-2 short:!py-1 short:!text-sm"
               >
                 <item.icon className="h-4 w-4 mr-2 short:!mr-1" />
                 <span>{item.name}</span>
@@ -150,7 +150,7 @@ export function Header() {
                 key={item.href}
                 to={item.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center rounded-md px-4 py-3 text-lg font-semibold text-content-text-primary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
+                className="flex items-center rounded-md px-4 py-3 text-lg font-semibold text-content-text-primary transition-all duration-200 hover:text-brand-primary"
               >
                 <item.icon className="h-5 w-5 mr-3" />
                 <span>{item.name}</span>
@@ -179,7 +179,7 @@ export function Header() {
                   <Link
                     to={`/users/${username}`}
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
+                    className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary"
                   >
                     <Eye className="h-5 w-5 mr-3" />
                     View Profile
@@ -188,7 +188,7 @@ export function Header() {
                   <Link
                     to="/profile/edit"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-secondary hover:bg-hover-glass"
+                    className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-secondary"
                   >
                     <Edit className="h-5 w-5 mr-3" />
                     Edit Profile
@@ -207,7 +207,7 @@ export function Header() {
                 <Link
                   to="/auth/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary hover:bg-hover-glass"
+                  className="flex items-center rounded-md px-4 py-3 text-base font-medium text-content-text-secondary transition-all duration-200 hover:text-brand-primary"
                 >
                   <User className="h-5 w-5 mr-3" />
                   Sign in

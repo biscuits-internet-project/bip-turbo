@@ -175,7 +175,7 @@ function YearChip({ active, onClick, children }: YearChipProps) {
         "px-2.5 py-1 text-xs font-medium rounded-full border transition-colors cursor-pointer",
         active
           ? "border-brand-primary bg-brand-primary/15 text-content-text-primary"
-          : "border-content-glass-border text-content-text-tertiary hover:text-content-text-secondary",
+          : "text-content-text-tertiary hover:text-content-text-secondary",
       )}
     >
       {children}

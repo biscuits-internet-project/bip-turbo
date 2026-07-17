@@ -66,7 +66,7 @@ function ReviewNote({ notes }: { notes: string }) {
   const isTruncated = shouldTruncate && !isExpanded && displayText.length < notes.length;
 
   return (
-    <div className="mt-2 pt-2 border-t border-glass-border/30">
+    <div className="mt-2 pt-2 border-t">
       <div className="text-base text-content-text-tertiary leading-relaxed">
         {displayText}
         {isTruncated && (
@@ -344,11 +344,11 @@ export default function SongPage() {
           <Select value={activeTab} onValueChange={handleTabChange}>
             <SelectTrigger
               aria-label="Song view"
-              className="w-full h-11 bg-glass-bg border border-glass-border text-content-text-primary hover:bg-glass-bg/80 focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
+              className="w-full h-11 border text-content-text-primary focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
             >
               <SelectValue />
             </SelectTrigger>
-            <SelectContent className="bg-glass-bg border-glass-border backdrop-blur-md">
+            <SelectContent className="backdrop-blur-md">
               <SelectItem value="performances">All Performances</SelectItem>
               {hasJamCharts && <SelectItem value="jam-charts">Jam Charts</SelectItem>}
               {hasAllTimers && <SelectItem value="all-timers">All-Timers</SelectItem>}

@@ -44,7 +44,7 @@ export default function TourDates() {
           <div className="relative overflow-x-auto">
             <table className="w-full text-md">
               <thead>
-                <tr className="text-left text-sm text-content-text-secondary border-b border-glass-border/40">
+                <tr className="text-left text-sm text-content-text-secondary border-b">
                   <th className="p-4">Date</th>
                   <th className="p-4">Venue</th>
                   <th className="p-4">Address</th>
@@ -52,10 +52,7 @@ export default function TourDates() {
               </thead>
               <tbody>
                 {dates.map((td: TourDate) => (
-                  <tr
-                    key={td.formattedStartDate + td.venueName}
-                    className="border-b border-glass-border/40 hover:bg-hover-glass"
-                  >
+                  <tr key={td.formattedStartDate + td.venueName} className="border-b">
                     <td className="p-4 text-content-text-primary">
                       {td.formattedStartDate === td.formattedEndDate
                         ? td.formattedStartDate

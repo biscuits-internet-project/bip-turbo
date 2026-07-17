@@ -3,10 +3,10 @@
  * `SelectTrigger`) everywhere a value is entered: admin/edit forms, auth,
  * contact, review, and blog. One surface so a field looks the same in every
  * form and a token change propagates in one edit, instead of the old
- * three-way split (this constant vs. raw `glass-content` vs. the glass-select
+ * three-way split (this constant vs. raw `glass-content` vs. the compact-select
  * tokens). The only inputs that stay off it are the compact filter-bar
- * controls (`glassSelectTriggerClass`), which sit on glass chrome rather than
- * inside a content form.
+ * controls (`compactSelectTriggerClass`), which are sized for a filter bar rather
+ * than a content form.
  */
 export const formInputClass = "bg-content-bg-secondary border-content-bg-secondary text-content-text-primary";
 
