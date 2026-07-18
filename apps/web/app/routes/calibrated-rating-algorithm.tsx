@@ -5,7 +5,7 @@ import { useSession } from "~/hooks/use-session";
 
 export function meta() {
   return [
-    { title: "How ratings work | Biscuits Internet Project" },
+    { title: "How Calibrated Ratings Work | Biscuits Internet Project" },
     {
       name: "description",
       content:
@@ -39,7 +39,7 @@ function PostLink({ href, children }: { href: string; children: React.ReactNode 
  * link, shown when the `ratings.toggle-visible` flag makes the opt-in available to
  * this signed-in viewer.
  */
-export default function ShowRatingAlgorithm() {
+export default function CalibratedRatingAlgorithm() {
   const { toggleVisible } = useFeatureFlags();
   const { user } = useSession();
   // Link straight to the viewer's profile (where the opt-in toggle lives) only
@@ -49,7 +49,7 @@ export default function ShowRatingAlgorithm() {
   return (
     <div className="space-y-6 md:space-y-8">
       <div>
-        <h1 className="page-heading">HOW RATINGS WORK</h1>
+        <h1 className="page-heading">HOW CALIBRATED RATINGS WORK</h1>
       </div>
 
       <div className="grid gap-6 md:gap-8">

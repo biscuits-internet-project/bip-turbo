@@ -1,7 +1,7 @@
 import { setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import ShowRatingAlgorithm from "./show-rating-algorithm";
+import CalibratedRatingAlgorithm from "./calibrated-rating-algorithm";
 
 vi.mock("~/hooks/use-feature-flags", () => ({ useFeatureFlags: vi.fn() }));
 vi.mock("~/hooks/use-session", () => ({ useSession: vi.fn() }));
@@ -35,18 +35,18 @@ function mockUser(username: string | null) {
   });
 }
 
-describe("ShowRatingAlgorithm", () => {
+describe("CalibratedRatingAlgorithm", () => {
   test("links 'your profile settings' to the viewer's profile when the toggle is available", async () => {
     mockFlags(true);
     mockUser("tractorbeam");
-    await setupWithRouter(<ShowRatingAlgorithm />);
+    await setupWithRouter(<CalibratedRatingAlgorithm />);
     expect(screen.getByRole("link", { name: "your profile settings" })).toHaveAttribute("href", "/users/tractorbeam");
   });
 
   test("leaves 'your profile settings' as plain text when the toggle flag is off", async () => {
     mockFlags(false);
     mockUser("tractorbeam");
-    await setupWithRouter(<ShowRatingAlgorithm />);
+    await setupWithRouter(<CalibratedRatingAlgorithm />);
     expect(screen.queryByRole("link", { name: "your profile settings" })).not.toBeInTheDocument();
     expect(screen.getByText(/your profile settings/)).toBeInTheDocument();
   });
@@ -54,7 +54,7 @@ describe("ShowRatingAlgorithm", () => {
   test("leaves 'your profile settings' as plain text for a signed-out visitor", async () => {
     mockFlags(true);
     mockUser(null);
-    await setupWithRouter(<ShowRatingAlgorithm />);
+    await setupWithRouter(<CalibratedRatingAlgorithm />);
     expect(screen.queryByRole("link", { name: "your profile settings" })).not.toBeInTheDocument();
   });
 });
