@@ -10,6 +10,7 @@ import { ShowDateLink } from "~/components/show-date-link";
 import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
 import { DurationValue } from "~/components/track/duration-cell";
 import { NumberCell } from "~/components/ui/number-cell";
+import type { TrackRatingComparison } from "~/server/track-user-ratings";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
 import { TrackRatingCell } from "./track-rating-cell";
@@ -42,26 +43,36 @@ export const gapSortingFn = makeGapSortingFn("gap");
 export const filteredGapSortingFn = makeGapSortingFn("filteredGap");
 
 /**
- * Sort comparator for the Rating column. Tracks with the same community
- * average resolve by vote count first (more votes = more confidence in the
- * average), then by show date, then by position so within-show repeats with
- * matching rating + vote count stay in setlist order relative to each other.
- *
- * Missing ratings collapse to -Infinity so unrated rows cluster at the
- * bottom on desc and the top on asc, matching the Gap column's treatment
- * of debuts/repeats.
+ * Sort comparator factory for the Rating column, parameterized by how a row's
+ * rating and vote count are resolved. Tracks with the same rating resolve by vote
+ * count first (more votes = more confidence), then by show date, then by position
+ * so within-show repeats with matching rating + count stay in setlist order.
+ * Missing ratings collapse to -Infinity so unrated rows cluster at the bottom on
+ * desc and the top on asc. The `ratingOf`/`countOf` seam lets the plain export and
+ * the calibrated-aware column share one comparator instead of two copies.
  */
-export function ratingSortingFn(a: Row<SongPagePerformance>, b: Row<SongPagePerformance>): number {
-  const aRating = a.original.rating ?? Number.NEGATIVE_INFINITY;
-  const bRating = b.original.rating ?? Number.NEGATIVE_INFINITY;
-  if (aRating !== bRating) return aRating - bRating;
-  const aVotes = a.original.ratingsCount ?? 0;
-  const bVotes = b.original.ratingsCount ?? 0;
-  if (aVotes !== bVotes) return aVotes - bVotes;
-  const dateCmp = compareByShowDate(a.original, b.original);
-  if (dateCmp !== 0) return dateCmp;
-  return (a.original.position ?? 0) - (b.original.position ?? 0);
+function makeRatingSortingFn(
+  ratingOf: (row: SongPagePerformance) => number | null,
+  countOf: (row: SongPagePerformance) => number | null,
+): (a: Row<SongPagePerformance>, b: Row<SongPagePerformance>) => number {
+  return (a, b) => {
+    const aRating = ratingOf(a.original) ?? Number.NEGATIVE_INFINITY;
+    const bRating = ratingOf(b.original) ?? Number.NEGATIVE_INFINITY;
+    if (aRating !== bRating) return aRating - bRating;
+    const aVotes = countOf(a.original) ?? 0;
+    const bVotes = countOf(b.original) ?? 0;
+    if (aVotes !== bVotes) return aVotes - bVotes;
+    const dateCmp = compareByShowDate(a.original, b.original);
+    if (dateCmp !== 0) return dateCmp;
+    return (a.original.position ?? 0) - (b.original.position ?? 0);
+  };
 }
+
+/** The plain-average Rating-column comparator (community `rating`/`ratingsCount`). */
+export const ratingSortingFn = makeRatingSortingFn(
+  (row) => row.rating ?? null,
+  (row) => row.ratingsCount ?? null,
+);
 
 /**
  * Adapt a SongPagePerformance row to the minimal Track-like shape the
@@ -194,6 +205,14 @@ interface PerformanceColumnOptions {
   hasNarrowingFilter?: boolean;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
+  /**
+   * The viewer's headline rating per track — the Calibrated Track Rating when they
+   * opted in, else the community average. Overrides the plain `row.rating` baked into
+   * the performance DTO for both display and sorting. Absent ⇒ the plain baked value.
+   */
+  displayRatingMap?: Map<string, { average: number; count: number }>;
+  /** Plain vs calibrated per track, present only for the author compare overlay. */
+  comparisonMap?: Map<string, TrackRatingComparison>;
 }
 
 function SortableHeader({
@@ -234,9 +253,22 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
     hasNarrowingFilter,
     userRatingMap,
     isAuthenticated,
+    displayRatingMap,
+    comparisonMap,
   } = options;
   const includeGapColumns = showGapColumns !== false;
   const columnHelper = createColumnHelper<SongPagePerformance>();
+
+  // The viewer's headline rating/count for a row: the live calibrated-or-plain map
+  // when loaded, falling back to the plain value baked into the DTO. Used by the
+  // rating column's accessor, sort, and cell so display and ordering never disagree.
+  const ratingOf = (row: SongPagePerformance): number | null =>
+    displayRatingMap?.get(row.trackId)?.average ?? row.rating ?? null;
+  const countOf = (row: SongPagePerformance): number | null =>
+    displayRatingMap?.get(row.trackId)?.count ?? row.ratingsCount ?? null;
+  // Same comparator as the plain export, but over the resolved values so a calibrated
+  // viewer sorts by the calibrated score.
+  const displayRatingSortingFn = makeRatingSortingFn(ratingOf, countOf);
   const columns: ColumnDef<SongPagePerformance, unknown>[] = [];
 
   // AllTimer column comes first so the flame anchors the leftmost slot
@@ -506,15 +538,15 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
         },
       },
     ) as ColumnDef<SongPagePerformance, unknown>,
-    columnHelper.accessor((row) => row.rating ?? 0, {
+    columnHelper.accessor((row) => ratingOf(row) ?? 0, {
       id: "rating",
       header: ({ column }) => <SortableHeader column={column} label="Rating" />,
       enableSorting: true,
       // Rating ties resolve to vote count (more votes = more confidence),
-      // then show date, then track position — same chain as gapSortingFn so
+      // then show date, then track position — same chain as ratingSortingFn so
       // identical-rating runs across multiple shows still read in a stable
       // order. Sort defaults to descending ("best first") via sortDescFirst.
-      sortingFn: ratingSortingFn,
+      sortingFn: displayRatingSortingFn,
       sortDescFirst: true,
       // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
       // average + 3-digit vote count + the viewer's own half-step rating
@@ -526,19 +558,16 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       // badge, so the column doesn't need a wider expanded state.
       meta: { fixedWidth: "8.25rem", mobileFixedWidth: "6.75rem" },
       cell: (info) => {
-        const rating = info.getValue();
-        const ratingsCount = info.row.original.ratingsCount;
-        const trackId = info.row.original.trackId;
-        const showSlug = info.row.original.show.slug;
-        const userRating = userRatingMap.get(trackId) ?? null;
+        const row = info.row.original;
         return (
           <TrackRatingCell
-            trackId={trackId}
-            showSlug={showSlug}
-            initialRating={rating || null}
-            ratingsCount={ratingsCount || null}
-            userRating={userRating}
+            trackId={row.trackId}
+            showSlug={row.show.slug}
+            initialRating={ratingOf(row)}
+            ratingsCount={countOf(row)}
+            userRating={userRatingMap.get(row.trackId) ?? null}
             isAuthenticated={isAuthenticated}
+            comparison={comparisonMap?.get(row.trackId)}
           />
         );
       },

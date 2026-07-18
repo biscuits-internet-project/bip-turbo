@@ -8,7 +8,9 @@ import {
   COLD_START_ENTROPY_K,
   COLD_START_RATER_K,
   computeCleanedScopeStats,
+  discriminatingRaterWeight,
   ENTROPY_FULL_WEIGHT,
+  entropyPowerWeightedAverage,
   entropyWeightedCenteredAverage,
   meanOf,
   POPULATION_SHOW_MEAN,
@@ -20,6 +22,7 @@ import {
   type ScopedRating,
   SHRINK_K,
   selectContributingRatings,
+  TRACK_DISCRIMINATING_GAMMA,
 } from "./rater-weighting";
 import type { RatingValueBucket } from "./rating-service";
 
@@ -122,7 +125,7 @@ export function rankShowComparisons(
 }
 
 /** One rater's GLOBAL-scope centering stats + their per-era bad-faith flag. */
-interface RaterScopeStat {
+export interface RaterScopeStat {
   mean: number;
   entropy: number;
   count: number;
@@ -131,7 +134,7 @@ interface RaterScopeStat {
 
 /** Look up a rater's stats for a given scope era (`"GLOBAL"` for centering, the show's
  * drummer era for exclusion); undefined for a statless (brand-new) rater. */
-type StatByUserEra = (userId: string, era: RaterEra) => RaterScopeStat | undefined;
+export type StatByUserEra = (userId: string, era: RaterEra) => RaterScopeStat | undefined;
 
 /**
  * Pure: a show's calibrated score from its deduped ratings, the raters' GLOBAL-scope
@@ -144,7 +147,7 @@ type StatByUserEra = (userId: string, era: RaterEra) => RaterScopeStat | undefin
  * mean + entropy are cold-start-shrunk by their rating count so a new/low-volume rater
  * still moves the score (a statless rater = pop-centered + full weight).
  */
-function computeShowWeighted(
+export function computeShowWeighted(
   ratings: ReadonlyArray<{ userId: string; value: number }>,
   showEra: RaterEra | null,
   statByUserEra: StatByUserEra,
@@ -171,6 +174,33 @@ function computeShowWeighted(
   return {
     weightedRating: result.contributingCount > 0 ? result.weightedAverage : null,
     weightedRatingsCount: result.contributingCount,
+  };
+}
+
+/** Look up a rater's GLOBAL-scope TRACK stats (entropy/mean/count) — the discriminating weight input. */
+type TrackStatByUser = (userId: string) => { mean: number; entropy: number; ratingsCount: number } | undefined;
+
+/**
+ * Pure: a track's Calibrated Track Rating from its deduped ratings and each rater's GLOBAL
+ * TRACK stats. Entropy^gamma weighted over RAW star values — no centering, no anchor-shrink
+ * (see {@link entropyPowerWeightedAverage}); one-note fluffers drop to weight 0. A statless
+ * rater (no track stats yet) also drops out. The single track-scoring rule, shared by the
+ * batch recompute and the incremental path so they can't diverge.
+ */
+export function computeTrackDiscriminating(
+  ratings: ReadonlyArray<{ userId: string; value: number }>,
+  statByUser: TrackStatByUser,
+  gamma: number,
+): { discriminatingRating: number | null; discriminatingRatingsCount: number } {
+  const result = entropyPowerWeightedAverage(
+    ratings.map((rating) => {
+      const stats = statByUser(rating.userId);
+      return { value: rating.value, weight: stats ? discriminatingRaterWeight(stats, gamma) : 0 };
+    }),
+  );
+  return {
+    discriminatingRating: result.contributingCount > 0 ? result.weightedAverage : null,
+    discriminatingRatingsCount: result.contributingCount,
   };
 }
 
@@ -293,6 +323,57 @@ export class RaterWeightService {
       };
     }
     return byId;
+  }
+
+  /**
+   * The Calibrated Track Rating + contributing count per track, keyed by track id. Read
+   * straight from the denormalized `tracks.discriminating_rating` — unlike shows there's no
+   * count-shrink or anchor (the track score deliberately keeps its raw spread). The count is
+   * the raters left after fluffer exclusion. Absent (unrated / all-excluded) ⇒ caller falls
+   * back to the canonical average + count.
+   */
+  async getCalibratedForTracks(trackIds: string[]): Promise<Record<string, { rating: number; count: number }>> {
+    if (trackIds.length === 0) return {};
+    const tracks = await this.db.track.findMany({
+      where: { id: { in: trackIds }, discriminatingRating: { not: null } },
+      select: { id: true, discriminatingRating: true, discriminatingRatingsCount: true },
+    });
+    const byId: Record<string, { rating: number; count: number }> = {};
+    for (const track of tracks) {
+      if (track.discriminatingRating == null) continue;
+      byId[track.id] = { rating: track.discriminatingRating, count: track.discriminatingRatingsCount };
+    }
+    return byId;
+  }
+
+  /**
+   * The calibrated histogram for one track: raw-star-value buckets of exactly the raters
+   * who feed the Calibrated Track Rating — those with a positive discriminating weight
+   * (fluffers and one-note zero-entropy raters dropped), by the track-global `rater_stats`
+   * bucket (tracks have no era scope). Bars stay raw star values; membership matches the
+   * score, so the bar total equals the displayed `discriminating_ratings_count`. Falls
+   * back to the full deduped set when no `rater_stats` exist or every rater drops out,
+   * matching the plain distribution the headline falls back to. Empty when unrated.
+   * Mirrors {@link getCalibratedDistribution} for shows.
+   */
+  async getCalibratedTrackDistribution(trackId: string): Promise<RatingValueBucket[]> {
+    const ratings = await this.loadCanonicalShowRatings("Track", trackId);
+    if (ratings.length === 0) return [];
+    const statRows = await this.db.raterStats.findMany({
+      where: { userId: { in: ratings.map((rating) => rating.userId) }, kind: "TRACK", era: "GLOBAL" },
+      select: { userId: true, mean: true, entropy: true, ratingsCount: true },
+    });
+    const contributing = new Set<string>();
+    for (const row of statRows) {
+      const weight = discriminatingRaterWeight(
+        { mean: row.mean, entropy: row.entropy, ratingsCount: row.ratingsCount },
+        TRACK_DISCRIMINATING_GAMMA,
+      );
+      if (weight > 0) contributing.add(row.userId);
+    }
+    const used = ratings.filter((rating) => contributing.has(rating.userId));
+    const active = used.length > 0 ? used : ratings;
+    return bucketRatingValues(active.map((rating) => rating.value));
   }
 
   /**
@@ -607,8 +688,36 @@ export class RaterWeightService {
   }
 
   /**
-   * Full rebuild: every person's per-kind scope stats (deduped) then every rated
-   * show's calibrated score. Run by the cron/script. Returns coverage counts.
+   * Chunked bulk write of computed scores into a denormalized (score, count) column pair,
+   * joining the values in as a VALUES table — one UPDATE per chunk instead of a per-row
+   * round-trip. Table and column names are hardcoded literals (via `Prisma.raw`), never
+   * user input. Shared by the show (`weighted_rating`) and track (`discriminating_rating`)
+   * recompute writes. Chunked to stay well under the bind-parameter limit.
+   */
+  private async writeDenormalizedScores(
+    table: "shows" | "tracks",
+    scoreColumn: string,
+    countColumn: string,
+    updates: ReadonlyArray<{ id: string; score: number | null; count: number }>,
+  ): Promise<void> {
+    const WRITE_CHUNK = 1000;
+    for (let i = 0; i < updates.length; i += WRITE_CHUNK) {
+      const rows = updates
+        .slice(i, i + WRITE_CHUNK)
+        .map((update) => Prisma.sql`(${update.id}::uuid, ${update.score}::double precision, ${update.count}::int)`);
+      await this.db.$executeRaw(Prisma.sql`
+        UPDATE ${Prisma.raw(table)} AS t
+        SET ${Prisma.raw(scoreColumn)} = v.score, ${Prisma.raw(countColumn)} = v.count
+        FROM (VALUES ${Prisma.join(rows)}) AS v(id, score, count)
+        WHERE t.id = v.id
+      `);
+    }
+  }
+
+  /**
+   * Full rebuild: every person's per-kind scope stats (deduped), then every rated show's
+   * calibrated score and every rated track's discriminating score. Run by the cron/script.
+   * Returns coverage counts.
    */
   async recomputeAll(): Promise<{ users: number; rateables: number }> {
     const rawRatings = await this.db.rating.findMany({
@@ -683,24 +792,55 @@ export class RaterWeightService {
       updates.push({ id: showId, ...computeShowWeighted(showRatings, era, statByUserEra, populationByKind.SHOW) });
     }
 
-    // One bulk UPDATE instead of ~1800 per-row round-trips: join the computed values
-    // in as a VALUES table. Chunked only to stay well under the parameter limit.
-    const WRITE_CHUNK = 1000;
-    for (let i = 0; i < updates.length; i += WRITE_CHUNK) {
-      const rows = updates
-        .slice(i, i + WRITE_CHUNK)
-        .map(
-          (update) =>
-            Prisma.sql`(${update.id}::uuid, ${update.weightedRating}::double precision, ${update.weightedRatingsCount}::int)`,
-        );
-      await this.db.$executeRaw`
-        UPDATE shows AS s
-        SET weighted_rating = v.weighted_rating, weighted_ratings_count = v.weighted_ratings_count
-        FROM (VALUES ${Prisma.join(rows)}) AS v(id, weighted_rating, weighted_ratings_count)
-        WHERE s.id = v.id
-      `;
-    }
+    // One bulk UPDATE instead of ~1800 per-row round-trips (see writeDenormalizedScores).
+    await this.writeDenormalizedScores(
+      "shows",
+      "weighted_rating",
+      "weighted_ratings_count",
+      updates.map((update) => ({ id: update.id, score: update.weightedRating, count: update.weightedRatingsCount })),
+    );
 
-    return { users: scopedByUser.size, rateables: updates.length };
+    // Calibrated Track Rating: entropy^gamma weighted, un-centered, un-shrunk. Weights come
+    // from each rater's GLOBAL-scope TRACK stats (just built above); excluded fluffers fall out.
+    const trackStatByUser = new Map<string, { mean: number; entropy: number; ratingsCount: number }>();
+    for (const record of allRecords) {
+      if (record.kind !== "TRACK" || record.era !== "GLOBAL") continue;
+      trackStatByUser.set(record.userId, {
+        mean: record.mean,
+        entropy: record.entropy,
+        ratingsCount: record.ratingsCount,
+      });
+    }
+    const ratingsByTrack = new Map<string, Array<{ userId: string; value: number }>>();
+    for (const rating of ratings) {
+      if (rating.rateableType !== "Track") continue;
+      const bucket = ratingsByTrack.get(rating.rateableId) ?? [];
+      bucket.push({ userId: rating.userId, value: rating.value });
+      ratingsByTrack.set(rating.rateableId, bucket);
+    }
+    const trackUpdates: Array<{ id: string; discriminatingRating: number | null; discriminatingRatingsCount: number }> =
+      [];
+    for (const [trackId, trackRatings] of ratingsByTrack) {
+      trackUpdates.push({
+        id: trackId,
+        ...computeTrackDiscriminating(
+          trackRatings,
+          (userId) => trackStatByUser.get(userId),
+          TRACK_DISCRIMINATING_GAMMA,
+        ),
+      });
+    }
+    await this.writeDenormalizedScores(
+      "tracks",
+      "discriminating_rating",
+      "discriminating_ratings_count",
+      trackUpdates.map((update) => ({
+        id: update.id,
+        score: update.discriminatingRating,
+        count: update.discriminatingRatingsCount,
+      })),
+    );
+
+    return { users: scopedByUser.size, rateables: updates.length + trackUpdates.length };
   }
 }

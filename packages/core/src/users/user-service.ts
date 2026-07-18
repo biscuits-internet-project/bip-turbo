@@ -58,6 +58,8 @@ function mapUserToDomainEntity(dbUser: DbUser): User {
     updatedAt: dbUser.updatedAt,
     showCalibratedRatings: dbUser.showCalibratedRatings ?? null,
     showRatingComparisonDebug: dbUser.showRatingComparisonDebug ?? null,
+    trackCalibratedRatings: dbUser.trackCalibratedRatings ?? null,
+    trackRatingComparisonDebug: dbUser.trackRatingComparisonDebug ?? null,
     colorCodeRatings: dbUser.colorCodeRatings ?? null,
     showSetlistTimes: dbUser.showSetlistTimes ?? null,
   };

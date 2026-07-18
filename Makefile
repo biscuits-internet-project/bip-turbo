@@ -98,6 +98,9 @@ recompute-ratings:
 rating-validity-eval:
 	cd packages/core && doppler run -- bun run scripts/rating-validity-eval.ts
 
+track-rating-calibration-spike:
+	cd packages/core && doppler run -- bun run scripts/track-rating-calibration-spike.ts
+
 db-sync-missing-shows:
 	cd packages/core && doppler run -- bun run scripts/sync-missing-shows.ts $(if $(HELP),--help) $(if $(YEARS),--years=$(YEARS)) $(if $(DRY_RUN),--dry-run) $(if $(PRUNE_GHOST_SHOWS),--prune-ghost-shows) $(if $(NO_USERS),--no-users) $(if $(FULL_USERS),--full-users) $(if $(PRUNE_USERS),--prune-users)
 

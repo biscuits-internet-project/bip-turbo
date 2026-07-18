@@ -32,7 +32,7 @@ describe("computeTrackUserRatings", () => {
   // no performance/setlist rows (e.g. a venue with no tracked shows yet).
   test("returns empty response and makes no service calls when trackIds is empty", async () => {
     const result = await computeTrackUserRatings({ currentUser: undefined }, []);
-    expect(result).toEqual({ userRatings: {}, averageRatings: {} });
+    expect(result).toEqual({ userRatings: {}, averageRatings: {}, calibratedRatings: {}, comparisons: {} });
     expect(findManyByUserIdAndRateableIds).not.toHaveBeenCalled();
     expect(getAveragesForRateables).not.toHaveBeenCalled();
     expect(findByEmail).not.toHaveBeenCalled();

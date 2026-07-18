@@ -616,6 +616,8 @@ model Track {
   nextTrackId     String?                  @map("next_track_id") @db.Uuid
   averageRating   Float?                   @default(0) @map("average_rating")
   ratingsCount    Int                      @default(0) @map("ratings_count")
+  discriminatingRating       Float?        @map("discriminating_rating")
+  discriminatingRatingsCount Int           @default(0) @map("discriminating_ratings_count")
   searchText      String?                  @map("search_text") @db.Text
   searchVector    Unsupported("tsvector")? @map("search_vector")
   gap                       Int?
@@ -765,6 +767,8 @@ model User {
   avatarFileUrl       String?      @map("avatar_file_url") @db.VarChar
   showCalibratedRatings     Boolean? @map("show_adjusted_rating")
   showRatingComparisonDebug Boolean? @map("show_rating_compare")
+  trackCalibratedRatings     Boolean? @map("track_calibrated_rating")
+  trackRatingComparisonDebug Boolean? @map("track_rating_compare")
   colorCodeRatings          Boolean? @map("color_code_ratings")
   showSetlistTimes          Boolean? @map("show_setlist_times")
   avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)

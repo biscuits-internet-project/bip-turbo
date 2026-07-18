@@ -11,6 +11,8 @@ const updateUserSchema = z.object({
   // Toggles arrive as "true"/"false" strings; persistence is flag-gated below.
   showCalibratedRatings: z.enum(["true", "false"]).optional(),
   showRatingComparisonDebug: z.enum(["true", "false"]).optional(),
+  trackCalibratedRatings: z.enum(["true", "false"]).optional(),
+  trackRatingComparisonDebug: z.enum(["true", "false"]).optional(),
   colorCodeRatings: z.enum(["true", "false"]).optional(),
   showSetlistTimes: z.enum(["true", "false"]).optional(),
 });
@@ -76,6 +78,8 @@ export async function action({ request }: ActionFunctionArgs) {
       username?: string;
       showCalibratedRatings?: boolean;
       showRatingComparisonDebug?: boolean;
+      trackCalibratedRatings?: boolean;
+      trackRatingComparisonDebug?: boolean;
       colorCodeRatings?: boolean;
       showSetlistTimes?: boolean;
     } = {};
@@ -86,6 +90,12 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     if (flags.compareVisible && validatedData.showRatingComparisonDebug !== undefined) {
       update.showRatingComparisonDebug = validatedData.showRatingComparisonDebug === "true";
+    }
+    if (flags.toggleVisible && validatedData.trackCalibratedRatings !== undefined) {
+      update.trackCalibratedRatings = validatedData.trackCalibratedRatings === "true";
+    }
+    if (flags.compareVisible && validatedData.trackRatingComparisonDebug !== undefined) {
+      update.trackRatingComparisonDebug = validatedData.trackRatingComparisonDebug === "true";
     }
     // Color coding and setlist times are available to everyone, so no flag
     // guards these.

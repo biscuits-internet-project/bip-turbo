@@ -69,7 +69,7 @@ export function PerformanceTable({
   };
 
   const trackIds = useMemo(() => performances.map((performance) => performance.trackId), [performances]);
-  const { userRatingMap } = useTrackUserRatings(trackIds);
+  const { userRatingMap, displayRatingMap, comparisonMap } = useTrackUserRatings(trackIds);
 
   const columns = useMemo(
     () =>
@@ -81,6 +81,8 @@ export function PerformanceTable({
         hasNarrowingFilter,
         userRatingMap,
         isAuthenticated,
+        displayRatingMap,
+        comparisonMap,
       }),
     [
       showSongColumn,
@@ -90,6 +92,8 @@ export function PerformanceTable({
       hasNarrowingFilter,
       userRatingMap,
       isAuthenticated,
+      displayRatingMap,
+      comparisonMap,
     ],
   );
 

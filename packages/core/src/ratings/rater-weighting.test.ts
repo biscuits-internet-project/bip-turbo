@@ -3,6 +3,9 @@ import {
   bucketRatingValues,
   center,
   computeCleanedScopeStats,
+  discriminatingRaterWeight,
+  ENTROPY_FULL_WEIGHT,
+  entropyPowerWeightedAverage,
   entropyWeight,
   entropyWeightedCenteredAverage,
   isExcludedBucket,
@@ -116,6 +119,47 @@ describe("entropyWeightedCenteredAverage", () => {
 
   test("returns an empty result when every rater is weightless", () => {
     const result = entropyWeightedCenteredAverage([{ value: 5, userMean: 4, entropy: 0 }], { mean: 4 }, 2);
+    expect(result.contributingCount).toBe(0);
+    expect(result.weightedAverage).toBe(0);
+  });
+});
+
+// discriminatingRaterWeight — the calibrated TRACK rating's per-rater weight: a
+// sharpened entropy weight (favouring scale-users), zero for excluded fluffers.
+describe("discriminatingRaterWeight", () => {
+  test("excludes a one-note fluffer bucket entirely", () => {
+    expect(discriminatingRaterWeight({ entropy: 0.3, mean: 4.9, ratingsCount: 8 }, 3)).toBe(0);
+  });
+
+  test("gives a full-scale rater full weight regardless of gamma", () => {
+    // entropy >= ENTROPY_FULL_WEIGHT → entropyWeight 1 → 1^gamma = 1.
+    expect(discriminatingRaterWeight({ entropy: ENTROPY_FULL_WEIGHT, mean: 3, ratingsCount: 20 }, 3)).toBe(1);
+  });
+
+  test("a higher gamma shrinks a mid-entropy rater's weight (base < 1)", () => {
+    const stats = { entropy: 1, mean: 3, ratingsCount: 20 }; // entropyWeight = 0.5
+    const soft = discriminatingRaterWeight(stats, 1);
+    const sharp = discriminatingRaterWeight(stats, 3);
+    expect(soft).toBeCloseTo(0.5, 5);
+    expect(sharp).toBeLessThan(soft);
+  });
+});
+
+// entropyPowerWeightedAverage — the raw (un-centered, un-shrunk) weighted mean
+// behind the calibrated track score.
+describe("entropyPowerWeightedAverage", () => {
+  test("weights raw values and drops the weightless ones", () => {
+    const result = entropyPowerWeightedAverage([
+      { value: 5, weight: 1 },
+      { value: 1, weight: 1 },
+      { value: 5, weight: 0 }, // a fluffer, dropped
+    ]);
+    expect(result.contributingCount).toBe(2);
+    expect(result.weightedAverage).toBe(3);
+  });
+
+  test("returns an empty result when every rater is weightless", () => {
+    const result = entropyPowerWeightedAverage([{ value: 5, weight: 0 }]);
     expect(result.contributingCount).toBe(0);
     expect(result.weightedAverage).toBe(0);
   });

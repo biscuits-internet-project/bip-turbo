@@ -12,7 +12,13 @@ import { useFeatureFlags } from "~/hooks/use-feature-flags";
 // flagged toggles appear only when their feature flag is on, and flipping any
 // toggle persists immediately (no save button). Color coding ships to everyone,
 // so it renders unflagged and keeps the card alive for a typical user.
-const base = { showCalibratedRatings: null, showRatingComparisonDebug: null, colorCodeRatings: null };
+const base = {
+  showCalibratedRatings: null,
+  showRatingComparisonDebug: null,
+  trackCalibratedRatings: null,
+  trackRatingComparisonDebug: null,
+  colorCodeRatings: null,
+};
 
 function mockFlags(overrides: Partial<ReturnType<typeof useFeatureFlags>>) {
   vi.mocked(useFeatureFlags).mockReturnValue({
@@ -80,11 +86,33 @@ describe("RatingDisplaySettings", () => {
     expect((init.body as FormData).get("colorCodeRatings")).toBe("true");
   });
 
-  test("shows only the opt-in toggle when just toggle-visible is on", async () => {
+  test("shows only the opt-in toggles when just toggle-visible is on", async () => {
     mockFlags({ toggleVisible: true });
     await setupWithRouter(<RatingDisplaySettings {...base} />);
     expect(screen.getByText("Calibrated show rating")).toBeInTheDocument();
+    expect(screen.getByText("Calibrated track rating")).toBeInTheDocument();
     expect(screen.queryByText("Show Rating Comparison Overlay (debug)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Track Rating Comparison Overlay (debug)")).not.toBeInTheDocument();
+  });
+
+  test("shows the track comparison overlay toggle only when compare-visible is on", async () => {
+    mockFlags({ toggleVisible: true, compareVisible: true });
+    await setupWithRouter(<RatingDisplaySettings {...base} />);
+    expect(screen.getByText("Track Rating Comparison Overlay (debug)")).toBeInTheDocument();
+  });
+
+  test("auto-saves the calibrated-track opt-in to /api/users on toggle", async () => {
+    mockFlags({ toggleVisible: true });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { user } = await setupWithRouter(<RatingDisplaySettings {...base} />);
+    await user.click(screen.getByLabelText("Use the calibrated track rating"));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/users");
+    expect((init.body as FormData).get("trackCalibratedRatings")).toBe("true");
   });
 
   test("shows the comparison overlay toggle when compare-visible is on", async () => {

@@ -1,5 +1,41 @@
 import { describe, expect, test, vi } from "vitest";
-import { RaterWeightService, rankShowComparisons } from "./rater-weight-service";
+import { computeTrackDiscriminating, RaterWeightService, rankShowComparisons } from "./rater-weight-service";
+
+describe("computeTrackDiscriminating", () => {
+  const wide = { mean: 3, entropy: 2, ratingsCount: 30 }; // full weight
+  const fluffer = { mean: 4.9, entropy: 0.3, ratingsCount: 20 }; // excluded → weight 0
+
+  test("weights by rater and drops excluded fluffers, keeping raw (un-centered) low scores", () => {
+    const stats = new Map([
+      ["wide", wide],
+      ["fluffer", fluffer],
+    ]);
+    const result = computeTrackDiscriminating(
+      [
+        { userId: "wide", value: 0.5 }, // a genuine low vote from a scale-user
+        { userId: "fluffer", value: 5 }, // dropped
+      ],
+      (userId) => stats.get(userId),
+      3,
+    );
+    // Only the wide rater counts, un-centered → the 0.5 survives intact.
+    expect(result.discriminatingRating).toBeCloseTo(0.5, 5);
+    expect(result.discriminatingRatingsCount).toBe(1);
+  });
+
+  test("returns null when every contributing rater is excluded or statless", () => {
+    const result = computeTrackDiscriminating(
+      [
+        { userId: "fluffer", value: 5 },
+        { userId: "unknown", value: 5 }, // no stats row → weight 0
+      ],
+      (userId) => (userId === "fluffer" ? fluffer : undefined),
+      3,
+    );
+    expect(result.discriminatingRating).toBeNull();
+    expect(result.discriminatingRatingsCount).toBe(0);
+  });
+});
 
 describe("rankShowComparisons", () => {
   // The 2001-09-01 overlay scenario: two single-vote 5.0 shows top the raw-average

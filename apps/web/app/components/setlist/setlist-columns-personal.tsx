@@ -30,6 +30,7 @@ export function createPersonalSetlistColumns(
     averageRatingMap: ctx?.averageRatingMap ?? new Map(),
     userRatingMap: ctx?.userRatingMap ?? new Map(),
     isAuthenticated: ctx?.isAuthenticated ?? false,
+    comparisonMap: ctx?.comparisonMap,
   };
   return [
     ...createSetlistCommonColumns<PersonalSetlistTableRow>({ songLinkSearchParams: "attended=attended" }),

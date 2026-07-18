@@ -146,6 +146,8 @@ describe("SetlistTable", () => {
     vi.mocked(useTrackUserRatings).mockReturnValue({
       userRatingMap: new Map([["t-1", 5]]),
       averageRatingMap: new Map([["t-1", { average: 4.4, count: 22 }]]),
+      displayRatingMap: new Map([["t-1", { average: 4.4, count: 22 }]]),
+      comparisonMap: new Map(),
       isLoading: false,
     });
 

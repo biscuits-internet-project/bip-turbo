@@ -79,6 +79,15 @@ vi.mock("~/components/performance/performance-filter-controls", () => ({
 vi.mock("~/components/rating", () => ({
   RatingComponent: () => <div data-testid="RatingComponent" />,
 }));
+vi.mock("~/hooks/use-track-user-ratings", () => ({
+  useTrackUserRatings: () => ({
+    userRatingMap: new Map(),
+    averageRatingMap: new Map(),
+    displayRatingMap: new Map(),
+    comparisonMap: new Map(),
+    isLoading: false,
+  }),
+}));
 vi.mock("~/components/admin/admin-only", () => ({
   AdminOnly: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));

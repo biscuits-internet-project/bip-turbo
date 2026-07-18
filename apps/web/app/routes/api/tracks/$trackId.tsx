@@ -3,6 +3,7 @@ import { protectedAction, publicLoader } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
 import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
+import { resolveViewerRatingMode } from "~/server/viewer-rating";
 
 export const loader = publicLoader(async ({ params, context }) => {
   const { currentUser } = context;
@@ -29,14 +30,26 @@ export const loader = publicLoader(async ({ params, context }) => {
     }
   }
 
-  // Get the fresh average rating and count (already on track from DB)
-  const averageRating = track.averageRating || 0;
-  const ratingsCount = track.ratingsCount || 0;
+  // Headline rating + count AND the histogram both track the viewer's rating mode: a
+  // calibrated viewer sees the Calibrated Track Rating and the fluffer-dropped
+  // contributing distribution (so the overlay matches the setlist's inline cell);
+  // everyone else sees the plain community average + deduped distribution. Computed
+  // here (not denormalized) so it loads only when a track's overlay opens.
+  let averageRating = track.averageRating || 0;
+  let ratingsCount = track.ratingsCount || 0;
+  const { trackMode } = await resolveViewerRatingMode(context);
+  const calibrated = trackMode === "calibrated";
+  if (calibrated) {
+    const score = (await services.raterWeights.getCalibratedForTracks([trackId]))[trackId];
+    if (score) {
+      averageRating = score.rating;
+      ratingsCount = score.count;
+    }
+  }
 
-  // Rating distribution for the per-track histogram in the hover overlay.
-  // Computed here (not denormalized) so it loads only when a user opens a
-  // track's overlay, which is the only caller of this loader.
-  const distribution = await services.ratings.getRatingDistribution(trackId, "Track");
+  const distribution = calibrated
+    ? await services.raterWeights.getCalibratedTrackDistribution(trackId)
+    : await services.ratings.getRatingDistribution(trackId, "Track");
 
   return new Response(
     JSON.stringify({
