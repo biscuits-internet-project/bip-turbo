@@ -276,6 +276,8 @@ export interface McpSyncUser {
   // Display prefs, mirrored from prod so adoption can be inspected locally.
   showCalibratedRatings: boolean | null;
   showRatingComparisonDebug: boolean | null;
+  trackCalibratedRatings: boolean | null;
+  trackRatingComparisonDebug: boolean | null;
   colorCodeRatings: boolean | null;
   // Optional until the setlist-times deploy lands on prod: an older prod omits
   // it, and the sync then leaves the local value alone rather than clearing it.
@@ -1704,6 +1706,8 @@ export async function syncUserActivity(
               avatarFileUrl: u.avatarFileUrl,
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
+              trackCalibratedRatings: u.trackCalibratedRatings,
+              trackRatingComparisonDebug: u.trackRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
               showSetlistTimes: u.showSetlistTimes,
               updatedAt: new Date(u.updatedAt),
@@ -1722,6 +1726,8 @@ export async function syncUserActivity(
               avatarFileUrl: u.avatarFileUrl,
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
+              trackCalibratedRatings: u.trackCalibratedRatings,
+              trackRatingComparisonDebug: u.trackRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
               showSetlistTimes: u.showSetlistTimes,
               updatedAt: new Date(u.updatedAt),
@@ -1739,6 +1745,8 @@ export async function syncUserActivity(
               avatarFileUrl: u.avatarFileUrl,
               showCalibratedRatings: u.showCalibratedRatings,
               showRatingComparisonDebug: u.showRatingComparisonDebug,
+              trackCalibratedRatings: u.trackCalibratedRatings,
+              trackRatingComparisonDebug: u.trackRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
               showSetlistTimes: u.showSetlistTimes,
               createdAt: new Date(u.createdAt),

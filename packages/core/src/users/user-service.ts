@@ -441,6 +441,8 @@ export class UserService {
       // Display prefs, mirrored to local so prod adoption can be inspected.
       showCalibratedRatings: boolean | null;
       showRatingComparisonDebug: boolean | null;
+      trackCalibratedRatings: boolean | null;
+      trackRatingComparisonDebug: boolean | null;
       colorCodeRatings: boolean | null;
       showSetlistTimes: boolean | null;
       createdAt: Date;
@@ -467,6 +469,8 @@ export class UserService {
         avatarFileUrl: true,
         showCalibratedRatings: true,
         showRatingComparisonDebug: true,
+        trackCalibratedRatings: true,
+        trackRatingComparisonDebug: true,
         colorCodeRatings: true,
         showSetlistTimes: true,
         createdAt: true,
