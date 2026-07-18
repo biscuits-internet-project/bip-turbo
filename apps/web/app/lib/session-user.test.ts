@@ -5,7 +5,7 @@ import { toSessionUser } from "./session-user";
 function makeSupabaseUser(overrides: Partial<User> = {}): User {
   return {
     id: "auth-1",
-    email: "evan@foo.net",
+    email: "test-user@example.com",
     app_metadata: {},
     user_metadata: {},
     aud: "authenticated",
@@ -21,15 +21,15 @@ describe("toSessionUser", () => {
   test("projects the supabase user to the client-safe shape", () => {
     const result = toSessionUser(
       makeSupabaseUser({
-        user_metadata: { username: "evan", internal_user_id: "local-1" },
+        user_metadata: { username: "test-user", internal_user_id: "local-1" },
         app_metadata: { isAdmin: true, provider: "email" },
       }),
     );
 
     expect(result).toEqual({
       id: "auth-1",
-      email: "evan@foo.net",
-      username: "evan",
+      email: "test-user@example.com",
+      username: "test-user",
       avatarUrl: null,
       internalUserId: "local-1",
       isAdmin: true,
@@ -72,9 +72,9 @@ describe("toSessionUser", () => {
   // ensureUserSynced fires) still gets a well-formed shape; the
   // client-side sync fills the id in later.
   test("returns null internalUserId when metadata lacks it", () => {
-    const result = toSessionUser(makeSupabaseUser({ user_metadata: { username: "evan" } }));
+    const result = toSessionUser(makeSupabaseUser({ user_metadata: { username: "test-user" } }));
     expect(result.internalUserId).toBeNull();
-    expect(result.username).toBe("evan");
+    expect(result.username).toBe("test-user");
   });
 
   // Supabase types `email` as optional. The helper coerces missing

@@ -761,7 +761,7 @@ function variantSweepReport(
   const distTracks = [...plain.keys()].filter((id) => (plain.get(id)?.count ?? 0) >= minDistRatings);
 
   const configs: Array<{ label: string; options: VariantOptions }> = [
-    { label: "discriminating (none, γ" + gamma + ", k0)", options: { centering: "none", gamma, shrinkK: 0 } },
+    { label: `discriminating (none, γ${gamma}, k0)`, options: { centering: "none", gamma, shrinkK: 0 } },
     { label: `mean-center (mean, γ${gamma}, k0)`, options: { centering: "mean", gamma, shrinkK: 0 } },
     { label: `z-score (zscore, γ${gamma}, k0)`, options: { centering: "zscore", gamma, shrinkK: 0 } },
     { label: `mean + light shrink (mean, γ${gamma}, k1)`, options: { centering: "mean", gamma, shrinkK: 1 } },

@@ -3674,7 +3674,7 @@ describe("syncUserActivity — avatarFileId FK safety", () => {
 
 describe("syncUserActivity — username-keyed user upsert", () => {
   // When a prod user's id doesn't match locally but their username does
-  // (e.g. local was seeded from a dump that gave evan a different id), the
+  // (e.g. local was seeded from a dump that gave test-user a different id), the
   // sync must update the local row in place — NOT create a second row that
   // would hit users_username_unique — and must remap ratings/attendances
   // owned by the prod id onto the local id so they attach to the right
@@ -3684,10 +3684,10 @@ describe("syncUserActivity — username-keyed user upsert", () => {
       users: [
         {
           // Local id, kept stable across the sync (PKs aren't rewritten).
-          id: "local-evan-id",
-          email: "stub-local-evan-id@local.invalid",
+          id: "local-test-user-id",
+          email: "stub-local-test-user-id@local.invalid",
           passwordDigest: "STUB",
-          username: "evan",
+          username: "test-user",
           avatarFileId: null,
           avatarFileUrl: null,
           createdAt: new Date("2020-01-01T00:00:00Z"),
@@ -3701,11 +3701,11 @@ describe("syncUserActivity — username-keyed user upsert", () => {
         {
           users: [
             {
-              // Prod's id for "evan" differs from local.
-              id: "prod-evan-id",
-              username: "evan",
+              // Prod's id for "test-user" differs from local.
+              id: "prod-test-user-id",
+              username: "test-user",
               avatarFileId: null,
-              avatarFileUrl: "https://cdn.example/evan.jpg",
+              avatarFileUrl: "https://cdn.example/test-user.jpg",
               createdAt: "2020-01-01T00:00:00Z",
               updatedAt: "2024-08-12T00:00:00Z",
             },
@@ -3718,7 +3718,7 @@ describe("syncUserActivity — username-keyed user upsert", () => {
           ratings: [
             {
               id: "r-1",
-              userId: "prod-evan-id",
+              userId: "prod-test-user-id",
               value: 5,
               rateableType: "Show",
               rateableId: "show-1",
@@ -3746,11 +3746,11 @@ describe("syncUserActivity — username-keyed user upsert", () => {
     // Only one user row — no users_username_unique violation; local id
     // stays stable; the prod-side update (new avatar URL) lands.
     expect(state.users).toHaveLength(1);
-    expect(state.users[0].id).toBe("local-evan-id");
-    expect(state.users[0].avatarFileUrl).toBe("https://cdn.example/evan.jpg");
-    // Rating's userId was remapped from prod-evan-id to local-evan-id.
+    expect(state.users[0].id).toBe("local-test-user-id");
+    expect(state.users[0].avatarFileUrl).toBe("https://cdn.example/test-user.jpg");
+    // Rating's userId was remapped from prod-test-user-id to local-test-user-id.
     expect(state.ratings).toHaveLength(1);
-    expect(state.ratings[0].userId).toBe("local-evan-id");
+    expect(state.ratings[0].userId).toBe("local-test-user-id");
   });
 });
 

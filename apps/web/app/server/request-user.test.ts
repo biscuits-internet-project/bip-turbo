@@ -26,7 +26,7 @@ describe("getRequestUser", () => {
   // must dedupe to one upstream auth call so we don't pay the Supabase
   // round-trip twice per page.
   test("dedupes concurrent calls that share a cookie header", async () => {
-    const user = { id: "u1", email: "evan@foo.net" } as User;
+    const user = { id: "u1", email: "test-user@example.com" } as User;
     supabaseGetUser.mockResolvedValue({ data: { user }, error: null });
 
     const reqA = makeRequest();
@@ -42,7 +42,7 @@ describe("getRequestUser", () => {
   // the old in-flight entry — entries evict on settle so the next
   // request's auth state is fetched fresh.
   test("re-fetches after the first call has resolved", async () => {
-    const user = { id: "u1", email: "evan@foo.net" } as User;
+    const user = { id: "u1", email: "test-user@example.com" } as User;
     supabaseGetUser.mockResolvedValue({ data: { user }, error: null });
 
     await getRequestUser(makeRequest());

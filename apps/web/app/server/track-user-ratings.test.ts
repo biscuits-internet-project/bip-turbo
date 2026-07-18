@@ -57,7 +57,7 @@ describe("computeTrackUserRatings", () => {
     getAveragesForRateables.mockResolvedValue({ t1: { average: 3, count: 2 } });
     findByEmail.mockResolvedValue(null);
     const result = await computeTrackUserRatings(
-      { currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } },
+      { currentUser: { id: "auth-1", email: "test-user@example.com", isAdmin: false } },
       ["t1"],
     );
     expect(result.averageRatings).toEqual({ t1: { average: 3, count: 2 } });
@@ -73,14 +73,14 @@ describe("computeTrackUserRatings", () => {
       t1: { average: 5, count: 8 },
       t3: { average: 4, count: 4 },
     });
-    findByEmail.mockResolvedValue({ id: "user-1", email: "evan@foo.net" });
+    findByEmail.mockResolvedValue({ id: "user-1", email: "test-user@example.com" });
     findManyByUserIdAndRateableIds.mockResolvedValue([
       { rateableId: "t1", rateableType: "Track", value: 5, userId: "user-1" },
       { rateableId: "t3", rateableType: "Track", value: 3, userId: "user-1" },
     ]);
 
     const result = await computeTrackUserRatings(
-      { currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } },
+      { currentUser: { id: "auth-1", email: "test-user@example.com", isAdmin: false } },
       ["t1", "t2", "t3"],
     );
 
