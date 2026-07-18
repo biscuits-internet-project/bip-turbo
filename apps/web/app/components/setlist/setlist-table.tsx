@@ -39,7 +39,7 @@ export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) 
   const { showSetlistTimes } = usePreferences();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
-  const { userRatingMap, averageRatingMap } = useTrackUserRatings(trackIds);
+  const { userRatingMap, displayRatingMap, comparisonMap } = useTrackUserRatings(trackIds);
   const { data: songPlayDates, isLoading: isPlayDatesLoading } = useSongPlayDates();
 
   const rows: SetlistTableRow[] = useMemo(() => {
@@ -52,10 +52,16 @@ export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) 
   const columns = useMemo(
     () =>
       applyTimePreference(
-        createSetlistColumns({ showSlug, averageRatingMap, userRatingMap, isAuthenticated }),
+        createSetlistColumns({
+          showSlug,
+          averageRatingMap: displayRatingMap,
+          userRatingMap,
+          isAuthenticated,
+          comparisonMap,
+        }),
         showSetlistTimes,
       ),
-    [showSlug, averageRatingMap, userRatingMap, isAuthenticated, showSetlistTimes],
+    [showSlug, displayRatingMap, userRatingMap, isAuthenticated, comparisonMap, showSetlistTimes],
   );
   return (
     <DataTable

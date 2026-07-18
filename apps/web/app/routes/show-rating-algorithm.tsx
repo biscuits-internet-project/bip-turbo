@@ -5,11 +5,11 @@ import { useSession } from "~/hooks/use-session";
 
 export function meta() {
   return [
-    { title: "How show ratings work | Biscuits Internet Project" },
+    { title: "How ratings work | Biscuits Internet Project" },
     {
       name: "description",
       content:
-        "How the Calibrated Show Rating works: entropy weighting, bias-centering, bad-faith exclusion, duplicate-account de-duplication, and count-shrinkage, and how it draws on (and differs from) the phish.net ratings research.",
+        "How the Calibrated Show Rating and Calibrated Track Rating work: entropy weighting, bias-centering, bad-faith exclusion, duplicate-account de-duplication, and count-shrinkage, and how they draw on (and differ from) the phish.net ratings research.",
     },
   ];
 }
@@ -32,7 +32,7 @@ function PostLink({ href, children }: { href: string; children: React.ReactNode 
 }
 
 /**
- * Public explainer for the Calibrated Show Rating. Always reachable by direct URL
+ * Public explainer for the Calibrated Show and Track Ratings. Always reachable by direct URL
  * (the `ratings.explainer-nav-link` flag gates only the nav link, not this page).
  * Written to be accurate enough to share with the phish.net ratings author whose
  * series it builds on. No loader; the only dynamic bit is the "profile settings"
@@ -49,7 +49,7 @@ export default function ShowRatingAlgorithm() {
   return (
     <div className="space-y-6 md:space-y-8">
       <div>
-        <h1 className="page-heading">HOW SHOW RATINGS WORK</h1>
+        <h1 className="page-heading">HOW RATINGS WORK</h1>
       </div>
 
       <div className="grid gap-6 md:gap-8">
@@ -57,15 +57,17 @@ export default function ShowRatingAlgorithm() {
           <CardContent className="p-6">
             <div className="prose prose-invert max-w-none space-y-4">
               <p className="text-content-text-secondary">
-                Every show has a <strong className="text-content-text-primary">community average</strong>, the plain
-                mean of fans' star ratings. It is simple and transparent, but a raw average is easy to skew: a handful
-                of people who rate everything 5 (or everything 0.5), or one person voting from several accounts, can
-                move a show more than they should.
+                Every show and every track has a{" "}
+                <strong className="text-content-text-primary">community average</strong>, the plain mean of fans' star
+                ratings. It is simple and transparent, but a raw average is easy to skew: a handful of people who rate
+                everything 5 (or everything 0.5), or one person voting from several accounts, can move the number more
+                than they should.
               </p>
               <p className="text-content-text-secondary">
-                The <strong className="text-content-text-primary">Calibrated Show Rating</strong> is an opt-in
-                alternative that tries to measure the same thing, how good the show was, while being much harder to
-                skew. Everyone sees the community average by default; you can switch on the Calibrated Show Rating in{" "}
+                The <strong className="text-content-text-primary">Calibrated Show Rating</strong> and the{" "}
+                <strong className="text-content-text-primary">Calibrated Track Rating</strong> are opt-in alternatives
+                that aim at the same thing, how good a show or track was, while being much harder to skew. Everyone sees
+                the community average by default; you can switch either on in{" "}
                 {settingsHref ? (
                   <Link to={settingsHref} className="text-brand-primary hover:underline">
                     your profile settings
@@ -73,7 +75,9 @@ export default function ShowRatingAlgorithm() {
                 ) : (
                   "your profile settings"
                 )}
-                .
+                . They share a core idea, giving more weight to raters who use the whole scale, but differ where shows
+                and tracks differ. This page explains what each does, then goes deeper on the show rating's design and
+                how we tested it.
               </p>
               <p className="text-content-text-secondary">
                 This work is directly inspired by Paul Jakus's four-part series on rating shows for phish.net:{" "}
@@ -90,7 +94,9 @@ export default function ShowRatingAlgorithm() {
 
         <Card variant="panel">
           <CardContent className="p-6">
-            <h2 className="text-2xl font-semibold text-content-text-primary mb-4">What the calibration does</h2>
+            <h2 className="text-2xl font-semibold text-content-text-primary mb-4">
+              What the Calibrated Show Rating does
+            </h2>
             <div className="space-y-5">
               <div>
                 <h3 className="text-lg font-medium text-content-text-primary mb-1">Weights raters by how they rate</h3>
@@ -142,6 +148,25 @@ export default function ShowRatingAlgorithm() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card variant="panel">
+          <CardContent className="p-6">
+            <h2 className="text-2xl font-semibold text-content-text-primary mb-4">The Calibrated Track Rating</h2>
+            <p className="text-content-text-secondary text-sm mb-3">
+              Tracks have far fewer ratings than shows, from fewer raters, and those ratings skew high: most sit near 5
+              stars. The Calibrated Track Rating is a separate opt-in that gives more weight to raters who use the whole
+              0.5 to 5 star scale, which spreads the numbers out.
+            </p>
+            <p className="text-content-text-secondary text-sm">
+              It works by adjusting how much{" "}
+              <span className="text-content-text-primary">weight each rater&apos;s votes are given</span>, rather than
+              by removing raters. Someone who uses the full range is given more weight than someone who gives nearly
+              everything 5. Unlike the show rating, it also skips two steps that helped shows but not tracks in our
+              testing: it doesn&apos;t shift a rater&apos;s scores toward the crowd average, and it doesn&apos;t pull
+              thin tracks toward a global anchor.
+            </p>
           </CardContent>
         </Card>
 

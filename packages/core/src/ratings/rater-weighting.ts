@@ -192,6 +192,56 @@ export interface WeightedAverageResult {
   contributingCount: number;
 }
 
+/**
+ * Gamma for the Calibrated Track Rating's entropy weighting. Tracks pile at the 5-star
+ * ceiling far worse than shows (people only rate tracks they liked), so — unlike the show
+ * scheme — the track score is deliberately NOT mean-centered and NOT count-shrunk, and it
+ * leans HARDER on wide-range raters by raising the entropy weight to this power (shows use
+ * an effective power of 1). Higher favors scale-users more (more spread, less reliable); a
+ * spike over the full track corpus put the useful range at 2-6. Tunable; a change needs a
+ * recompute + a cache-key bump but no migration.
+ */
+export const TRACK_DISCRIMINATING_GAMMA = 3;
+
+/**
+ * One rater's confidence weight for the calibrated track score: their entropy weight raised
+ * to `gamma` (favouring raters who use the whole scale), or 0 for a one-note fluffer/bomber
+ * dropped by {@link isExcludedBucket}. The single "who counts, and how much" rule for tracks,
+ * shared by the score and any track histogram so they can't disagree.
+ */
+export function discriminatingRaterWeight(
+  stats: Pick<RaterStats, "entropy" | "mean" | "ratingsCount">,
+  gamma: number,
+): number {
+  if (isExcludedBucket(stats)) return 0;
+  return entropyWeight(stats.entropy, ENTROPY_FULL_WEIGHT) ** gamma;
+}
+
+/**
+ * A track's calibrated score: the entropy^gamma-weighted average of RAW star values — no
+ * mean-centering and no anchor-shrink, because tracks need their spread preserved rather
+ * than regressed toward a ceiling-inflated mean. Weightless (excluded) raters fall out.
+ * Clamped once at the end.
+ */
+export function entropyPowerWeightedAverage(
+  contributions: ReadonlyArray<{ value: number; weight: number }>,
+): WeightedAverageResult {
+  let valueSum = 0;
+  let weightSum = 0;
+  let contributingCount = 0;
+  for (const { value, weight } of contributions) {
+    if (weight <= 0) continue;
+    valueSum += value * weight;
+    weightSum += weight;
+    contributingCount += 1;
+  }
+  return {
+    weightedAverage: weightSum === 0 ? 0 : clampStar(valueSum / weightSum),
+    weightSum,
+    contributingCount,
+  };
+}
+
 /** entropy/mean/count for one bucket of a rater's ratings. */
 function statsOfRatings(ratings: ReadonlyArray<ScopedRating>): RaterStats {
   const values = ratings.map((rating) => rating.value);

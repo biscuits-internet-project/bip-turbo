@@ -513,6 +513,8 @@ export default function UserProfile() {
             <RatingDisplaySettings
               showCalibratedRatings={user.showCalibratedRatings}
               showRatingComparisonDebug={user.showRatingComparisonDebug}
+              trackCalibratedRatings={user.trackCalibratedRatings}
+              trackRatingComparisonDebug={user.trackRatingComparisonDebug}
               colorCodeRatings={user.colorCodeRatings}
             />
             <SetlistDisplaySettings showSetlistTimes={user.showSetlistTimes} />

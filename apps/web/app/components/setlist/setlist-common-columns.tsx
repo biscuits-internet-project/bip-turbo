@@ -6,6 +6,7 @@ import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-c
 import { DurationValue } from "~/components/track/duration-cell";
 import { NumberCell } from "~/components/ui/number-cell";
 import { SortableHeader } from "~/components/ui/sortable-header";
+import type { TrackRatingComparison } from "~/server/track-user-ratings";
 import { GapCell, type GapCellState } from "./gap-cell";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
 import { TrackRatingOverlay } from "./track-rating-overlay";
@@ -27,17 +28,19 @@ function withSetPositionTiebreak<T extends TrackLight>(primary: (a: T, b: T) => 
 
 /**
  * Per-row inputs the rating column needs that the row itself doesn't carry:
- * the show slug (target of any rating mutation), the community average map and
- * the viewer's rating map (both resolved live from useTrackUserRatings at the
- * table level — community averages no longer ride in the structural setlist
- * blob), and the auth state. Identical between the catalog and personal column
- * factories.
+ * the show slug (target of any rating mutation), the viewer's headline rating map
+ * (the Calibrated Track Rating when they opted in, else the community average —
+ * both resolved live from useTrackUserRatings at the table level, since community
+ * averages no longer ride in the structural setlist blob), the viewer's own rating
+ * map, and the auth state. `comparisonMap` is present only for the author compare
+ * overlay. Identical between the catalog and personal column factories.
  */
 export interface SetlistRatingContext {
   showSlug: string;
   averageRatingMap: Map<string, { average: number; count: number }>;
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
+  comparisonMap?: Map<string, TrackRatingComparison>;
 }
 
 /**
@@ -89,6 +92,7 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
           ratingsCount={average?.count ?? null}
           userRating={ctx.userRatingMap.get(row.id) ?? null}
           isAuthenticated={ctx.isAuthenticated}
+          comparison={ctx.comparisonMap?.get(row.id)}
         />
       );
     },

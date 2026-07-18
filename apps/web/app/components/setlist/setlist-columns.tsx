@@ -33,6 +33,7 @@ export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): Colum
     averageRatingMap: ctx?.averageRatingMap ?? new Map(),
     userRatingMap: ctx?.userRatingMap ?? new Map(),
     isAuthenticated: ctx?.isAuthenticated ?? false,
+    comparisonMap: ctx?.comparisonMap,
   };
   return [
     ...createSetlistCommonColumns<SetlistTableRow>(),

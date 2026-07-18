@@ -19,10 +19,14 @@ import { PREFERENCES_DEFAULT } from "~/hooks/use-preferences";
 export function RatingDisplaySettings({
   showCalibratedRatings,
   showRatingComparisonDebug,
+  trackCalibratedRatings,
+  trackRatingComparisonDebug,
   colorCodeRatings,
 }: {
   showCalibratedRatings: boolean | null;
   showRatingComparisonDebug: boolean | null;
+  trackCalibratedRatings: boolean | null;
+  trackRatingComparisonDebug: boolean | null;
   colorCodeRatings: boolean | null;
 }) {
   const { toggleVisible, compareVisible, defaultCalibrated } = useFeatureFlags();
@@ -68,6 +72,34 @@ export function RatingDisplaySettings({
             ariaLabel="Show rating comparison overlay"
             description="Show the community→calibrated score and rank delta on show cards and pages."
             initial={showRatingComparisonDebug ?? false}
+          />
+        )}
+
+        {toggleVisible && (
+          <PreferenceToggle
+            field="trackCalibratedRatings"
+            label="Calibrated track rating"
+            ariaLabel="Use the calibrated track rating"
+            description={
+              <>
+                Leans on raters who use the whole 0.5 to 5 star scale and discounts one-note fluffers, so tracks spread
+                out instead of all sitting near 5.{" "}
+                <Link to="/show-rating-algorithm" className="text-brand-primary hover:underline">
+                  How it works →
+                </Link>
+              </>
+            }
+            initial={trackCalibratedRatings ?? defaultCalibrated}
+          />
+        )}
+
+        {compareVisible && (
+          <PreferenceToggle
+            field="trackRatingComparisonDebug"
+            label="Track Rating Comparison Overlay (debug)"
+            ariaLabel="Track rating comparison overlay"
+            description="Show the community→calibrated track score and delta on setlist and performance rows."
+            initial={trackRatingComparisonDebug ?? false}
           />
         )}
       </CardContent>

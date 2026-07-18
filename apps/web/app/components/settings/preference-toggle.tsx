@@ -9,6 +9,8 @@ import { Switch } from "~/components/ui/switch";
 export type PreferenceField =
   | "showCalibratedRatings"
   | "showRatingComparisonDebug"
+  | "trackCalibratedRatings"
+  | "trackRatingComparisonDebug"
   | "colorCodeRatings"
   | "showSetlistTimes";
 

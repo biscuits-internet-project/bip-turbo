@@ -11,6 +11,8 @@ export const userSchema = z.object({
   // Display prefs (tri-state: null = no explicit choice → app default).
   showCalibratedRatings: z.boolean().nullable(),
   showRatingComparisonDebug: z.boolean().nullable(),
+  trackCalibratedRatings: z.boolean().nullable(),
+  trackRatingComparisonDebug: z.boolean().nullable(),
   colorCodeRatings: z.boolean().nullable(),
   showSetlistTimes: z.boolean().nullable(),
 });

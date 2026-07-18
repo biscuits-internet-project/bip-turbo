@@ -20,6 +20,7 @@ import { StatBox } from "~/components/ui/stat-box";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { publicLoader } from "~/lib/base-loaders";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { pickGapTier } from "~/lib/gap-tier";
@@ -209,6 +210,12 @@ export default function SongPage() {
 
   const hasAllTimers = useMemo(() => allPerformances.some((p) => p.allTimer), [allPerformances]);
   const filteredAllTimers = useMemo(() => filteredPerformances.filter((p) => p.allTimer), [filteredPerformances]);
+  // The featured all-timer cards (below) show a rating outside the performance
+  // table, so they need the same calibrated-or-plain headline the tables get.
+  // Keyed on the full performance set (matching the loader's prefetch) so it
+  // reuses the dehydrated cache instead of firing a separate request.
+  const allPerformanceTrackIds = useMemo(() => allPerformances.map((p) => p.trackId), [allPerformances]);
+  const { displayRatingMap: allTimerCardRatingMap } = useTrackUserRatings(allPerformanceTrackIds);
   // Jam Charts: all-timer OR any track with a curated note (non-empty).
   // Superset of all-timers; the tab only appears when the song has at
   // least one such performance.
@@ -432,7 +439,10 @@ export default function SongPage() {
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="text-lg font-medium text-content-text-primary">{p.show.date}</div>
-                          <RatingComponent rating={p.rating || null} ratingsCount={p.ratingsCount} />
+                          <RatingComponent
+                            rating={allTimerCardRatingMap.get(p.trackId)?.average ?? p.rating ?? null}
+                            ratingsCount={allTimerCardRatingMap.get(p.trackId)?.count ?? p.ratingsCount}
+                          />
                         </div>
                         <div className="space-y-2">
                           <div className="text-brand-secondary/90 font-medium text-base">{p.venue?.name}</div>

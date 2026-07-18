@@ -2,13 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { batchedPostFetch } from "~/lib/batched-fetch";
 import { trackUserRatingsQueryKey } from "~/lib/query-keys";
-import type { TrackUserRatingsResponse } from "~/server/track-user-ratings";
+import type { TrackRatingComparison, TrackUserRatingsResponse } from "~/server/track-user-ratings";
 
 function mergeTrackUserRatings(results: TrackUserRatingsResponse[]): TrackUserRatingsResponse {
-  const merged: TrackUserRatingsResponse = { userRatings: {}, averageRatings: {} };
+  const merged: TrackUserRatingsResponse = {
+    userRatings: {},
+    averageRatings: {},
+    calibratedRatings: {},
+    comparisons: {},
+  };
   for (const result of results) {
     Object.assign(merged.userRatings, result.userRatings);
     Object.assign(merged.averageRatings, result.averageRatings);
+    Object.assign(merged.calibratedRatings, result.calibratedRatings);
+    Object.assign(merged.comparisons, result.comparisons);
   }
   return merged;
 }
@@ -52,5 +59,28 @@ export function useTrackUserRatings(trackIds: string[]) {
     return map;
   }, [data?.averageRatings]);
 
-  return { userRatingMap, averageRatingMap, isLoading };
+  // The headline map a viewer sees: the plain community average, overlaid with the
+  // calibrated score wherever the viewer opted in and it exists — same {average, count}
+  // shape either way, so rating components don't need to know which is which.
+  const displayRatingMap = useMemo(() => {
+    const map = new Map(averageRatingMap);
+    if (data?.calibratedRatings) {
+      for (const [trackId, value] of Object.entries(data.calibratedRatings)) {
+        map.set(trackId, { average: value.rating, count: value.count });
+      }
+    }
+    return map;
+  }, [averageRatingMap, data?.calibratedRatings]);
+
+  const comparisonMap = useMemo(() => {
+    const map = new Map<string, TrackRatingComparison>();
+    if (data?.comparisons) {
+      for (const [trackId, value] of Object.entries(data.comparisons)) {
+        map.set(trackId, value);
+      }
+    }
+    return map;
+  }, [data?.comparisons]);
+
+  return { userRatingMap, averageRatingMap, displayRatingMap, comparisonMap, isLoading };
 }
