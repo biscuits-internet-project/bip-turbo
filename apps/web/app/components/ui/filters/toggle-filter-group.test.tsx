@@ -20,16 +20,14 @@ describe("ToggleFilterGroup", () => {
     expect(screen.getByRole("button", { name: "Segue In" })).toBeInTheDocument();
   });
 
-  // Active chips get a filled background to visually distinguish them from
-  // inactive ones. The active class is the primary brand color.
-  test("active filter chip has active styling class", async () => {
+  // Active chips are marked pressed so screen readers announce the selection
+  // and the parent's active set stays reflected in the UI; the filled-brand
+  // background follows the same flag and is verified in the browser.
+  test("only the active filter chip is pressed", async () => {
     await setup(<ToggleFilterGroup filters={filters} activeFilters={new Set(["encore"])} onToggle={() => {}} />);
 
-    const encoreButton = screen.getByRole("button", { name: "Encore" });
-    expect(encoreButton.className).toContain("bg-brand-primary");
-
-    const openerButton = screen.getByRole("button", { name: "Set Opener" });
-    expect(openerButton.className).not.toContain("bg-brand-primary");
+    expect(screen.getByRole("button", { name: "Encore" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Set Opener" })).toHaveAttribute("aria-pressed", "false");
   });
 
   // Clicking a chip fires onToggle with that chip's key so the parent can

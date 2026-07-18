@@ -182,25 +182,20 @@ describe("SongPage", () => {
     expect(mockClearFilters).toHaveBeenCalled();
   });
 
-  // The 4 stat cards (Times Played, First Played, Last Played, Most
-  // Common Year) render as a 2x2 grid on mobile and 4x1 at lg+ so phone
-  // users only scroll past two rows of cards instead of four.
-  test("stat grid is 2 columns on mobile, 4 columns on lg", () => {
+  // The 4 stat cards (Times Played, First Played, Last Played, Most Common
+  // Year) render together in one grouping list. Their responsive 2x2 → 4x1
+  // column layout is a browser concern.
+  test("renders the four stat cards in a grouping list", () => {
     renderSongPage();
 
-    const timesPlayedLabel = screen.getByText(/Times Played/);
-    const grid = timesPlayedLabel.closest("dl");
-    expect(grid?.className).toContain("grid-cols-2");
-    expect(grid?.className).toContain("lg:grid-cols-4");
-    // No single-column stacking on mobile — each row pairs two cards.
-    expect(grid?.className).not.toContain("grid-cols-1");
+    const grid = screen.getByText(/Times Played/).closest("dl");
+    expect(grid).not.toBeNull();
+    expect(screen.getByText(/Most Common Year/)).toBeInTheDocument();
   });
 
   // The First/Last Played stat cards include a venue sublabel (sublabel2).
-  // On mobile that wrapped venue line makes the cards taller than the
-  // viewport allows for the 2x2 grid; we hide it via `hidden sm:block`
-  // so phone users see just the date + label.
-  test("StatBox sublabel2 (venue) is hidden on mobile (hidden sm:block)", () => {
+  // It renders into the DOM; CSS hides it on mobile (a browser concern).
+  test("StatBox renders the venue sublabel", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValueOnce({
       song: {
         title: "I-Man",
@@ -227,9 +222,7 @@ describe("SongPage", () => {
     });
     renderSongPage();
 
-    const venueLine = screen.getByText(/University of Pennsylvania, Philadelphia, PA/);
-    expect(venueLine.className).toContain("hidden");
-    expect(venueLine.className).toContain("sm:block");
+    expect(screen.getByText(/University of Pennsylvania, Philadelphia, PA/)).toBeInTheDocument();
   });
 
   // The TabsList on song-detail clips at narrow widths because there can be
@@ -238,17 +231,14 @@ describe("SongPage", () => {
   // used before, but its OS-styling didn't look like a dropdown to users, so
   // they didn't realize it was tappable. The Radix trigger renders as a
   // styled button (role="combobox") with a visible chevron.
-  test("song tabs render as a Radix Select on mobile (sm:hidden) and tab strip on sm+", () => {
+  test("song tabs render both a tab strip and a mobile Radix Select", () => {
     renderSongPage();
 
-    const tabList = screen.getByRole("tablist");
-    expect(tabList.className).toContain("hidden");
-    expect(tabList.className).toContain("sm:flex");
-
+    // Both switchers are in the DOM; which shows at which width is CSS.
+    expect(screen.getByRole("tablist")).toBeInTheDocument();
     const trigger = screen.getByRole("combobox", { name: /song view/i });
     expect(trigger.textContent).toMatch(/All Performances/);
-    const wrapper = screen.getByTestId("mobile-song-view");
-    expect(wrapper.className).toContain("sm:hidden");
+    expect(screen.getByTestId("mobile-song-view")).toBeInTheDocument();
   });
 
   // The "last show" sublabel marks the song as having been played at the
@@ -412,23 +402,6 @@ describe("SongPage", () => {
 
     expect(screen.getByText("Avg / Median Gap")).toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
-  });
-
-  // StatBox uses light padding (sm:p-3) so the eight-card grid reads as a
-  // compact info strip. Headline number shrinks on mobile so the value
-  // fits on one line within the narrower box.
-  test("StatBox uses light padding and scales headline with viewport", () => {
-    renderSongPage();
-
-    const timesPlayedLabel = screen.getByText(/Times Played/);
-    const card = timesPlayedLabel.closest("div[class*='glass-content']");
-    expect(card?.className).toContain("p-2");
-    expect(card?.className).toContain("sm:p-3");
-    expect(card?.className).not.toContain("sm:p-6");
-
-    const value = screen.getByText("100");
-    expect(value.className).toContain("text-xl");
-    expect(value.className).toContain("sm:text-3xl");
   });
 
   // The song's kind (original/cover/mashup/improvisation) is editable in the

@@ -128,19 +128,19 @@ describe("PerformanceTable", () => {
     await setupWithRouter(<PerformanceTable performances={performances} />);
 
     const rows = screen.getAllByRole("row");
-    const greyedRow = rows.find((row) => row.className.includes("opacity-60"));
+    const greyedRow = rows.find((row) => row.getAttribute("data-counts-for-stats") === "false");
     expect(greyedRow).toBeDefined();
-    expect(greyedRow?.className).toContain("text-content-text-tertiary");
-    const otherRows = rows.filter((row) => row !== greyedRow && row.getAttribute("role") === "row");
+    const bodyRows = rows.filter((row) => row.querySelector("td"));
+    const otherRows = bodyRows.filter((row) => row !== greyedRow);
     for (const row of otherRows) {
-      expect(row.className).not.toContain("opacity-60");
+      expect(row.getAttribute("data-counts-for-stats")).toBe("true");
     }
   });
 
   // The grey-row signal (count_for_stats=false) and the attended-row signal
-  // (green left border) are independent axes — a user attending a soundcheck
-  // is meaningful even if it doesn't count for stats. The row should carry
-  // BOTH classes when both apply.
+  // (attendance) are independent axes — a user attending a soundcheck is
+  // meaningful even if it doesn't count for stats. The row should carry BOTH
+  // signals when both apply.
   test("a count_for_stats=false show that the user attended gets both signals", async () => {
     vi.mocked(useShowUserData).mockReturnValue({
       attendanceMap: new Map([["s-soundcheck", { id: "att-1" } as never]]),
@@ -160,15 +160,14 @@ describe("PerformanceTable", () => {
     ];
     await setupWithRouter(<PerformanceTable performances={performances} />);
 
-    const row = screen.getAllByRole("row").find((r) => r.className.includes("opacity-60"));
+    const row = screen.getAllByRole("row").find((r) => r.getAttribute("data-counts-for-stats") === "false");
     expect(row).toBeDefined();
-    expect(row?.className).toContain("text-content-text-tertiary");
-    expect(row?.className).toContain("!border-l-green-500");
+    expect(row?.getAttribute("data-attended")).toBe("true");
   });
 
-  // Attended rows get a green left border via useAttendanceRowHighlight.
-  // Verifies the hook→rowClassName→DataTable wiring is intact.
-  test("attended rows get the attendance highlight class", async () => {
+  // Attended rows are highlighted via useAttendanceRowHighlight. Verifies the
+  // hook→rowAttributes→DataTable wiring is intact.
+  test("attended rows carry the data-attended hook", async () => {
     vi.mocked(useShowUserData).mockReturnValue({
       attendanceMap: new Map([["s-attended", { id: "att-1" } as never]]),
       userRatingMap: new Map(),
@@ -186,19 +185,12 @@ describe("PerformanceTable", () => {
     await setupWithRouter(<PerformanceTable performances={performances} />);
 
     const rows = screen.getAllByRole("row");
-    // Attended row should have both the green background tint and the left
-    // border highlight. The !border-l-green-500 class uses Tailwind's
-    // important modifier to avoid border conflicts with TableRow's border-b.
-    const attendedRow = rows.find((row) => row.className.includes("bg-green-500"));
+    const attendedRow = rows.find((row) => row.getAttribute("data-attended") === "true");
     expect(attendedRow).toBeDefined();
-    expect(attendedRow?.className).toContain("!border-l-green-500");
-    expect(attendedRow?.className).toContain("!border-l-2");
 
-    // Non-attended rows should have neither class. Body rows are the ones with
-    // data cells, which excludes the header row.
-    const nonAttendedRow = rows.find((row) => row.querySelector("td") && !row.className.includes("bg-green-500"));
+    // The other body row is a show the user did not attend.
+    const nonAttendedRow = rows.find((row) => row.querySelector("td") && row.getAttribute("data-attended") === "false");
     expect(nonAttendedRow).toBeDefined();
-    expect(nonAttendedRow?.className).not.toContain("!border-l-green-500");
   });
 
   // The isAuthenticated prop flows through to TrackRatingCell so it knows

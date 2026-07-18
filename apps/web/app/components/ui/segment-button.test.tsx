@@ -4,34 +4,25 @@ import { describe, expect, test, vi } from "vitest";
 import { SegmentButton } from "./segment-button";
 
 describe("SegmentButton", () => {
-  // aria-pressed reflects the `active` prop so screen readers announce
-  // the current selection. The visual branch (border-brand-primary vs
-  // border-transparent) follows the same flag.
-  test("active=true sets aria-pressed and the brand-primary border", async () => {
+  // aria-pressed reflects the `active` prop so screen readers announce the
+  // current selection. The visual branch (brand-primary underline vs
+  // transparent) follows the same flag; the browser owns its appearance.
+  test("active=true sets aria-pressed", async () => {
     await setup(
       <SegmentButton active={true} onClick={vi.fn()}>
         chart
       </SegmentButton>,
     );
-    const button = screen.getByRole("button", { name: "chart" });
-    expect(button).toHaveAttribute("aria-pressed", "true");
-    expect(button.className).toContain("border-brand-primary");
-    expect(button.className).toContain("text-content-text-primary");
+    expect(screen.getByRole("button", { name: "chart" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  // The inactive segment renders with a transparent border (no visible
-  // underline) and the tertiary text tone so the active segment stands
-  // out as the selection.
-  test("active=false renders the inactive border and tertiary text", async () => {
+  test("active=false clears aria-pressed", async () => {
     await setup(
       <SegmentButton active={false} onClick={vi.fn()}>
         table
       </SegmentButton>,
     );
-    const button = screen.getByRole("button", { name: "table" });
-    expect(button).toHaveAttribute("aria-pressed", "false");
-    expect(button.className).toContain("border-transparent");
-    expect(button.className).toContain("text-content-text-tertiary");
+    expect(screen.getByRole("button", { name: "table" })).toHaveAttribute("aria-pressed", "false");
   });
 
   // Clicking fires the supplied handler. Verified via spy rather than

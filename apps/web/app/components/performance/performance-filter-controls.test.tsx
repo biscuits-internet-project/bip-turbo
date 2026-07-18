@@ -202,47 +202,26 @@ describe("PerformanceFilterControls", () => {
     expect(handleUpdateFilter).not.toHaveBeenCalled();
   });
 
-  // The filter chrome is a "Search & Filters" collapsible toggle (chevron +
-  // slide). It's force-open from sm+ (it only crowds phones) so desktop users
-  // see filters by default; on phones it starts collapsed behind the toggle.
-  test("renders a Search & Filters toggle that force-opens the body from sm+", async () => {
+  // The filter chrome is a "Search & Filters" collapsible toggle. Its
+  // force-open-from-sm+ and hide-on-desktop responsive behaviour lives in (and
+  // is tested by) CollapsibleSection; here we assert the toggle is wired up.
+  test("renders a Search & Filters toggle", async () => {
     await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
 
     expect(screen.getByRole("button", { name: /^Search & Filters/ })).toBeInTheDocument();
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("sm:grid-rows-[1fr]");
   });
 
-  // On desktop the toggle itself is hidden (the filters render bare); the header
-  // wrapper carries sm:hidden so only phones/landscape show the toggle.
-  test("hides the toggle entirely at sm+ (filters render bare on desktop)", async () => {
-    await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
-
-    const toggle = screen.getByRole("button", { name: /^Search & Filters/ });
-    expect(toggle.parentElement?.className).toContain("sm:hidden");
-  });
-
-  // On phones the body starts collapsed (grid-rows-[0fr]) and opens to
-  // grid-rows-[1fr] when the toggle is clicked.
+  // On phones the body starts collapsed and opens when the toggle is clicked.
   test("filter body is collapsed by default and opens when the toggle is clicked", async () => {
     const { user } = await setup(
       <PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />,
     );
 
     const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("grid-rows-[0fr]");
+    expect(body).toHaveAttribute("data-open", "false");
 
     await user.click(screen.getByRole("button", { name: /^Search & Filters/ }));
-    expect(body.className).toContain("grid-rows-[1fr]");
-  });
-
-  // Phone-landscape collapse: a rotated phone has the same vertical-space crunch
-  // as portrait, so the body re-collapses on short viewports even above sm.
-  test("re-collapses on landscape phones via short:!grid-rows-[0fr]", async () => {
-    await setup(<PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} />);
-
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("short:!grid-rows-[0fr]");
+    expect(body).toHaveAttribute("data-open", "true");
   });
 
   // The Filters toggle shows an active-filter count so users know there's state
@@ -293,19 +272,6 @@ describe("PerformanceFilterControls", () => {
 
     const toggle = screen.getByRole("button", { name: /^Search & Filters/ });
     expect(toggle.textContent).toMatch(/1/);
-  });
-
-  // On dense pages (the musician profile) the filter chrome collapses on desktop
-  // too: with collapsibleOnDesktop the body drops its sm force-open so it stays
-  // collapsed at every width until the user opens it.
-  test("collapsibleOnDesktop collapses the filters at all widths (no sm force-open)", async () => {
-    await setup(
-      <PerformanceFilterControls {...defaultProps} searchValue="" onSearchChange={() => {}} collapsibleOnDesktop />,
-    );
-
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).not.toContain("sm:grid-rows-[1fr]");
-    expect(body.className).toContain("grid-rows-[0fr]");
   });
 
   // Clicking Clear All delegates to the parent's clearFilters callback, which

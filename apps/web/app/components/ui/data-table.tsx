@@ -140,6 +140,14 @@ interface DataTableProps<TData, TValue> {
   secondaryFilterComponent?: ReactNode;
   isLoading?: boolean;
   rowClassName?: (data: TData, index: number) => string | undefined;
+  /**
+   * Per-row semantic attributes (`data-*`, `aria-*`) spread onto the `<tr>`.
+   * Prefer this over encoding row state in `rowClassName` when a test needs to
+   * recognize the state: styling classes are free to change, a `data-*` hook is
+   * a stable contract. Undefined-valued entries are dropped so a row only
+   * carries the attributes that apply.
+   */
+  rowAttributes?: (data: TData, index: number) => Record<string, string | undefined>;
   initialSorting?: SortingState;
 }
 
@@ -157,6 +165,7 @@ export function DataTable<TData, TValue>({
   secondaryFilterComponent,
   isLoading = false,
   rowClassName,
+  rowAttributes,
   initialSorting,
   getRowId,
 }: DataTableProps<TData, TValue>) {
@@ -337,6 +346,11 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   className={`border-t ${rowClassName?.(row.original, index) ?? ""}`}
+                  {...Object.fromEntries(
+                    Object.entries(rowAttributes?.(row.original, index) ?? {}).filter(
+                      ([, value]) => value !== undefined,
+                    ),
+                  )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell

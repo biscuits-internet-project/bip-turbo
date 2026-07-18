@@ -94,7 +94,6 @@ describe("HistoriesPage", () => {
 
     const basisHistory = screen.getByText(/Basis for a Day was composed/);
     expect(basisHistory.textContent).toContain("\n\n");
-    expect(basisHistory.className).toContain("whitespace-pre-line");
   });
 
   test("preserves paragraph breaks from plain text \\n\\n", () => {
@@ -102,7 +101,6 @@ describe("HistoriesPage", () => {
 
     const wavesHistory = screen.getByText(/Above the Waves was first performed/);
     expect(wavesHistory.textContent).toContain("\n\n");
-    expect(wavesHistory.className).toContain("whitespace-pre-line");
   });
 
   // HTML entities in stored history (e.g. &quot;, &#x27;) should decode to

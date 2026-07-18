@@ -52,7 +52,7 @@ export function PerformanceTable({
   const { user } = useSession();
   const isAuthenticated = !!user;
 
-  const { rowClassName: attendanceRowClassName } = useAttendanceRowHighlight(performances, getShowId);
+  const { rowClassName: attendanceRowClassName, isAttended } = useAttendanceRowHighlight(performances, getShowId);
 
   // Two independent row signals that can stack:
   //   * count_for_stats=false (soundchecks, radio sessions, cancelled stubs,
@@ -67,6 +67,15 @@ export function PerformanceTable({
     if (attendance) parts.push(attendance);
     return parts.length > 0 ? parts.join(" ") : undefined;
   };
+
+  // Semantic hooks mirroring the two independent row signals above, so tests
+  // recognize row state by contract rather than by pattern-matching the
+  // styling classes (which are free to change). Mirrors `data-attended` on the
+  // setlist card and `data-rated` on the rating badge.
+  const rowAttributes = (perf: SongPagePerformance) => ({
+    "data-attended": String(isAttended(perf)),
+    "data-counts-for-stats": String(perf.show.countForStats !== false),
+  });
 
   const trackIds = useMemo(() => performances.map((performance) => performance.trackId), [performances]);
   const { userRatingMap, displayRatingMap, comparisonMap } = useTrackUserRatings(trackIds);
@@ -107,6 +116,7 @@ export function PerformanceTable({
         isLoading={isLoading}
         filterComponent={headerContent}
         rowClassName={rowClassName}
+        rowAttributes={rowAttributes}
         initialSorting={[{ id: "date", desc: true }]}
         pageSize={pageSize}
       />

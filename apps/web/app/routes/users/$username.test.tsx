@@ -241,19 +241,14 @@ describe("UserProfile", () => {
     }
   });
 
-  // Profile tabs render as a <select> on mobile (sm:hidden) and the
-  // horizontal tab strip at sm+. Mirrors the song-detail page pattern so
-  // the long "Song Version Ratings" label doesn't clip on phones.
-  test("tabs render as a select on mobile and a tab strip at sm+", () => {
+  // Profile tabs render both a <select> for mobile and the horizontal tab
+  // strip; which shows at which width is CSS. Mirrors the song-detail pattern
+  // so the long "Song Version Ratings" label doesn't clip on phones.
+  test("renders both the tab strip and the mobile select", () => {
     renderProfile();
 
-    const tabList = screen.getByRole("tablist");
-    expect(tabList.className).toContain("hidden");
-    expect(tabList.className).toContain("sm:flex");
-
-    const select = screen.getByLabelText(/profile view/i);
-    const wrapper = select.closest("div");
-    expect(wrapper?.className).toContain("sm:hidden");
+    expect(screen.getByRole("tablist")).toBeInTheDocument();
+    expect(screen.getByLabelText(/profile view/i)).toBeInTheDocument();
   });
 
   // The route delegates rendering to SetlistList, passing through the

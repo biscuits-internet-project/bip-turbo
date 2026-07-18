@@ -26,12 +26,11 @@ describe("UrlSortableHeader", () => {
     expect(screen.getByRole("button", { name: /Show/ })).toBeInTheDocument();
   });
 
-  // The active column (currentSort === sortKey) gets the emphasized label;
-  // an idle column does not. The bold class is the structural signal the
-  // rest of the table's styling keys off.
-  test("emphasizes the label only when its column is the active sort", () => {
+  // The active column (currentSort === sortKey) is marked active so the table
+  // can emphasize its label + arrow; an idle column is not.
+  test("marks itself active only when its column is the active sort", () => {
     const { rerender } = setup({ currentSort: "rating" });
-    expect(screen.getByText("Show").className).not.toContain("font-semibold");
+    expect(screen.getByRole("button", { name: /Show/ })).toHaveAttribute("data-active", "false");
 
     rerender(
       <UrlSortableHeader<Sort>
@@ -42,7 +41,7 @@ describe("UrlSortableHeader", () => {
         onSortChange={vi.fn()}
       />,
     );
-    expect(screen.getByText("Show").className).toContain("font-semibold");
+    expect(screen.getByRole("button", { name: /Show/ })).toHaveAttribute("data-active", "true");
   });
 
   // Clicking an idle column applies the default direction (desc) so a fresh
