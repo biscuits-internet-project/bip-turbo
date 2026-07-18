@@ -13,23 +13,24 @@ beforeAll(() => {
 });
 
 describe("committed quonfig workspace", () => {
-  test("launch flag posture: feature on, default simple, beta gated to the author", async () => {
+  test("flag posture: feature on, default simple, toggle open to everyone, compare author-only", async () => {
     const anon = await getFeatureFlags();
     expect(anon.calibratedEnabled).toBe(true); // feature runs in prod
     expect(anon.recomputeEnabled).toBe(true); // cron runs from day one
     expect(anon.defaultCalibrated).toBe(false); // default stays simple (opt-in)
-    expect(anon.toggleVisible).toBe(false); // not the author → no toggle
-    expect(anon.compareVisible).toBe(false);
+    expect(anon.toggleVisible).toBe(true); // opt-in toggle open to everyone
+    expect(anon.compareVisible).toBe(false); // debug overlay stays author-only
     expect(anon.explainerNavLink).toBe(false); // page reachable by URL; nav link off
   });
 
-  test("the rating-beta segment opens the toggles to the author only", async () => {
+  test("the compare/debug overlay is limited to the author", async () => {
     const author = await getFeatureFlags({ user: { username: "evan" } });
     expect(author.toggleVisible).toBe(true);
     expect(author.compareVisible).toBe(true);
 
     const other = await getFeatureFlags({ user: { username: "someone-else" } });
-    expect(other.toggleVisible).toBe(false);
+    expect(other.toggleVisible).toBe(true); // everyone gets the opt-in toggle
+    expect(other.compareVisible).toBe(false); // but not the debug overlay
   });
 });
 

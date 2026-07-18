@@ -1,6 +1,6 @@
 {
   "key": "ratings.compare-visible",
-  "description": "Whether a user sees the author comparison/debug overlay toggle, which shows the community vs calibrated score and rank delta on show cards and the show page. This is intended to be for debugging only. Targeted to the rating-beta segment. The user's on/off choice is stored in User.show_rating_compare. Launch state: rating-beta segment only.",
+  "description": "Whether a user sees the author comparison/debug overlay toggle, which shows the community vs calibrated score and rank delta on show cards and the show page. This is intended to be for debugging only, so it's limited to the author. The user's on/off choice is stored in User.show_rating_compare. Launch state: author only.",
   "type": "feature_flag",
   "valueType": "bool",
   "default": {
@@ -8,10 +8,11 @@
       {
         "criteria": [
           {
-            "operator": "IN_SEG",
+            "operator": "PROP_IS_ONE_OF",
+            "propertyName": "user.username",
             "valueToMatch": {
-              "type": "string",
-              "value": "rating-beta"
+              "type": "string_list",
+              "value": ["evan"]
             }
           }
         ],
