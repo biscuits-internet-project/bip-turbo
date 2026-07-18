@@ -12,6 +12,13 @@ interface RatingProps {
    * treated as "not rated" — the divider and slot don't render.
    */
   userRating?: number | null;
+  /**
+   * Forces the color scale on (`true`) or off (`false`) regardless of the
+   * viewer's saved preference. Only the settings preview sets it, to show the
+   * same rating both ways; leave it undefined everywhere else so the viewer's
+   * own preference decides.
+   */
+  colorCode?: boolean;
 }
 
 /**
@@ -45,9 +52,9 @@ function ratingColorStyle(value: number, enabled: boolean): { color: string } | 
  * colored number. With the scale off it falls back to gold, which is then the
  * badge's only color.
  */
-export function StarValue({ value, label }: { value: number; label: string }) {
+export function StarValue({ value, label, colorCode }: { value: number; label: string; colorCode?: boolean }) {
   const { colorCodeRatings } = usePreferences();
-  const tint = ratingColorStyle(value, colorCodeRatings);
+  const tint = ratingColorStyle(value, colorCode ?? colorCodeRatings);
   return (
     <span className="inline-flex items-center whitespace-nowrap">
       <Star className="h-3 w-3 sm:h-4 sm:w-4 shrink-0 text-rating-gold mr-0.5 sm:mr-1" style={tint} />
@@ -58,8 +65,9 @@ export function StarValue({ value, label }: { value: number; label: string }) {
   );
 }
 
-export const RatingComponent = ({ rating, ratingsCount, userRating }: RatingProps) => {
+export const RatingComponent = ({ rating, ratingsCount, userRating, colorCode }: RatingProps) => {
   const { colorCodeRatings } = usePreferences();
+  const colorEnabled = colorCode ?? colorCodeRatings;
 
   if (!rating) return <div className="text-xs sm:text-sm text-content-text-secondary">Rate</div>;
   const hasUserRating = typeof userRating === "number" && userRating > 0;
@@ -69,7 +77,7 @@ export const RatingComponent = ({ rating, ratingsCount, userRating }: RatingProp
   const outerGap = hasUserRating ? "gap-1" : "gap-1 sm:gap-1.5";
   return (
     <div className={`flex items-center ${outerGap}`}>
-      <StarValue value={rating} label={rating.toFixed(2)} />
+      <StarValue value={rating} label={rating.toFixed(2)} colorCode={colorCode} />
       {ratingsCount &&
         ratingsCount > 0 &&
         (hasUserRating ? (
@@ -99,7 +107,7 @@ export const RatingComponent = ({ rating, ratingsCount, userRating }: RatingProp
             // as its integer; the slot is wide enough for "5½" while still
             // centering "5".
             className="font-medium text-[10px] sm:text-xs text-content-text-primary inline-block min-w-[2ch] text-center whitespace-nowrap"
-            style={ratingColorStyle(userRating, colorCodeRatings)}
+            style={ratingColorStyle(userRating, colorEnabled)}
           >
             {formatHalfStep(userRating)}
           </span>

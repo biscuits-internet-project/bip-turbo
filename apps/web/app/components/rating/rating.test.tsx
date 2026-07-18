@@ -109,6 +109,26 @@ describe("RatingComponent", () => {
     expect(screen.getByTestId("user-rating-value").style.color).toBe("");
   });
 
+  // The `colorCode` override wins over the saved preference so the settings
+  // preview can force the scale on. Here the preference is off (bare setup).
+  test("colors values when colorCode={true} overrides a disabled preference", async () => {
+    await setup(<RatingComponent rating={1.8} userRating={4.5} colorCode={true} />);
+    expect(screen.getByText("1.80")).toHaveStyle({ color: ratingColor(1.8) });
+    expect(screen.getByTestId("user-rating-value")).toHaveStyle({ color: ratingColor(4.5) });
+  });
+
+  // The other direction: the preview's "off" column forces the scale off even
+  // when the viewer has color coding on.
+  test("leaves values uncolored when colorCode={false} overrides an enabled preference", async () => {
+    await setup(
+      <PreferencesProvider colorCodeRatings={true} showSetlistTimes={null}>
+        <RatingComponent rating={1.8} userRating={4.5} colorCode={false} />
+      </PreferencesProvider>,
+    );
+    expect(screen.getByText("1.80").style.color).toBe("");
+    expect(screen.getByTestId("user-rating-value").style.color).toBe("");
+  });
+
   test("leaves both values uncolored when the viewer opts out", async () => {
     await setup(
       <PreferencesProvider colorCodeRatings={false} showSetlistTimes={null}>

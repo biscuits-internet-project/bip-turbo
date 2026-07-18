@@ -1,5 +1,6 @@
 import type { RouteConfig } from "@react-router/dev/routes";
 import { index, layout, prefix, route } from "@react-router/dev/routes";
+import { CALIBRATED_RATING_ALGORITHM_PATH } from "./lib/route-paths";
 
 export default [
   // Root index route
@@ -10,7 +11,7 @@ export default [
 
   // Legal and info pages
   route("about", "routes/about.tsx"),
-  route("show-rating-algorithm", "routes/show-rating-algorithm.tsx"),
+  route(CALIBRATED_RATING_ALGORITHM_PATH.slice(1), "routes/calibrated-rating-algorithm.tsx"),
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),
   route("community", "routes/community.tsx"),

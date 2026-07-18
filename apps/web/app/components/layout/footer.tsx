@@ -2,6 +2,7 @@ import { Heart, Mail, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ContactDialog } from "~/components/contact/contact-dialog";
 import { useFeatureFlags } from "~/hooks/use-feature-flags";
+import { CALIBRATED_RATING_ALGORITHM_PATH } from "~/lib/route-paths";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -39,7 +40,7 @@ export function Footer() {
           </Link>
           {explainerNavLink && (
             <Link
-              to="/show-rating-algorithm"
+              to={CALIBRATED_RATING_ALGORITHM_PATH}
               className="text-content-text-secondary hover:text-content-text-primary transition-colors duration-200"
             >
               Ratings

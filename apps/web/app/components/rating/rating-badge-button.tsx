@@ -7,7 +7,7 @@ import { usePreferences } from "~/hooks/use-preferences";
 import { ROW_CHIP_HOVER } from "~/lib/interaction-styles";
 import { cn } from "~/lib/utils";
 
-type RatingBadgeSize = "compact" | "regular";
+export type RatingBadgeSize = "compact" | "regular";
 
 /**
  * The badge's surface when the color scale is off. Note `glass-secondary` sets
@@ -38,6 +38,31 @@ const RATED_GOLD_CHROME =
  */
 const SCALE_CHROME =
   "border border-content-text-secondary/28 hover:border-content-text-secondary/60 hover:bg-content-text-secondary/10";
+
+/**
+ * Layout + padding for the badge chip, by size and whether the viewer has
+ * rated (a rated badge tightens padding to fit the divider + personal value).
+ * Exported so the rating-display settings preview renders the same chip shape
+ * without the button, popover, and click behavior.
+ */
+export function ratingBadgeLayoutClass(size: RatingBadgeSize, hasRated: boolean): string {
+  const layout =
+    size === "compact"
+      ? "inline-flex items-center justify-center gap-1 py-1 rounded-md"
+      : "flex items-center justify-center gap-1 h-6 sm:h-8 rounded-md";
+  const padding = size === "compact" ? (hasRated ? "px-1" : "px-2") : hasRated ? "px-1.5 sm:px-2" : "px-2 sm:px-3";
+  return cn(layout, padding);
+}
+
+/**
+ * The badge's edge, one of three never-layered surfaces (see `BADGE_CHROME`).
+ * Scale on: a neutral hairline, since the tinted score carries the color. Scale
+ * off: gold once rated, glass until then. `colorEnabled` is passed in rather
+ * than read from preferences so the settings preview can force each column.
+ */
+export function ratingBadgeStateClass(colorEnabled: boolean, hasRated: boolean): string {
+  return colorEnabled ? SCALE_CHROME : hasRated ? RATED_GOLD_CHROME : BADGE_CHROME;
+}
 
 interface RatingBadgeButtonProps {
   rateableId: string;
@@ -128,23 +153,7 @@ export function RatingBadgeButton({
     onAverageRatingChange?.(average, count);
   };
 
-  // Size variants pick layout + height classes. `compact` is inline-flex
-  // so the table cell can hug the content width; `regular` uses flex with
-  // explicit height to align next to neighbor buttons (Saw it?, etc.).
-  const layoutClass =
-    size === "compact"
-      ? "inline-flex items-center justify-center gap-1 py-1 rounded-md"
-      : "flex items-center justify-center gap-1 h-6 sm:h-8 rounded-md";
-
-  // Padding tightens when the personal score renders to compensate for the
-  // busier row (divider + extra value).
-  const paddingClass =
-    size === "compact" ? (localHasRated ? "px-1" : "px-2") : localHasRated ? "px-1.5 sm:px-2" : "px-2 sm:px-3";
-
-  // Three surfaces, never layered — see BADGE_CHROME for why they can't be.
-  // Scale on: a neutral hairline, since the score carries the color. Scale off:
-  // gold once rated, glass until then.
-  const stateClass = colorCodeRatings ? SCALE_CHROME : localHasRated ? RATED_GOLD_CHROME : BADGE_CHROME;
+  const stateClass = ratingBadgeStateClass(colorCodeRatings, localHasRated);
 
   // The picker has to be opaque or the rows under it read through. Only
   // `glass-secondary` brings its own fill (plus a backdrop blur); the gold and
@@ -167,8 +176,7 @@ export function RatingBadgeButton({
       // classes that are free to change.
       data-rated={localHasRated}
       className={cn(
-        layoutClass,
-        paddingClass,
+        ratingBadgeLayoutClass(size, localHasRated),
         ROW_CHIP_HOVER,
         stateClass,
         isAnimating && "animate-[avg-rating-update_0.5s_ease-out]",
