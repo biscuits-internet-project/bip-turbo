@@ -26,8 +26,8 @@ vi.mock("~/hooks/use-feature-flags", () => ({
 const baseLoaderData = {
   user: {
     id: "u1",
-    email: "evan@foo.net",
-    username: "evan",
+    email: "test-user@example.com",
+    username: "test-user",
     avatarUrl: null,
     createdAt: new Date("2020-01-01T00:00:00Z"),
   },
@@ -130,7 +130,7 @@ const trackRatingRow = {
   },
 };
 
-function renderProfile(initialEntry = "/users/evan") {
+function renderProfile(initialEntry = "/users/test-user") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <UserProfile />
@@ -171,7 +171,7 @@ describe("UserProfile", () => {
   test("Settings tab holds the display-preference cards on your own profile", () => {
     vi.mocked(useSerializedLoaderData).mockReturnValue({ ...baseLoaderData, activeTab: "settings" });
 
-    renderProfile("/users/evan?tab=settings");
+    renderProfile("/users/test-user?tab=settings");
 
     expect(screen.getByText(/rating display/i)).toBeInTheDocument();
     expect(screen.getByText(/setlist display/i)).toBeInTheDocument();
@@ -213,7 +213,7 @@ describe("UserProfile", () => {
       activeTab: "track-ratings",
     });
 
-    renderProfile("/users/evan?tab=track-ratings");
+    renderProfile("/users/test-user?tab=track-ratings");
 
     const trackTab = screen.getByRole("tab", { name: /song version ratings/i });
     expect(trackTab.getAttribute("data-state")).toBe("active");
@@ -331,7 +331,7 @@ describe("UserProfile", () => {
       ratingsPagination: { page: 1, pageSize: 100, totalPages: 18, total: 1739 },
     });
 
-    renderProfile("/users/evan?tab=show-ratings");
+    renderProfile("/users/test-user?tab=show-ratings");
     // Charts is the default view, so pagination isn't shown until the user
     // switches to the table.
     expect(screen.queryByText(/Showing 1 to 100 of 1739 results/)).not.toBeInTheDocument();
@@ -351,7 +351,7 @@ describe("UserProfile", () => {
       ratingsPagination: { page: 2, pageSize: 100, totalPages: 78, total: 7784 },
     });
 
-    renderProfile("/users/evan?tab=track-ratings");
+    renderProfile("/users/test-user?tab=track-ratings");
     fireEvent.click(screen.getByRole("button", { name: /^table$/i }));
     expect(screen.getAllByText(/Showing 101 to 200 of 7784 results/)).toHaveLength(2);
   });
@@ -367,7 +367,7 @@ describe("UserProfile", () => {
       ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 1 },
     });
 
-    renderProfile("/users/evan?tab=show-ratings&view=table");
+    renderProfile("/users/test-user?tab=show-ratings&view=table");
 
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.queryByTestId("RatingCharts")).not.toBeInTheDocument();
@@ -382,7 +382,7 @@ describe("UserProfile", () => {
       ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 1 },
     });
 
-    renderProfile("/users/evan?tab=show-ratings");
+    renderProfile("/users/test-user?tab=show-ratings");
 
     expect(screen.getByTestId("RatingCharts")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
@@ -399,7 +399,7 @@ describe("UserProfile", () => {
       ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 5 },
     });
 
-    renderProfile("/users/evan?tab=show-ratings");
+    renderProfile("/users/test-user?tab=show-ratings");
     fireEvent.click(screen.getByRole("button", { name: /^table$/i }));
     expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
   });
@@ -477,14 +477,16 @@ describe("shouldRevalidate", () => {
   // Toggling Charts/Table changes only `view`, which the loader ignores — so
   // it must not refetch the (heavy) ratings query.
   test("skips revalidation when only the view sub-tab changes", () => {
-    expect(run("/users/evan?tab=show-ratings", "/users/evan?tab=show-ratings&view=table")).toBe(false);
+    expect(run("/users/test-user?tab=show-ratings", "/users/test-user?tab=show-ratings&view=table")).toBe(false);
   });
 
   // A tab / page / sort / dir change is loader-relevant and must revalidate.
   test("revalidates when a loader-relevant param changes", () => {
-    expect(run("/users/evan?tab=show-ratings", "/users/evan?tab=track-ratings")).toBe(true);
-    expect(run("/users/evan?tab=show-ratings&page=1", "/users/evan?tab=show-ratings&page=2")).toBe(true);
-    expect(run("/users/evan?tab=show-ratings&sort=date", "/users/evan?tab=show-ratings&sort=rating")).toBe(true);
-    expect(run("/users/evan?tab=show-ratings&dir=desc", "/users/evan?tab=show-ratings&dir=asc")).toBe(true);
+    expect(run("/users/test-user?tab=show-ratings", "/users/test-user?tab=track-ratings")).toBe(true);
+    expect(run("/users/test-user?tab=show-ratings&page=1", "/users/test-user?tab=show-ratings&page=2")).toBe(true);
+    expect(run("/users/test-user?tab=show-ratings&sort=date", "/users/test-user?tab=show-ratings&sort=rating")).toBe(
+      true,
+    );
+    expect(run("/users/test-user?tab=show-ratings&dir=desc", "/users/test-user?tab=show-ratings&dir=asc")).toBe(true);
   });
 });

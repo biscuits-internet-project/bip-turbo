@@ -112,9 +112,10 @@ describe("computeShowUserData", () => {
     getAveragesForRateables.mockResolvedValue({});
     findByEmail.mockResolvedValue(null);
 
-    const result = await computeShowUserData({ currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } }, [
-      "show-1",
-    ]);
+    const result = await computeShowUserData(
+      { currentUser: { id: "auth-1", email: "test-user@example.com", isAdmin: false } },
+      ["show-1"],
+    );
 
     expect(result.attendances["show-1"]).toBeNull();
     expect(result.userRatings["show-1"]).toBeNull();
@@ -130,17 +131,17 @@ describe("computeShowUserData", () => {
       "show-1": { average: 4.0, count: 5 },
       "show-2": { average: 3.0, count: 2 },
     });
-    findByEmail.mockResolvedValue({ id: "user-1", email: "evan@foo.net" });
+    findByEmail.mockResolvedValue({ id: "user-1", email: "test-user@example.com" });
     const attendance1 = { id: "att-1", showId: "show-1", userId: "user-1" } as Attendance;
     findManyByUserIdAndShowIds.mockResolvedValue([attendance1]);
     findManyByUserIdAndRateableIds.mockResolvedValue([
       { rateableId: "show-2", rateableType: "Show", value: 5, userId: "user-1" },
     ]);
 
-    const result = await computeShowUserData({ currentUser: { id: "auth-1", email: "evan@foo.net", isAdmin: false } }, [
-      "show-1",
-      "show-2",
-    ]);
+    const result = await computeShowUserData(
+      { currentUser: { id: "auth-1", email: "test-user@example.com", isAdmin: false } },
+      ["show-1", "show-2"],
+    );
 
     expect(result.attendances["show-1"]).toBe(attendance1);
     expect(result.attendances["show-2"]).toBeNull();
@@ -154,13 +155,14 @@ describe("computeShowUserData", () => {
   // calibrated-score or rank-comparison queries — those are the expensive parts.
   test("skips calibrated + rank queries in simple mode", async () => {
     getAveragesForRateables.mockResolvedValue({});
-    findByEmail.mockResolvedValue({ id: "user-1", email: "evan@foo.net", showCalibratedRatings: null });
+    findByEmail.mockResolvedValue({ id: "user-1", email: "test-user@example.com", showCalibratedRatings: null });
     findManyByUserIdAndShowIds.mockResolvedValue([]);
     findManyByUserIdAndRateableIds.mockResolvedValue([]);
 
-    const result = await computeShowUserData({ currentUser: { id: "a", email: "evan@foo.net", isAdmin: false } }, [
-      "show-1",
-    ]);
+    const result = await computeShowUserData(
+      { currentUser: { id: "a", email: "test-user@example.com", isAdmin: false } },
+      ["show-1"],
+    );
 
     expect(getDisplayedForShows).not.toHaveBeenCalled();
     expect(getShowRankComparisons).not.toHaveBeenCalled();
@@ -173,7 +175,7 @@ describe("computeShowUserData", () => {
     getAveragesForRateables.mockResolvedValue({});
     findByEmail.mockResolvedValue({
       id: "user-1",
-      email: "evan@foo.net",
+      email: "test-user@example.com",
       showCalibratedRatings: true,
       showRatingComparisonDebug: true,
     });
@@ -188,9 +190,10 @@ describe("computeShowUserData", () => {
     };
     getShowRankComparisons.mockResolvedValue({ "show-1": rank });
 
-    const result = await computeShowUserData({ currentUser: { id: "a", email: "evan@foo.net", isAdmin: false } }, [
-      "show-1",
-    ]);
+    const result = await computeShowUserData(
+      { currentUser: { id: "a", email: "test-user@example.com", isAdmin: false } },
+      ["show-1"],
+    );
 
     expect(result.displayedRatings["show-1"]).toEqual({ rating: 4.2, count: 18 });
     expect(result.rankComparisons["show-1"]).toEqual(rank);
