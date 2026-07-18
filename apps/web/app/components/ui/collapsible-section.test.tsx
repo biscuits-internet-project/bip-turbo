@@ -28,81 +28,56 @@ describe("CollapsibleSection", () => {
     expect(screen.getByRole("heading", { name: "Songs" })).toBeInTheDocument();
   });
 
-  // Default mode: collapsed on mobile (JS state) but force-expanded at >= md via
-  // CSS, so there's no hydration flash from a JS breakpoint hook.
-  test("expands at md via CSS and starts collapsed on mobile", () => {
-    render(<CollapsibleSection title="Songs">body</CollapsibleSection>);
-
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("md:grid-rows-[1fr]");
-    expect(body.className).toContain("grid-rows-[0fr]");
-  });
-
   test("toggling the header opens the collapsed mobile body", async () => {
     const { user } = await setup(<CollapsibleSection title="Songs">body</CollapsibleSection>);
 
     const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("grid-rows-[0fr]");
+    const toggle = screen.getByTestId("collapsible-section-toggle");
+    expect(body).toHaveAttribute("data-open", "false");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(screen.getByTestId("collapsible-section-toggle"));
-    expect(body.className).toContain("grid-rows-[1fr]");
+    await user.click(toggle);
+    expect(body).toHaveAttribute("data-open", "true");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
   });
 
-  // collapsibleOnDesktop drops the md: force-open so the section collapses at
-  // every width (the chevron stays visible on desktop too).
-  test("collapsibleOnDesktop collapses at all widths", () => {
-    render(
+  // The force-open-at-breakpoint behaviour is implemented as static Tailwind
+  // classes on purpose (a JS media hook would flash on hydration), so the class
+  // string IS the contract and there's no runtime state to assert — the browser
+  // verifies the classes actually take effect. These three cases guard the
+  // prop→class branch only.
+  test("default force-opens at md; breakpoint='sm' force-opens at sm; collapsibleOnDesktop force-opens at neither", () => {
+    const { rerender } = render(<CollapsibleSection title="Songs">body</CollapsibleSection>);
+    expect(screen.getByTestId("collapsible-section-body").className).toContain("md:grid-rows-[1fr]");
+
+    rerender(
+      <CollapsibleSection title="Songs" breakpoint="sm">
+        body
+      </CollapsibleSection>,
+    );
+    let body = screen.getByTestId("collapsible-section-body");
+    expect(body.className).toContain("sm:grid-rows-[1fr]");
+    expect(body.className).not.toContain("md:grid-rows-[1fr]");
+
+    rerender(
       <CollapsibleSection title="Songs" collapsibleOnDesktop>
         body
       </CollapsibleSection>,
     );
-
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).not.toContain("md:grid-rows-[1fr]");
-  });
-
-  // breakpoint="sm" force-expands from the small breakpoint instead of md, for
-  // filter chrome that only needs collapsing on phones.
-  test("breakpoint='sm' force-opens at sm rather than md", () => {
-    render(
-      <CollapsibleSection title="Filter by Year" breakpoint="sm">
-        body
-      </CollapsibleSection>,
-    );
-
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("sm:grid-rows-[1fr]");
+    body = screen.getByTestId("collapsible-section-body");
     expect(body.className).not.toContain("md:grid-rows-[1fr]");
   });
 
   // collapseOnLandscape re-collapses on short (landscape-phone) viewports even
-  // above the breakpoint, so the filter chrome doesn't eat a rotated phone.
-  test("collapseOnLandscape adds the short: re-collapse overrides", () => {
+  // above the breakpoint. Same class-is-contract exception as above.
+  test("collapseOnLandscape adds the short: re-collapse override", () => {
     render(
       <CollapsibleSection title="Filter by Year" breakpoint="sm" collapseOnLandscape>
         body
       </CollapsibleSection>,
     );
 
-    const body = screen.getByTestId("collapsible-section-body");
-    expect(body.className).toContain("short:!grid-rows-[0fr]");
-  });
-
-  // dividerWhenClosed draws a bottom border on the header only while collapsed,
-  // so bare chrome (the filter panel) signals there's hidden content; the line
-  // drops away once opened.
-  test("dividerWhenClosed shows a bottom border only while closed", async () => {
-    const { user } = await setup(
-      <CollapsibleSection title="Filters" dividerWhenClosed>
-        body
-      </CollapsibleSection>,
-    );
-
-    const toggle = screen.getByTestId("collapsible-section-toggle");
-    expect(toggle.className).toContain("border-b");
-
-    await user.click(toggle);
-    expect(toggle.className).not.toContain("border-b");
+    expect(screen.getByTestId("collapsible-section-body").className).toContain("short:!grid-rows-[0fr]");
   });
 
   // titleAs lets a nested card (the lineup) drop to an h3 while page sections

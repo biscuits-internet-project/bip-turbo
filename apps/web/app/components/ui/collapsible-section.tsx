@@ -161,6 +161,11 @@ export function CollapsibleSection({
       </TitleTag>
       <div
         data-testid="collapsible-section-body"
+        // Semantic hook for the JS open/close state, so tests assert state
+        // rather than the `grid-rows-[1fr]/[0fr]` styling. The responsive
+        // force-open (`sm:`/`md:`/`short:`) is pure CSS with no JS observable,
+        // so it's intentionally not reflected here — that's a browser concern.
+        data-open={open}
         className={cn(
           "grid transition-[grid-template-rows] duration-300 ease-out",
           !collapsibleOnDesktop && forceOpen.rows,

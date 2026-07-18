@@ -5,12 +5,10 @@ import { describe, expect, test } from "vitest";
 import { PageHeader } from "./page-header";
 
 describe("PageHeader", () => {
-  test("renders the title with the shared page-heading style", async () => {
+  test("renders the title as a heading", async () => {
     await setupWithRouter(<PageHeader title="MUSICIANS" />);
 
-    const heading = screen.getByRole("heading", { name: "MUSICIANS" });
-    expect(heading).toBeInTheDocument();
-    expect(heading.className).toContain("page-heading");
+    expect(screen.getByRole("heading", { name: "MUSICIANS" })).toBeInTheDocument();
   });
 
   test("renders actions and a back link in the control row", async () => {

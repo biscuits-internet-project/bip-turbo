@@ -35,6 +35,9 @@ export function UrlSortableHeader<S extends string>({
   return (
     <button
       type="button"
+      // Semantic hook for "this column is the active sort", so tests assert
+      // sort state rather than the bold-label / accent-arrow styling.
+      data-active={isActive}
       className="cursor-pointer select-none hover:text-content-text-primary text-left flex flex-wrap items-start gap-x-1"
       onClick={() => onSortChange(sortKey, nextDirection)}
     >

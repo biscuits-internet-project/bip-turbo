@@ -35,32 +35,28 @@ describe("SongsLayout", () => {
     expect(screen.getByRole("link", { name: /this year/i })).toHaveAttribute("href", "/songs/this-year");
   });
 
-  // The active tab should be visually distinguished via a border-brand-primary
-  // class, determined by the current pathname.
-  test("highlights 'All Songs' tab when on /songs", () => {
+  // The active tab is marked aria-current="page" (which the brand-primary
+  // underline styling follows), determined by the current pathname.
+  test("marks 'All Songs' current when on /songs", () => {
     renderAtPath("/songs");
 
-    const allSongsLink = screen.getByRole("link", { name: /all songs/i });
-    expect(allSongsLink.className).toContain("border-brand-primary");
+    expect(screen.getByRole("link", { name: /all songs/i })).toHaveAttribute("aria-current", "page");
   });
 
-  // When navigated to /songs/all-timers, the All-Timers tab should be active.
-  test("highlights 'All-Timers' tab when on /songs/all-timers", () => {
+  // When navigated to /songs/all-timers, the All-Timers tab is current and the
+  // others are not.
+  test("marks 'All-Timers' current when on /songs/all-timers", () => {
     renderAtPath("/songs/all-timers");
 
-    const allTimersLink = screen.getByRole("link", { name: /all-timers/i });
-    expect(allTimersLink.className).toContain("border-brand-primary");
-
-    const allSongsLink = screen.getByRole("link", { name: /all songs/i });
-    expect(allSongsLink.className).not.toContain("border-brand-primary");
+    expect(screen.getByRole("link", { name: /all-timers/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /all songs/i })).not.toHaveAttribute("aria-current");
   });
 
-  // When navigated to /songs/histories, the Histories tab should be active.
-  test("highlights 'Histories' tab when on /songs/histories", () => {
+  // When navigated to /songs/histories, the Histories tab is current.
+  test("marks 'Histories' current when on /songs/histories", () => {
     renderAtPath("/songs/histories");
 
-    const historiesLink = screen.getByRole("link", { name: /histories/i });
-    expect(historiesLink.className).toContain("border-brand-primary");
+    expect(screen.getByRole("link", { name: /histories/i })).toHaveAttribute("aria-current", "page");
   });
 
   // The tab bar should NOT render on song detail pages, edit pages, or new song page
@@ -103,21 +99,14 @@ describe("SongsLayout", () => {
     expect(screen.getByTestId("outlet")).toBeInTheDocument();
   });
 
-  // On mobile, the tab strip is hidden via `sm:flex` (so it does not wrap
-  // and clip the rightmost tab on narrow viewports). A native <select>
-  // dropdown takes its place inside an `sm:hidden` container so users
-  // still have a single-tap way to switch tabs.
-  test("tab strip is hidden on mobile (uses sm:flex), select dropdown is mobile-only", () => {
+  // Two switchers render together: the desktop tab strip and a native <select>
+  // for mobile. Which one is visible at which width is CSS (a browser concern);
+  // jsdom only sees that both controls exist.
+  test("renders both the desktop tab strip and the mobile select", () => {
     renderAtPath("/songs");
 
-    const tabStrip = screen.getByRole("link", { name: /all songs/i }).closest("div[class*='border-b']");
-    expect(tabStrip?.className).toContain("hidden");
-    expect(tabStrip?.className).toContain("sm:flex");
-
-    // The native select is rendered for mobile; its parent should be sm:hidden
-    const select = screen.getByLabelText(/songs view/i);
-    const wrapper = select.closest("div");
-    expect(wrapper?.className).toContain("sm:hidden");
+    expect(screen.getByRole("link", { name: /all songs/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/songs view/i)).toBeInTheDocument();
   });
 
   // The mobile select reflects the current tab as its value, so opening
@@ -137,8 +126,7 @@ describe("SongsLayout", () => {
     fireEvent.change(select, { target: { value: "/songs/all-timers" } });
 
     // The active tab in the desktop strip should now reflect the new path.
-    const allTimersLink = screen.getByRole("link", { name: /all-timers/i });
-    expect(allTimersLink.className).toContain("border-brand-primary");
+    expect(screen.getByRole("link", { name: /all-timers/i })).toHaveAttribute("aria-current", "page");
   });
 
   // Admins get a shortcut to the authors admin from the songs header (AdminOnly

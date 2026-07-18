@@ -37,6 +37,9 @@ export function TriStateFilterButton({ state, label, icon, href }: TriStateFilte
   return (
     <Link
       to={href}
+      // Semantic hook for the current filter state, so tests assert state
+      // rather than the per-state border/background styling.
+      data-state={state}
       aria-label={`${label} filter — ${STATE_DESCRIPTION[state]}, ${NEXT_DESCRIPTION[state]}`}
       className={cn(
         "px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 border",

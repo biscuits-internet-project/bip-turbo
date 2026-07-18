@@ -67,6 +67,22 @@ For a glass surface in markup use the `.glass` / `.glass-secondary` /
 glass utility, register the token in `@theme` first, and the class will work
 everywhere.
 
+## Testing: assert state, never a Tailwind class
+
+**Never assert a `className` contains a Tailwind utility** (`toContain("bg-x")`,
+`toHaveClass`, `className.includes`). jsdom computes no Tailwind, so it passes even
+if the class is misspelled, its token was never registered, `!important` overrides
+it, or nothing renders. All of those have shipped green here (dead `bg-glass-*`,
+`border-dashed` beaten by `.glass-secondary`).
+
+- **Assert state via a semantic hook** (`data-attended`, `data-active`,
+  `data-state`, `aria-*`), so styling stays free to change. See `RatingBadgeButton`
+  (`data-rated`) and the attendance row (`data-attended`).
+- **If the rendered value must resolve** (contrast, a responsive breakpoint) that's
+  a **browser** check, not jsdom.
+- **Assert the class only where it *is* the contract** (a className constant's own
+  content), and even then prefer the behaviour it produces.
+
 ## Package-Specific Commands
 
 ```bash

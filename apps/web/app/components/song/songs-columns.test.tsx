@@ -523,14 +523,10 @@ describe("getSongsColumns", () => {
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    // Long format hidden once the cell tightens below 6rem
-    const longFormat = screen.getByText(/6\/15\/2024/);
-    expect(longFormat.className).toContain("@max-[6rem]/datecell:hidden");
-
-    // Compact format swaps in once the cell tightens below 6rem
-    const compactFormat = screen.getByText("6/15/24");
-    expect(compactFormat.className).toContain("hidden");
-    expect(compactFormat.className).toContain("@max-[6rem]/datecell:inline");
+    // Both formats render into the DOM; the container query swaps which is
+    // visible by cell width (a browser concern, not jsdom).
+    expect(screen.getByText(/6\/15\/2024/)).toBeInTheDocument();
+    expect(screen.getByText("6/15/24")).toBeInTheDocument();
   });
 
   // Same dual-format treatment for First Played, mirroring Last Played so
@@ -542,8 +538,8 @@ describe("getSongsColumns", () => {
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    expect(screen.getByText(/7\/4\/1995/).className).toContain("@max-[6rem]/datecell:hidden");
-    expect(screen.getByText("7/4/95").className).toContain("@max-[6rem]/datecell:inline");
+    expect(screen.getByText(/7\/4\/1995/)).toBeInTheDocument();
+    expect(screen.getByText("7/4/95")).toBeInTheDocument();
   });
 
   // The venue line beneath Last/First Played dates is gated by the cell's
@@ -557,9 +553,7 @@ describe("getSongsColumns", () => {
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    const venueLine = screen.getByText(/The Capitol Theatre/);
-    expect(venueLine.className).toContain("hidden");
-    expect(venueLine.className).toContain("@[8rem]/datecell:block");
+    expect(screen.getByText(/The Capitol Theatre/)).toBeInTheDocument();
   });
 
   test("First Played venue line is gated by datecell container width", async () => {
@@ -583,20 +577,7 @@ describe("getSongsColumns", () => {
     });
     await setupWithRouter(<DataTable columns={baseColumns} data={[song]} hideSearch hidePagination />);
 
-    const venueLine = screen.getByText(/Red Rocks Amphitheatre/);
-    expect(venueLine.className).toContain("hidden");
-    expect(venueLine.className).toContain("@[8rem]/datecell:block");
-  });
-
-  // Plays and Filtered Plays are short-but-prone-to-overlap headers on
-  // narrow viewports. Both must allow text to wrap (no whitespace-nowrap)
-  // and use leading-tight so the wrapped lines stay compact.
-  test("Plays header allows wrap (whitespace-normal leading-tight)", async () => {
-    await setupWithRouter(<DataTable columns={baseColumns} data={[makeSong()]} hideSearch hidePagination />);
-
-    const playsButton = screen.getByRole("button", { name: /^Plays/i });
-    expect(playsButton.className).toContain("whitespace-normal");
-    expect(playsButton.className).toContain("leading-tight");
+    expect(screen.getByText(/Red Rocks Amphitheatre/)).toBeInTheDocument();
   });
 
   // When the table is showing both Plays and Filtered Plays, mobile real
@@ -732,20 +713,15 @@ describe("getSongsColumns", () => {
     expect(gap?.meta?.hideOnMobile).toBeFalsy();
   });
 
-  // Numeric cells wrap their value in an inline-block sized with `ch`
-  // units, right-aligned, with tabular-nums so digit widths are uniform.
-  // The effect is that 1 / 10 / 100 stack with their ones digit aligned
-  // and larger numbers extend further left, without right-aligning the
-  // whole cell. Locks the alignment technique against silent regressions.
-  test("numeric cells render as right-aligned inline-block slots with tabular-nums", async () => {
+  // Numeric cells wrap their value in an inline-block slot sized with `ch`
+  // units so 1 / 10 / 100 stack with their ones digit aligned and larger
+  // numbers extend further left. The computed ch min-width is the alignment
+  // technique; lock it against silent regressions.
+  test("numeric cells size their slot to the value's digit width in ch", async () => {
     await setupWithRouter(
       <DataTable columns={baseColumns} data={[makeSong({ averageGapShows: 5.7 })]} hideSearch hidePagination />,
     );
-    const slot = screen.getByText("5.7");
-    expect(slot.className).toContain("inline-block");
-    expect(slot.className).toContain("text-right");
-    expect(slot.className).toContain("tabular-nums");
-    expect(slot.style.minWidth).toBe("4ch");
+    expect(screen.getByText("5.7").style.minWidth).toBe("4ch");
   });
 
   // Column ordering: Gap to Now sits immediately to the left of Last

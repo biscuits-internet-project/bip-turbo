@@ -54,6 +54,7 @@ export default function SongsLayout() {
                 <Link
                   key={tab.path}
                   to={tab.path}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 text-sm font-medium",
                     isActive

@@ -72,15 +72,11 @@ describe("TriStateFilterButton", () => {
     expect(document.querySelector(".rotate-45")).toBeNull();
   });
 
-  // Each state applies a distinct border class — empty is the only state
-  // without a colored border. These are the visual cues sighted users get
-  // to tell the three states apart.
-  test.each([
-    ["empty", "border-transparent"],
-    ["positive", "border-brand-primary"],
-    ["negative", "border-red-500"],
-  ] as const)("%s state has %s border class", async (state, expectedClass) => {
+  // Each state is exposed via data-state so the three states are distinguishable
+  // by contract; the per-state border/background is the visual cue and is a
+  // browser concern.
+  test.each(["empty", "positive", "negative"] as const)("exposes data-state='%s'", async (state) => {
     await setupWithRouter(<TriStateFilterButton {...baseProps} state={state} />);
-    expect(screen.getByRole("link").className).toContain(expectedClass);
+    expect(screen.getByRole("link")).toHaveAttribute("data-state", state);
   });
 });

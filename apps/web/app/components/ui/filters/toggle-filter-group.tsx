@@ -11,6 +11,7 @@ export function ToggleFilterGroup({ filters, activeFilters, onToggle }: ToggleFi
         <button
           type="button"
           key={filter.key}
+          aria-pressed={activeFilters.has(filter.key)}
           onClick={() => onToggle(filter.key)}
           className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
             activeFilters.has(filter.key)
