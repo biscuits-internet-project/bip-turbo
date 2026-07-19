@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { LinkButton } from "~/components/ui/link-button";
 import { PaginationControls } from "~/components/ui/pagination-controls";
 import { SegmentButton } from "~/components/ui/segment-button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { TabNav, type TabNavItem } from "~/components/ui/tab-nav";
+import { Tabs, TabsContent } from "~/components/ui/tabs";
 import { UrlSortableHeader } from "~/components/ui/url-sortable-header";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { type PublicContext, publicLoader } from "~/lib/base-loaders";
@@ -443,68 +444,35 @@ export default function UserProfile() {
         </CardContent>
       </Card>
 
-      {/* Content Tabs — mobile shows a <select> dropdown (sm:hidden), sm+
-          renders the horizontal tab strip. Mirrors the song-detail page so
-          the long "Song Version Ratings" label doesn't clip on phones. */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(value) => navigate(tabHref(value as TabValue), { preventScrollReset: true })}
-        className="w-full"
-      >
-        <div className="sm:hidden mb-4">
-          <label htmlFor="user-profile-tab-select" className="sr-only">
-            Profile view
-          </label>
-          <select
-            id="user-profile-tab-select"
-            value={activeTab}
-            onChange={(event) => navigate(tabHref(event.target.value as TabValue), { preventScrollReset: true })}
-            className="w-full h-11 px-3 rounded-md border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
-          >
-            {isOwnProfile && <option value="settings">Settings</option>}
-            <option value="shows">Shows Attended ({attendanceCount})</option>
-            <option value="reviews">Reviews ({reviewCount})</option>
-            <option value="show-ratings">Show Ratings ({showRatingsCount})</option>
-            <option value="track-ratings">Song Version Ratings ({trackRatingsCount})</option>
-            {blogPosts.length > 0 && <option value="blog">Blog Posts ({blogPosts.length})</option>}
-          </select>
-        </div>
-        <TabsList className="mb-6 hidden sm:flex">
-          {isOwnProfile && (
-            <TabsTrigger value="settings" asChild>
-              <Link to={tabHref("settings")} preventScrollReset>
-                Settings
-              </Link>
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="shows" asChild>
-            <Link to={tabHref("shows")} preventScrollReset>
-              Shows Attended ({attendanceCount})
-            </Link>
-          </TabsTrigger>
-          <TabsTrigger value="reviews" asChild>
-            <Link to={tabHref("reviews")} preventScrollReset>
-              Reviews ({reviewCount})
-            </Link>
-          </TabsTrigger>
-          <TabsTrigger value="show-ratings" asChild>
-            <Link to={tabHref("show-ratings")} preventScrollReset>
-              Show Ratings ({showRatingsCount})
-            </Link>
-          </TabsTrigger>
-          <TabsTrigger value="track-ratings" asChild>
-            <Link to={tabHref("track-ratings")} preventScrollReset>
-              Song Version Ratings ({trackRatingsCount})
-            </Link>
-          </TabsTrigger>
-          {blogPosts.length > 0 && (
-            <TabsTrigger value="blog" asChild>
-              <Link to={tabHref("blog")} preventScrollReset>
-                Blog Posts ({blogPosts.length})
-              </Link>
-            </TabsTrigger>
-          )}
-        </TabsList>
+      {/* Content Tabs — one TabNav that shows the horizontal strip when it fits
+          and collapses to a dropdown when it doesn't (the long "Song Version
+          Ratings" label clips on phones). Navigation carries preventScrollReset
+          so switching tabs keeps the viewport in place. */}
+      <Tabs value={activeTab} className="w-full">
+        <TabNav
+          className="mb-6"
+          ariaLabel="Profile view"
+          value={activeTab}
+          onValueChange={(value) => navigate(tabHref(value as TabValue), { preventScrollReset: true })}
+          items={
+            [
+              isOwnProfile && { value: "settings", label: "Settings", href: tabHref("settings") },
+              { value: "shows", label: `Shows Attended (${attendanceCount})`, href: tabHref("shows") },
+              { value: "reviews", label: `Reviews (${reviewCount})`, href: tabHref("reviews") },
+              { value: "show-ratings", label: `Show Ratings (${showRatingsCount})`, href: tabHref("show-ratings") },
+              {
+                value: "track-ratings",
+                label: `Song Version Ratings (${trackRatingsCount})`,
+                href: tabHref("track-ratings"),
+              },
+              blogPosts.length > 0 && {
+                value: "blog",
+                label: `Blog Posts (${blogPosts.length})`,
+                href: tabHref("blog"),
+              },
+            ].filter(Boolean) as TabNavItem[]
+          }
+        />
 
         {/* Settings Tab — display preferences, own profile only. Individual
             rating toggles self-hide behind their feature flags. */}

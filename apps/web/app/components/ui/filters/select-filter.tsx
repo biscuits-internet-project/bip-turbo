@@ -1,21 +1,7 @@
-import {
-  compactSelectContentClass,
-  compactSelectItemClass,
-  compactSelectTriggerClass,
-} from "~/components/ui/compact-select";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+import { Dropdown } from "~/components/ui/dropdown";
 
 const labelClass =
   "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
-const groupLabelClass = "text-xs uppercase text-content-text-tertiary tracking-wide py-1";
 
 export interface SelectFilterOptionGroup {
   label: string;
@@ -48,28 +34,17 @@ export function SelectFilter({
       <label htmlFor={id} className={labelClass}>
         {label}
       </label>
-      <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger id={id} className={`${width ?? ""} ${compactSelectTriggerClass}`}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent className={compactSelectContentClass}>
-          {options?.map((option) => (
-            <SelectItem key={option.value} value={option.value} className={compactSelectItemClass}>
-              {option.label}
-            </SelectItem>
-          ))}
-          {groups?.map((group) => (
-            <SelectGroup key={group.label}>
-              <SelectLabel className={groupLabelClass}>{group.label}</SelectLabel>
-              {group.options.map((option) => (
-                <SelectItem key={option.value} value={option.value} className={compactSelectItemClass}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          ))}
-        </SelectContent>
-      </Select>
+      <Dropdown
+        id={id}
+        size="compact"
+        value={value}
+        onValueChange={onValueChange}
+        options={options}
+        groups={groups}
+        placeholder={placeholder}
+        ariaLabel={label}
+        className={width}
+      />
     </div>
   );
 }

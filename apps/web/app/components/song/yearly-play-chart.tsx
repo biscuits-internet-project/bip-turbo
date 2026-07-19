@@ -36,10 +36,10 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
   const isPercent = mode === "percent";
 
   return (
-    <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-6" })}>
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+    <div className={cardVariants({ variant: "elevated", className: "rounded-lg p-3 sm:p-6" })}>
+      <div className="flex items-start justify-between mb-4 gap-3">
         <h3 className="text-lg font-semibold text-content-text-primary">Played by Year</h3>
-        <div className="flex items-center flex-wrap gap-y-2">
+        <div className="flex items-center justify-end flex-wrap gap-y-2">
           <fieldset className="flex border-0 p-0 m-0">
             <legend className="sr-only">Chart units</legend>
             <SegmentButton size="md" active={mode === "count"} onClick={() => setMode("count")}>
@@ -49,7 +49,7 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
               % of Shows
             </SegmentButton>
           </fieldset>
-          <div className="mx-3 h-5 w-px bg-content-text-tertiary/30" aria-hidden="true" />
+          <div className="hidden sm:block mx-3 h-5 w-px bg-content-text-tertiary/30" aria-hidden="true" />
           <fieldset className="flex border-0 p-0 m-0">
             <legend className="sr-only">Year scope</legend>
             <SegmentButton size="md" active={yearScope === "played"} onClick={() => setYearScope("played")}>
@@ -63,12 +63,13 @@ export function YearlyPlayChart({ yearlyPlayData, showsByYear }: YearlyPlayChart
       </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+          <LineChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} opacity={0.3} />
             <XAxis dataKey="year" stroke={CHART_COLORS.axis} fontSize={12} />
             <YAxis
               stroke={CHART_COLORS.axis}
               fontSize={12}
+              width={40}
               tickFormatter={isPercent ? (v: number) => `${Math.round(v * 100)}%` : undefined}
             />
             <Tooltip content={<YearlyChartTooltip />} />

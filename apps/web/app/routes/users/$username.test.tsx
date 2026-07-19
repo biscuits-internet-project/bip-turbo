@@ -241,14 +241,14 @@ describe("UserProfile", () => {
     }
   });
 
-  // Profile tabs render both a <select> for mobile and the horizontal tab
-  // strip; which shows at which width is CSS. Mirrors the song-detail pattern
-  // so the long "Song Version Ratings" label doesn't clip on phones.
-  test("renders both the tab strip and the mobile select", () => {
+  // Profile tabs run through the shared TabNav (labelled "Profile view"), which
+  // collapses the strip to a dropdown when the long "Song Version Ratings"
+  // label won't fit. jsdom reports zero widths, so the strip renders; the
+  // collapse path is covered in tab-nav.test.tsx.
+  test("renders the profile view tablist", () => {
     renderProfile();
 
-    expect(screen.getByRole("tablist")).toBeInTheDocument();
-    expect(screen.getByLabelText(/profile view/i)).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: /profile view/i })).toBeInTheDocument();
   });
 
   // The route delegates rendering to SetlistList, passing through the

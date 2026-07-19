@@ -82,6 +82,13 @@ html body[data-scroll-locked] {
   margin-right: 0 !important;
 }
 
+/* Hide the horizontal scrollbar on the overflow-scrolling tab bar (TabNav)
+   while keeping it scrollable. Firefox/old-Edge use the inline
+   scrollbar-width/ms-overflow-style; this handles WebKit. */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 @layer base {
   /* Design Token System - Premium Purple & Vibrant Green Palette */
   :root {

@@ -1,10 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import { BookUser, Calendar, Clock, Flame, History, ListMusic, Plus } from "lucide-react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
-import { cn } from "~/lib/utils";
+import { TabNav } from "~/components/ui/tab-nav";
 
 interface Tab {
   label: string;
@@ -46,46 +46,19 @@ export default function SongsLayout() {
               </AdminOnly>
             }
           />
-          <div className="w-full hidden sm:flex justify-start border-b mb-6">
-            {TABS.map((tab) => {
-              const isActive = pathname === tab.path;
-              const Icon = tab.icon;
-              return (
-                <Link
-                  key={tab.path}
-                  to={tab.path}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 text-sm font-medium",
-                    isActive
-                      ? "border-b-2 border-brand-primary text-content-text-primary"
-                      : "text-content-text-tertiary hover:text-content-text-secondary",
-                  )}
-                >
-                  <Icon className={cn("h-4 w-4", tab.iconClassName)} />
-                  {tab.label}
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="sm:hidden mb-6">
-            <label htmlFor="songs-view-select" className="sr-only">
-              Songs view
-            </label>
-            <select
-              id="songs-view-select"
-              value={pathname}
-              onChange={(event) => navigate(event.target.value)}
-              className="w-full h-11 px-3 rounded-md border text-content-text-primary focus:outline-none focus:ring-1 focus:ring-ring/20"
-            >
-              {TABS.map((tab) => (
-                <option key={tab.path} value={tab.path}>
-                  {tab.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <TabNav
+            className="mb-6"
+            ariaLabel="Songs view"
+            value={pathname}
+            onValueChange={navigate}
+            items={TABS.map((tab) => ({
+              value: tab.path,
+              label: tab.label,
+              href: tab.path,
+              icon: tab.icon,
+              iconClassName: tab.iconClassName,
+            }))}
+          />
         </>
       )}
 

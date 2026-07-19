@@ -25,7 +25,7 @@ describe("SelectFilter", () => {
       <SelectFilter id="test-filter" label="Type" value="cover" onValueChange={() => {}} options={options} />,
     );
 
-    expect(screen.getByText("Cover")).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveTextContent("Cover");
   });
 
   // When the user picks a new option, onValueChange fires with the option's
