@@ -7,7 +7,7 @@ import { z } from "zod";
 import { ShowYoutubeManager } from "~/components/show/show-youtube-manager";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import { CompactSelect } from "~/components/ui/compact-select";
+import { Dropdown } from "~/components/ui/dropdown";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
@@ -123,7 +123,8 @@ export function ShowForm({
             <FormItem>
               <FormLabel className="text-content-text-secondary">Band</FormLabel>
               <FormControl>
-                <CompactSelect
+                <Dropdown
+                  size="compact"
                   value={field.value}
                   onValueChange={field.onChange}
                   placeholder="Select a band"

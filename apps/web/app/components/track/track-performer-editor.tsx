@@ -2,7 +2,7 @@ import type { Musician, TrackMusicianDelta } from "@bip/domain";
 import { useRef } from "react";
 import { InstrumentSearch } from "~/components/musician/instrument-search";
 import { MusicianSearch } from "~/components/musician/musician-search";
-import { CompactSelect } from "~/components/ui/compact-select";
+import { Dropdown } from "~/components/ui/dropdown";
 import { MultiEntityPicker } from "~/components/ui/multi-entity-picker";
 import type { TrackPerformerDelta } from "./use-track-api";
 
@@ -124,7 +124,8 @@ export function TrackPerformerEditor({ rows, onChange }: TrackPerformerEditorPro
             autoOpen={row.autoOpen}
             className="h-8 w-full sm:w-48"
           />
-          <CompactSelect
+          <Dropdown
+            size="compact"
             value={row.present ? "present" : "out"}
             onValueChange={(value) => setPresent(row.uid, value === "present")}
             options={STATUS_OPTIONS}

@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { CompactSelect } from "~/components/ui/compact-select";
+import { Dropdown } from "~/components/ui/dropdown";
 import { formLabelClass } from "~/lib/form-styles";
 import { formatDateMedium } from "~/lib/utils";
 import type { EarlierPerformance } from "./use-track-api";
@@ -62,7 +62,8 @@ export function TrackCompletionsEditor({ options, value, onChange }: TrackComple
             </ul>
           )}
           {available.length > 0 && (
-            <CompactSelect
+            <Dropdown
+              size="compact"
               value=""
               onValueChange={add}
               options={available.map((option) => ({ value: option.trackId, label: formatDateMedium(option.showDate) }))}

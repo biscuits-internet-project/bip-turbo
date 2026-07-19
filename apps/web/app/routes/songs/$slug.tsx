@@ -15,9 +15,9 @@ import { isNoteworthy } from "~/components/track/noteworthy-marker";
 import { cardVariants } from "~/components/ui/card";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { StatBox } from "~/components/ui/stat-box";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { TabNav, type TabNavItem } from "~/components/ui/tab-nav";
+import { Tabs, TabsContent } from "~/components/ui/tabs";
 import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-performance-page-filters";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
@@ -204,8 +204,11 @@ export default function SongPage() {
   const handleTabChange = (value: string) => {
     clearFilters();
     // "performances" is the default; navigate to bare /songs/:slug so
-    // the URL doesn't carry a redundant /performances suffix.
-    navigate(value === "performances" ? `/songs/${song.slug}` : `/songs/${song.slug}/${value}`);
+    // the URL doesn't carry a redundant /performances suffix. preventScrollReset
+    // keeps the viewport where it is — switching tabs shouldn't jump to the top.
+    navigate(value === "performances" ? `/songs/${song.slug}` : `/songs/${song.slug}/${value}`, {
+      preventScrollReset: true,
+    });
   };
 
   const hasAllTimers = useMemo(() => allPerformances.some((p) => p.allTimer), [allPerformances]);
@@ -346,66 +349,34 @@ export default function SongPage() {
         </div>
       )}
 
-      <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
-        <div className="sm:hidden mb-4" data-testid="mobile-song-view">
-          <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger
-              aria-label="Song view"
-              className="w-full h-11 border text-content-text-primary focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="backdrop-blur-md">
-              <SelectItem value="performances">All Performances</SelectItem>
-              {hasJamCharts && <SelectItem value="jam-charts">Jam Charts</SelectItem>}
-              {hasAllTimers && <SelectItem value="all-timers">All-Timers</SelectItem>}
-              <SelectItem value="stats">Stats</SelectItem>
-              {song.history && <SelectItem value="history">History</SelectItem>}
-              {song.lyrics && <SelectItem value="lyrics">Lyrics</SelectItem>}
-              {(song.tabs || song.guitarTabsUrl) && <SelectItem value="guitar-tabs">Guitar Tabs</SelectItem>}
-            </SelectContent>
-          </Select>
-        </div>
-        <TabsList className="w-full hidden sm:flex justify-start">
-          <TabsTrigger value="performances">
-            <ListMusic className="h-4 w-4" />
-            All Performances
-          </TabsTrigger>
-          {hasJamCharts && (
-            <TabsTrigger value="jam-charts">
-              <Flame className="h-4 w-4 text-flame-jam" />
-              Jam Charts
-            </TabsTrigger>
-          )}
-          {hasAllTimers && (
-            <TabsTrigger value="all-timers">
-              <Flame className="h-4 w-4 text-flame-all-timer" />
-              All-Timers
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="stats">
-            <BarChart3 className="h-4 w-4" />
-            Graphs
-          </TabsTrigger>
-          {song.history && (
-            <TabsTrigger value="history">
-              <History className="h-4 w-4" />
-              History
-            </TabsTrigger>
-          )}
-          {song.lyrics && (
-            <TabsTrigger value="lyrics">
-              <FileTextIcon className="h-4 w-4" />
-              Lyrics
-            </TabsTrigger>
-          )}
-          {(song.tabs || song.guitarTabsUrl) && (
-            <TabsTrigger value="guitar-tabs">
-              <GuitarIcon className="h-4 w-4" />
-              Guitar Tabs
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <Tabs value={activeTab} className="w-full">
+        <TabNav
+          className="mb-2"
+          ariaLabel="Song view"
+          value={activeTab}
+          onValueChange={handleTabChange}
+          items={
+            [
+              { value: "performances", label: "All Performances", icon: ListMusic },
+              hasJamCharts && {
+                value: "jam-charts",
+                label: "Jam Charts",
+                icon: Flame,
+                iconClassName: "text-flame-jam",
+              },
+              hasAllTimers && {
+                value: "all-timers",
+                label: "All-Timers",
+                icon: Flame,
+                iconClassName: "text-flame-all-timer",
+              },
+              { value: "stats", label: "Graphs", icon: BarChart3 },
+              song.history && { value: "history", label: "History", icon: History },
+              song.lyrics && { value: "lyrics", label: "Lyrics", icon: FileTextIcon },
+              (song.tabs || song.guitarTabsUrl) && { value: "guitar-tabs", label: "Guitar Tabs", icon: GuitarIcon },
+            ].filter(Boolean) as TabNavItem[]
+          }
+        />
 
         {hasJamCharts && (
           <TabsContent value="jam-charts" className="mt-6">

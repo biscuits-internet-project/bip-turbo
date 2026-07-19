@@ -6,7 +6,7 @@ import { useNavigate, useSubmit } from "react-router-dom";
 import { z } from "zod";
 import { AuthorSearch } from "~/components/author/author-search";
 import { Button } from "~/components/ui/button";
-import { CompactSelect } from "~/components/ui/compact-select";
+import { Dropdown } from "~/components/ui/dropdown";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { MultiEntityPicker, type MultiEntityRow } from "~/components/ui/multi-entity-picker";
@@ -139,7 +139,8 @@ export function SongForm({ defaultValues, submitLabel, cancelHref }: SongFormPro
             <FormItem>
               <FormLabel className="text-content-text-secondary">Type</FormLabel>
               <FormControl>
-                <CompactSelect
+                <Dropdown
+                  size="compact"
                   value={field.value || "original"}
                   onValueChange={field.onChange}
                   options={[

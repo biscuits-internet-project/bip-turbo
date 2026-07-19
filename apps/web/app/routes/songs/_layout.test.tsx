@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test, vi } from "vitest";
 
@@ -24,39 +24,40 @@ function renderAtPath(path: string) {
 }
 
 describe("SongsLayout", () => {
-  // The layout should render a tab bar with five navigation tabs.
+  // The layout renders a TabNav whose route tabs keep real hrefs (so they open
+  // in new tabs / prefetch), one per songs view.
   test("renders five tab links: All Songs, All-Timers, Histories, Last 10 Shows, This Year", () => {
     renderAtPath("/songs");
 
-    expect(screen.getByRole("link", { name: /all songs/i })).toHaveAttribute("href", "/songs");
-    expect(screen.getByRole("link", { name: /all-timers/i })).toHaveAttribute("href", "/songs/all-timers");
-    expect(screen.getByRole("link", { name: /histories/i })).toHaveAttribute("href", "/songs/histories");
-    expect(screen.getByRole("link", { name: /last 10 shows/i })).toHaveAttribute("href", "/songs/recent");
-    expect(screen.getByRole("link", { name: /this year/i })).toHaveAttribute("href", "/songs/this-year");
+    expect(screen.getByRole("tab", { name: /all songs/i })).toHaveAttribute("href", "/songs");
+    expect(screen.getByRole("tab", { name: /all-timers/i })).toHaveAttribute("href", "/songs/all-timers");
+    expect(screen.getByRole("tab", { name: /histories/i })).toHaveAttribute("href", "/songs/histories");
+    expect(screen.getByRole("tab", { name: /last 10 shows/i })).toHaveAttribute("href", "/songs/recent");
+    expect(screen.getByRole("tab", { name: /this year/i })).toHaveAttribute("href", "/songs/this-year");
   });
 
-  // The active tab is marked aria-current="page" (which the brand-primary
-  // underline styling follows), determined by the current pathname.
-  test("marks 'All Songs' current when on /songs", () => {
+  // The active tab is marked selected (data-state=active drives the brand
+  // underline), determined by the current pathname.
+  test("marks 'All Songs' active when on /songs", () => {
     renderAtPath("/songs");
 
-    expect(screen.getByRole("link", { name: /all songs/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("tab", { name: /all songs/i })).toHaveAttribute("data-state", "active");
   });
 
-  // When navigated to /songs/all-timers, the All-Timers tab is current and the
+  // When navigated to /songs/all-timers, the All-Timers tab is active and the
   // others are not.
-  test("marks 'All-Timers' current when on /songs/all-timers", () => {
+  test("marks 'All-Timers' active when on /songs/all-timers", () => {
     renderAtPath("/songs/all-timers");
 
-    expect(screen.getByRole("link", { name: /all-timers/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /all songs/i })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("tab", { name: /all-timers/i })).toHaveAttribute("data-state", "active");
+    expect(screen.getByRole("tab", { name: /all songs/i })).toHaveAttribute("data-state", "inactive");
   });
 
-  // When navigated to /songs/histories, the Histories tab is current.
-  test("marks 'Histories' current when on /songs/histories", () => {
+  // When navigated to /songs/histories, the Histories tab is active.
+  test("marks 'Histories' active when on /songs/histories", () => {
     renderAtPath("/songs/histories");
 
-    expect(screen.getByRole("link", { name: /histories/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("tab", { name: /histories/i })).toHaveAttribute("data-state", "active");
   });
 
   // The tab bar should NOT render on song detail pages, edit pages, or new song page
@@ -64,16 +65,16 @@ describe("SongsLayout", () => {
   test("does not render tab bar on /songs/:slug", () => {
     renderAtPath("/songs/basis-for-a-day");
 
-    expect(screen.queryByRole("link", { name: /all songs/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /all-timers/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /histories/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /all songs/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /all-timers/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /histories/i })).not.toBeInTheDocument();
   });
 
   // The tab bar should not render on the new song admin page.
   test("does not render tab bar on /songs/new", () => {
     renderAtPath("/songs/new");
 
-    expect(screen.queryByRole("link", { name: /all songs/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /all songs/i })).not.toBeInTheDocument();
   });
 
   // The "SONGS" heading should appear in the layout on tabbed pages.
@@ -99,34 +100,12 @@ describe("SongsLayout", () => {
     expect(screen.getByTestId("outlet")).toBeInTheDocument();
   });
 
-  // Two switchers render together: the desktop tab strip and a native <select>
-  // for mobile. Which one is visible at which width is CSS (a browser concern);
-  // jsdom only sees that both controls exist.
-  test("renders both the desktop tab strip and the mobile select", () => {
+  // The single TabNav control carries the accessible name "Songs view"; its
+  // bar-vs-dropdown responsiveness is exercised in tab-nav.test.tsx.
+  test("renders the songs view tablist", () => {
     renderAtPath("/songs");
 
-    expect(screen.getByRole("link", { name: /all songs/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/songs view/i)).toBeInTheDocument();
-  });
-
-  // The mobile select reflects the current tab as its value, so opening
-  // the dropdown shows the user where they are.
-  test("mobile select value reflects the current tab path", () => {
-    renderAtPath("/songs/all-timers");
-
-    const select = screen.getByLabelText(/songs view/i) as HTMLSelectElement;
-    expect(select.value).toBe("/songs/all-timers");
-  });
-
-  // Changing the mobile select navigates to the chosen tab path.
-  test("changing mobile select navigates to the new tab", () => {
-    renderAtPath("/songs");
-
-    const select = screen.getByLabelText(/songs view/i) as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: "/songs/all-timers" } });
-
-    // The active tab in the desktop strip should now reflect the new path.
-    expect(screen.getByRole("link", { name: /all-timers/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("tablist", { name: /songs view/i })).toBeInTheDocument();
   });
 
   // Admins get a shortcut to the authors admin from the songs header (AdminOnly

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
-import { CompactSelect } from "~/components/ui/compact-select";
+import { Dropdown } from "~/components/ui/dropdown";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { formInputClass } from "~/lib/form-styles";
@@ -144,7 +144,8 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                 </FormLabel>
                 <FormControl>
                   {isUSOrCanada ? (
-                    <CompactSelect
+                    <Dropdown
+                      size="compact"
                       key={selectedCountry}
                       value={field.value && stateOptions.includes(field.value) ? field.value : ""}
                       onValueChange={field.onChange}
@@ -176,7 +177,8 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                 Country <span className="text-error">*</span>
               </FormLabel>
               <FormControl>
-                <CompactSelect
+                <Dropdown
+                  size="compact"
                   value={field.value}
                   onValueChange={field.onChange}
                   options={COUNTRIES.map((country) => ({ value: country, label: country }))}

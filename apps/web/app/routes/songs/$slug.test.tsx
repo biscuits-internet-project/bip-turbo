@@ -148,7 +148,8 @@ describe("SongPage", () => {
     renderSongPage();
 
     await user.click(screen.getByRole("tab", { name: /graphs/i }));
-    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day/stats");
+    // preventScrollReset keeps the viewport in place when switching tabs.
+    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day/stats", { preventScrollReset: true });
   });
 
   // The default ("performances") tab navigates back to the bare song
@@ -159,7 +160,7 @@ describe("SongPage", () => {
     renderSongPage();
 
     await user.click(screen.getByRole("tab", { name: /all performances/i }));
-    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day");
+    expect(mockNavigate).toHaveBeenCalledWith("/songs/basis-for-a-day", { preventScrollReset: true });
   });
 
   // The All-Timers tab visibility should be based on the unfiltered data,
@@ -225,20 +226,16 @@ describe("SongPage", () => {
     expect(screen.getByText(/University of Pennsylvania, Philadelphia, PA/)).toBeInTheDocument();
   });
 
-  // The TabsList on song-detail clips at narrow widths because there can be
-  // up to 6 tabs (All Performances, All-Timers, Stats, History, Lyrics,
-  // Guitar Tabs). Mobile gets a Radix Select instead — a native <select> was
-  // used before, but its OS-styling didn't look like a dropdown to users, so
-  // they didn't realize it was tappable. The Radix trigger renders as a
-  // styled button (role="combobox") with a visible chevron.
-  test("song tabs render both a tab strip and a mobile Radix Select", () => {
+  // Song views run through the shared TabNav: a tab strip that collapses to a
+  // dropdown when the tabs don't fit (there can be up to 7). jsdom reports zero
+  // widths, so it renders the bar; the collapse-to-dropdown path is covered in
+  // tab-nav.test.tsx. The control carries the "Song view" accessible name.
+  test("song tabs render through a labelled TabNav strip", () => {
     renderSongPage();
 
-    // Both switchers are in the DOM; which shows at which width is CSS.
-    expect(screen.getByRole("tablist")).toBeInTheDocument();
-    const trigger = screen.getByRole("combobox", { name: /song view/i });
-    expect(trigger.textContent).toMatch(/All Performances/);
-    expect(screen.getByTestId("mobile-song-view")).toBeInTheDocument();
+    const tablist = screen.getByRole("tablist", { name: /song view/i });
+    expect(tablist).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /all performances/i })).toBeInTheDocument();
   });
 
   // The "last show" sublabel marks the song as having been played at the

@@ -2,8 +2,8 @@ import { Globe, MapPin, Plus, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRevalidator } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { CompactSelect } from "~/components/ui/compact-select";
 import { DataTable } from "~/components/ui/data-table";
+import { Dropdown } from "~/components/ui/dropdown";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
 import { StatBox } from "~/components/ui/stat-box";
@@ -111,7 +111,8 @@ export default function VenuesPage() {
         searchPlaceholder="Search venues..."
         initialSorting={[{ id: "shows", desc: true }]}
         filterComponent={
-          <CompactSelect
+          <Dropdown
+            size="compact"
             value={stateFilter || ALL_STATES}
             onValueChange={(value) => setStateFilter(value === ALL_STATES ? "" : value)}
             options={stateOptions}
