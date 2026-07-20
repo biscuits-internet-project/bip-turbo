@@ -1,8 +1,11 @@
+import { RATING_DISPLAY_DECIMALS_DEFAULT } from "@bip/domain";
 import { createContext, useContext, useMemo } from "react";
 
 export type Preferences = {
   colorCodeRatings: boolean;
   showSetlistTimes: boolean;
+  /** Decimal places rating scores render at (1-4); resolved from the viewer's choice. */
+  ratingDecimalPlaces: number;
 };
 
 /**
@@ -21,6 +24,7 @@ export type Preferences = {
 export const PREFERENCES_DEFAULT: Preferences = {
   colorCodeRatings: false,
   showSetlistTimes: true,
+  ratingDecimalPlaces: RATING_DISPLAY_DECIMALS_DEFAULT,
 };
 
 const PreferencesContext = createContext<Preferences>(PREFERENCES_DEFAULT);
@@ -38,18 +42,23 @@ const PreferencesContext = createContext<Preferences>(PREFERENCES_DEFAULT);
 export function PreferencesProvider({
   colorCodeRatings,
   showSetlistTimes,
+  ratingDecimalPlaces,
   children,
 }: {
   colorCodeRatings: boolean | null | undefined;
   showSetlistTimes: boolean | null | undefined;
+  // Optional so the many test wrappers that don't exercise it can omit it; it
+  // resolves to the default below when absent, like any unset preference.
+  ratingDecimalPlaces?: number | null | undefined;
   children: React.ReactNode;
 }) {
   const value = useMemo<Preferences>(
     () => ({
       colorCodeRatings: colorCodeRatings ?? PREFERENCES_DEFAULT.colorCodeRatings,
       showSetlistTimes: showSetlistTimes ?? PREFERENCES_DEFAULT.showSetlistTimes,
+      ratingDecimalPlaces: ratingDecimalPlaces ?? PREFERENCES_DEFAULT.ratingDecimalPlaces,
     }),
-    [colorCodeRatings, showSetlistTimes],
+    [colorCodeRatings, showSetlistTimes, ratingDecimalPlaces],
   );
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }

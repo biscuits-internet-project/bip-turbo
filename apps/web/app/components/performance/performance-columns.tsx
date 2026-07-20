@@ -1,4 +1,4 @@
-import { compareByShowDate, type SongPagePerformance } from "@bip/domain";
+import { compareByShowDate, RATING_DISPLAY_DECIMALS_DEFAULT, type SongPagePerformance } from "@bip/domain";
 import { type Column, type ColumnDef, createColumnHelper, type Row } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDown, ArrowUpIcon, Filter, RotateCcw, Star } from "lucide-react";
 import type { ReactNode } from "react";
@@ -10,6 +10,7 @@ import { ShowDateLink } from "~/components/show-date-link";
 import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-cell";
 import { DurationValue } from "~/components/track/duration-cell";
 import { NumberCell } from "~/components/ui/number-cell";
+import { ratingColumnWidth } from "~/lib/rating-column-width";
 import type { TrackRatingComparison } from "~/server/track-user-ratings";
 import { CombinedNotes } from "./combined-notes";
 import { DateVenueCell } from "./date-venue-cell";
@@ -213,6 +214,8 @@ interface PerformanceColumnOptions {
   displayRatingMap?: Map<string, { average: number; count: number }>;
   /** Plain vs calibrated per track, present only for the author compare overlay. */
   comparisonMap?: Map<string, TrackRatingComparison>;
+  /** Viewer's rating decimal-places setting — sizes the rating column for its score width. */
+  ratingDecimalPlaces?: number;
 }
 
 function SortableHeader({
@@ -255,6 +258,7 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
     isAuthenticated,
     displayRatingMap,
     comparisonMap,
+    ratingDecimalPlaces = RATING_DISPLAY_DECIMALS_DEFAULT,
   } = options;
   const includeGapColumns = showGapColumns !== false;
   const columnHelper = createColumnHelper<SongPagePerformance>();
@@ -548,15 +552,8 @@ export function createPerformanceColumns(options: PerformanceColumnOptions): Col
       // order. Sort defaults to descending ("best first") via sortDescFirst.
       sortingFn: displayRatingSortingFn,
       sortDescFirst: true,
-      // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
-      // average + 3-digit vote count + the viewer's own half-step rating
-      // (4½ is the widest valid user value; ratings cap at 5). Measured at
-      // ~120px on desktop / ~103px on mobile. Desktop 8.25rem (132px)
-      // leaves ~12px slack; mobile 6.75rem (108px) leaves ~5px so typical
-      // rows (no user rating, 1-2 digit count) don't carry obvious empty
-      // space. The 5-star editor pops in a popover that overlays the
-      // badge, so the column doesn't need a wider expanded state.
-      meta: { fixedWidth: "8.25rem", mobileFixedWidth: "6.75rem" },
+      // Width scales with the viewer's chosen decimal places (see ratingColumnWidth).
+      meta: ratingColumnWidth(ratingDecimalPlaces),
       cell: (info) => {
         const row = info.row.original;
         return (

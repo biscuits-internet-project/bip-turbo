@@ -22,6 +22,8 @@ interface DropdownProps {
   ariaLabel?: string;
   id?: string;
   size?: "default" | "compact";
+  /** Disables the trigger (e.g. while a selection is being saved). */
+  disabled?: boolean;
   className?: string;
 }
 
@@ -40,6 +42,7 @@ const triggerBaseClass = cn(
   "group inline-flex items-center justify-between gap-1 rounded-md border border-[hsl(var(--border))] text-content-text-primary transition-colors",
   dropdownSurface,
   "hover:bg-[hsl(var(--content-bg-tertiary))] focus:outline-none focus-visible:ring-1 data-[placeholder]:text-content-text-tertiary",
+  "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[hsl(var(--content-bg-secondary))]",
 );
 const triggerSizeClass = {
   default: "h-11 px-3 text-sm",
@@ -55,6 +58,7 @@ export function Dropdown({
   ariaLabel,
   id,
   size = "default",
+  disabled,
   className,
 }: DropdownProps) {
   // Every label the trigger might display. Rendered invisibly, stacked in one
@@ -66,7 +70,7 @@ export function Dropdown({
     ...(groups ?? []).flatMap((group) => group.options.map((option) => option.label)),
   ];
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectPrimitive.Trigger
         id={id}
         aria-label={ariaLabel}

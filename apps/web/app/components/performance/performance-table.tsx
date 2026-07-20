@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Card } from "~/components/ui/card";
 import { DataTable } from "~/components/ui/data-table";
 import { useAttendanceRowHighlight } from "~/hooks/use-attendance-row-highlight";
+import { usePreferences } from "~/hooks/use-preferences";
 import { useSession } from "~/hooks/use-session";
 import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { createPerformanceColumns } from "./performance-columns";
@@ -51,6 +52,7 @@ export function PerformanceTable({
 }: PerformanceTableProps) {
   const { user } = useSession();
   const isAuthenticated = !!user;
+  const { ratingDecimalPlaces } = usePreferences();
 
   const { rowClassName: attendanceRowClassName, isAttended } = useAttendanceRowHighlight(performances, getShowId);
 
@@ -92,6 +94,7 @@ export function PerformanceTable({
         isAuthenticated,
         displayRatingMap,
         comparisonMap,
+        ratingDecimalPlaces,
       }),
     [
       showSongColumn,
@@ -103,6 +106,7 @@ export function PerformanceTable({
       isAuthenticated,
       displayRatingMap,
       comparisonMap,
+      ratingDecimalPlaces,
     ],
   );
 

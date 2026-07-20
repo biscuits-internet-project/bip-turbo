@@ -30,7 +30,7 @@ interface SetlistTablePersonalProps {
 export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChange }: SetlistTablePersonalProps) {
   const { data, isLoading } = usePersonalSongHistory();
   const { user } = useSession();
-  const { showSetlistTimes } = usePreferences();
+  const { showSetlistTimes, ratingDecimalPlaces } = usePreferences();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
   const { userRatingMap, displayRatingMap, comparisonMap } = useTrackUserRatings(trackIds);
@@ -62,10 +62,11 @@ export function SetlistTablePersonal({ tracks, showSlug, showDate, onSummaryChan
           userRatingMap,
           isAuthenticated,
           comparisonMap,
+          ratingDecimalPlaces,
         }),
         showSetlistTimes,
       ),
-    [showSlug, displayRatingMap, userRatingMap, isAuthenticated, comparisonMap, showSetlistTimes],
+    [showSlug, displayRatingMap, userRatingMap, isAuthenticated, comparisonMap, showSetlistTimes, ratingDecimalPlaces],
   );
 
   // Hoist the summary up to the parent so it can render alongside the

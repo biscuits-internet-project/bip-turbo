@@ -38,6 +38,11 @@ export type RootPreferences = {
    */
   colorCodeRatings: boolean | null;
   showSetlistTimes: boolean | null;
+  /**
+   * Decimal places the viewer chose for rating scores (1-4), as stored: `null`
+   * means they never chose, which `usePreferences()` resolves to the app default.
+   */
+  ratingDecimalPlaces: number | null;
 };
 
 export type RootData = {
@@ -98,6 +103,7 @@ export async function loader({ request }: Route.LoaderArgs): Promise<RootData> {
     preferences: {
       colorCodeRatings: viewer?.colorCodeRatings ?? null,
       showSetlistTimes: viewer?.showSetlistTimes ?? null,
+      ratingDecimalPlaces: viewer?.ratingDecimalPlaces ?? null,
     },
   };
 }
@@ -131,6 +137,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <PreferencesProvider
                 colorCodeRatings={data?.preferences?.colorCodeRatings}
                 showSetlistTimes={data?.preferences?.showSetlistTimes}
+                ratingDecimalPlaces={data?.preferences?.ratingDecimalPlaces}
               >
                 <GlobalSearchProvider>
                   <SearchProvider>

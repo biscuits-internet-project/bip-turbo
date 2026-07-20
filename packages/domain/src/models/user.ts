@@ -15,6 +15,8 @@ export const userSchema = z.object({
   trackRatingComparisonDebug: z.boolean().nullable(),
   colorCodeRatings: z.boolean().nullable(),
   showSetlistTimes: z.boolean().nullable(),
+  // Rating score decimal places (1-4); null = no explicit choice → app default.
+  ratingDecimalPlaces: z.number().int().min(1).max(4).nullable(),
 });
 
 export const userMinimalSchema = userSchema

@@ -6,6 +6,7 @@ import { AllTimerCell, allTimerColumnMeta } from "~/components/track/all-timer-c
 import { DurationValue } from "~/components/track/duration-cell";
 import { NumberCell } from "~/components/ui/number-cell";
 import { SortableHeader } from "~/components/ui/sortable-header";
+import { ratingColumnWidth } from "~/lib/rating-column-width";
 import type { TrackRatingComparison } from "~/server/track-user-ratings";
 import { GapCell, type GapCellState } from "./gap-cell";
 import { compareBySetThenPosition, countDistinctEncores, formatSetLabel } from "./set-label";
@@ -41,6 +42,8 @@ export interface SetlistRatingContext {
   userRatingMap: Map<string, number>;
   isAuthenticated: boolean;
   comparisonMap?: Map<string, TrackRatingComparison>;
+  /** Viewer's rating decimal-places setting — sizes the column for its score width. */
+  ratingDecimalPlaces: number;
 }
 
 /**
@@ -58,14 +61,8 @@ export function createRatingColumn<T extends TrackLight>(ctx: SetlistRatingConte
   return columnHelper.accessor((row) => ctx.averageRatingMap.get(row.id)?.average ?? Number.NEGATIVE_INFINITY, {
     id: "rating",
     header: ({ column }) => <SortableHeader column={column} label="Rating" />,
-    // Sized for the busiest badge form: "★ 5.00 · 999 | 4½" — community
-    // average + 3-digit vote count + the viewer's own half-step rating
-    // (4½ is the widest valid user value; ratings cap at 5). Matches the
-    // performance table's rating column width so the column reads
-    // consistently across setlist and song-detail tables. The 5-star
-    // picker pops in a popover overlay, so the column doesn't need a
-    // wider expanded state.
-    meta: { fixedWidth: "8.25rem", mobileFixedWidth: "6.75rem" },
+    // Width scales with the viewer's chosen decimal places (see ratingColumnWidth).
+    meta: ratingColumnWidth(ctx.ratingDecimalPlaces),
     enableSorting: true,
     // Ties resolve first to vote count (more votes = more confidence in the
     // average), then to canonical set+position so "all unrated tracks" still

@@ -41,12 +41,24 @@ describe("rankShowComparisons", () => {
   // The 2001-09-01 overlay scenario: two single-vote 5.0 shows top the raw-average
   // field, but the genuine #1 (highest average among well-rated shows) must own the
   // TOP-LIST rank — thin shows only inflate the `all` field, never the top list.
+  // weightedRatingsCount == ratingsCount here (no bomber exclusion in the fixture);
+  // date/dayOrder feed only the final full-tie tiebreak, which none of these hit.
+  const rankable = (id: string, canonical: number, weighted: number, ratingsCount: number, date: string) => ({
+    id,
+    canonical,
+    weighted,
+    ratingsCount,
+    weightedRatingsCount: ratingsCount,
+    date,
+    dayOrder: null,
+  });
+
   test("thin shows inflate the all-field but never the top list", () => {
     const shows = [
-      { id: "thin-a", canonical: 5.0, weighted: 5.0, ratingsCount: 1 },
-      { id: "thin-b", canonical: 5.0, weighted: 5.0, ratingsCount: 2 },
-      { id: "wetlands", canonical: 4.868, weighted: 4.8, ratingsCount: 34 },
-      { id: "haymaker", canonical: 4.839, weighted: 4.7, ratingsCount: 31 },
+      rankable("thin-a", 5.0, 5.0, 1, "2000-01-01"),
+      rankable("thin-b", 5.0, 5.0, 2, "2000-01-02"),
+      rankable("wetlands", 4.868, 4.8, 34, "2001-09-01"),
+      rankable("haymaker", 4.839, 4.7, 31, "2002-10-05"),
     ];
     const wetlands = rankShowComparisons(shows, ["wetlands"], 3.93, 3).get("wetlands");
     // Over all shows the two thin 5.0s sit above it; on the real top list it's #1.
@@ -58,9 +70,9 @@ describe("rankShowComparisons", () => {
   // the top list. Its raw average can top the all-field while its shrunk score sinks.
   test("a thin show is ranked in the all-field but absent from the top list", () => {
     const shows = [
-      { id: "big1", canonical: 4.8, weighted: 4.8, ratingsCount: 100 },
-      { id: "big2", canonical: 4.6, weighted: 4.6, ratingsCount: 100 },
-      { id: "thin", canonical: 5.0, weighted: 5.0, ratingsCount: 1 },
+      rankable("big1", 4.8, 4.8, 100, "2000-01-01"),
+      rankable("big2", 4.6, 4.6, 100, "2000-01-02"),
+      rankable("thin", 5.0, 5.0, 1, "2000-01-03"),
     ];
     const thin = rankShowComparisons(shows, ["thin"], 4.0, 3).get("thin");
     expect(thin?.top).toBeNull();
@@ -71,14 +83,44 @@ describe("rankShowComparisons", () => {
   // Canonical and calibrated are ranked independently within the top list:
   // count-shrinkage pulls a thinner high-average show below a heavily-rated one.
   test("ranks the calibrated (shrunk) score independently of canonical", () => {
-    const shows = [
-      { id: "a", canonical: 4.9, weighted: 4.9, ratingsCount: 10 },
-      { id: "b", canonical: 4.7, weighted: 4.7, ratingsCount: 500 },
-    ];
+    const shows = [rankable("a", 4.9, 4.9, 10, "2000-01-01"), rankable("b", 4.7, 4.7, 500, "2000-01-02")];
     const ranks = rankShowComparisons(shows, ["a", "b"], 4.0, 3);
     // a canonical 4.9 > b 4.7, but shrink(4.9,4.0,10,3)=4.692 < shrink(4.7,4.0,500,3)=4.696.
     expect(ranks.get("a")?.top).toMatchObject({ canonicalRank: 1, calibratedRank: 2 });
     expect(ranks.get("b")?.top).toMatchObject({ canonicalRank: 2, calibratedRank: 1 });
+  });
+
+  // Two shows whose calibrated scores differ only below the display precision must
+  // TIE on the rounded score and resolve by the displayed count — here the calibrated
+  // count is weighted_ratings_count, so the show with more contributing raters wins.
+  test("a sub-precision calibrated gap ties on the rounded score, count breaks it", () => {
+    const shows = [
+      // Equal weighted (== anchor) makes both shrink to exactly 4.0, so the score
+      // ties precisely and only the count tiebreak decides.
+      {
+        id: "fewer",
+        canonical: 4.8,
+        weighted: 4.8,
+        ratingsCount: 30,
+        weightedRatingsCount: 20,
+        date: "2001-01-01",
+        dayOrder: null,
+      },
+      {
+        id: "more",
+        canonical: 4.8,
+        weighted: 4.8,
+        ratingsCount: 30,
+        weightedRatingsCount: 28,
+        date: "2000-01-01",
+        dayOrder: null,
+      },
+    ];
+    const ranks = rankShowComparisons(shows, ["fewer", "more"], 4.0, 3);
+    // Equal calibrated score → the higher weighted_ratings_count (28) ranks first,
+    // even though "more" is the OLDER show (date tiebreak never reached).
+    expect(ranks.get("more")?.top).toMatchObject({ calibratedRank: 1 });
+    expect(ranks.get("fewer")?.top).toMatchObject({ calibratedRank: 2 });
   });
 });
 
@@ -202,27 +244,72 @@ describe("RaterWeightService recompute settings", () => {
 });
 
 describe("RaterWeightService.rankedShows", () => {
-  // Two shows with the same average_rating render best-first, so the score alone
-  // is a non-unique sort key. The simple path must carry a deterministic tiebreak
-  // into the SQL ORDER BY (ratings_count DESC, then the canonical show ordering).
-  test("simple mode orders by rating then a deterministic tiebreak", async () => {
-    const queryRaw = vi.fn().mockResolvedValue([]);
-    const db = { ratingSettings: { findFirst: vi.fn() }, $queryRaw: queryRaw } as never;
-    await new RaterWeightService(db).rankedShows("simple", 5);
-    const templateStrings: string[] = queryRaw.mock.calls[0][0];
-    expect(templateStrings.join("")).toContain("ORDER BY s.average_rating DESC, s.ratings_count DESC,");
+  // Simple mode ranks by the ROUNDED average users see, so two shows that print the
+  // same score tie on the primary key and the more-rated one wins — even when its
+  // full-precision average is lower. Sorting by the raw float would flip this.
+  test("simple mode ranks by rounded rating, then ratings_count", async () => {
+    const rows = [
+      {
+        id: "many",
+        date: "2002-01-01",
+        dayOrder: null,
+        average: 4.807,
+        weighted: null,
+        ratingsCount: 50,
+        weightedRatingsCount: 0,
+      },
+      {
+        id: "few",
+        date: "2001-01-01",
+        dayOrder: null,
+        average: 4.814,
+        weighted: null,
+        ratingsCount: 40,
+        weightedRatingsCount: 0,
+      },
+    ];
+    const db = { ratingSettings: { findFirst: vi.fn() }, $queryRaw: vi.fn().mockResolvedValue(rows) } as never;
+    const ranked = await new RaterWeightService(db).rankedShows("simple", 5);
+    // Both round to 4.81 → tie → "many" (50 ratings) outranks "few", flipping the
+    // full-precision order where 4.814 would beat 4.807.
+    expect(ranked.map((s) => s.id)).toEqual(["many", "few"]);
   });
 
-  // The calibrated path sorts in JS, so equal shrunk scores must resolve through
-  // an explicit comparator. Feeding the same rows in different input orders must
-  // yield one stable order: more-rated first, then newest-date first.
-  test("calibrated mode breaks equal scores by ratings_count then date (stable across input order)", async () => {
-    // Anchor 4 with raw == anchor makes shrinkToward return exactly 4 for every
+  // The calibrated path sorts in JS, so equal shrunk scores must resolve through the
+  // shared comparator, tiebreaking on the DISPLAYED count (weighted_ratings_count).
+  // Feeding the same rows in different input orders must yield one stable order:
+  // more-contributing-raters first, then newest-date first.
+  test("calibrated mode breaks equal scores by weighted_ratings_count then date (stable across input order)", async () => {
+    // Anchor 4 with weighted == anchor makes shrinkToward return exactly 4 for every
     // count, so all three shows tie on score and only the tiebreak decides order.
     const rows = [
-      { id: "older-30", date: "2008-01-01", dayOrder: null, raw: 4, ratings: 30 },
-      { id: "fewer-20", date: "2005-01-01", dayOrder: null, raw: 4, ratings: 20 },
-      { id: "newer-30", date: "2010-01-01", dayOrder: null, raw: 4, ratings: 30 },
+      {
+        id: "older-30",
+        date: "2008-01-01",
+        dayOrder: null,
+        average: null,
+        weighted: 4,
+        ratingsCount: 40,
+        weightedRatingsCount: 30,
+      },
+      {
+        id: "fewer-20",
+        date: "2005-01-01",
+        dayOrder: null,
+        average: null,
+        weighted: 4,
+        ratingsCount: 40,
+        weightedRatingsCount: 20,
+      },
+      {
+        id: "newer-30",
+        date: "2010-01-01",
+        dayOrder: null,
+        average: null,
+        weighted: 4,
+        ratingsCount: 40,
+        weightedRatingsCount: 30,
+      },
     ];
     const expected = ["newer-30", "older-30", "fewer-20"];
 

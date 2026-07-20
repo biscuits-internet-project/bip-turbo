@@ -1,4 +1,4 @@
-import type { TrackLight } from "@bip/domain";
+import { RATING_DISPLAY_DECIMALS_DEFAULT, type TrackLight } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { PersonalSetlistRow } from "~/lib/personal-setlist-columns";
 import {
@@ -31,6 +31,7 @@ export function createPersonalSetlistColumns(
     userRatingMap: ctx?.userRatingMap ?? new Map(),
     isAuthenticated: ctx?.isAuthenticated ?? false,
     comparisonMap: ctx?.comparisonMap,
+    ratingDecimalPlaces: ctx?.ratingDecimalPlaces ?? RATING_DISPLAY_DECIMALS_DEFAULT,
   };
   return [
     ...createSetlistCommonColumns<PersonalSetlistTableRow>({ songLinkSearchParams: "attended=attended" }),

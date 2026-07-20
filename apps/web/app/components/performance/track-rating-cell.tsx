@@ -1,4 +1,6 @@
+import { formatRatingScore } from "@bip/domain";
 import { RatingBadgeButton } from "~/components/rating/rating-badge-button";
+import { usePreferences } from "~/hooks/use-preferences";
 import type { TrackRatingComparison } from "~/server/track-user-ratings";
 
 /**
@@ -27,6 +29,7 @@ export function TrackRatingCell({
   isAuthenticated: boolean;
   comparison?: TrackRatingComparison;
 }) {
+  const { ratingDecimalPlaces } = usePreferences();
   const badge = (
     <RatingBadgeButton
       rateableId={trackId}
@@ -50,8 +53,9 @@ export function TrackRatingCell({
         className="text-[10px] leading-none text-content-text-tertiary tabular-nums"
         title="community → calibrated (Δ)"
       >
-        {comparison.plain.toFixed(2)}→{comparison.calibrated.toFixed(2)} ({comparison.delta >= 0 ? "+" : ""}
-        {comparison.delta.toFixed(2)})
+        {formatRatingScore(comparison.plain, ratingDecimalPlaces)}→
+        {formatRatingScore(comparison.calibrated, ratingDecimalPlaces)} ({comparison.delta >= 0 ? "+" : ""}
+        {formatRatingScore(comparison.delta, ratingDecimalPlaces)})
       </span>
     </div>
   );

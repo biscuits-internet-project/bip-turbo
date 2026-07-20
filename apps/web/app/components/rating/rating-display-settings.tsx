@@ -1,13 +1,24 @@
+import { RATING_DISPLAY_DECIMALS_MAX, RATING_DISPLAY_DECIMALS_MIN } from "@bip/domain";
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { RatingComponent } from "~/components/rating/rating";
 import { ratingBadgeLayoutClass, ratingBadgeStateClass } from "~/components/rating/rating-badge-button";
+import { PreferenceSelect } from "~/components/settings/preference-select";
 import { PreferenceToggle } from "~/components/settings/preference-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useFeatureFlags } from "~/hooks/use-feature-flags";
 import { PREFERENCES_DEFAULT } from "~/hooks/use-preferences";
 import { CALIBRATED_RATING_ALGORITHM_PATH } from "~/lib/route-paths";
 import { cn } from "~/lib/utils";
+
+/** Decimal-place choices for the rating precision dropdown (1-4). */
+const RATING_DECIMAL_OPTIONS = Array.from(
+  { length: RATING_DISPLAY_DECIMALS_MAX - RATING_DISPLAY_DECIMALS_MIN + 1 },
+  (_, index) => {
+    const value = String(RATING_DISPLAY_DECIMALS_MIN + index);
+    return { value, label: value };
+  },
+);
 
 /**
  * Live before/after for the color-code toggle: the same three ratings rendered
@@ -77,12 +88,14 @@ export function RatingDisplaySettings({
   trackCalibratedRatings,
   trackRatingComparisonDebug,
   colorCodeRatings,
+  ratingDecimalPlaces,
 }: {
   showCalibratedRatings: boolean | null;
   showRatingComparisonDebug: boolean | null;
   trackCalibratedRatings: boolean | null;
   trackRatingComparisonDebug: boolean | null;
   colorCodeRatings: boolean | null;
+  ratingDecimalPlaces: number | null;
 }) {
   const { toggleVisible, compareVisible, defaultCalibrated } = useFeatureFlags();
 
@@ -150,6 +163,16 @@ export function RatingDisplaySettings({
             initial={trackRatingComparisonDebug ?? false}
           />
         )}
+
+        {/* Available to everyone (ungated), like color coding below. */}
+        <PreferenceSelect
+          field="ratingDecimalPlaces"
+          label="Rating precision"
+          ariaLabel="Rating decimal places"
+          description="How many decimal places rating scores show, from 1 to 4."
+          initial={String(ratingDecimalPlaces ?? PREFERENCES_DEFAULT.ratingDecimalPlaces)}
+          options={RATING_DECIMAL_OPTIONS}
+        />
 
         {/* Available to everyone, so it sits last, after the opt-in calibrated
             settings. Carries a live before/after preview since the tint is
