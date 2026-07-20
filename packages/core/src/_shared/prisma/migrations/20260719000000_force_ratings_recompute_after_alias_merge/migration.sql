@@ -1,0 +1,13 @@
+-- One-time force of the ratings recompute so the expanded duplicate-account merge
+-- (msp trio HankScorpio/DeepDive/Mojobisco added to ALIAS_MERGE_GROUPS) takes effect
+-- in the denormalized average_rating / ratings_count columns.
+--
+-- The deploy entrypoint runs scripts/recompute-ratings.ts right after
+-- `prisma migrate deploy`, but that recompute is dirty-gated on
+-- rating_settings.ratings_dirty and a code-only dedup change never flips it. Flip it
+-- here so the very next recompute rebuilds every rateable's canonical average with the
+-- new dedup. The recompute clears the flag when it finishes.
+--
+-- Idempotent: re-running only re-sets true. If no settings row exists, isDirty()
+-- already treats the absent row as dirty, so the recompute still runs.
+UPDATE "rating_settings" SET "ratings_dirty" = true;
