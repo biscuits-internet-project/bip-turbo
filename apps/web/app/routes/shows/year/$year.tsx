@@ -255,7 +255,7 @@ export default function ShowsByYear() {
               title="Jump to Month"
               titleClassName="text-sm font-semibold text-white"
               headerExtra={
-                <span className="text-xs font-normal text-content-text-tertiary bg-content-bg-secondary px-2 py-0.5 rounded-full">
+                <span className="text-xs font-normal text-content-text-tertiary px-2 py-0.5 rounded-full">
                   {monthsWithShows.length} months
                 </span>
               }
@@ -275,7 +275,7 @@ export default function ShowsByYear() {
                       className={cn(
                         "px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 text-center",
                         active
-                          ? "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white cursor-pointer"
+                          ? "text-content-text-secondary hover:text-white cursor-pointer"
                           : "text-content-text-tertiary bg-transparent cursor-not-allowed opacity-40",
                       )}
                     >

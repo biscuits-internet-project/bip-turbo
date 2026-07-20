@@ -398,7 +398,7 @@ export function TrackManager({ showId, initialTracks = [], footnoteSetlist }: Tr
 
                 return (
                   <div key={setName} className="space-y-2">
-                    <h3 className="text-lg font-medium text-brand-secondary border-b border-content-bg-secondary pb-1">
+                    <h3 className="text-lg font-medium text-brand-secondary border-b pb-1">
                       {SET_OPTIONS.find((opt) => opt.value === setName)?.label || setName}
                     </h3>
 

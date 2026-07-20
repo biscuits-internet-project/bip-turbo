@@ -98,12 +98,12 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "name"> }) => (
             <FormItem>
               <FormLabel className="text-content-text-primary">
-                Venue Name <span className="text-error">*</span>
+                Venue Name <span className="">*</span>
               </FormLabel>
               <FormControl>
                 <Input placeholder="Enter venue name" {...field} className={formInputClass} />
               </FormControl>
-              <FormMessage className="text-error" />
+              <FormMessage className="" />
             </FormItem>
           )}
         />
@@ -114,12 +114,12 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "city"> }) => (
             <FormItem>
               <FormLabel className="text-content-text-primary">
-                City <span className="text-error">*</span>
+                City <span className="">*</span>
               </FormLabel>
               <FormControl>
                 <Input placeholder="Enter city" {...field} className={formInputClass} />
               </FormControl>
-              <FormMessage className="text-error" />
+              <FormMessage className="" />
             </FormItem>
           )}
         />
@@ -140,7 +140,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                     : selectedCountry === "Canada"
                       ? "Province"
                       : "State/Province"}
-                  {isUSOrCanada && <span className="text-error">*</span>}
+                  {isUSOrCanada && <span className="">*</span>}
                 </FormLabel>
                 <FormControl>
                   {isUSOrCanada ? (
@@ -162,7 +162,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                     />
                   )}
                 </FormControl>
-                <FormMessage className="text-error" />
+                <FormMessage className="" />
               </FormItem>
             );
           }}
@@ -174,7 +174,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
           render={({ field }: { field: ControllerRenderProps<VenueFormValues, "country"> }) => (
             <FormItem>
               <FormLabel className="text-content-text-primary">
-                Country <span className="text-error">*</span>
+                Country <span className="">*</span>
               </FormLabel>
               <FormControl>
                 <Dropdown
@@ -186,7 +186,7 @@ export function VenueForm({ defaultValues, onSubmit, submitLabel, cancelHref }: 
                   className="w-full"
                 />
               </FormControl>
-              <FormMessage className="text-error" />
+              <FormMessage className="" />
             </FormItem>
           )}
         />

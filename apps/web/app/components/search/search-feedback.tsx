@@ -127,10 +127,8 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
   }
 
   return (
-    <div
-      className={`flex items-center gap-2 !text-muted-foreground animate-in fade-in slide-in-from-bottom-2 duration-500 ${className}`}
-    >
-      <span className="text-sm !text-muted-foreground" style={{ color: "hsl(var(--muted-foreground)) !important" }}>
+    <div className={`flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500 ${className}`}>
+      <span className="text-sm" style={{ color: "hsl(var(--muted-foreground)) !important" }}>
         Was this helpful?
       </span>
       <div className="flex gap-1">
@@ -138,7 +136,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
           type="button"
           onClick={handleThumbsUp}
           disabled={isSubmitting}
-          className="p-2 h-8 w-8 cursor-pointer !text-muted-foreground rounded transition-colors"
+          className="p-2 h-8 w-8 cursor-pointer rounded transition-colors"
           style={{ color: "hsl(var(--muted-foreground)) !important" }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.2)";
@@ -155,7 +153,7 @@ export function SearchFeedback({ searchId, onFeedback, className }: SearchFeedba
           type="button"
           onClick={handleThumbsDown}
           disabled={isSubmitting}
-          className="p-2 h-8 w-8 cursor-pointer !text-muted-foreground rounded transition-colors"
+          className="p-2 h-8 w-8 cursor-pointer rounded transition-colors"
           style={{ color: "hsl(var(--muted-foreground)) !important" }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";

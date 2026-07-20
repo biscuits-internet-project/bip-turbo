@@ -6,7 +6,6 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 export function DatePicker({ date }: { date: Date }) {
   const [selectedDate, setSelectedDate] = React.useState<Date>(date);
@@ -14,10 +13,7 @@ export function DatePicker({ date }: { date: Date }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant={"outline"}
-          className={cn("w-[280px] justify-start text-left font-normal", !date && "text-muted-foreground")}
-        >
+        <Button variant={"outline"} className="w-[280px] justify-start text-left font-normal">
           <CalendarIcon />
           {date ? format(date, "PPP") : <span>Set publish date</span>}
         </Button>

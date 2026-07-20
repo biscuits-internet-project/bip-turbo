@@ -12,7 +12,7 @@ interface GroupedToggleFiltersProps {
 }
 
 const triggerBase =
-  "inline-flex items-center gap-2 h-[34px] px-3 rounded-md border text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20";
+  "inline-flex items-center gap-2 h-[34px] px-3 rounded-md border text-sm transition-colors focus-visible:outline-none focus-visible:ring-1";
 
 /**
  * Renders the toggle chips as a compact strip of group popovers (Quality,

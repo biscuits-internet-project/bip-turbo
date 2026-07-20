@@ -5,28 +5,27 @@ import * as React from "react";
 import { cn } from "~/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "",
         // The project's primary CTA — purple brand bg with the darker
         // `hover-accent` token on hover. Used for "Save", "Update",
         // "Add Track", etc. across the admin forms.
-        brand: "bg-brand-primary text-content-text-primary hover:bg-hover-accent",
+        brand: "bg-brand-primary text-content-text-primary",
         // Secondary "Cancel / back / dismiss" CTA — outlined dark-theme
-        // border with a fill-on-hover transition. Paired with `variant="brand"`
+        // border with a transition. Paired with `variant="brand"`
         // submits across the admin forms.
-        cancel:
-          "border border-content-bg-secondary bg-transparent text-content-text-secondary hover:bg-content-bg-secondary hover:text-content-text-primary",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        cancel: "border bg-transparent text-content-text-secondary hover:text-content-text-primary",
+        destructive: "",
         // Outlined red delete affordance — shared by the track delete row and
         // the show/entity delete buttons so every "delete" reads the same.
         destructiveOutline: "border border-red-600 bg-transparent text-red-400 hover:bg-red-900/20",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        outline: "border",
+        secondary: "",
+        ghost: "",
+        link: "underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",

@@ -16,13 +16,10 @@ type ResetPasswordFormProps = {
 export function ResetPasswordForm({ className, onSubmit, isLoading = false, ...props }: ResetPasswordFormProps) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card
-        variant="plain"
-        className="relative border border-brand/20 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300 hover:border-brand/30"
-      >
-        <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
-        <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
-        <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />
+      <Card variant="plain" className="relative border backdrop-blur-2xl transition-colors duration-300">
+        <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b via-transparent to-transparent" />
+        <div className="absolute inset-0 rounded-[inherit] shadow-2xl" />
+        <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b opacity-50" />
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold tracking-tight text-white">Set new password</CardTitle>
           <CardDescription className="text-base text-content-text-secondary">
@@ -74,17 +71,14 @@ export function ResetPasswordForm({ className, onSubmit, isLoading = false, ...p
                 type="submit"
                 variant="outline"
                 disabled={isLoading}
-                className="w-full text-content-text-secondary border-content-bg-secondary hover:bg-content-bg-secondary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-content-text-secondary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? "Updating..." : "Update password"}
               </Button>
             </div>
 
             <div className="text-center text-sm text-content-text-secondary">
-              Remember your password?{" "}
-              <Link to="/auth/login" className="text-brand hover:text-hover-accent">
-                Sign in
-              </Link>
+              Remember your password? <Link to="/auth/login">Sign in</Link>
             </div>
           </form>
         </CardContent>

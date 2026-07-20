@@ -63,7 +63,7 @@ const MovieScores: React.FC = () => {
           There are many theories as to where you should start the tape with the movie, so it might take you some
           experimenting to find the best sync. Here's a tip from one fan:
         </p>
-        <blockquote className="border-l-4 border-content-bg-secondary pl-4 my-4 text-content-text-secondary italic">
+        <blockquote className="border-l-4 pl-4 my-4 text-content-text-secondary italic">
           "When the 1988 dateline appears, the first note of the DJ spinning should start up. When they first take off
           in the motorcycles, the beat should get noticeably more intense. When the kid is headbutted by the big Clown
           leader, the drum machines should stop completely, leaving just the vocal sample. When the first child subject

@@ -211,7 +211,7 @@ export function SearchPicker<T>({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "justify-between border text-white focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20",
+            "justify-between border text-white focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-1",
             className,
           )}
         >

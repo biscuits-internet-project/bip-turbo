@@ -96,7 +96,7 @@ function UserCard({ userStats }: { userStats: UserStats }) {
 
         {/* Badges at the bottom */}
         {displayBadges.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-content-border/30">
+          <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t">
             {displayBadges.map((badge) => (
               <div
                 key={badge.id}

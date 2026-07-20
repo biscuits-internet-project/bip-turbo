@@ -8,7 +8,7 @@
  * dropdowns (`<Dropdown size="compact">`), which are sized for a filter bar
  * rather than a content form.
  */
-export const formInputClass = "bg-content-bg-secondary border-content-bg-secondary text-content-text-primary";
+export const formInputClass = "text-content-text-primary";
 
 /**
  * The auth form field surface — login, register, and password reset. Auth has
@@ -34,4 +34,4 @@ export const formLabelClass = "block text-sm font-medium text-content-text-secon
  * with the caller so denser lists can use `p-2` and content-heavier rows
  * can use `p-3` without forking the shared treatment.
  */
-export const listRowClass = "rounded-lg border border-content-bg-secondary bg-content-bg-secondary/50";
+export const listRowClass = "rounded-lg border";

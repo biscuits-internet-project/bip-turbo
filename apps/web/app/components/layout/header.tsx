@@ -57,7 +57,7 @@ export function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 short:!h-12 bg-[hsl(240,10%,3.9%)] border-b border-border/10 overflow-hidden">
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 short:!h-12 bg-[hsl(240,10%,3.9%)] border-b overflow-hidden">
         <div className="flex h-full items-center justify-between px-4 sm:px-6 lg:px-8 max-w-full">
           {/* Logo */}
           <div className="flex items-center">
@@ -158,7 +158,7 @@ export function Header() {
             ))}
 
             {/* Mobile Auth & User Menu */}
-            <div className="border-t border-border/10 pt-4 mt-4">
+            <div className="border-t pt-4 mt-4">
               {user ? (
                 <div className="space-y-1">
                   {/* User Info */}
@@ -170,7 +170,7 @@ export function Header() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground">{username}</span>
+                      <span className="text-sm font-medium">{username}</span>
                       <span className="text-xs text-content-text-secondary">{user.email}</span>
                     </div>
                   </div>

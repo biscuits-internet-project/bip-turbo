@@ -39,7 +39,7 @@ const dropdownSurface = "bg-[hsl(var(--content-bg-secondary))]";
 const triggerBaseClass = cn(
   "group inline-flex items-center justify-between gap-1 rounded-md border border-[hsl(var(--border))] text-content-text-primary transition-colors",
   dropdownSurface,
-  "hover:bg-[hsl(var(--content-bg-tertiary))] focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/40 data-[placeholder]:text-content-text-tertiary",
+  "hover:bg-[hsl(var(--content-bg-tertiary))] focus:outline-none focus-visible:ring-1 data-[placeholder]:text-content-text-tertiary",
 );
 const triggerSizeClass = {
   default: "h-11 px-3 text-sm",

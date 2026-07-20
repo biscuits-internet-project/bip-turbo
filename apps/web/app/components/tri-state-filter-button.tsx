@@ -43,10 +43,9 @@ export function TriStateFilterButton({ state, label, icon, href }: TriStateFilte
       aria-label={`${label} filter — ${STATE_DESCRIPTION[state]}, ${NEXT_DESCRIPTION[state]}`}
       className={cn(
         "px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1.5 border",
-        state === "positive" && "text-white bg-content-bg-tertiary border-brand-primary/50",
+        state === "positive" && "text-white border-brand-primary/50",
         state === "negative" && "text-white bg-red-600/10 border-red-500/50",
-        state === "empty" &&
-          "text-content-text-secondary bg-content-bg-secondary hover:bg-content-bg-tertiary hover:text-white border-transparent",
+        state === "empty" && "text-content-text-secondary hover:text-white border-transparent",
       )}
     >
       <FilterIcon state={state}>{icon}</FilterIcon>

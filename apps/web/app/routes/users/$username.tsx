@@ -423,7 +423,7 @@ export default function UserProfile() {
           </div>
 
           {/* Stats Grid — 2-up on mobile so each cell stays readable, 4-up at sm+. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 p-3 sm:p-4 bg-content-bg/30 rounded-lg border border-content-border/30 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 p-3 sm:p-4 rounded-lg border mb-4">
             <div className="text-center">
               <div className="text-xl sm:text-2xl font-bold text-brand-primary">{attendanceCount}</div>
               <div className="text-xs sm:text-sm text-content-text-secondary">Shows Attended</div>

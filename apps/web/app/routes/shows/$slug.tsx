@@ -417,7 +417,7 @@ export default function Show() {
 
       {/* Photos section at the bottom */}
       {photos.length > 0 && (
-        <div className="mt-10 pt-8 border-t border-border/50">
+        <div className="mt-10 pt-8 border-t">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-2xl font-bold text-content-text-primary">Photos</h2>
             <span className="text-sm text-content-text-tertiary">

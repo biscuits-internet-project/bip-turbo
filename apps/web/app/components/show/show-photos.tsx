@@ -77,8 +77,8 @@ export function ShowPhotos({ photos }: ShowPhotosProps) {
   return (
     <div className="relative group">
       {/* Gradient edges for scroll indication */}
-      <div className="absolute left-0 top-0 bottom-2 w-8 bg-gradient-to-r from-background to-transparent z-[5] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-background to-transparent z-[5] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute left-0 top-0 bottom-2 w-8 bg-gradient-to-r to-transparent z-[5] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l to-transparent z-[5] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
 
       {/* Scroll buttons */}
       {photos.length > 3 && (
@@ -122,7 +122,7 @@ export function ShowPhotos({ photos }: ShowPhotosProps) {
             key={photo.id}
             type="button"
             onClick={() => openPhoto(photo, index)}
-            className="flex-shrink-0 group/photo relative overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-all duration-300 hover:-translate-y-1"
+            className="flex-shrink-0 group/photo relative overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-300 hover:-translate-y-1"
           >
             {/* Image container with border */}
             <div className="relative rounded-xl overflow-hidden border-2 border-white/20 group-hover/photo:border-white/50 shadow-lg shadow-black/50 group-hover/photo:shadow-xl group-hover/photo:shadow-black/70 transition-all duration-300">
