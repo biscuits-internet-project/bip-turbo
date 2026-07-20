@@ -177,7 +177,7 @@ const Mixes: React.FC = () => {
         </Card>
 
         <Card title="Available Mixes">
-          <ul className="divide-y divide-divider">
+          <ul className="divide-y">
             {mixes.map((mix) => (
               <li key={mix.name.replace(/\s+/g, "-").toLowerCase()} className="py-3">
                 <a

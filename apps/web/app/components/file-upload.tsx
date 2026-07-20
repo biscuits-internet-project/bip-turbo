@@ -42,29 +42,29 @@ export function FileUpload({ onUploadComplete, onError, bucket, folder, classNam
           "file:mr-4 file:py-2 file:px-4 file:mb-4",
           "file:rounded-md file:border-0",
           "file:text-sm file:font-medium",
-          "file:bg-secondary file:text-secondary-foreground",
-          "hover:file:bg-secondary/80",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "",
+          "",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
           (!isReady || isUploading) && "pointer-events-none opacity-60",
         )}
       />
-      <div className="text-xs text-muted-foreground p-2">
+      <div className="text-xs p-2">
         <p>Accepted formats: {allowedTypesString}</p>
         <p>Maximum size: {Math.round(maxFileSize / 1024)}KB</p>
       </div>
       {!isReady && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Initializing upload service...</span>
         </div>
       )}
       {isUploading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Uploading...</span>
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm">{error}</p>}
     </div>
   );
 }

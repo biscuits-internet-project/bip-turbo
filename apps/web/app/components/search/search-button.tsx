@@ -59,7 +59,7 @@ export function SearchButton({ className, showShortcut = true }: SearchButtonPro
 
   return (
     <div className={cn("relative", className)}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" />
       <Input
         ref={inputRef}
         value={localQuery}
@@ -67,19 +67,15 @@ export function SearchButton({ className, showShortcut = true }: SearchButtonPro
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         placeholder="Search..."
-        className={cn("pl-9", localQuery ? "pr-8" : "pr-16", "bg-muted/50 border-muted", "h-9", "focus:bg-background")}
+        className={cn("pl-9", localQuery ? "pr-8" : "pr-16", "", "h-9", "")}
       />
       {localQuery ? (
-        <button
-          type="button"
-          onClick={handleClear}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded"
-        >
-          <X className="h-3 w-3 text-muted-foreground" />
+        <button type="button" onClick={handleClear} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded">
+          <X className="h-3 w-3" />
         </button>
       ) : (
         showShortcut && (
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-sm font-medium text-muted-foreground pointer-events-none">
+          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-sm font-medium pointer-events-none">
             <span className="text-sm">⌘</span>K
           </kbd>
         )

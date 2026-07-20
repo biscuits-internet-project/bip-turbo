@@ -482,12 +482,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
 
   if (error) {
     return (
-      <div
-        className={cn(
-          bare ? "p-0" : "bg-black/40 backdrop-blur-xl border border-warning rounded-lg p-6",
-          "text-warning",
-        )}
-      >
+      <div className={cn(bare ? "p-0" : "bg-black/40 backdrop-blur-xl border rounded-lg p-6", "")}>
         <p>Error loading audio: {error}</p>
       </div>
     );
@@ -519,7 +514,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         </audio>
 
         {/* Now playing */}
-        <div className="mb-4 bg-content-bg-secondary/50 rounded-md p-3 border border-content-bg-secondary">
+        <div className="mb-4 rounded-md p-3 border">
           <div className="text-sm font-medium text-content-text-tertiary mb-1">Now Playing:</div>
           <div className="text-base text-content-text-primary font-medium truncate">{getTrackName(currentFile)}</div>
           <div className="text-xs text-content-text-tertiary mt-1">
@@ -531,7 +526,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         <div className="mb-4">
           <div
             ref={progressRef}
-            className="h-2 bg-content-bg-secondary rounded-full cursor-pointer overflow-hidden"
+            className="h-2 rounded-full cursor-pointer overflow-hidden"
             onClick={handleProgressClick}
             onKeyDown={handleProgressKeyDown}
             role="slider"
@@ -542,7 +537,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             tabIndex={0}
           >
             <div
-              className="h-full bg-gradient-to-r from-brand-primary to-chart-primary rounded-full"
+              className="h-full bg-gradient-to-r from-brand-primary rounded-full"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
@@ -608,7 +603,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
               step="0.01"
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-20 h-1 bg-content-bg-secondary rounded-lg appearance-none cursor-pointer"
+              className="w-20 h-1 rounded-lg appearance-none cursor-pointer"
               aria-label="Volume"
             />
           </div>
@@ -618,15 +613,15 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
         {audioFiles.length > 1 && (
           <div className="track-list">
             <h4 className="text-md font-medium text-content-text-secondary mb-2">Tracks</h4>
-            <div className="max-h-48 overflow-y-auto rounded-md border border-content-bg-secondary bg-content-bg-secondary/30 scrollbar-thin scrollbar-thumb-content-bg-secondary scrollbar-track-content-bg">
+            <div className="max-h-48 overflow-y-auto rounded-md border scrollbar-thin scrollbar-thumb-content-bg-secondary scrollbar-track-content-bg">
               {audioFiles.map((file, index) => (
                 <button
                   key={file.name}
                   type="button"
                   className={cn(
-                    "w-full p-2 cursor-pointer text-sm border-b border-content-bg-secondary last:border-0 hover:bg-content-bg-secondary/80 transition-colors text-left",
+                    "w-full p-2 cursor-pointer text-sm border-b last:border-0 transition-colors text-left",
                     currentTrackIndex === index
-                      ? "bg-gradient-to-r from-brand-primary/50 to-chart-primary/30 text-brand-secondary"
+                      ? "bg-gradient-to-r from-brand-primary/50 text-brand-secondary"
                       : "text-content-text-secondary",
                   )}
                   onClick={() => playTrack(index)}
@@ -655,7 +650,7 @@ const ArchiveMusicPlayer: React.FC<ArchivePlayerProps> = ({ identifier, classNam
             href={`https://archive.org/details/${identifier}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-brand-secondary hover:text-hover-accent transition-colors"
+            className="text-brand-secondary transition-colors"
           >
             View on Archive.org
           </a>

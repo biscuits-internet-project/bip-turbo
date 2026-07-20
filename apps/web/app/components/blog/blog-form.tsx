@@ -237,7 +237,7 @@ export function BlogPostForm({ defaultValues, submitLabel, cancelHref }: BlogPos
                       alt="Content for blog post"
                       className={cn(
                         "w-full h-40 object-cover rounded-md transition-all",
-                        file.isCover && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                        file.isCover && "ring-2 ring-offset-2",
                       )}
                     />
                     <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 rounded-md flex items-center justify-center gap-2">

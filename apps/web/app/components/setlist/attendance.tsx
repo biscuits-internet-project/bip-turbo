@@ -128,8 +128,8 @@ export function AttendanceToggle({ showId, initialAttendance, onAttendanceChange
         disabled={isLoading}
         className={cn(
           "h-5 w-9",
-          "data-[state=checked]:bg-brand",
-          "data-[state=unchecked]:bg-brand/50",
+          "",
+          "",
           "[&>span]:h-4 [&>span]:w-4",
           "[&>span]:data-[state=checked]:bg-white",
           "[&>span]:data-[state=unchecked]:bg-white",

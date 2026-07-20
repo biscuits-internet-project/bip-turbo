@@ -29,12 +29,12 @@ describe("Card surface variants", () => {
     expect(card.className).toContain("glass-content");
   });
 
-  // "plain" is the opaque shadcn escape hatch: the bare bg-card defaults and
-  // no project surface class.
-  test("variant='plain' applies the bare shadcn card defaults", async () => {
+  // "plain" is the shadcn escape hatch: bare border + shadow, no project surface
+  // class. It carries the shadcn `shadow-sm` (unlike the flat `panel`) and none
+  // of the project surface markers, so callers can supply their own background.
+  test("variant='plain' is the bare shadcn card, not a project surface", async () => {
     const { container } = await setup(<Card variant="plain">content</Card>);
     const card = container.firstElementChild as HTMLElement;
-    expect(card.className).toContain("bg-card");
     expect(card.className).toContain("shadow-sm");
     expect(card.className).not.toContain("card-premium");
     expect(card.className).not.toContain("glass-content");

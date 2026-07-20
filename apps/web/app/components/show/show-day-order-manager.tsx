@@ -45,7 +45,7 @@ function SortableShowRow({ show, position, isCurrent }: SortableRowProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg border bg-content-bg-secondary/50 border-content-bg-secondary transition-all",
+        "flex items-center gap-3 p-3 rounded-lg border transition-all",
         isCurrent && "border-brand-primary/60 bg-brand-primary/10",
         isDragging && "opacity-50 shadow-lg z-50",
       )}
@@ -112,7 +112,7 @@ export function ShowDayOrderManager({ currentShowId, date, initialShows }: ShowD
   };
 
   return (
-    <Card variant="plain" className="border-content-bg-secondary bg-content-bg/50">
+    <Card variant="plain" className="">
       <CardHeader>
         <CardTitle className="text-content-text-primary">Same-date show order</CardTitle>
         <p className="text-sm text-content-text-secondary">

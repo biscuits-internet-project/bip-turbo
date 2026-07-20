@@ -76,13 +76,10 @@ export default function OAuthConsent() {
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="w-full max-w-md">
-        <Card
-          variant="plain"
-          className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300"
-        >
-          <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
-          <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
-          <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />
+        <Card variant="plain" className="relative border backdrop-blur-2xl transition-colors duration-300">
+          <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b via-transparent to-transparent" />
+          <div className="absolute inset-0 rounded-[inherit] shadow-2xl" />
+          <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b opacity-50" />
 
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-2xl font-bold tracking-tight text-content-text-primary">
@@ -129,7 +126,7 @@ export default function OAuthConsent() {
                 name="decision"
                 value="deny"
                 variant="outline"
-                className="w-full text-content-text-secondary border-content-bg-secondary hover:bg-content-bg-secondary/50"
+                className="w-full text-content-text-secondary"
               >
                 Deny
               </Button>

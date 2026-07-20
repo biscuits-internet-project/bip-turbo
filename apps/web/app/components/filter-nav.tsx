@@ -46,25 +46,16 @@ export function FilterNav({
   filterCounts,
   allCount,
 }: FilterNavProps) {
-  const subtitleCSS = cn(
-    "text-xs font-normal text-content-text-tertiary",
-    "bg-content-bg-secondary px-2 py-0.5 rounded-full",
-  );
+  const subtitleCSS = cn("text-xs font-normal text-content-text-tertiary", "px-2 py-0.5 rounded-full");
   const itemCSS = cn("px-2 py-1.5 text-sm font-medium rounded-md", "transition-all duration-200 text-center");
   const highlightedItemCSS = cn("text-white bg-gradient-to-r from-brand-primary to-brand-secondary", "font-semibold");
-  const nonHighlightedItemCSS = cn(
-    "text-content-text-secondary bg-content-bg-secondary",
-    "hover:bg-content-bg-tertiary hover:text-white",
-  );
+  const nonHighlightedItemCSS = cn("text-content-text-secondary", "hover:text-white");
   const toggleCSS = cn(
     "px-3 py-1.5 text-sm font-medium rounded-md",
     "transition-all duration-200 flex items-center gap-2",
   );
-  const toggleActiveCSS = cn("text-white bg-content-bg-tertiary border border-brand-primary/50");
-  const toggleInactiveCSS = cn(
-    "text-content-text-secondary bg-content-bg-secondary",
-    "hover:bg-content-bg-tertiary hover:text-white",
-  );
+  const toggleActiveCSS = cn("text-white border border-brand-primary/50");
+  const toggleInactiveCSS = cn("text-content-text-secondary", "hover:text-white");
   const columnCSS = cn({
     "grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8": widerItems,
     "grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12": !widerItems,
@@ -145,7 +136,7 @@ export function FilterNav({
       </div>
       {/* Parameter toggles rendered separately below the grid */}
       {!allSelected && parameters.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-content-bg-secondary">
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
           <span className="text-xs text-content-text-tertiary self-center">Filters:</span>
           {parameters.map((parameter) => {
             const newParams = new URLSearchParams(currentURLParameters.toString());

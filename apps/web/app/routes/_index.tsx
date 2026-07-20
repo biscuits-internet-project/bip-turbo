@@ -236,7 +236,7 @@ export default function Index() {
                 externalSources={externalSources}
                 empty={
                   <div className="text-center p-8 border border-dashed rounded-lg">
-                    <p className="text-muted-foreground">No recent shows available</p>
+                    <p className="">No recent shows available</p>
                   </div>
                 }
               />
@@ -335,7 +335,7 @@ export default function Index() {
                 </Card>
               ) : (
                 <div className="text-center p-6 border border-dashed rounded-lg">
-                  <p className="text-muted-foreground text-sm">No upcoming tour dates available</p>
+                  <p className="text-sm">No upcoming tour dates available</p>
                 </div>
               )}
             </div>
@@ -385,7 +385,7 @@ export default function Index() {
                 </div>
               ) : (
                 <div className="text-center p-6 border border-dashed rounded-lg">
-                  <p className="text-muted-foreground text-sm">No blog posts available</p>
+                  <p className="text-sm">No blog posts available</p>
                 </div>
               )}
             </div>
@@ -477,7 +477,7 @@ export default function Index() {
               externalSources={externalSources}
               empty={
                 <div className="text-center p-8 border border-dashed rounded-lg">
-                  <p className="text-muted-foreground">No recent shows available</p>
+                  <p className="">No recent shows available</p>
                 </div>
               }
             />
@@ -523,7 +523,7 @@ export default function Index() {
             </Card>
           ) : (
             <div className="text-center p-8 border border-dashed rounded-lg">
-              <p className="text-muted-foreground">No upcoming tour dates available</p>
+              <p className="">No upcoming tour dates available</p>
             </div>
           )}
         </div>
@@ -545,7 +545,7 @@ export default function Index() {
             </div>
           ) : (
             <div className="text-center p-8 border border-dashed rounded-lg">
-              <p className="text-muted-foreground">No blog posts available</p>
+              <p className="">No blog posts available</p>
             </div>
           )}
         </div>

@@ -16,13 +16,10 @@ type LoginFormProps = {
 export function LoginForm({ className, onSubmit, onGoogleClick, ...props }: LoginFormProps) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card
-        variant="plain"
-        className="relative border border-brand/10 bg-content-bg/90 backdrop-blur-2xl transition-colors duration-300 hover:border-brand/30"
-      >
-        <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand/10 via-transparent to-transparent" />
-        <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand/5" />
-        <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b from-brand/5 to-brand/0 opacity-50" />
+      <Card variant="plain" className="relative border backdrop-blur-2xl transition-colors duration-300">
+        <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b via-transparent to-transparent" />
+        <div className="absolute inset-0 rounded-[inherit] shadow-2xl" />
+        <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-b opacity-50" />
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold tracking-tight text-content-text-primary">Welcome back</CardTitle>
           <CardDescription className="text-base text-content-text-secondary">
@@ -60,10 +57,10 @@ export function LoginForm({ className, onSubmit, onGoogleClick, ...props }: Logi
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-content-bg-secondary" />
+                <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-content-text-tertiary">Or use email</span>
+                <span className="px-2 text-content-text-tertiary">Or use email</span>
               </div>
             </div>
 
@@ -90,7 +87,7 @@ export function LoginForm({ className, onSubmit, onGoogleClick, ...props }: Logi
                     <Label htmlFor="password" className="text-sm font-medium text-zinc-200">
                       Password
                     </Label>
-                    <Link to="/auth/forgot-password" className="text-sm text-brand-secondary hover:text-hover-accent">
+                    <Link to="/auth/forgot-password" className="text-sm text-brand-secondary">
                       Forgot password?
                     </Link>
                   </div>
@@ -107,18 +104,14 @@ export function LoginForm({ className, onSubmit, onGoogleClick, ...props }: Logi
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                variant="outline"
-                className="w-full text-content-text-secondary border-content-bg-secondary hover:bg-content-bg-secondary/50"
-              >
+              <Button type="submit" variant="outline" className="w-full text-content-text-secondary">
                 Sign in with Email
               </Button>
             </form>
 
             <div className="text-center text-sm text-content-text-secondary">
               Don&apos;t have an account?{" "}
-              <Link to="/auth/register" className="text-brand-secondary hover:text-hover-accent">
+              <Link to="/auth/register" className="text-brand-secondary">
                 Sign up
               </Link>
             </div>

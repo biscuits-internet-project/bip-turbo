@@ -37,11 +37,11 @@ export default function MediaResources(): ReactElement {
         <div
           className={cardVariants({
             variant: "panel",
-            className: "overflow-x-auto rounded-lg border border-content-bg-secondary",
+            className: "overflow-x-auto rounded-lg border",
           })}
         >
-          <table className="min-w-full divide-y divide-divider">
-            <thead className="bg-table-header">
+          <table className="min-w-full divide-y">
+            <thead className="">
               <tr>
                 <th
                   scope="col"
@@ -63,10 +63,10 @@ export default function MediaResources(): ReactElement {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-divider">
+            <tbody className="divide-y">
               {media.length > 0 ? (
                 media.map((m) => (
-                  <tr key={m.id || `${m.year}-${m.description}`} className="hover:bg-table-row-hover">
+                  <tr key={m.id || `${m.year}-${m.description}`} className="">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-content-text-primary">{m.year}</td>
                     <td className="px-6 py-4 text-sm">
                       <a

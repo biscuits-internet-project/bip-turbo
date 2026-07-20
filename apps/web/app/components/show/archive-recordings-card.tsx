@@ -42,7 +42,7 @@ export function ArchiveRecordingsCard({ items }: ArchiveRecordingsCardProps) {
                   href={recording.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-brand-secondary hover:text-hover-accent transition-colors block"
+                  className="text-sm text-brand-secondary transition-colors block"
                 >
                   {recording.identifier}
                   {isPrimary && items.length > 1 && (

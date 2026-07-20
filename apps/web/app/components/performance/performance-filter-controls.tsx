@@ -132,7 +132,7 @@ export function PerformanceFilterControls({
             placeholder="Search..."
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="w-full sm:w-auto sm:min-w-[250px] sm:max-w-md h-[34px] text-sm border text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
+            className="w-full sm:w-auto sm:min-w-[250px] sm:max-w-md h-[34px] text-sm border text-white focus-visible:outline-none focus-visible:ring-1 placeholder:text-content-text-tertiary"
           />
         )}
         {!hideTimeRange && (

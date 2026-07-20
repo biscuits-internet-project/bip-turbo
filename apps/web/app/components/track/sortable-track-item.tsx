@@ -98,7 +98,7 @@ export function SortableTrackItem({ track, onEdit, onDelete, isDeleting, footnot
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: footnotes are positional and stable per render
                 key={index}
-                className="text-content-text-accent text-sm pl-2 border-l-2 border-content-bg-secondary"
+                className="text-sm pl-2 border-l-2"
               >
                 {footnote}
               </div>

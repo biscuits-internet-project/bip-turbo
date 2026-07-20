@@ -100,9 +100,12 @@ export function FileUpload({
       <button
         type="button"
         className={cn(
-          "group relative flex min-h-[120px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 px-6 py-4 text-center transition-colors hover:border-muted-foreground/50",
-          isDragging && "border-primary",
-          errorState && "border-destructive",
+          "group relative flex min-h-[120px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-6 py-4 text-center transition-colors",
+          // Drag-over and error states have no highlight style yet (their former
+          // border-primary/border-destructive tokens were unregistered). State is
+          // kept wired for a future highlight; see cleanup notes.
+          isDragging && "",
+          errorState && "",
           isUploadingState && "pointer-events-none opacity-60",
         )}
         onDragOver={handleDragOver}
@@ -116,9 +119,9 @@ export function FileUpload({
 
         <div className="flex flex-col items-center gap-2">
           {isUploadingState ? (
-            <Icons.spinner className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Icons.spinner className="h-8 w-8 animate-spin" />
           ) : (
-            <Icons.upload className="h-8 w-8 text-muted-foreground transition-colors group-hover:text-foreground" />
+            <Icons.upload className="h-8 w-8 transition-colors" />
           )}
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium">
@@ -133,11 +136,9 @@ export function FileUpload({
                 </>
               )}
             </p>
-            {helperText && <p className="text-xs text-muted-foreground">{helperText}</p>}
-            {maxSize && !errorState && (
-              <p className="text-xs text-muted-foreground">Max file size: {formatFileSize(maxSize)}</p>
-            )}
-            {errorState && <p className="text-xs text-destructive">{errorState}</p>}
+            {helperText && <p className="text-xs">{helperText}</p>}
+            {maxSize && !errorState && <p className="text-xs">Max file size: {formatFileSize(maxSize)}</p>}
+            {errorState && <p className="text-xs">{errorState}</p>}
           </div>
         </div>
 
@@ -145,7 +146,7 @@ export function FileUpload({
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-2 top-2 h-6 w-6 rounded-full opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+            className="absolute right-2 top-2 h-6 w-6 rounded-full opacity-70 transition-opacity hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               setSelectedFile(null);

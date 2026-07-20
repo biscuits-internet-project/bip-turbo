@@ -207,9 +207,12 @@ export function ImageUpload({
       <button
         type="button"
         className={cn(
-          "group relative flex min-h-[120px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/25 px-6 py-4 text-center transition-colors hover:border-muted-foreground/50",
-          isDragging && "border-primary bg-primary/5",
-          error && "border-destructive",
+          "group relative flex min-h-[120px] w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed px-6 py-4 text-center transition-colors",
+          // Drag-over and error states have no highlight style yet (their former
+          // border-primary/border-destructive tokens were unregistered). State is
+          // kept wired for a future highlight; see cleanup notes.
+          isDragging && "",
+          error && "",
           (disabled || isUploading) && "pointer-events-none opacity-60",
         )}
         onDragOver={handleDragOver}
@@ -231,20 +234,20 @@ export function ImageUpload({
 
         <div className="flex flex-col items-center gap-2">
           {isUploading ? (
-            <Icons.spinner className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Icons.spinner className="h-8 w-8 animate-spin" />
           ) : (
-            <ImageIcon className="h-8 w-8 text-muted-foreground transition-colors group-hover:text-foreground" />
+            <ImageIcon className="h-8 w-8 transition-colors" />
           )}
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium">
               <span className="font-semibold">Click to upload</span> or drag and drop
             </p>
-            <p className="text-xs text-muted-foreground">{allowedTypeNames}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs">{allowedTypeNames}</p>
+            <p className="text-xs">
               Max {formatFileSize(effectiveMaxSize)}
               {multiple && maxFiles && ` · Up to ${maxFiles} files`}
             </p>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p className="text-xs">{error}</p>}
           </div>
         </div>
       </button>
@@ -264,7 +267,7 @@ export function ImageUpload({
               )}
 
               {preview.status === "error" && (
-                <div className="absolute inset-0 flex items-center justify-center bg-destructive/80">
+                <div className="absolute inset-0 flex items-center justify-center">
                   <p className="px-2 text-center text-xs text-white">{preview.error}</p>
                 </div>
               )}

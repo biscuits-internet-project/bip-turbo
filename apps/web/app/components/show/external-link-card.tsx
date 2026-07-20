@@ -40,7 +40,7 @@ export function ExternalLinkCard({ faviconDomain, title, items }: ExternalLinkCa
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-brand-secondary hover:text-hover-accent transition-colors"
+              className="text-sm text-brand-secondary transition-colors"
             >
               {label}
             </a>

@@ -54,7 +54,7 @@ export function PaginationControls({
     <button
       type="button"
       onClick={() => onToggleShowAll(!showAll)}
-      className="text-sm text-content-text-secondary underline decoration-dotted underline-offset-4 hover:text-brand-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 rounded-sm"
+      className="text-sm text-content-text-secondary underline decoration-dotted underline-offset-4 hover:text-brand-primary focus:outline-none focus-visible:ring-1 rounded-sm"
     >
       {showAll ? "Paginate" : "Show all"}
     </button>
@@ -97,7 +97,7 @@ export function PaginationControls({
               defaultValue={page}
               key={page}
               onKeyDown={handlePageInputKeyDown}
-              className="w-12 rounded border px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 focus:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-12 rounded border px-2 py-1 text-center text-sm text-white focus:outline-none focus:ring-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             of {totalPages}
           </span>

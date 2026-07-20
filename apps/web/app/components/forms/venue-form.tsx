@@ -13,7 +13,7 @@ export function VenueForm({ venue, onSubmit }: VenueFormProps) {
   return (
     <Card
       variant="plain"
-      className="relative border-none bg-content-bg/90 backdrop-blur-2xl before:pointer-events-none before:absolute before:-inset-1 before:rounded-[inherit] before:border before:border-brand-primary/20 before:opacity-0 before:transition before:duration-300 hover:before:opacity-100"
+      className="relative border-none backdrop-blur-2xl before:pointer-events-none before:absolute before:-inset-1 before:rounded-[inherit] before:border before:border-brand-primary/20 before:opacity-0 before:transition before:duration-300 hover:before:opacity-100"
     >
       <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-b from-brand-primary/10 via-transparent to-transparent" />
       <div className="absolute inset-0 rounded-[inherit] shadow-2xl shadow-brand-primary/5" />
@@ -34,7 +34,7 @@ export function VenueForm({ venue, onSubmit }: VenueFormProps) {
                 type="text"
                 defaultValue={venue.name}
                 required
-                className="border-content-bg-secondary bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary focus:border-focus-ring focus:ring-focus-ring/20"
+                className="bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary"
               />
             </div>
             <div className="space-y-2">
@@ -47,7 +47,7 @@ export function VenueForm({ venue, onSubmit }: VenueFormProps) {
                 type="text"
                 defaultValue={venue.slug}
                 required
-                className="border-content-bg-secondary bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary focus:border-focus-ring focus:ring-focus-ring/20"
+                className="bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary"
               />
             </div>
             <div className="space-y-2">
@@ -59,7 +59,7 @@ export function VenueForm({ venue, onSubmit }: VenueFormProps) {
                 name="city"
                 type="text"
                 defaultValue={venue.city ?? ""}
-                className="border-content-bg-secondary bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary focus:border-focus-ring focus:ring-focus-ring/20"
+                className="bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary"
               />
             </div>
             <div className="space-y-2">
@@ -71,7 +71,7 @@ export function VenueForm({ venue, onSubmit }: VenueFormProps) {
                 name="state"
                 type="text"
                 defaultValue={venue.state ?? ""}
-                className="border-content-bg-secondary bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary focus:border-focus-ring focus:ring-focus-ring/20"
+                className="bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary"
               />
             </div>
             <div className="space-y-2">
@@ -83,13 +83,13 @@ export function VenueForm({ venue, onSubmit }: VenueFormProps) {
                 name="country"
                 type="text"
                 defaultValue={venue.country ?? ""}
-                className="border-content-bg-secondary bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary focus:border-focus-ring focus:ring-focus-ring/20"
+                className="bg-black/50 text-content-text-secondary placeholder:text-content-text-tertiary"
               />
             </div>
           </div>
 
           <div className="space-y-4">
-            <Button type="submit" className="w-full bg-brand-primary text-content-text-primary hover:bg-hover-accent">
+            <Button type="submit" className="w-full bg-brand-primary text-content-text-primary">
               Save Changes
             </Button>
           </div>

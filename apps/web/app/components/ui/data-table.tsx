@@ -279,7 +279,7 @@ export function DataTable<TData, TValue>({
                 placeholder={searchPlaceholder}
                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
                 onChange={(event) => table.getColumn(searchKey)?.setFilterValue(event.target.value)}
-                className="w-auto min-w-[200px] sm:min-w-[350px] max-w-2xl pr-8 h-[42px] border text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/20 placeholder:text-content-text-tertiary"
+                className="w-auto min-w-[200px] sm:min-w-[350px] max-w-2xl pr-8 h-[42px] border text-white focus-visible:outline-none focus-visible:ring-1 placeholder:text-content-text-tertiary"
               />
               {searchActions}
             </div>

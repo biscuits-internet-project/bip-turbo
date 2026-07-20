@@ -78,8 +78,8 @@ export default function BlogPostPage() {
         </div>
       </div>
 
-      <Card variant="plain" className="relative overflow-hidden border-content-bg-secondary">
-        <div className="absolute inset-0 bg-gradient-to-br from-content-bg via-content-bg/95 to-brand/20 pointer-events-none" />
+      <Card variant="plain" className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br pointer-events-none" />
         <CardContent className="relative z-10 p-6">
           <div className="prose prose-invert max-w-none">
             {blogPost.coverImage && (

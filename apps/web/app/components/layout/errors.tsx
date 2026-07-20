@@ -22,17 +22,17 @@ export function ServerError() {
 
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center text-center">
-      <AlertTriangle className="h-24 w-24 text-muted-foreground/50" />
+      <AlertTriangle className="h-24 w-24" />
 
       <h1 className="mt-8 text-4xl font-bold tracking-tight">500</h1>
       <h2 className="mt-4 text-2xl font-semibold">Whoa, Reality Check!</h2>
       <div className="text-center">
-        <p className="mt-6 text-muted-foreground">
+        <p className="mt-6">
           Our server's on a cosmic voyage to another dimension.
           <br />
           We're sending good vibes to guide it back to Earth.
         </p>
-        <p className="mt-4 text-sm text-muted-foreground font-mono">{errorMessage}</p>
+        <p className="mt-4 text-sm font-mono">{errorMessage}</p>
       </div>
       <Button asChild className="mt-8">
         <Link to="/">Back to the Party</Link>
@@ -44,10 +44,10 @@ export function ServerError() {
 export function NotFound() {
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center text-center">
-      <Ghost className="h-24 w-24 text-muted-foreground/50" />
+      <Ghost className="h-24 w-24" />
 
       <h1 className="mt-8 text-4xl font-bold tracking-tight">404</h1>
-      <p className="mt-4 text-lg text-muted-foreground">Whoops! This page seems to have jammed out.</p>
+      <p className="mt-4 text-lg">Whoops! This page seems to have jammed out.</p>
 
       <div className="mt-8 flex items-center gap-4">
         <Button asChild variant="outline">
@@ -58,10 +58,10 @@ export function NotFound() {
         </Button>
       </div>
 
-      <p className="mt-8 max-w-md text-sm text-muted-foreground">
+      <p className="mt-8 max-w-md text-sm">
         If you think this is a mistake, please{" "}
         <ContactDialog>
-          <button type="button" className="text-primary underline-offset-4 hover:underline">
+          <button type="button" className="underline-offset-4 hover:underline">
             let us know
           </button>
         </ContactDialog>

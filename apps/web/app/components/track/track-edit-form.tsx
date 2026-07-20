@@ -38,7 +38,7 @@ export function TrackEditForm({
   children,
 }: TrackEditFormProps) {
   return (
-    <div className="flex flex-col gap-4 p-4 bg-content-bg/50 rounded-lg border border-content-bg-secondary">
+    <div className="flex flex-col gap-4 p-4 rounded-lg border">
       <div>
         <label htmlFor="track-song" className={formLabelClass}>
           Song
