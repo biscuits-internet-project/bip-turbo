@@ -8,9 +8,10 @@
  * Two layers:
  *  - `normalize` folds case/space/underscore, which provably catches login
  *    variants (e.g. "RyKnow" / "RyKnow ", "Digital Buddha" / "DigitalBuddha").
- *  - `ALIAS_MERGE_GROUPS` curates spelling variants that normalization misses
- *    (e.g. "Invisble" vs "Invisible"). Only confirmed-same-person groups go here;
- *    fuzzy matches that might be distinct people are deliberately excluded.
+ *  - `ALIAS_MERGE_GROUPS` curates same-person groups normalization misses (a
+ *    spelling variant like "Invisble" vs "Invisible", or accounts sharing one
+ *    confirmed email namespace). Only infrastructure-backed groups go here; a
+ *    behavioral-only match that might be distinct people is deliberately excluded.
  */
 
 /** Fold a username to its login-variant key: lowercase, no spaces or underscores. */
@@ -19,12 +20,26 @@ export function normalize(username: string): string {
 }
 
 /**
- * Confirmed same-person groups whose normalized keys still differ (spelling
- * variants). Each inner array lists the normalized forms that should merge.
+ * Confirmed same-person groups whose normalized keys still differ. Each inner
+ * array lists the normalized forms that should merge.
+ *
+ * Only same-person links backed by account *infrastructure* — a shared confirmed
+ * email namespace, or near-identical usernames created minutes apart — go here.
+ * Behavioral "switch" evidence (one account re-rating another's batch with matching
+ * scores) is deliberately NOT sufficient: a shared community score source, or a
+ * script, produces that same pattern across genuinely different people. Several
+ * rater accounts here re-rate one identical show-batch in lockstep yet never once
+ * operate concurrently, so batch-mirroring cannot tell one operator from a shared
+ * sheet.
  */
 const ALIAS_MERGE_GROUPS: string[][] = [
-  // "InvisbleBuddha" (misspelled) + "Invisiblebuddha" (correct) + "invisblebuddha".
+  // "InvisbleBuddha" (misspelled) + "Invisiblebuddha" + "invisblebuddha": one-letter
+  // username variants, two of them created 8 minutes apart. One person.
   ["invisblebuddha", "invisiblebuddha"],
+  // HankScorpio, DeepDive, and Mojobisco all authenticate under one personal 33mail
+  // alias namespace (…@msp.33mail.com) and each account is email-confirmed, so all
+  // three verification links landed in one inbox = one person.
+  ["hankscorpio", "deepdive", "mojobisco"],
 ];
 
 /** normalized form → the group's chosen representative key. */
