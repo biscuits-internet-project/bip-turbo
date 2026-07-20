@@ -1,7 +1,6 @@
-import { compareByShowDate, drummerEraForDate, shrinkToward } from "@bip/domain";
+import { displayedRatingComparator, drummerEraForDate, shrinkToward } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
-import { showOrderBySql } from "../_shared/show-ordering";
 import { aliasKey, mostRecentPerKey } from "./rater-aliases";
 import {
   bucketRatingValues,
@@ -65,7 +64,13 @@ interface RankableShow {
   canonical: number;
   /** The raw (un-shrunk) weighted rating. */
   weighted: number;
+  /** Deduped community count — the count shown beside the canonical (simple) score. */
   ratingsCount: number;
+  /** Post-exclusion contributing count — the count shown beside the calibrated score. */
+  weightedRatingsCount: number;
+  /** YYYY-MM-DD, for the show-ordering final tiebreak. */
+  date: string;
+  dayOrder: number | null;
 }
 
 /** A show's position by canonical average vs calibrated score within one field. */
@@ -100,14 +105,39 @@ export function rankShowComparisons(
     id: show.id,
     canonical: show.canonical,
     calibrated: shrinkToward(show.weighted, anchor, show.ratingsCount, k),
+    ratingsCount: show.ratingsCount,
+    weightedRatingsCount: show.weightedRatingsCount,
+    show: { id: show.id, date: show.date, dayOrder: show.dayOrder },
     qualified: show.ratingsCount >= RANKED_SHOW_MIN_RATINGS,
   }));
   const topField = scored.filter((show) => show.qualified);
 
-  // Competition rank within a field: 1 + the number strictly better (ties share a rank).
+  // Competition rank within a field: 1 + the number ranked strictly better under the
+  // displayed-order comparator (rounded score → count → date), so the rank matches the
+  // Top Rated list and a difference no user can see never separates two tied shows.
+  // Canonical ranks by the deduped count, calibrated by the post-exclusion count; both
+  // round at the fixed default precision, since the ranking is one global artifact and
+  // can't depend on any one viewer's per-user decimal setting.
+  const compare = displayedRatingComparator();
   const rankIn = (field: typeof scored, target: (typeof scored)[number]): RankInField => ({
-    canonicalRank: 1 + field.filter((show) => show.canonical > target.canonical).length,
-    calibratedRank: 1 + field.filter((show) => show.calibrated > target.calibrated).length,
+    canonicalRank:
+      1 +
+      field.filter(
+        (show) =>
+          compare(
+            { rating: show.canonical, count: show.ratingsCount, show: show.show },
+            { rating: target.canonical, count: target.ratingsCount, show: target.show },
+          ) < 0,
+      ).length,
+    calibratedRank:
+      1 +
+      field.filter(
+        (show) =>
+          compare(
+            { rating: show.calibrated, count: show.weightedRatingsCount, show: show.show },
+            { rating: target.calibrated, count: target.weightedRatingsCount, show: target.show },
+          ) < 0,
+      ).length,
     total: field.length,
   });
 
@@ -274,7 +304,15 @@ export class RaterWeightService {
     const [shows, anchor] = await Promise.all([
       this.db.show.findMany({
         where: { weightedRating: { not: null } },
-        select: { id: true, averageRating: true, weightedRating: true, ratingsCount: true },
+        select: {
+          id: true,
+          averageRating: true,
+          weightedRating: true,
+          ratingsCount: true,
+          weightedRatingsCount: true,
+          date: true,
+          dayOrder: true,
+        },
       }),
       this.shrinkAnchor(),
     ]);
@@ -286,6 +324,9 @@ export class RaterWeightService {
               canonical: show.averageRating,
               weighted: show.weightedRating,
               ratingsCount: show.ratingsCount,
+              weightedRatingsCount: show.weightedRatingsCount,
+              date: show.date,
+              dayOrder: show.dayOrder,
             },
           ]
         : [],
@@ -409,41 +450,43 @@ export class RaterWeightService {
    * derives the year-picker counts from it, so the counts always match the list.
    */
   async rankedShows(mode: "simple" | "calibrated", minRatings: number): Promise<Array<{ id: string; date: string }>> {
-    // Tied scores must resolve to a stable order (they render best-first and the
-    // score alone is non-unique — e.g. two 85/18 shows both average 4.7222…).
-    // Tiebreak by ratings_count DESC (more-rated ranks higher among equals), then
-    // by the canonical show ordering DESC as a fully deterministic final key.
-    if (mode === "simple") {
-      return this.db.$queryRaw<Array<{ id: string; date: string }>>`
-        SELECT s.id, s.date
-        FROM shows s
-        WHERE s.average_rating IS NOT NULL AND s.ratings_count >= ${minRatings}
-        ORDER BY s.average_rating DESC, s.ratings_count DESC, ${showOrderBySql("s", "DESC")}
-      `;
-    }
-
-    const anchor = await this.shrinkAnchor();
+    // Rank by the rounded display score (at the fixed default precision — this
+    // ordering is one global list, not per-viewer): two shows printing the same
+    // rounded number tie on the primary key and resolve through the shared
+    // display-order comparator (rounded rating DESC → displayed count DESC →
+    // newest-date-first), so the order never flips on precision no one can see and
+    // stays stable across environments (the anchor is per-environment). The
+    // displayed count differs by mode: simple shows the deduped `ratings_count`,
+    // calibrated the post-exclusion `weighted_ratings_count`.
+    const anchor = mode === "calibrated" ? await this.shrinkAnchor() : 0;
+    const scoreNotNull =
+      mode === "calibrated" ? Prisma.sql`s.weighted_rating IS NOT NULL` : Prisma.sql`s.average_rating IS NOT NULL`;
     const rows = await this.db.$queryRaw<
-      Array<{ id: string; date: string; dayOrder: number | null; raw: number; ratings: number }>
+      Array<{
+        id: string;
+        date: string;
+        dayOrder: number | null;
+        average: number;
+        weighted: number;
+        ratingsCount: number;
+        weightedRatingsCount: number;
+      }>
     >`
-      SELECT s.id, s.date, s.day_order AS "dayOrder", s.weighted_rating AS raw, s.ratings_count AS ratings
+      SELECT s.id, s.date, s.day_order AS "dayOrder",
+             s.average_rating AS average, s.weighted_rating AS weighted,
+             s.ratings_count AS "ratingsCount", s.weighted_ratings_count AS "weightedRatingsCount"
       FROM shows s
-      WHERE s.weighted_rating IS NOT NULL AND s.ratings_count >= ${minRatings}
+      WHERE ${scoreNotNull} AND s.ratings_count >= ${minRatings}
     `;
     return rows
       .map((r) => ({
         id: r.id,
         date: r.date,
-        dayOrder: r.dayOrder,
-        ratings: r.ratings,
-        score: shrinkToward(r.raw, anchor, r.ratings, SHRINK_K),
+        rating: mode === "calibrated" ? shrinkToward(r.weighted, anchor, r.ratingsCount, SHRINK_K) : r.average,
+        count: mode === "calibrated" ? r.weightedRatingsCount : r.ratingsCount,
+        show: { id: r.id, date: r.date, dayOrder: r.dayOrder },
       }))
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        if (b.ratings !== a.ratings) return b.ratings - a.ratings;
-        // DESC of the canonical ASC comparator, mirroring showOrderBySql(…, "DESC").
-        return -compareByShowDate({ show: a }, { show: b });
-      })
+      .sort(displayedRatingComparator())
       .map(({ id, date }) => ({ id, date }));
   }
 

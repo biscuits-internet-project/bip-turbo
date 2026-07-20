@@ -771,6 +771,7 @@ model User {
   trackRatingComparisonDebug Boolean? @map("track_rating_compare")
   colorCodeRatings          Boolean? @map("color_code_ratings")
   showSetlistTimes          Boolean? @map("show_setlist_times")
+  ratingDecimalPlaces       Int?     @map("rating_decimal_places")
   avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   attendances         Attendance[]
   blogPosts           BlogPost[]

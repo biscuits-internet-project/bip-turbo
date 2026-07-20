@@ -22,6 +22,7 @@ export * from "./models/song";
 export * from "./models/track";
 export * from "./models/user";
 export * from "./models/venue";
+export * from "./rating-display";
 export * from "./recurrence";
 export * from "./search";
 export * from "./segue-run";

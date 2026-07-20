@@ -15,6 +15,8 @@ const updateUserSchema = z.object({
   trackRatingComparisonDebug: z.enum(["true", "false"]).optional(),
   colorCodeRatings: z.enum(["true", "false"]).optional(),
   showSetlistTimes: z.enum(["true", "false"]).optional(),
+  // Rating display precision arrives as the chosen decimal-places string.
+  ratingDecimalPlaces: z.enum(["1", "2", "3", "4"]).optional(),
 });
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -82,6 +84,7 @@ export async function action({ request }: ActionFunctionArgs) {
       trackRatingComparisonDebug?: boolean;
       colorCodeRatings?: boolean;
       showSetlistTimes?: boolean;
+      ratingDecimalPlaces?: number;
     } = {};
     if (validatedData.username) update.username = validatedData.username;
     const flags = await getFeatureFlags({ user: { id: localUser.id, username: localUser.username } });
@@ -104,6 +107,9 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     if (validatedData.showSetlistTimes !== undefined) {
       update.showSetlistTimes = validatedData.showSetlistTimes === "true";
+    }
+    if (validatedData.ratingDecimalPlaces !== undefined) {
+      update.ratingDecimalPlaces = Number(validatedData.ratingDecimalPlaces);
     }
 
     const updatedUser = await services.users.update(localUser.id, update);

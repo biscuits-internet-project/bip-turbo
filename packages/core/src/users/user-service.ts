@@ -62,6 +62,7 @@ function mapUserToDomainEntity(dbUser: DbUser): User {
     trackRatingComparisonDebug: dbUser.trackRatingComparisonDebug ?? null,
     colorCodeRatings: dbUser.colorCodeRatings ?? null,
     showSetlistTimes: dbUser.showSetlistTimes ?? null,
+    ratingDecimalPlaces: dbUser.ratingDecimalPlaces ?? null,
   };
 }
 
@@ -445,6 +446,7 @@ export class UserService {
       trackRatingComparisonDebug: boolean | null;
       colorCodeRatings: boolean | null;
       showSetlistTimes: boolean | null;
+      ratingDecimalPlaces: number | null;
       createdAt: Date;
       updatedAt: Date;
     }>
@@ -473,6 +475,7 @@ export class UserService {
         trackRatingComparisonDebug: true,
         colorCodeRatings: true,
         showSetlistTimes: true,
+        ratingDecimalPlaces: true,
         createdAt: true,
         updatedAt: true,
       },

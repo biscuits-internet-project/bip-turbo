@@ -36,7 +36,7 @@ interface SetlistTableProps {
  */
 export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) {
   const { user } = useSession();
-  const { showSetlistTimes } = usePreferences();
+  const { showSetlistTimes, ratingDecimalPlaces } = usePreferences();
   const isAuthenticated = !!user;
   const trackIds = useMemo(() => tracks.map((t) => t.id), [tracks]);
   const { userRatingMap, displayRatingMap, comparisonMap } = useTrackUserRatings(trackIds);
@@ -58,10 +58,11 @@ export function SetlistTable({ tracks, showSlug, showDate }: SetlistTableProps) 
           userRatingMap,
           isAuthenticated,
           comparisonMap,
+          ratingDecimalPlaces,
         }),
         showSetlistTimes,
       ),
-    [showSlug, displayRatingMap, userRatingMap, isAuthenticated, comparisonMap, showSetlistTimes],
+    [showSlug, displayRatingMap, userRatingMap, isAuthenticated, comparisonMap, showSetlistTimes, ratingDecimalPlaces],
   );
   return (
     <DataTable

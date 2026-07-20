@@ -32,6 +32,25 @@ describe("RatingComponent", () => {
     expect(screen.queryByTestId("user-rating-value")).not.toBeInTheDocument();
   });
 
+  // The community score renders at the viewer's chosen decimal-places setting,
+  // seeded into the preferences context — no per-badge threading.
+  test("renders the community score at the viewer's chosen decimal places", async () => {
+    await setup(
+      <PreferencesProvider colorCodeRatings={null} showSetlistTimes={null} ratingDecimalPlaces={4}>
+        <RatingComponent rating={4.8112} ratingsCount={12} />
+      </PreferencesProvider>,
+    );
+    expect(screen.getByText("4.8112")).toBeInTheDocument();
+    expect(screen.queryByText("4.81")).not.toBeInTheDocument();
+  });
+
+  // With no provider (default context) the score stays at 2 decimals.
+  test("renders the community score at 2 decimals by default", async () => {
+    await setup(<RatingComponent rating={4.811} ratingsCount={12} />);
+    expect(screen.getByText("4.81")).toBeInTheDocument();
+    expect(screen.queryByText("4.811")).not.toBeInTheDocument();
+  });
+
   // Null userRating (e.g. logged-in but hasn't rated yet) renders today's
   // UI unchanged. We never show a placeholder slot — quieter UI for the
   // common "not rated" case.

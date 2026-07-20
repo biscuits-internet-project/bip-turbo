@@ -1,4 +1,6 @@
 import type { RankInField, ShowRankComparison } from "@bip/core";
+import { formatRatingScore, roundRatingForDisplay } from "@bip/domain";
+import { usePreferences } from "~/hooks/use-preferences";
 
 /**
  * The debug rating comparison overlay: a show's simple→calibrated score plus how its
@@ -9,8 +11,8 @@ import type { RankInField, ShowRankComparison } from "@bip/core";
  * behind the `ratings.compare-visible` flag + the user's `showRatingComparisonDebug` pref.
  */
 
-function formatScore(value: number | undefined): string {
-  return value != null && value > 0 ? value.toFixed(2) : "—";
+function formatScore(value: number | undefined, decimals: number): string {
+  return value != null && value > 0 ? formatRatingScore(value, decimals) : "—";
 }
 
 const labelCell = "px-2 py-0.5 text-left font-normal text-content-text-secondary";
@@ -48,19 +50,28 @@ export function CalibratedSummary({
   rank: ShowRankComparison;
   compact?: boolean;
 }) {
+  const { ratingDecimalPlaces } = usePreferences();
   const scoreDiff = canonical != null ? rank.calibrated - canonical : 0;
-  const scoreMoved = Math.abs(scoreDiff) >= 0.005;
+  // "Moved" at the viewer's display precision: a diff that rounds to zero at that
+  // precision reads as no change.
+  const scoreMoved = roundRatingForDisplay(scoreDiff, ratingDecimalPlaces) !== 0;
   return (
     <table className={`border-collapse ${compact ? "text-[10px] leading-tight sm:text-xs" : "text-sm"}`}>
       <tbody>
         <tr>
           <td className={labelCell}>Score</td>
-          <td className={`${numCell} text-content-text-tertiary`}>{formatScore(canonical ?? undefined)}</td>
-          <td className={`${numCell} font-semibold text-content-text-primary`}>{rank.calibrated.toFixed(2)}</td>
+          <td className={`${numCell} text-content-text-tertiary`}>
+            {formatScore(canonical ?? undefined, ratingDecimalPlaces)}
+          </td>
+          <td className={`${numCell} font-semibold text-content-text-primary`}>
+            {formatRatingScore(rank.calibrated, ratingDecimalPlaces)}
+          </td>
           <td
             className={`${numCell} ${scoreDiff > 0 ? "text-green-500" : scoreDiff < 0 ? "text-red-500" : "text-content-text-tertiary"}`}
           >
-            {scoreMoved ? `${scoreDiff > 0 ? "+" : "−"}${Math.abs(scoreDiff).toFixed(2)}` : "—"}
+            {scoreMoved
+              ? `${scoreDiff > 0 ? "+" : "−"}${formatRatingScore(Math.abs(scoreDiff), ratingDecimalPlaces)}`
+              : "—"}
           </td>
         </tr>
         <RankRow label="all" rank={rank.all} />

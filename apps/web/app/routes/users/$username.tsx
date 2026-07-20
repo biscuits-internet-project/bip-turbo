@@ -484,6 +484,7 @@ export default function UserProfile() {
               trackCalibratedRatings={user.trackCalibratedRatings}
               trackRatingComparisonDebug={user.trackRatingComparisonDebug}
               colorCodeRatings={user.colorCodeRatings}
+              ratingDecimalPlaces={user.ratingDecimalPlaces}
             />
             <SetlistDisplaySettings showSetlistTimes={user.showSetlistTimes} />
           </TabsContent>

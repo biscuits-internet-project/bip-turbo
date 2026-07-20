@@ -1,3 +1,4 @@
+import { formatRatingScore } from "@bip/domain";
 import { Star } from "lucide-react";
 import { usePreferences } from "~/hooks/use-preferences";
 import { ratingColor } from "~/lib/rating-colors";
@@ -66,7 +67,7 @@ export function StarValue({ value, label, colorCode }: { value: number; label: s
 }
 
 export const RatingComponent = ({ rating, ratingsCount, userRating, colorCode }: RatingProps) => {
-  const { colorCodeRatings } = usePreferences();
+  const { colorCodeRatings, ratingDecimalPlaces } = usePreferences();
   const colorEnabled = colorCode ?? colorCodeRatings;
 
   if (!rating) return <div className="text-xs sm:text-sm text-content-text-secondary">Rate</div>;
@@ -77,7 +78,7 @@ export const RatingComponent = ({ rating, ratingsCount, userRating, colorCode }:
   const outerGap = hasUserRating ? "gap-1" : "gap-1 sm:gap-1.5";
   return (
     <div className={`flex items-center ${outerGap}`}>
-      <StarValue value={rating} label={rating.toFixed(2)} colorCode={colorCode} />
+      <StarValue value={rating} label={formatRatingScore(rating, ratingDecimalPlaces)} colorCode={colorCode} />
       {ratingsCount &&
         ratingsCount > 0 &&
         (hasUserRating ? (

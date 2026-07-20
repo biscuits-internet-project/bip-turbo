@@ -18,6 +18,7 @@ const base = {
   trackCalibratedRatings: null,
   trackRatingComparisonDebug: null,
   colorCodeRatings: null,
+  ratingDecimalPlaces: null,
 };
 
 function mockFlags(overrides: Partial<ReturnType<typeof useFeatureFlags>>) {
@@ -84,6 +85,44 @@ describe("RatingDisplaySettings", () => {
     expect(url).toBe("/api/users");
     expect(init.method).toBe("POST");
     expect((init.body as FormData).get("colorCodeRatings")).toBe("true");
+  });
+
+  // The precision dropdown is ungated (available to everyone) and auto-saves the
+  // chosen decimal count to /api/users like the toggles do.
+  test("auto-saves the rating precision choice with no flag enabled", async () => {
+    mockFlags({});
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { user } = await setupWithRouter(<RatingDisplaySettings {...base} />);
+    await user.click(screen.getByLabelText("Rating decimal places"));
+    await user.click(await screen.findByRole("option", { name: "3" }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/users");
+    expect((init.body as FormData).get("ratingDecimalPlaces")).toBe("3");
+  });
+
+  // Holds the save open so the in-flight state is observable on its own: the
+  // dropdown disables while the POST is pending, then re-enables once it settles.
+  test("disables the precision dropdown while its save is in flight", async () => {
+    mockFlags({});
+    let settle: () => void = () => {};
+    const pending = new Promise<{ ok: boolean }>((resolve) => {
+      settle = () => resolve({ ok: true });
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(pending));
+
+    const { user } = await setupWithRouter(<RatingDisplaySettings {...base} />);
+    const trigger = screen.getByLabelText("Rating decimal places");
+    await user.click(trigger);
+    await user.click(await screen.findByRole("option", { name: "3" }));
+
+    expect(trigger).toBeDisabled();
+
+    settle();
+    await waitFor(() => expect(trigger).not.toBeDisabled());
   });
 
   test("shows only the opt-in toggles when just toggle-visible is on", async () => {

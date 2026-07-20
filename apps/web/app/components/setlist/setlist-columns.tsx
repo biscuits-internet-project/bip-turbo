@@ -1,4 +1,4 @@
-import type { TrackLight } from "@bip/domain";
+import { RATING_DISPLAY_DECIMALS_DEFAULT, type TrackLight } from "@bip/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 import { buildGapCellState, isWithinShowRepeat } from "./gap-cell";
 import {
@@ -34,6 +34,7 @@ export function createSetlistColumns(ctx?: Partial<SetlistRatingContext>): Colum
     userRatingMap: ctx?.userRatingMap ?? new Map(),
     isAuthenticated: ctx?.isAuthenticated ?? false,
     comparisonMap: ctx?.comparisonMap,
+    ratingDecimalPlaces: ctx?.ratingDecimalPlaces ?? RATING_DISPLAY_DECIMALS_DEFAULT,
   };
   return [
     ...createSetlistCommonColumns<SetlistTableRow>(),

@@ -12,7 +12,8 @@ export type PreferenceField =
   | "trackCalibratedRatings"
   | "trackRatingComparisonDebug"
   | "colorCodeRatings"
-  | "showSetlistTimes";
+  | "showSetlistTimes"
+  | "ratingDecimalPlaces";
 
 /**
  * One labelled preference switch that persists itself. Every settings card is

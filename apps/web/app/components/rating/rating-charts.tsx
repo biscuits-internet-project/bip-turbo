@@ -1,4 +1,5 @@
 import type { RatingYearBucket } from "@bip/core";
+import { formatRatingScore } from "@bip/domain";
 import { useState } from "react";
 import {
   Bar,
@@ -15,6 +16,7 @@ import {
 import { cardVariants } from "~/components/ui/card";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
+import { usePreferences } from "~/hooks/use-preferences";
 import { CHART_BAR_CURSOR, CHART_COLORS, chartSeriesColor } from "~/lib/chart-colors";
 import {
   availableYears,
@@ -235,13 +237,14 @@ function HistogramTooltip({
 
 /** Trend tooltip: average and median for the hovered concert year. */
 function TrendTooltip({ active, payload, label }: ChartTooltipProps) {
+  const { ratingDecimalPlaces } = usePreferences();
   if (!active || !payload || payload.length === 0) return null;
   return (
     <ChartTooltipCard>
       <div className="font-medium">{label}</div>
       {payload.map((entry) => (
         <div key={entry.dataKey ?? entry.name} style={{ color: entry.color }}>
-          {entry.name}: {(entry.value ?? 0).toFixed(2)}
+          {entry.name}: {formatRatingScore(entry.value ?? 0, ratingDecimalPlaces)}
         </div>
       ))}
     </ChartTooltipCard>
