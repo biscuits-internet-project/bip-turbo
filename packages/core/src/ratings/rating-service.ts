@@ -215,7 +215,7 @@ export class RatingService {
    * After a rating mutation: mark the calibrated-rating tables dirty (cheap, so the
    * hourly cron rebuilds the actor's stats + the cross-show ripple) and do the
    * one cheap thing inline — recompute the touched rateable's calibrated score from
-   * current stats so the rated show updates immediately. We deliberately do NOT
+   * current stats so the rated show/track updates immediately. We deliberately do NOT
    * recompute the actor's stats here: the old delete-then-recreate-per-write was
    * heavy and could wipe stats on a transient failure. The recompute is
    * best-effort (swallowed) so it never breaks the live rating write.

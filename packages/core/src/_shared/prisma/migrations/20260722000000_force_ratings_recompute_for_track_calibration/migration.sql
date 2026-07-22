@@ -1,0 +1,13 @@
+-- One-time force of the ratings recompute so every track rated since the last batch
+-- run picks up the Calibrated Track Rating its write path now maintains inline.
+--
+-- The deploy entrypoint runs scripts/recompute-ratings.ts right after
+-- `prisma migrate deploy`, but that recompute is dirty-gated on
+-- rating_settings.ratings_dirty, which may already be clear from the hourly cron.
+-- Flip it here so this deploy rebuilds tracks.discriminating_rating /
+-- discriminating_ratings_count for the tracks whose rating writes never reached them.
+-- The recompute clears the flag when it finishes.
+--
+-- Idempotent: re-running only re-sets true. If no settings row exists, isDirty()
+-- already treats the absent row as dirty, so the recompute still runs.
+UPDATE "rating_settings" SET "ratings_dirty" = true;

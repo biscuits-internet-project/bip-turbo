@@ -400,19 +400,11 @@ export class RaterWeightService {
   async getCalibratedTrackDistribution(trackId: string): Promise<RatingValueBucket[]> {
     const ratings = await this.loadCanonicalShowRatings("Track", trackId);
     if (ratings.length === 0) return [];
-    const statRows = await this.db.raterStats.findMany({
-      where: { userId: { in: ratings.map((rating) => rating.userId) }, kind: "TRACK", era: "GLOBAL" },
-      select: { userId: true, mean: true, entropy: true, ratingsCount: true },
+    const statByUser = await this.loadTrackStats(ratings.map((rating) => rating.userId));
+    const used = ratings.filter((rating) => {
+      const stats = statByUser(rating.userId);
+      return stats != null && discriminatingRaterWeight(stats, TRACK_DISCRIMINATING_GAMMA) > 0;
     });
-    const contributing = new Set<string>();
-    for (const row of statRows) {
-      const weight = discriminatingRaterWeight(
-        { mean: row.mean, entropy: row.entropy, ratingsCount: row.ratingsCount },
-        TRACK_DISCRIMINATING_GAMMA,
-      );
-      if (weight > 0) contributing.add(row.userId);
-    }
-    const used = ratings.filter((rating) => contributing.has(rating.userId));
     const active = used.length > 0 ? used : ratings;
     return bucketRatingValues(active.map((rating) => rating.value));
   }
@@ -668,9 +660,11 @@ export class RaterWeightService {
   }
 
   /**
-   * Recompute one show's calibrated score (`shows.weighted_rating`) from current
-   * rater_stats. Show-only — tracks have no denormalized calibrated column. The
-   * batch passes `population` + the prebuilt canonical map to skip per-call work.
+   * Recompute one rateable's denormalized calibrated score (`shows.weighted_rating`
+   * or `tracks.discriminating_rating`) from current rater_stats. Both are what the
+   * page reads, so a rating write has to land here too or the score and count stay
+   * at their pre-rating values until the hourly batch. The batch passes `population`
+   * + the prebuilt canonical map to skip per-call work.
    */
   async recomputeRateable(
     rateableType: string,
@@ -678,6 +672,7 @@ export class RaterWeightService {
     population?: PopulationStats,
     canonicalUsers?: Map<string, string>,
   ): Promise<void> {
+    if (rateableType === "Track") return this.recomputeTrack(rateableId, canonicalUsers);
     if (rateableType !== "Show") return;
 
     const ratings = await this.loadCanonicalShowRatings(rateableType, rateableId, canonicalUsers);
@@ -700,6 +695,49 @@ export class RaterWeightService {
       where: { id: rateableId },
       data: { weightedRating, weightedRatingsCount },
     });
+  }
+
+  /**
+   * The track half of {@link recomputeRateable}. Tracks have no era scope and no
+   * population anchor — the score is entropy^gamma-weighted raw stars — so this
+   * needs only the raters' GLOBAL-scope TRACK stats.
+   */
+  private async recomputeTrack(trackId: string, canonicalUsers?: Map<string, string>): Promise<void> {
+    const ratings = await this.loadCanonicalShowRatings("Track", trackId, canonicalUsers);
+    if (ratings.length === 0) {
+      await this.db.track.update({
+        where: { id: trackId },
+        data: { discriminatingRating: null, discriminatingRatingsCount: 0 },
+      });
+      return;
+    }
+
+    const statByUser = await this.loadTrackStats(ratings.map((rating) => rating.userId));
+    const { discriminatingRating, discriminatingRatingsCount } = computeTrackDiscriminating(
+      ratings,
+      statByUser,
+      TRACK_DISCRIMINATING_GAMMA,
+    );
+    await this.db.track.update({
+      where: { id: trackId },
+      data: { discriminatingRating, discriminatingRatingsCount },
+    });
+  }
+
+  /**
+   * The GLOBAL-scope TRACK stats for a set of raters — the discriminating-weight
+   * input. Shared by the track score and its histogram so both draw the
+   * contributing set from the same rows.
+   */
+  private async loadTrackStats(userIds: string[]): Promise<TrackStatByUser> {
+    const statRows = await this.db.raterStats.findMany({
+      where: { userId: { in: userIds }, kind: "TRACK", era: "GLOBAL" },
+      select: { userId: true, mean: true, entropy: true, ratingsCount: true },
+    });
+    const byUser = new Map(
+      statRows.map((row) => [row.userId, { mean: row.mean, entropy: row.entropy, ratingsCount: row.ratingsCount }]),
+    );
+    return (userId) => byUser.get(userId);
   }
 
   /**
