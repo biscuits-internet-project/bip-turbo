@@ -366,9 +366,66 @@ describe("RaterWeightService.recomputeRateable", () => {
     expect(data.weightedRatingsCount).toBe(1);
   });
 
-  test("ignores non-show rateables (no denormalized calibrated column for tracks)", async () => {
-    const { db, showUpdate } = makeDb();
+  // A track rating write must land on tracks.discriminating_rating immediately —
+  // the setlist headline reads that column, so leaving it to the hourly batch
+  // shows the pre-rating score and count on the very next page load.
+  test("writes the calibrated score to tracks.discriminating_rating, dropping the zero-entropy fluffer", async () => {
+    const trackUpdate = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: "wide", value: 0.5 },
+          { userId: "fluffer", value: 5 },
+        ]),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      show: { findMany: vi.fn(), update: vi.fn() },
+      track: { findMany: vi.fn(), update: trackUpdate },
+      raterStats: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: "wide", mean: 3, entropy: 2, ratingsCount: 30 },
+          { userId: "fluffer", mean: 4.9, entropy: 0.3, ratingsCount: 20 },
+        ]),
+      },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as never;
+
     await new RaterWeightService(db).recomputeRateable("Track", "t1");
+
+    const data = (
+      trackUpdate.mock.calls[0][0] as {
+        data: { discriminatingRating: number; discriminatingRatingsCount: number };
+      }
+    ).data;
+    // Raw (un-centered) stars: the fluffer's 5 drops to weight 0, leaving the
+    // wide rater's genuine 0.5 as the whole score.
+    expect(data.discriminatingRating).toBeCloseTo(0.5, 10);
+    expect(data.discriminatingRatingsCount).toBe(1);
+  });
+
+  test("zeroes a track whose last rating was removed", async () => {
+    const trackUpdate = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      user: { findMany: vi.fn().mockResolvedValue([]) },
+      rating: { findMany: vi.fn().mockResolvedValue([]), groupBy: vi.fn().mockResolvedValue([]) },
+      show: { findMany: vi.fn(), update: vi.fn() },
+      track: { findMany: vi.fn(), update: trackUpdate },
+      raterStats: { findMany: vi.fn().mockResolvedValue([]) },
+      ratingSettings: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as never;
+
+    await new RaterWeightService(db).recomputeRateable("Track", "t1");
+
+    expect(trackUpdate.mock.calls[0][0]).toEqual({
+      where: { id: "t1" },
+      data: { discriminatingRating: null, discriminatingRatingsCount: 0 },
+    });
+  });
+
+  test("ignores rateable types with no denormalized calibrated column", async () => {
+    const { db, showUpdate } = makeDb();
+    await new RaterWeightService(db).recomputeRateable("Review", "r1");
     expect(showUpdate).not.toHaveBeenCalled();
   });
 
