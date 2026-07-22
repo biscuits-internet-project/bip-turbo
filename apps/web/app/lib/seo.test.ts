@@ -40,7 +40,8 @@ describe("getVenueMeta", () => {
 describe("getShowMeta", () => {
   it("uses the country when the show's venue has no state", () => {
     const setlist = {
-      show: { slug: "2023-05-22-harpa", date: "2023-05-22", venue: harpa },
+      show: { slug: "2023-05-22-harpa", date: "2023-05-22" },
+      venue: harpa,
       sets: [],
     } as unknown as Setlist;
     const title = titleContent(getShowMeta(setlist));

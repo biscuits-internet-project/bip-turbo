@@ -33,6 +33,7 @@ import type {
   DbVenue,
 } from "../_shared/database/models";
 import type { PaginationOptions, SortOptions } from "../_shared/database/types";
+import { mapDbShowToDomainEntity } from "../_shared/show-mapper";
 import {
   NON_STUB_SHOWS_WHERE,
   resolveShowOrderBy,
@@ -160,19 +161,6 @@ function previousPerformanceShowFromDb(
 }
 
 // Mapper functions
-function mapShowToDomainEntity(dbShow: DbShow): Show {
-  const { createdAt, updatedAt, slug, venueId, bandId, ...rest } = dbShow;
-  return {
-    ...rest,
-    slug: slug ?? "",
-    venueId: venueId ?? "",
-    bandId: bandId ?? "",
-    date: String(dbShow.date),
-    createdAt: new Date(createdAt),
-    updatedAt: new Date(updatedAt),
-  };
-}
-
 function mapVenueToDomainEntity(dbVenue: DbVenue): Venue {
   const { createdAt, updatedAt, name, slug, city, country, ...rest } = dbVenue;
   return {
@@ -635,7 +623,7 @@ function mapSetlistToDomainEntity(
 
   const eligible = eligibleGapsForAggregation(tracks);
   return {
-    show: mapShowToDomainEntity(show),
+    show: mapDbShowToDomainEntity(show),
     venue: mapVenueToDomainEntity(show.venue),
     sets,
     annotations: tracks.flatMap((t) => t.annotations ?? []).map((a) => mapAnnotationToDomainEntity(a)),

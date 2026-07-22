@@ -198,6 +198,59 @@ describe("ShowService.search", () => {
   });
 });
 
+describe("ShowService.findMany", () => {
+  // The mapped show is built from an explicit field list, so an included venue
+  // has to be attached deliberately. The MCP `get_shows_by_year` getter asks
+  // for `includes: ["venue"]` and reads venueName/venueCity/venueState off it;
+  // it silently returned empty strings when the relation stopped riding along.
+  // The raw relation itself must not survive — the mapped Venue replaces it.
+  test("attaches the mapped venue when the caller includes it", async () => {
+    const db = makeMockDb();
+    db.show.findMany.mockResolvedValue([
+      {
+        id: "show-1",
+        slug: "2024-07-26-red-rocks",
+        date: "2024-07-26",
+        venueId: "v-1",
+        bandId: "b-1",
+        notes: null,
+        relistenUrl: null,
+        likesCount: 0,
+        averageRating: 0,
+        ratingsCount: 0,
+        showPhotosCount: 0,
+        showYoutubesCount: 0,
+        reviewsCount: 0,
+        countForStats: true,
+        dayOrder: null,
+        duration: null,
+        searchText: "2024-07-26 red rocks",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        venue: {
+          id: "v-1",
+          name: "Red Rocks",
+          slug: "red-rocks",
+          city: "Morrison",
+          state: "CO",
+          country: "US",
+          timesPlayed: 3,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+    ]);
+    const service = new ShowService(db as never, logger, makeCacheInvalidationStub(), makeStatsStub());
+
+    const shows = await service.findMany({ includes: ["venue"] });
+
+    expect(shows[0].venue?.name).toBe("Red Rocks");
+    expect(shows[0].venue?.city).toBe("Morrison");
+    expect(shows[0].venue?.state).toBe("CO");
+    expect(shows[0]).not.toHaveProperty("searchText");
+  });
+});
+
 describe("ShowService.reorderByDate", () => {
   // Admin reorders the same-date shows for 2017-07-22: every show in the
   // supplied id list must have its dayOrder rewritten to its new position

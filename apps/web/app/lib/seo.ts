@@ -85,8 +85,8 @@ export function getShowMeta(setlist: Setlist) {
         })()
       : show.date;
 
-  const venue = show.venue?.name || "Unknown Venue";
-  const location = show.venue ? formatVenueLocation(show.venue) : "";
+  const venue = setlist.venue?.name || "Unknown Venue";
+  const location = setlist.venue ? formatVenueLocation(setlist.venue) : "";
 
   const title = `${date} - ${venue} ${location ? `- ${location}` : ""} | ${SEO_CONFIG.siteName}`;
   const description = `View setlist, reviews, and recordings from ${SEO_CONFIG.bandName} show at ${venue}${location ? ` in ${location}` : ""} on ${date}. ${setlist.sets?.length || 0} sets.`;
@@ -97,7 +97,7 @@ export function getShowMeta(setlist: Setlist) {
   const keywords = [
     ...SEO_CONFIG.keywords,
     venue,
-    show.venue?.city || "",
+    setlist.venue?.city || "",
     date,
     ...songNames.slice(0, 10), // Include first 10 songs as keywords
   ].filter(Boolean);
@@ -378,7 +378,7 @@ export function getBlogMeta(blogPost: { title: string; blurb?: string; slug: str
 // Generate JSON-LD structured data for a show
 export function getShowStructuredData(setlist: Setlist) {
   const show = setlist.show;
-  const venue = show.venue;
+  const venue = setlist.venue;
 
   const musicEvent = {
     "@context": "https://schema.org",

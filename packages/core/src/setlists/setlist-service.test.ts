@@ -941,6 +941,62 @@ describe("SetlistService.findMany", () => {
   });
 });
 
+describe("Setlist.show payload weight", () => {
+  // The mapped `show` is built from an explicit field list, not a spread of the
+  // Prisma row. Every relation the setlist query loads (tracks, showMusicians,
+  // venue) already has a mapped, rendered counterpart on the Setlist itself
+  // (sets[].tracks, lineup, venue), so spreading them onto `show` doubled the
+  // cached payload — ~60% of a 50-show blob — while the declared `Show` return
+  // type hid it (excess-property checks don't apply to spreads).
+  test("omits the raw query relations and search text from the mapped show", async () => {
+    const db = makeMockDb();
+    const service = new SetlistService(db as never, makeRockOperaStub());
+    db.show.findUnique.mockResolvedValue({
+      id: "show-1",
+      slug: "2024-07-26",
+      date: "2024-07-26",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      venueId: "v-1",
+      bandId: "b-1",
+      notes: null,
+      likesCount: 0,
+      relistenUrl: null,
+      averageRating: 4.5,
+      ratingsCount: 12,
+      showPhotosCount: 0,
+      showYoutubesCount: 0,
+      reviewsCount: 0,
+      countForStats: true,
+      dayOrder: null,
+      duration: null,
+      searchText: "2024-07-26 red rocks morrison co",
+      tracks: [],
+      showMusicians: [],
+      venue: {
+        id: "v-1",
+        name: "Red Rocks",
+        slug: "red-rocks",
+        city: "Morrison",
+        country: "US",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+
+    const setlist = await service.findByShowSlug("2024-07-26");
+
+    expect(setlist?.show).not.toHaveProperty("tracks");
+    expect(setlist?.show).not.toHaveProperty("showMusicians");
+    expect(setlist?.show).not.toHaveProperty("venue");
+    expect(setlist?.show).not.toHaveProperty("searchText");
+    // The fields the pages actually render still come through.
+    expect(setlist?.show.averageRating).toBe(4.5);
+    expect(setlist?.show.ratingsCount).toBe(12);
+    expect(setlist?.venue.name).toBe("Red Rocks");
+  });
+});
+
 describe("SetlistService.findMany stub filtering", () => {
   // Stubs must be filtered at the SQL boundary, not in JS after pagination,
   // so a venueless stub landing on a page can't silently shrink it below the
