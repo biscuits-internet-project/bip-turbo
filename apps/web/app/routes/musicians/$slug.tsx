@@ -58,7 +58,7 @@ interface ShowRow {
 interface MusicianPageData {
   musician: MusicianWithInstrument;
   tier: MusicianTier;
-  stats: { showCount: number; songCount: number };
+  stats: { showCount: number; songCount: number; playCount: number };
   firstShow: MusicianAppearanceShow | null;
   lastShow: MusicianAppearanceShow | null;
   // Empty for core members; for drummers, shows outside their era; else all shows.
@@ -92,7 +92,8 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
         ? await services.instruments.findById(musician.defaultInstrumentId)
         : null;
 
-      const { showIds, songCount, firstShow, lastShow } = await services.musicians.findAppearances(musician.id);
+      const { showIds, showCount, songCount, playCount, firstShow, lastShow } =
+        await services.musicians.findAppearances(musician.id);
       const tier = classifyMusician(slug);
       // A drummer's everyday shows are implied by their era; only out-of-era
       // appearances (sit-ins before/after their tenure) are notable, so every
@@ -145,7 +146,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
       return {
         musician: { ...musician, defaultInstrument },
         tier,
-        stats: { showCount: showIds.length, songCount },
+        stats: { showCount, songCount, playCount },
         firstShow,
         lastShow,
         shows,
@@ -273,9 +274,10 @@ export default function MusicianPage() {
       </div>
 
       <div className="space-y-8">
-        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <dl className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <StatBox label="Shows Played" value={stats.showCount} />
-          <StatBox label="Songs Played" value={stats.songCount} />
+          <StatBox label="Unique Songs" value={stats.songCount} />
+          <StatBox label="Song Plays" value={stats.playCount} />
           <PerformanceStatBox label="First Performance" show={firstShow} />
           <PerformanceStatBox label="Last Performance" show={lastShow} />
         </dl>

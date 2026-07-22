@@ -69,6 +69,9 @@ export type TrackMusicianInstrument = z.infer<typeof trackMusicianInstrumentSche
  * A musician plus their appearance aggregates, for the /musicians index table.
  * Dates are ISO `YYYY-MM-DD` strings (null when the musician has no recorded
  * appearances yet).
+ *
+ * `playCount` counts every play (a song played on ten shows counts ten times);
+ * `songCount` counts the distinct repertoire behind those plays.
  */
 export type MusicianWithStats = {
   id: string;
@@ -76,6 +79,7 @@ export type MusicianWithStats = {
   slug: string;
   knownFrom: string | null;
   defaultInstrumentName: string | null;
+  playCount: number;
   songCount: number;
   showCount: number;
   firstShowDate: string | null;
@@ -92,10 +96,16 @@ export type MusicianAppearanceShow = {
   venue: { name: string | null; city: string | null; state: string | null } | null;
 };
 
-/** A musician's appearance summary for their profile header and tables. */
+/**
+ * A musician's appearance summary for their profile header and tables.
+ * `showIds` are exactly the shows the counts are drawn from, so the profile's
+ * shows table lists the same set its "Shows Played" figure reports.
+ */
 export type MusicianAppearances = {
   showIds: string[];
+  showCount: number;
   songCount: number;
+  playCount: number;
   firstShow: MusicianAppearanceShow | null;
   lastShow: MusicianAppearanceShow | null;
 };

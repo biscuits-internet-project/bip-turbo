@@ -109,10 +109,10 @@ export const CacheKeys = {
    */
   musicians: {
     /** Full musician profile payload (appearances, songs played/written,
-     *  performances). :v6 bump: `setlist.show` no longer carries the raw query
-     *  relations (tracks, showMusicians, venue) or searchText; performances
-     *  embed Setlist. */
-    page: (slug: string) => `musician:${slug}:data:v6`,
+     *  performances). :v8 bump: `stats` splits the old `songCount` into
+     *  `songCount` (distinct repertoire) and `playCount` (every play), and the
+     *  appearance show set is now stats-shows-only. */
+    page: (slug: string) => `musician:${slug}:data:v8`,
     /** Every musician profile cache (for pattern deletion on broad mutations). */
     allPages: () => "musician:*:data:*",
   },

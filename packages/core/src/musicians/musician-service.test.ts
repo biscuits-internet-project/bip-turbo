@@ -58,20 +58,20 @@ describe("MusicianService.create — dedupe by slug", () => {
   });
 });
 
-describe("MusicianService.findTopBySongCount", () => {
+describe("MusicianService.findTopByPlayCount", () => {
   // The picker's default list surfaces the most-played musicians first (the
   // core lineup + frequent guests) so the common picks aren't buried under an
   // alphabetical list. Ties break alphabetically for a stable order.
-  test("orders by song count desc, breaking ties alphabetically, and caps at the limit", async () => {
+  test("orders by play count desc, breaking ties alphabetically, and caps at the limit", async () => {
     const service = new MusicianService({} as never, logger);
     vi.spyOn(service, "findAllWithStats").mockResolvedValue([
-      { id: "1", name: "Allen Aucoin", slug: "allen-aucoin", songCount: 5 },
-      { id: "2", name: "Marc Brownstein", slug: "marc-brownstein", songCount: 40 },
-      { id: "3", name: "Aron Magner", slug: "aron-magner", songCount: 40 },
-      { id: "4", name: "Sam Altman", slug: "sam-altman", songCount: 12 },
+      { id: "1", name: "Allen Aucoin", slug: "allen-aucoin", playCount: 5 },
+      { id: "2", name: "Marc Brownstein", slug: "marc-brownstein", playCount: 40 },
+      { id: "3", name: "Aron Magner", slug: "aron-magner", playCount: 40 },
+      { id: "4", name: "Sam Altman", slug: "sam-altman", playCount: 12 },
     ] as never);
 
-    const result = await service.findTopBySongCount(3);
+    const result = await service.findTopByPlayCount(3);
 
     expect(result.map((m) => m.slug)).toEqual([
       // 40 (Aron < Marc alphabetically), then 40, then 12 — Allen's 5 is cut.
@@ -79,6 +79,40 @@ describe("MusicianService.findTopBySongCount", () => {
       "marc-brownstein",
       "sam-altman",
     ]);
+  });
+});
+
+describe("MusicianService.findAllWithStats", () => {
+  // Shows, songs and plays are three aggregates over the same appearances
+  // (venues turned up at, distinct repertoire, repeat plays); mapping any of
+  // them to the wrong field would silently swap plausible-looking numbers.
+  test("maps the show, song, and play aggregates to their own fields", async () => {
+    const db = {
+      $queryRaw: vi.fn(() =>
+        Promise.resolve([
+          {
+            id: "1",
+            name: "Aron Magner",
+            slug: "aron-magner",
+            known_from: null,
+            default_instrument_id: null,
+            default_instrument_name: "Keyboards",
+            show_count: BigInt(1899),
+            song_count: BigInt(550),
+            play_count: BigInt(20111),
+            first_show_date: "1995-04-15",
+            last_show_date: "2026-01-03",
+          },
+        ]),
+      ),
+    };
+    const service = new MusicianService(db as never, logger);
+
+    const [magner] = await service.findAllWithStats();
+
+    expect(magner.showCount).toBe(1899);
+    expect(magner.songCount).toBe(550);
+    expect(magner.playCount).toBe(20111);
   });
 });
 
@@ -371,64 +405,57 @@ describe("MusicianService.delete guards referenced rows", () => {
 });
 
 describe("MusicianService.findAppearances", () => {
+  // The shows and the counts are two raw queries over two shared builders;
+  // route each by the column the show query projects.
   function makeAppearancesDb(args: {
-    lineupShowIds: string[];
-    presentDeltaShowIds: string[];
-    songCount: number;
+    showIds: string[];
+    songCount?: number;
+    playCount?: number;
     firstShowDate?: string;
     lastShowDate?: string;
   }) {
     return {
-      showMusician: {
-        findMany: vi.fn(() => Promise.resolve(args.lineupShowIds.map((showId) => ({ showId })))),
-      },
-      trackMusician: {
-        findMany: vi.fn(() => Promise.resolve(args.presentDeltaShowIds.map((showId) => ({ track: { showId } })))),
-      },
-      // findAppearances counts distinct (song, show) via a raw query.
-      $queryRaw: vi.fn(() => Promise.resolve([{ song_count: BigInt(args.songCount) }])),
+      $queryRaw: vi.fn((strings: TemplateStringsArray) =>
+        strings.join("").includes("SELECT DISTINCT a.show_id")
+          ? Promise.resolve(args.showIds.map((show_id) => ({ show_id })))
+          : Promise.resolve([{ song_count: BigInt(args.songCount ?? 0), play_count: BigInt(args.playCount ?? 0) }]),
+      ),
       show: {
-        findFirst: vi.fn(({ orderBy }: { orderBy: { date: "asc" | "desc" } }) => {
-          const date = orderBy.date === "asc" ? (args.firstShowDate ?? null) : (args.lastShowDate ?? null);
+        findFirst: vi.fn(({ orderBy }: { orderBy: Array<{ date?: "asc" | "desc" }> }) => {
+          const date = orderBy[0]?.date === "asc" ? (args.firstShowDate ?? null) : (args.lastShowDate ?? null);
           return Promise.resolve(date ? { date, slug: `show-${date}`, venue: null } : null);
         }),
       },
     };
   }
 
-  test("unions lineup shows with sit-in shows and dedupes overlaps", async () => {
-    // The musician is in the lineup for show-1 and show-2, and sat in on a
-    // track of show-2 (overlap) and show-3 (new).
-    const db = makeAppearancesDb({
-      lineupShowIds: ["show-1", "show-2"],
-      presentDeltaShowIds: ["show-2", "show-3"],
-      songCount: 0,
-    });
+  // The shows table and the "Shows Played" figure both read `showIds`, so the
+  // count has to be the length of that same list rather than its own query.
+  test("reports the appearance shows and counts them", async () => {
+    const db = makeAppearancesDb({ showIds: ["show-1", "show-2", "show-3"] });
     const service = new MusicianService(db as never, logger);
 
     const result = await service.findAppearances("musician-1");
 
-    expect([...result.showIds].sort()).toEqual(["show-1", "show-2", "show-3"]);
+    expect(result.showIds).toEqual(["show-1", "show-2", "show-3"]);
+    expect(result.showCount).toBe(3);
   });
 
-  test("song count comes from the distinct (song, show) query", async () => {
-    const db = makeAppearancesDb({
-      lineupShowIds: ["show-1"],
-      presentDeltaShowIds: ["show-9"],
-      songCount: 42,
-    });
+  // The profile header shows repeat plays next to distinct repertoire; both
+  // come from one raw query, so each has to land on its own field.
+  test("song and play counts come from the aggregate query", async () => {
+    const db = makeAppearancesDb({ showIds: ["show-1"], songCount: 17, playCount: 42 });
     const service = new MusicianService(db as never, logger);
 
     const result = await service.findAppearances("musician-1");
 
-    expect(result.songCount).toBe(42);
+    expect(result.songCount).toBe(17);
+    expect(result.playCount).toBe(42);
   });
 
   test("surfaces first and last show dates from the appearance show set", async () => {
     const db = makeAppearancesDb({
-      lineupShowIds: ["show-1"],
-      presentDeltaShowIds: [],
-      songCount: 5,
+      showIds: ["show-1"],
       firstShowDate: "2003-04-12",
       lastShowDate: "2019-09-01",
     });
@@ -438,5 +465,18 @@ describe("MusicianService.findAppearances", () => {
 
     expect(result.firstShow?.date).toBe("2003-04-12");
     expect(result.lastShow?.date).toBe("2019-09-01");
+  });
+
+  // Musicians with no recorded appearances must not fan out into two
+  // first/last lookups over an empty id list.
+  test("skips the first/last lookups when there are no appearance shows", async () => {
+    const db = makeAppearancesDb({ showIds: [] });
+    const service = new MusicianService(db as never, logger);
+
+    const result = await service.findAppearances("musician-1");
+
+    expect(result.showCount).toBe(0);
+    expect(result.firstShow).toBeNull();
+    expect(db.show.findFirst).not.toHaveBeenCalled();
   });
 });
