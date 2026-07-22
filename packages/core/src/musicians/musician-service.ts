@@ -9,7 +9,14 @@ import type {
 import type { DbClient, DbInstrument, DbMusician } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
+import { SHOW_ORDER_ASC, SHOW_ORDER_DESC } from "../_shared/show-ordering";
 import { slugify } from "../_shared/utils/slugify";
+import {
+  MUSICIAN_SONG_PLAY_COUNTS_SQL,
+  type MusicianSongPlayCountsRow,
+  musicianAppearanceShowsSql,
+  musicianSongPlaysSql,
+} from "./musician-appearances";
 
 export interface CreateInstrumentInput {
   name: string;
@@ -269,58 +276,30 @@ export class MusicianService {
   }
 
   /**
-   * Shows and track count a musician appears on, for their profile page.
-   * Appearances combine lineup membership (every track of a show they were in
-   * the lineup for, minus their per-track sat-outs) with sit-ins (present=true
-   * deltas on shows they were not in the lineup for).
-   *
-   * Known simplification for this preview: a show where the musician is in the
-   * lineup but sat out every track still counts as an appearance. Full
-   * lineup-minus-satouts-plus-sitins show filtering is deferred to the Phase 8
-   * filter work.
+   * Shows, repertoire, and plays for a musician's profile page, off the shared
+   * appearance definitions so every figure here matches the /musicians index.
+   * `showIds` also drives the profile's shows table and first/last cards, so
+   * the listed shows are exactly the ones the count reports.
    */
   async findAppearances(musicianId: string): Promise<MusicianAppearances> {
-    const [lineupRows, presentDeltas, songCountRows] = await Promise.all([
-      this.db.showMusician.findMany({ where: { musicianId }, select: { showId: true } }),
-      this.db.trackMusician.findMany({
-        where: { musicianId, present: true },
-        select: { track: { select: { showId: true } } },
-      }),
-      // Distinct (song, show) the musician played on count_for_stats=true shows —
-      // the same "a song twice in one show counts once" math as Song.timesPlayed
-      // and the /musicians index, so the profile's "Songs Played" stays consistent.
-      this.db.$queryRaw<[{ song_count: bigint }]>`
-        WITH appearances AS (
-          SELECT t.show_id, t.song_id
-          FROM show_musicians sm
-          JOIN tracks t ON t.show_id = sm.show_id
-          WHERE sm.musician_id = ${musicianId}::uuid
-            AND NOT EXISTS (
-              SELECT 1 FROM track_musicians tm
-              WHERE tm.track_id = t.id AND tm.musician_id = ${musicianId}::uuid AND tm.present = false
-            )
-          UNION
-          SELECT t.show_id, t.song_id
-          FROM track_musicians tm
-          JOIN tracks t ON t.id = tm.track_id
-          WHERE tm.musician_id = ${musicianId}::uuid AND tm.present = true
-        )
-        SELECT COUNT(DISTINCT (a.song_id, a.show_id)) FILTER (WHERE s.count_for_stats) AS song_count
-        FROM appearances a
-        JOIN shows s ON s.id = a.show_id
+    const [showRows, countRows] = await Promise.all([
+      this.db.$queryRaw<Array<{ show_id: string }>>`
+        SELECT DISTINCT a.show_id FROM (${musicianAppearanceShowsSql(musicianId)}) a
+      `,
+      this.db.$queryRaw<[MusicianSongPlayCountsRow]>`
+        SELECT ${MUSICIAN_SONG_PLAY_COUNTS_SQL} FROM (${musicianSongPlaysSql(musicianId)}) p
       `,
     ]);
 
-    const lineupShowIds = lineupRows.map((row) => row.showId);
-    const sitInShowIds = presentDeltas.map((delta) => delta.track.showId);
-    const showIds = Array.from(new Set([...lineupShowIds, ...sitInShowIds]));
-    const songCount = Number(songCountRows[0]?.song_count ?? 0);
+    const showIds = showRows.map((row) => row.show_id);
+    const songCount = Number(countRows[0]?.song_count ?? 0);
+    const playCount = Number(countRows[0]?.play_count ?? 0);
 
     const [firstShow, lastShow] = showIds.length
       ? await Promise.all([this.findAppearanceShow(showIds, "asc"), this.findAppearanceShow(showIds, "desc")])
       : [null, null];
 
-    return { showIds, songCount, firstShow, lastShow };
+    return { showIds, showCount: showIds.length, songCount, playCount, firstShow, lastShow };
   }
 
   /** Earliest/latest appearance show (with venue) for the first/last cards. */
@@ -330,7 +309,7 @@ export class MusicianService {
   ): Promise<MusicianAppearanceShow | null> {
     const show = await this.db.show.findFirst({
       where: { id: { in: showIds } },
-      orderBy: { date: direction },
+      orderBy: direction === "asc" ? SHOW_ORDER_ASC : SHOW_ORDER_DESC,
       select: { date: true, slug: true, venue: { select: { name: true, city: true, state: true } } },
     });
     if (!show) return null;
@@ -343,53 +322,41 @@ export class MusicianService {
 
   /**
    * Every musician with their appearance aggregates in one query, for the
-   * /musicians index table. A musician "plays" a track when they are in that
-   * show's lineup and have no sat-out delta for the track, OR they have a
-   * present=true sit-in delta for it. The song count counts distinct
-   * (song, show) pairs on count_for_stats=true shows — the same "a song played
-   * twice in one show counts once" math as Song.timesPlayed — so it never
-   * exceeds the per-song totals. Distinct show count and first/last dates span
-   * all of the musician's appearance shows.
+   * /musicians index table, off the same shared appearance definitions the
+   * profile page uses. Show count and first/last dates span every appearance
+   * show (including early ones with no setlist entered); song and play counts
+   * come from the tracks those shows do have.
    */
   async findAllWithStats(): Promise<MusicianWithStats[]> {
     const rows = await this.db.$queryRaw<
-      Array<{
-        id: string;
-        name: string;
-        slug: string;
-        known_from: string | null;
-        default_instrument_id: string | null;
-        default_instrument_name: string | null;
-        song_count: bigint;
-        show_count: bigint;
-        first_show_date: string | null;
-        last_show_date: string | null;
-      }>
+      Array<
+        MusicianSongPlayCountsRow & {
+          id: string;
+          name: string;
+          slug: string;
+          known_from: string | null;
+          default_instrument_id: string | null;
+          default_instrument_name: string | null;
+          show_count: bigint;
+          first_show_date: string | null;
+          last_show_date: string | null;
+        }
+      >
     >`
-      WITH appearances AS (
-        SELECT t.show_id, t.song_id, sm.musician_id
-        FROM show_musicians sm
-        JOIN tracks t ON t.show_id = sm.show_id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM track_musicians tm
-          WHERE tm.track_id = t.id AND tm.musician_id = sm.musician_id AND tm.present = false
-        )
-        UNION
-        SELECT t.show_id, t.song_id, tm.musician_id
-        FROM track_musicians tm
-        JOIN tracks t ON t.id = tm.track_id
-        WHERE tm.present = true
-      ),
-      stats AS (
+      WITH show_stats AS (
         SELECT
           a.musician_id,
-          COUNT(DISTINCT (a.song_id, a.show_id)) FILTER (WHERE s.count_for_stats) AS song_count,
           COUNT(DISTINCT a.show_id) AS show_count,
           to_char(MIN(s.date::date), 'YYYY-MM-DD') AS first_show_date,
           to_char(MAX(s.date::date), 'YYYY-MM-DD') AS last_show_date
-        FROM appearances a
+        FROM (${musicianAppearanceShowsSql()}) a
         JOIN shows s ON s.id = a.show_id
         GROUP BY a.musician_id
+      ),
+      play_stats AS (
+        SELECT p.musician_id, ${MUSICIAN_SONG_PLAY_COUNTS_SQL}
+        FROM (${musicianSongPlaysSql()}) p
+        GROUP BY p.musician_id
       )
       SELECT
         m.id,
@@ -398,13 +365,15 @@ export class MusicianService {
         m.known_from,
         m.default_instrument_id,
         i.name AS default_instrument_name,
-        COALESCE(stats.song_count, 0) AS song_count,
-        COALESCE(stats.show_count, 0) AS show_count,
-        stats.first_show_date,
-        stats.last_show_date
+        COALESCE(show_stats.show_count, 0) AS show_count,
+        COALESCE(play_stats.song_count, 0) AS song_count,
+        COALESCE(play_stats.play_count, 0) AS play_count,
+        show_stats.first_show_date,
+        show_stats.last_show_date
       FROM musicians m
       LEFT JOIN instruments i ON i.id = m.default_instrument_id
-      LEFT JOIN stats ON stats.musician_id = m.id
+      LEFT JOIN show_stats ON show_stats.musician_id = m.id
+      LEFT JOIN play_stats ON play_stats.musician_id = m.id
       ORDER BY m.name ASC
     `;
 
@@ -414,22 +383,23 @@ export class MusicianService {
       slug: row.slug,
       knownFrom: row.known_from ?? null,
       defaultInstrumentName: row.default_instrument_name ?? null,
-      songCount: Number(row.song_count),
       showCount: Number(row.show_count),
+      songCount: Number(row.song_count),
+      playCount: Number(row.play_count),
       firstShowDate: row.first_show_date,
       lastShowDate: row.last_show_date,
     }));
   }
 
   /**
-   * The most-played musicians first (song count desc, ties alphabetical), for
+   * The most-played musicians first (play count desc, ties alphabetical), for
    * the picker's default list — surfacing the core lineup and frequent guests
-   * ahead of one-off sit-ins. Reuses the findAllWithStats song-count metric so
+   * ahead of one-off sit-ins. Reuses the findAllWithStats play-count metric so
    * "how much a musician played" stays defined in one place.
    */
-  async findTopBySongCount(limit: number): Promise<MusicianWithStats[]> {
+  async findTopByPlayCount(limit: number): Promise<MusicianWithStats[]> {
     const all = await this.findAllWithStats();
-    return all.sort((a, b) => b.songCount - a.songCount || a.name.localeCompare(b.name)).slice(0, limit);
+    return all.sort((a, b) => b.playCount - a.playCount || a.name.localeCompare(b.name)).slice(0, limit);
   }
 
   async create(data: CreateMusicianInput): Promise<Musician> {

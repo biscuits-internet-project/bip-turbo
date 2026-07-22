@@ -282,6 +282,8 @@ export interface McpSyncUser {
   // Optional until the setlist-times deploy lands on prod: an older prod omits
   // it, and the sync then leaves the local value alone rather than clearing it.
   showSetlistTimes?: boolean | null;
+  // Same optional-until-deployed guard as showSetlistTimes above.
+  ratingDecimalPlaces?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1710,6 +1712,7 @@ export async function syncUserActivity(
               trackRatingComparisonDebug: u.trackRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
               showSetlistTimes: u.showSetlistTimes,
+              ratingDecimalPlaces: u.ratingDecimalPlaces,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1730,6 +1733,7 @@ export async function syncUserActivity(
               trackRatingComparisonDebug: u.trackRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
               showSetlistTimes: u.showSetlistTimes,
+              ratingDecimalPlaces: u.ratingDecimalPlaces,
               updatedAt: new Date(u.updatedAt),
             },
           });
@@ -1749,6 +1753,7 @@ export async function syncUserActivity(
               trackRatingComparisonDebug: u.trackRatingComparisonDebug,
               colorCodeRatings: u.colorCodeRatings,
               showSetlistTimes: u.showSetlistTimes,
+              ratingDecimalPlaces: u.ratingDecimalPlaces,
               createdAt: new Date(u.createdAt),
               updatedAt: new Date(u.updatedAt),
             },

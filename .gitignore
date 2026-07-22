@@ -17,3 +17,5 @@ apps/web/.react-router/*
 .gitattributes
 .playwright-mcp/*
 backups/
+# Rater duplicate-account investigation: contains real user emails (PII), keep out of git
+rater-investigation/

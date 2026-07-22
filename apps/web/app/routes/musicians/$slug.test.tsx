@@ -60,7 +60,7 @@ function makeData({ slug = "mike-greenfield", tier = "guest", songs, performance
       updatedAt: new Date(),
     },
     tier,
-    stats: { showCount: 5, songCount: 3 },
+    stats: { showCount: 5, songCount: 2, playCount: 3 },
     firstShow: null,
     lastShow: null,
     shows:
@@ -120,6 +120,20 @@ describe("MusicianPage body", () => {
     expect(screen.getByRole("heading", { name: /Songs played with the band/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /Shows played with the band/ })).toBeInTheDocument();
     expect(screen.getAllByText("(outside their era)")).toHaveLength(2);
+  });
+
+  // Unique Songs (distinct repertoire) and Song Plays (repeat plays) are two
+  // different numbers over the same appearances, so each headline stat has to
+  // read from its own field rather than both showing the same aggregate.
+  test("the headline stats separate shows, distinct songs, and repeat plays", async () => {
+    loaderData.mockReturnValue(makeData({ slug: "mike-greenfield", tier: "guest" }));
+
+    await setupWithRouter(<MusicianPage />);
+
+    const statValue = (label: string) => screen.getByText(label).closest("div")?.textContent;
+    expect(statValue("Shows Played")).toContain("5");
+    expect(statValue("Unique Songs")).toContain("2");
+    expect(statValue("Song Plays")).toContain("3");
   });
 
   // Core members appear on essentially every show, so the tables are omitted —

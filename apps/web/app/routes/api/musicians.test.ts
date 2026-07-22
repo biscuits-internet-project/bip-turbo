@@ -6,9 +6,9 @@ vi.mock("~/lib/base-loaders", () => ({
 }));
 
 const search = vi.fn();
-const findTopBySongCount = vi.fn();
+const findTopByPlayCount = vi.fn();
 vi.mock("~/server/services", () => ({
-  services: { musicians: { search, findTopBySongCount } },
+  services: { musicians: { search, findTopByPlayCount } },
 }));
 
 vi.mock("~/lib/logger", () => ({
@@ -24,20 +24,20 @@ function makeArgs(url: string): LoaderFunctionArgs & { context: unknown } {
 describe("GET /api/musicians", () => {
   beforeEach(() => {
     search.mockReset();
-    findTopBySongCount.mockReset();
+    findTopByPlayCount.mockReset();
   });
 
-  // The picker's loadOnOpen hits ?top=N for the initial list, ordered by song
+  // The picker's loadOnOpen hits ?top=N for the initial list, ordered by play
   // count (most-played first) rather than alphabetically.
-  test("returns the top musicians by song count for ?top=N, without searching", async () => {
+  test("returns the top musicians by play count for ?top=N, without searching", async () => {
     const top = [{ id: "jg", name: "Jon Gutwillig", slug: "jon-gutwillig" }];
-    findTopBySongCount.mockResolvedValue(top);
+    findTopByPlayCount.mockResolvedValue(top);
 
     const response = (await loader(makeArgs("http://localhost/api/musicians?top=5"))) as Response;
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(top);
-    expect(findTopBySongCount).toHaveBeenCalledWith(5);
+    expect(findTopByPlayCount).toHaveBeenCalledWith(5);
     expect(search).not.toHaveBeenCalled();
   });
 

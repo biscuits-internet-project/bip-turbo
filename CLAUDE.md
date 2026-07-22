@@ -121,6 +121,14 @@ Any code that orders or filters shows/tracks chronologically MUST use the helper
 
 Use `SHOW_ORDER_ASC` / `SHOW_ORDER_DESC` for Prisma `orderBy`, `showOrderBySql` for raw SQL, `TRACK_BY_SHOW_ORDER_ASC` for ordering tracks by their show, `statsShowsSql` / `STATS_SHOWS_WHERE` for the count_for_stats=true predicate, and `compareByShowDate` for in-memory sorts.
 
+## Every generated statistic is count_for_stats-only, from one shared definition
+
+Any number the site presents as a statistic — counts, averages, totals, first/last dates, "top N" orderings — MUST filter to `count_for_stats = TRUE` via `statsShowsSql` / `STATS_SHOWS_WHERE`. No exceptions for "this set obviously matches". Display-only listings that deliberately show every performance (e.g. the song-detail performances table) are the only queries that skip it, and they aren't statistics.
+
+When the same statistic surfaces in more than one place (an index table and a detail page, say), the *row set* it aggregates over lives in exactly one exported SQL builder that both callers use, not in two hand-written queries that happen to agree today. Two queries drift: the /musicians index and a musician's profile shipped three different definitions of "shows played" (lineup rows vs. shows-with-tracks, one stats-filtered and one not) and disagreed by 96 for Aron Magner. Precedent to copy: [musician-appearances.ts](packages/core/src/musicians/musician-appearances.ts), which exports the appearance-show and song-play row sets plus the shared aggregate SELECT list.
+
+Related: a musician's play count uses distinct `(song_id, show_id)` pairs, matching `Song.timesPlayed`, so a musician's plays can never exceed the per-song totals shown elsewhere.
+
 ## Commit and PR Messages
 
 Describe the final before→after change as the user will see it, not the development process or intermediate iterations. Be pithy. Lead with the user-visible change.
