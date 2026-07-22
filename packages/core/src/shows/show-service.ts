@@ -4,6 +4,7 @@ import { type CacheInvalidationService, yearFromShowDate } from "../_shared/cach
 import type { DbClient, DbShow, DbVenue } from "../_shared/database/models";
 import { buildIncludeClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
+import { mapDbShowToDomainEntity } from "../_shared/show-mapper";
 import {
   DAY_ORDER_NULL_SENTINEL,
   NON_STUB_SHOWS_WHERE,
@@ -56,17 +57,14 @@ export interface LineupEntry {
 }
 
 // Mapper functions
-function mapShowToDomainEntity(show: DbShow): Show {
-  const { venueId, bandId, ...rest } = show;
-  return {
-    ...rest,
-    date: String(show.date),
-    createdAt: new Date(show.createdAt),
-    updatedAt: new Date(show.updatedAt),
-    slug: show.slug ?? "",
-    venueId: venueId ?? "",
-    bandId: bandId ?? "",
-  };
+/**
+ * Map a show row that may carry an included venue, attaching the mapped venue
+ * rather than letting the raw relation ride along on the show.
+ */
+function mapShowWithVenueToDomainEntity(show: DbShow & { venue?: DbVenue | null }): Show {
+  const mapped = mapDbShowToDomainEntity(show);
+  if (show.venue) mapped.venue = mapVenueToDomainEntity(show.venue);
+  return mapped;
 }
 
 function mapVenueToDomainEntity(dbVenue: DbVenue): Venue {
@@ -139,12 +137,12 @@ export class ShowService {
 
   async findById(id: string): Promise<Show | null> {
     const result = await this.db.show.findUnique({ where: { id } });
-    return result ? mapShowToDomainEntity(result) : null;
+    return result ? mapDbShowToDomainEntity(result) : null;
   }
 
   async findBySlug(slug: string): Promise<Show | null> {
     const result = await this.db.show.findUnique({ where: { slug } });
-    return result ? mapShowToDomainEntity(result) : null;
+    return result ? mapDbShowToDomainEntity(result) : null;
   }
 
   async findMany(filterOrOptions: ShowFilter | QueryOptions<Show> = {}): Promise<Show[]> {
@@ -188,7 +186,7 @@ export class ShowService {
       include,
     });
 
-    return results.map((result: DbShow) => mapShowToDomainEntity(result));
+    return results.map((result) => mapShowWithVenueToDomainEntity(result));
   }
 
   async findManyByDates(dates: string[]): Promise<Show[]> {
@@ -207,13 +205,7 @@ export class ShowService {
       orderBy: SHOW_ORDER_ASC,
     });
 
-    return results.map((result) => {
-      const show = mapShowToDomainEntity(result);
-      if (result.venue) {
-        show.venue = mapVenueToDomainEntity(result.venue);
-      }
-      return show;
-    });
+    return results.map((result) => mapShowWithVenueToDomainEntity(result));
   }
 
   async findByDate(date: string): Promise<Show[]> {
@@ -339,7 +331,7 @@ export class ShowService {
       take: options?.pagination?.limit,
     });
 
-    return shows.map((show) => mapShowToDomainEntity(show));
+    return shows.map((show) => mapDbShowToDomainEntity(show));
   }
 
   async create(data: ShowServiceCreateInput): Promise<Show> {
@@ -369,7 +361,7 @@ export class ShowService {
       },
     });
 
-    const show = mapShowToDomainEntity(result);
+    const show = mapDbShowToDomainEntity(result);
 
     // New shows default to the current band makeup. Resolve the seeded
     // musicians lazily so an unseeded environment degrades to an empty lineup
@@ -516,7 +508,7 @@ export class ShowService {
       },
     });
 
-    const show = mapShowToDomainEntity(result);
+    const show = mapDbShowToDomainEntity(result);
 
     // Year-tag purges cover both the old date (so its listing evicts) and
     // the new date (so its listing picks the row up). `||` not `??` so an

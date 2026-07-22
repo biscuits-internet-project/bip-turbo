@@ -102,10 +102,11 @@ describe("getRockOperaPerformances", () => {
 
     const usedKey = cacheGetOrSet.mock.calls[0][0] as string;
     expect(usedKey).toMatch(/^rock-operas:performances:hot-air-balloon/);
-    // v13 = the Setlist shape with dateFirstPlayed on the lean song.
-    // A payload-shape change without a version bump would serve stale-shape
-    // blobs from deployed instances until TTL (the cache-versioning rule).
-    expect(usedKey).toContain(":v13");
+    // v14 = the Setlist shape whose `show` carries only domain fields (no raw
+    // tracks/showMusicians/venue relations). A payload-shape change without a
+    // version bump would serve stale-shape blobs from deployed instances until
+    // TTL (the cache-versioning rule).
+    expect(usedKey).toContain(":v14");
   });
 
   // Setlists must be loaded by show id in chronological-asc order so the

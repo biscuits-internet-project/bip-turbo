@@ -11,10 +11,11 @@ export const CacheKeys = {
    * Show-related cache keys
    */
   show: {
-    /** Complete show + setlist data for show page. :v15 bump: the payload is
-     *  now Setlist, so track songs carry only the lean fields (id/title/
-     *  slug/kind/authors/dateFirstPlayed), no lyrics/history/notes/tabs text. */
-    data: (slug: string) => `show:${slug}:data:v15`,
+    /** Complete show + setlist data for show page. :v16 bump: `setlist.show`
+     *  no longer carries the raw query relations (tracks, showMusicians,
+     *  venue) or searchText — those duplicated sets[].tracks / lineup / venue
+     *  and made up ~60% of the payload. */
+    data: (slug: string) => `show:${slug}:data:v16`,
 
     // Note: Reviews are loaded fresh from DB, not cached
 
@@ -33,8 +34,9 @@ export const CacheKeys = {
     /** Paginated show listings with filters */
     list: (filters: CacheFilters) => {
       const filterHash = hashFilters(filters);
-      // :v15 bump: SongLight gained dateFirstPlayed (Setlist shape change).
-      return `shows:list:${filterHash}:v15`;
+      // :v16 bump: `setlist.show` no longer carries the raw query relations
+      // (tracks, showMusicians, venue) or searchText.
+      return `shows:list:${filterHash}:v16`;
     },
 
     /** All show listing caches (for pattern deletion) */
@@ -107,9 +109,10 @@ export const CacheKeys = {
    */
   musicians: {
     /** Full musician profile payload (appearances, songs played/written,
-     *  performances). :v5 bump: SongLight gained dateFirstPlayed (Setlist
-     *  shape change; performances embed Setlist). */
-    page: (slug: string) => `musician:${slug}:data:v5`,
+     *  performances). :v6 bump: `setlist.show` no longer carries the raw query
+     *  relations (tracks, showMusicians, venue) or searchText; performances
+     *  embed Setlist. */
+    page: (slug: string) => `musician:${slug}:data:v6`,
     /** Every musician profile cache (for pattern deletion on broad mutations). */
     allPages: () => "musician:*:data:*",
   },
@@ -132,10 +135,11 @@ export const CacheKeys = {
      * Pre-built SetlistList payload (setlists + external sources) for one
      * page of a user's attended shows. Paginated because the heaviest users
      * have 400+ attended shows and the un-paginated payload is large enough
-     * to be slow to deserialize/transport even from Redis. :v15 bump:
-     * SongLight gained dateFirstPlayed (Setlist shape change).
+     * to be slow to deserialize/transport even from Redis. :v16 bump:
+     * `setlist.show` no longer carries the raw query relations (tracks,
+     * showMusicians, venue) or searchText.
      */
-    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v15`,
+    attendedSetlists: (userId: string, page: number) => `user:${userId}:attended-setlists:p${page}:v16`,
     /** All pages of a single user's attended-setlists caches (for per-user invalidation). */
     allAttendedSetlistsForUser: (userId: string) => `user:${userId}:attended-setlists:*`,
     /** All per-user attended-setlists caches (for pattern deletion on broad show mutations). */
@@ -160,9 +164,9 @@ export const CacheKeys = {
    */
   rockOperas: {
     /** Resource-page list payload: setlists + external sources for one rock
-     *  opera. :v13 bump: SongLight gained dateFirstPlayed (Setlist
-     *  shape change). */
-    performances: (slug: string) => `rock-operas:performances:${slug}:v13`,
+     *  opera. :v14 bump: `setlist.show` no longer carries the raw query
+     *  relations (tracks, showMusicians, venue) or searchText. */
+    performances: (slug: string) => `rock-operas:performances:${slug}:v14`,
     /** Pattern for invalidating every performances cache (broad mutations). */
     allPerformances: () => "rock-operas:performances:*",
   },
@@ -171,9 +175,10 @@ export const CacheKeys = {
    * Home page cache keys
    */
   home: {
-    /** Recent setlists for home page (limit + sort direction). :v15 bump:
-     *  SongLight gained dateFirstPlayed (Setlist shape change). */
-    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v15`,
+    /** Recent setlists for home page (limit + sort direction). :v16 bump:
+     *  `setlist.show` no longer carries the raw query relations (tracks,
+     *  showMusicians, venue) or searchText. */
+    recentSetlists: (limit: number) => `home:recent-setlists:${limit}:v16`,
   },
 
   /**
