@@ -1,6 +1,14 @@
 service: bip-web
 image: doncote/bip-web
 
+# Boot runs migrations plus the stats and ratings recomputes before the server
+# listens, so a new container serves fresh caches from its first request. That
+# costs ~12-16s normally and ~22s when a migration enqueues a full-catalog stats
+# recompute (2026-07-15 deploy). Kamal's 30s default left no room for the latter.
+# The old container keeps serving until the new one is healthy, so a longer
+# budget is only a ceiling on how long a genuinely broken boot takes to fail.
+deploy_timeout: 120
+
 servers:
   web:
     hosts:
@@ -20,7 +28,11 @@ proxy:
   response_timeout: 30
   healthcheck:
     path: /healthcheck
-    interval: 10
+    # Probe often enough that a container is promoted as soon as it listens.
+    # At a 10s interval the 2026-07-15 deploy went healthy at 22.3s but was
+    # only probed at 20s and 30s, so it was declared unhealthy despite booting
+    # inside the budget. /healthcheck is a static 200 with no DB dependency.
+    interval: 3
     timeout: 2
 
 registry:
