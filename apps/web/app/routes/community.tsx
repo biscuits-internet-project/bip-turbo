@@ -39,7 +39,7 @@ function UserCard({ userStats }: { userStats: UserStats }) {
   const displayBadges = badges?.slice(0, 3) || [];
 
   return (
-    <Card variant="panel" className="hover:glass-content-hover transition-all duration-300">
+    <Card variant="panel" className="transition-all duration-300">
       <CardContent className="p-4">
         {/* Header with avatar, username, and score */}
         <div className="flex items-center gap-3 mb-3">

@@ -104,12 +104,7 @@ export function Header() {
               {user ? (
                 <UserDropdown user={user} />
               ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  asChild
-                  className="glass-secondary hover:glass-content transition-all duration-200"
-                >
+                <Button variant="ghost" size="sm" asChild className="glass-secondary transition-all duration-200">
                   <Link to="/auth/login">Sign in</Link>
                 </Button>
               )}
