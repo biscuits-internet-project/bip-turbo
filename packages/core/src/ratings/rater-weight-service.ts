@@ -1,7 +1,8 @@
 import { displayedRatingComparator, drummerEraForDate, shrinkToward } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient } from "../_shared/database/models";
-import { aliasKey, mostRecentPerKey } from "./rater-aliases";
+import type { AliasRulesetService } from "./alias-ruleset-service";
+import { aliasKey, EMPTY_ALIAS_RULESET, mostRecentPerKey } from "./rater-aliases";
 import {
   bucketRatingValues,
   COLD_START_ENTROPY_K,
@@ -246,7 +247,13 @@ export function computeTrackDiscriminating(
  * is the batch the cron/script runs.
  */
 export class RaterWeightService {
-  constructor(protected readonly db: DbClient) {}
+  constructor(
+    protected readonly db: DbClient,
+    // The same-person merge rules. Absent ⇒ login-variant folding only, which is what
+    // a unit test with synthetic usernames wants; every production path is wired with
+    // the loader in `createServices`, guarded by a test there.
+    protected readonly aliasRules?: AliasRulesetService,
+  ) {}
 
   /** The shrink anchor: the cron-derived cleaned global mean (falls back to the seed). */
   private async shrinkAnchor(): Promise<number> {
@@ -751,11 +758,12 @@ export class RaterWeightService {
       select: { id: true, username: true },
     });
     const counts = await this.db.rating.groupBy({ by: ["userId"], _count: { id: true } });
+    const ruleset = (await this.aliasRules?.get()) ?? EMPTY_ALIAS_RULESET;
     const ratingCount = new Map(counts.map((c) => [c.userId, c._count.id]));
     const groups = new Map<string, Array<{ id: string; n: number }>>();
     for (const user of users) {
       if (!user.username) continue;
-      const key = aliasKey(user.username, user.id);
+      const key = aliasKey(user.username, user.id, ruleset);
       const group = groups.get(key) ?? [];
       group.push({ id: user.id, n: ratingCount.get(user.id) ?? 0 });
       groups.set(key, group);

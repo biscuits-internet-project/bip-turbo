@@ -2,7 +2,8 @@ import type { Rating } from "@bip/domain";
 import { Prisma } from "@prisma/client";
 import type { DbClient, DbRating } from "../_shared/database/models";
 import { setSortKeySql, showOrderBySql } from "../_shared/show-ordering";
-import { aliasKey, mostRecentPerKey } from "./rater-aliases";
+import type { AliasRulesetService } from "./alias-ruleset-service";
+import { type AliasRuleset, aliasKey, EMPTY_ALIAS_RULESET, mostRecentPerKey } from "./rater-aliases";
 import type { RaterWeightService } from "./rater-weight-service";
 import { bucketRatingValues } from "./rater-weighting";
 
@@ -45,9 +46,9 @@ function toDedupableRating(row: {
  * buildCanonicalUserMap in rater-weight-service. Aggregate-only — a user's own
  * ratings history is never deduped.)
  */
-function dedupeRatings<T extends DedupableRating>(ratings: ReadonlyArray<T>): T[] {
+function dedupeRatings<T extends DedupableRating>(ratings: ReadonlyArray<T>, ruleset: AliasRuleset): T[] {
   return mostRecentPerKey(ratings, (rating) =>
-    rating.username ? aliasKey(rating.username, rating.userId) : rating.userId,
+    rating.username ? aliasKey(rating.username, rating.userId, ruleset) : rating.userId,
   );
 }
 
@@ -63,8 +64,11 @@ function averageOf(deduped: ReadonlyArray<{ value: number }>): { averageRating: 
  * bulk rebuild path uses this on its per-rateable groups; single-rateable callers
  * go through {@link RatingService.dedupedRatingsFor} + {@link averageOf}.
  */
-function dedupedAverage(ratings: ReadonlyArray<DedupableRating>): { averageRating: number; ratingsCount: number } {
-  return averageOf(dedupeRatings(ratings));
+function dedupedAverage(
+  ratings: ReadonlyArray<DedupableRating>,
+  ruleset: AliasRuleset,
+): { averageRating: number; ratingsCount: number } {
+  return averageOf(dedupeRatings(ratings, ruleset));
 }
 
 export type ShowRatingsSort = "date" | "rating" | "modified";
@@ -209,7 +213,16 @@ export class RatingService {
     // Optional so existing callers/tests are unaffected. When present, rating
     // mutations also maintain the calibrated rater-weighting tables.
     protected readonly raterWeights?: RaterWeightService,
+    // The same-person merge rules. Absent ⇒ login-variant folding only, which is
+    // what a unit test with synthetic usernames wants; every production path is
+    // wired with the loader in `createServices`, guarded by a test there.
+    protected readonly aliasRules?: AliasRulesetService,
   ) {}
+
+  /** The merge rules for this dedup pass, or normalize-only when none are wired. */
+  private async ruleset(): Promise<AliasRuleset> {
+    return (await this.aliasRules?.get()) ?? EMPTY_ALIAS_RULESET;
+  }
 
   /**
    * After a rating mutation: mark the calibrated-rating tables dirty (cheap, so the
@@ -243,7 +256,7 @@ export class RatingService {
       where: { rateableId, rateableType },
       select: RATING_DEDUP_SELECT,
     });
-    return dedupeRatings(rows.map(toDedupableRating));
+    return dedupeRatings(rows.map(toDedupableRating), await this.ruleset());
   }
 
   private async updateRateableAverageRating(
@@ -314,7 +327,8 @@ export class RatingService {
     const writeAverages = async (rateableType: string, table: "shows" | "tracks", ids: Set<string>) => {
       if (ids.size === 0) return;
       const byRateable = await groupRatingsByRateable(rateableType, ids);
-      const entries = Array.from(ids, (id) => ({ id, ...dedupedAverage(byRateable.get(id) ?? []) }));
+      const ruleset = await this.ruleset();
+      const entries = Array.from(ids, (id) => ({ id, ...dedupedAverage(byRateable.get(id) ?? [], ruleset) }));
       const CHUNK = 1000;
       for (let i = 0; i < entries.length; i += CHUNK) {
         const rows = entries

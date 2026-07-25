@@ -1,6 +1,13 @@
-import { getFeatureFlags, runRatingsRecompute } from "@bip/core";
+import {
+  dbClient,
+  getFeatureFlags,
+  runDuplicateAccountDetection,
+  runRatingsRecompute,
+  summarizeDuplicateAccountDetection,
+} from "@bip/core";
 import type { ActionFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
+import { env } from "~/server/env";
 import { services } from "~/server/services";
 
 interface CronJobResult {
@@ -53,10 +60,50 @@ async function recomputeRatings(): Promise<CronJobResult> {
   }
 }
 
+/**
+ * Shared-inbox detection for duplicate rater accounts. Only runs here, in
+ * production: it reads `users.email`, which the MCP sync feed deliberately withholds,
+ * so local can never do this. Findings land in `rater_alias_groups` and reach local
+ * through the normal sync.
+ *
+ * The message is counts only. This repository is public, so the response body is echoed
+ * into a world-readable Actions run log — a username here would publish an accusation.
+ */
+async function detectDuplicateAccounts(): Promise<CronJobResult> {
+  const startTime = Date.now();
+
+  try {
+    const result = await runDuplicateAccountDetection({
+      db: dbClient,
+      namespaceSalt: env.DUPLICATE_ACCOUNT_HASH_SALT,
+      logger,
+    });
+    return {
+      success: true,
+      message: summarizeDuplicateAccountDetection(result),
+      duration: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    // The detail stays in the app log and out of the response, because the response is
+    // what gets printed to the public Actions log. Nothing is lost by holding it back:
+    // no query in this job puts an address in a predicate (email is only ever selected),
+    // so a driver error can't carry one either way — this is belt-and-braces.
+    logger.error("Failed to detect duplicate accounts", { error });
+    return {
+      success: false,
+      message: "Failed to detect duplicate accounts; see the application log for details",
+      duration: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
 // Map of available cron jobs. The community page builds its own cache on
 // demand (see ~/server/community-page), so no cron warms it anymore.
 const cronJobs: Record<string, () => Promise<CronJobResult>> = {
   "recompute-ratings": recomputeRatings,
+  "detect-duplicate-accounts": detectDuplicateAccounts,
 };
 
 export async function action({ params, request }: ActionFunctionArgs) {

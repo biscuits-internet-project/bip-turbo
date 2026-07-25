@@ -26,6 +26,14 @@ bun prisma migrate deploy \
 echo "Recomputing pending stats..."
 bun run scripts/recompute-pending.ts
 
+# Must precede the ratings recompute below: this flags ratings dirty when it merges
+# accounts, and that recompute is dirty-gated, so going first applies a new merge to
+# the denormalized averages in the same deploy instead of leaving it for the cron.
+# Unlike its neighbours this tolerates failure: `set -e` is on, and a moderation job
+# must never stop the app from booting.
+echo "Detecting duplicate rater accounts (no-op when nothing new)..."
+bun run scripts/detect-duplicate-accounts.ts || echo "Duplicate-account detection skipped (failed)"
+
 echo "Recomputing ratings (deploy-time backfill; no-op when unchanged)..."
 bun run scripts/recompute-ratings.ts
 

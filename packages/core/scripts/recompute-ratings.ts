@@ -1,6 +1,7 @@
 import prisma from "../src/_shared/prisma/client";
 import { getFeatureFlags } from "../src/_shared/quonfig";
 import { createTestLogger } from "../src/_shared/test-logger";
+import { AliasRulesetService } from "../src/ratings/alias-ruleset-service";
 import { RaterWeightService } from "../src/ratings/rater-weight-service";
 import { RatingService } from "../src/ratings/rating-service";
 import { runRatingsRecompute } from "../src/ratings/recompute-ratings";
@@ -22,8 +23,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const raterWeights = new RaterWeightService(prisma);
-  const ratings = new RatingService(prisma, raterWeights);
+  const aliasRules = new AliasRulesetService(prisma);
+  const raterWeights = new RaterWeightService(prisma, aliasRules);
+  const ratings = new RatingService(prisma, raterWeights, aliasRules);
 
   try {
     await runRatingsRecompute({ raterWeights, ratings, logger });

@@ -136,7 +136,8 @@ function createdRow(createMany: ReturnType<typeof vi.fn>, match: (data: Record<s
 
 describe("RaterWeightService.recomputeUser", () => {
   // A user who rates two Aucoin-era shows across the scale but bombs every
-  // Marlon-era show at 0.5 — the barfly07/Stepnotonpets pattern.
+  // Marlon-era show at 0.5 — the protest-bombing pattern: real judgement in one era,
+  // a flat floor in another.
   function makeDb() {
     const ratingFindMany = vi.fn().mockResolvedValue([
       { rateableId: "s1", rateableType: "Show", value: 5, createdAt: new Date("2010-01-02") },

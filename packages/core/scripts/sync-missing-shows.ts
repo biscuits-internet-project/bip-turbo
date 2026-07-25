@@ -22,6 +22,7 @@ import prisma from "../src/_shared/prisma/client";
 import { RedisService } from "../src/_shared/redis";
 import { createTestLogger } from "../src/_shared/test-logger";
 import { InstrumentService, MusicianService } from "../src/musicians/musician-service";
+import { AliasRulesetService } from "../src/ratings/alias-ruleset-service";
 import { RaterWeightService } from "../src/ratings/rater-weight-service";
 import { RatingService } from "../src/ratings/rating-service";
 import { runRatingsRecompute } from "../src/ratings/recompute-ratings";
@@ -315,6 +316,24 @@ export interface McpSyncReview {
   showId: string | null;
   content: string;
   status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// A same-person rater merge rule. Keyed by normalized username, so no user id and no
+// id-drift remapping. Non-PII by construction: prod derives these from email addresses
+// the sync feed never carries, and only the reason code and a salted namespace
+// fingerprint come back — never an address.
+export interface McpRaterAliasGroup {
+  id: string;
+  normalizedUsername: string;
+  groupKey: string;
+  merged: boolean;
+  source: string;
+  reasonCodes: string[];
+  namespaceSignal: string | null;
+  namespaceFingerprint: string | null;
+  note: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1529,6 +1548,11 @@ interface UserActivityStats {
   attendancesReconciled: number;
   reviewsReconciled: number;
   aggregatesRebuilt: number;
+  // Same-person merge rules mirrored from prod. Prod is authoritative for the whole
+  // set — local scoring has to fold identities exactly as prod does — so these count a
+  // full reconcile, not an incremental pull.
+  raterAliasGroupsUpserted: number;
+  raterAliasGroupsDeleted: number;
 }
 
 interface SyncUserActivityOptions {
@@ -1610,6 +1634,8 @@ export async function syncUserActivity(
     attendancesReconciled: 0,
     reviewsReconciled: 0,
     aggregatesRebuilt: 0,
+    raterAliasGroupsUpserted: 0,
+    raterAliasGroupsDeleted: 0,
   };
 
   // Cursor = local MAX(updatedAt). First run on a fresh table yields null;
@@ -2244,6 +2270,103 @@ export async function syncUserActivity(
     console.log(`📰 Blog posts: skipped (${err instanceof Error ? err.message : "MCP tool unavailable"})`);
   }
 
+  // --- Rater alias groups (same-person merge rules) ---
+  // Mirrors prod's identity decisions, including the ones only prod can make: the
+  // duplicate-account cron proves a shared inbox from an email address this feed never
+  // carries. Local must fold identities identically or every deduped average, count,
+  // histogram, and calibrated score disagrees with prod.
+  //
+  // Always a FULL reconcile (since=epoch, then delete what prod no longer has), unlike
+  // the cursor-based tables: the set is a handful of rows, a cursor can't observe a
+  // deletion, and a leftover local rule silently merges votes prod counts separately.
+  // Runs before the aggregate rebuild below so that rebuild uses the new rules. Wrapped
+  // in try/catch for pre-deploy MCP tolerance.
+  try {
+    console.log("🧬 Rater alias groups: full reconcile");
+    const prodGroups: McpRaterAliasGroup[] = [];
+    pageCursor = null;
+    do {
+      const args: Record<string, unknown> = { since: new Date(0).toISOString(), limit: SYNC_PAGE_LIMIT };
+      if (pageCursor) args.cursor = pageCursor;
+      const { raterAliasGroups, nextCursor } = await mcp<{
+        raterAliasGroups: McpRaterAliasGroup[];
+        nextCursor: string | null;
+      }>("list_rater_alias_groups_since", args);
+      prodGroups.push(...raterAliasGroups);
+      pageCursor = nextCursor;
+    } while (pageCursor !== null);
+
+    const localGroups = await db.raterAliasGroup.findMany({
+      select: {
+        normalizedUsername: true,
+        groupKey: true,
+        merged: true,
+        source: true,
+        reasonCodes: true,
+        namespaceSignal: true,
+        namespaceFingerprint: true,
+        note: true,
+      },
+    });
+    const remoteUsernames = new Set(prodGroups.map((group) => group.normalizedUsername));
+    const staleUsernames = localGroups
+      .map((group) => group.normalizedUsername)
+      .filter((normalizedUsername) => !remoteUsernames.has(normalizedUsername));
+
+    // Only rows that actually differ get written. A blind rewrite would make every sync
+    // report a change, and a "changed" rule triggers the FULL calibrated recompute at
+    // the end of this script — the most expensive thing it does. Comparing one
+    // serialized form of the synced columns keeps that check honest as columns are
+    // added, where a hand-written field-by-field comparison silently misses one.
+    const identity = (group: (typeof localGroups)[number] | McpRaterAliasGroup) =>
+      JSON.stringify([
+        group.normalizedUsername,
+        group.groupKey,
+        group.merged,
+        group.source,
+        group.reasonCodes,
+        group.namespaceSignal,
+        group.namespaceFingerprint,
+        group.note,
+      ]);
+    const localIdentities = new Set(localGroups.map(identity));
+    const changedGroups = prodGroups.filter((remote) => !localIdentities.has(identity(remote)));
+
+    if (isDryRun) {
+      stats.raterAliasGroupsUpserted = changedGroups.length;
+      stats.raterAliasGroupsDeleted = staleUsernames.length;
+    } else {
+      for (const group of changedGroups) {
+        const data = {
+          groupKey: group.groupKey,
+          merged: group.merged,
+          source: group.source,
+          reasonCodes: group.reasonCodes,
+          namespaceSignal: group.namespaceSignal,
+          namespaceFingerprint: group.namespaceFingerprint,
+          note: group.note,
+          updatedAt: new Date(group.updatedAt),
+        };
+        // Upsert on the normalized username, not the id: a local row seeded by the
+        // migration carries its own generated id, so an id-keyed upsert would try to
+        // insert a duplicate name and trip the unique index.
+        await db.raterAliasGroup.upsert({
+          where: { normalizedUsername: group.normalizedUsername },
+          update: data,
+          create: { ...data, normalizedUsername: group.normalizedUsername, createdAt: new Date(group.createdAt) },
+        });
+        stats.raterAliasGroupsUpserted++;
+      }
+      if (staleUsernames.length > 0) {
+        await db.raterAliasGroup.deleteMany({ where: { normalizedUsername: { in: staleUsernames } } });
+        stats.raterAliasGroupsDeleted = staleUsernames.length;
+      }
+    }
+    console.log(`🧬 Rater alias groups: ~${stats.raterAliasGroupsUpserted}, -${stats.raterAliasGroupsDeleted}`);
+  } catch (err) {
+    console.log(`🧬 Rater alias groups: skipped (${err instanceof Error ? err.message : "MCP tool unavailable"})`);
+  }
+
   // --- Full-mode reconciliation: delete local rows not on prod ---
   if (pruneOrphans) {
     console.log("🧹 Pruning local rows missing from prod");
@@ -2573,11 +2696,15 @@ async function syncMissingShows(): Promise<void> {
   // RatingService needs no cache-invalidation dependency: the sync only calls
   // rebuildAggregatesFor (rating writes no longer bust any structural cache),
   // and it does its own outer invalidation pass on changedSlugs.
-  const ratingService = new RatingService(prisma);
+  // Both rating services take the alias-rule loader so the aggregates this rebuilds
+  // dedupe duplicate accounts exactly as prod does — including the merges prod's
+  // email detector found, which arrive in the same sync run.
+  const aliasRules = new AliasRulesetService(prisma);
+  const ratingService = new RatingService(prisma, undefined, aliasRules);
   // Synced ratings change rater stats and every show's calibrated weighted_rating,
   // but they bypass the live write path that flags the recompute dirty, so the
   // sync runs the calibrated recompute itself at the end (see below).
-  const raterWeights = new RaterWeightService(prisma);
+  const raterWeights = new RaterWeightService(prisma, aliasRules);
   // SegueRun rows reference Track ids in a non-FK String[] array. When the
   // setlist reconcile inserts or deletes a track, those arrays go stale; we
   // call generateSegueRunsForShow per structurally-changed show to rebuild.
@@ -4382,8 +4509,15 @@ async function syncMissingShows(): Promise<void> {
     // this script's per-row work, so recompute them when ratings actually changed.
     // Mark dirty (the sync touched ratings) and run the same routine the cron and
     // deploy use, so weighted_rating + the shrink anchor aren't left stale.
+    //
+    // A changed merge rule counts too, and needs the FULL recompute rather than the
+    // touched-rateable rebuild above: folding two accounts into one identity moves
+    // every show and track either of them ever rated, which the sync never touched.
     const ratingsChanged =
-      (stats.userActivity?.ratingsUpserted ?? 0) > 0 || (stats.userActivity?.ratingsDeleted ?? 0) > 0;
+      (stats.userActivity?.ratingsUpserted ?? 0) > 0 ||
+      (stats.userActivity?.ratingsDeleted ?? 0) > 0 ||
+      (stats.userActivity?.raterAliasGroupsUpserted ?? 0) > 0 ||
+      (stats.userActivity?.raterAliasGroupsDeleted ?? 0) > 0;
     if (!isDryRun && ratingsChanged) {
       console.log("📊 Recomputing calibrated ratings");
       try {

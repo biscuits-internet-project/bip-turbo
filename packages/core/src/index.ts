@@ -11,6 +11,9 @@ export * from "./attendances/attendance-service";
 export * from "./blog-posts/blog-post-service";
 // Views
 export * from "./page-composers/song-page-composer";
+export * from "./ratings/alias-ruleset-service";
+export * from "./ratings/detect-duplicate-accounts";
+export * from "./ratings/email-identity-signals";
 export * from "./ratings/rater-weight-service";
 export * from "./ratings/rater-weighting";
 export * from "./ratings/rating-mode";

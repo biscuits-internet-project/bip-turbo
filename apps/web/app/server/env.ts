@@ -17,6 +17,12 @@ export const envSchema = z.object({
   CLOUDFLARE_IMAGES_API_TOKEN: z.string(),
   CLOUDFLARE_ZONE_ID: z.string(),
   CLOUDFLARE_CACHE_PURGE_TOKEN: z.string(),
+  // Salts the published fingerprint of a shared email-alias namespace, so two
+  // duplicate-account groups under different subdomains stay distinguishable without
+  // either subdomain ever leaving the database. Optional on purpose: absent, the
+  // duplicate-account job records the signal label with no fingerprint, so no secret
+  // setup gates it.
+  DUPLICATE_ACCOUNT_HASH_SALT: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

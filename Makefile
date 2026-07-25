@@ -95,6 +95,9 @@ recompute-pending:
 recompute-ratings:
 	cd packages/core && QUONFIG_DATADIR=$(CURDIR)/quonfig doppler run -- bun run scripts/recompute-ratings.ts
 
+detect-duplicate-accounts:
+	cd packages/core && doppler run -- bun run scripts/detect-duplicate-accounts.ts
+
 rating-validity-eval:
 	cd packages/core && doppler run -- bun run scripts/rating-validity-eval.ts
 

@@ -1,30 +1,54 @@
 import { describe, expect, test } from "vitest";
-import { aliasKey, mostRecentPerKey, normalize } from "./rater-aliases";
+import { type AliasRuleset, aliasKey, EMPTY_ALIAS_RULESET, mostRecentPerKey, normalize } from "./rater-aliases";
+
+function ruleset(overrides: Partial<AliasRuleset> = {}): AliasRuleset {
+  return { ...EMPTY_ALIAS_RULESET, ...overrides };
+}
 
 // normalize folds the cosmetic differences one login produces (case, spaces,
-// underscores) so "RyKnow" and "ryknow " resolve to the same identity.
+// underscores) so "RockCandy" and "rockcandy " resolve to the same identity.
 describe("normalize", () => {
   test("lowercases and strips spaces and underscores", () => {
-    expect(normalize("RyKnow ")).toBe("ryknow");
-    expect(normalize("Digital_Buddha")).toBe("digitalbuddha");
-    expect(normalize("Digital Buddha")).toBe("digitalbuddha");
+    expect(normalize("RockCandy ")).toBe("rockcandy");
+    expect(normalize("Rock_Candy")).toBe("rockcandy");
+    expect(normalize("Rock Candy")).toBe("rockcandy");
   });
 });
 
 describe("aliasKey", () => {
-  test("login variants of one name share a key", () => {
-    expect(aliasKey("RyKnow")).toBe(aliasKey("ryknow "));
+  test("login variants of one name share a key with no curated rules at all", () => {
+    expect(aliasKey("RockCandy", undefined, EMPTY_ALIAS_RULESET)).toBe(
+      aliasKey("rockcandy ", undefined, EMPTY_ALIAS_RULESET),
+    );
   });
 
-  test("curated spelling variants merge to one representative", () => {
+  test("a merge rule folds a spelling variant onto the group's representative", () => {
     // "Invisble" (misspelled) and "Invisible" are the same person.
-    expect(aliasKey("InvisbleBuddha")).toBe(aliasKey("Invisible Buddha"));
+    const rules = ruleset({
+      mergeRemap: new Map([
+        ["higwire", "higwire"],
+        ["highwire", "higwire"],
+      ]),
+    });
+
+    expect(aliasKey("Higwire", undefined, rules)).toBe("higwire");
+    expect(aliasKey("High wire", undefined, rules)).toBe("higwire");
   });
 
-  test("a deny-listed name stays solo, keyed by its own account id", () => {
-    // digitalbuddha is held out of auto-merge: each account keeps a distinct key.
-    expect(aliasKey("DigitalBuddha", "user-1")).toBe("solo:user-1");
-    expect(aliasKey("DigitalBuddha", "user-1")).not.toBe(aliasKey("DigitalBuddha", "user-2"));
+  test("a held-out name stays solo, keyed by its own account id", () => {
+    const rules = ruleset({ heldOut: new Set(["mindlessdribble"]) });
+
+    expect(aliasKey("MindlessDribble", "user-1", rules)).toBe("solo:user-1");
+    expect(aliasKey("MindlessDribble", "user-1", rules)).not.toBe(aliasKey("MindlessDribble", "user-2", rules));
+  });
+
+  // Without the account id there is nothing to key a solo identity on, so the
+  // held-out name falls back to its normalized form rather than colliding on a
+  // shared "solo" bucket.
+  test("a held-out name without an account id falls back to its normalized form", () => {
+    expect(aliasKey("MindlessDribble", undefined, ruleset({ heldOut: new Set(["mindlessdribble"]) }))).toBe(
+      "mindlessdribble",
+    );
   });
 });
 
