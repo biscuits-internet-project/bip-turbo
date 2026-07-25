@@ -8,6 +8,7 @@
       "!**/dist",
       "!**/.turbo",
       "!**/node_modules",
+      "!**/.claude/worktrees",
       "!**/tailwind.config.js",
       "!**/data-migrations",
       "!**/*.css",
