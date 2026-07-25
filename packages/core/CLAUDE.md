@@ -52,6 +52,37 @@ bun prisma:studio         # Open Prisma Studio
 
 Never mutate schema or data outside a migration (local or prod) — see the root `CLAUDE.md`. `db-query`/`db-execute` are read-only inspection tools. Schema edits: change `schema.prisma`, then migrate. If `migrate dev` wants to reset the dev DB on drift, hand-author the `migration.sql` and apply with `bun run prisma:migrate:deploy`. Seed/backfill data ships as idempotent `INSERT ... ON CONFLICT DO NOTHING` inside a migration, never a runtime script.
 
+## A BEFORE trigger reads its own row from `NEW`, never with a re-SELECT
+
+A `BEFORE INSERT OR UPDATE ... FOR EACH ROW` trigger cannot see its own row in the
+table yet. A body that computes a derived column by calling a helper which
+re-SELECTs that table silently stores the wrong value: on INSERT the row does not
+exist, so the helper returns NULL; on UPDATE it returns the *pre-update* value, so
+a rename never reaches the derived column.
+
+This shipped four times. `update_{song,venue,show,track}_search_fields` all did
+`NEW.search_text := build_<entity>_search_text(NEW.id)`, which left 760 of 802
+venues with a NULL `search_text` — invisible to the trigram and full-text branches
+of the venue search — and every renamed row stuck on its old name.
+
+- Source own-row columns from `NEW` directly.
+- When the derived value also needs *joined* data (another table's columns), keep
+  the id-based lookup for the joined part only, or move the whole body into a
+  row-typed overload the trigger can pass `NEW` to. Precedent:
+  `build_venue_search_text(v venues)` holds the logic and
+  `build_venue_search_text(uuid)` wraps it, so the trigger and the backfill /
+  verification query cannot drift apart.
+- A related-row edit does NOT fire the dependent table's trigger. Renaming a venue
+  leaves its shows' derived text stale. Either accept it, or do not denormalize.
+- **Verify with the definition, not by eyeball:**
+  `SELECT count(*) FROM <table> WHERE <col> IS DISTINCT FROM build_<entity>(id)`
+  must return 0 after any fix.
+
+**When you fix a shared SQL pattern, fix every sibling that copied it.** The songs
+trigger was fixed alone in `20260715000001` and the other three kept the bug for
+another nine days. `pg_proc` is greppable, so one query finds them all:
+`SELECT proname FROM pg_proc WHERE prosrc LIKE '%NEW.id%';`
+
 ## ALWAYS apply migrations locally with `deploy`, NEVER `migrate dev` / `make migrate`
 
 The local DB is a prod restore whose `_prisma_migrations` history diverges from disk: migrations were renumbered (the `…130xxx` → `…000xxx` reshuffle), leaving orphan rows recorded under old names. `prisma migrate dev` (which `make migrate` runs) reads that as drift, spins up a shadow DB to replay the whole history, trips a data-migration failure mid-replay (e.g. the `stats_recompute_requests` NULL-row insert), and then wants to **reset the dev DB — wiping the restored prod data**. It does this in the shadow DB and aborts, so the real DB usually survives, but it never accomplishes anything and the error is a red herring.
