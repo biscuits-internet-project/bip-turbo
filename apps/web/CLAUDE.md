@@ -67,6 +67,19 @@ For a glass surface in markup use the `.glass` / `.glass-secondary` /
 glass utility, register the token in `@theme` first, and the class will work
 everywhere.
 
+**Tailwind variants do not compose with these classes either.** `.glass` and
+friends are plain class selectors inside `@layer components`, not `@utility`
+declarations, so `hover:glass-content` generates no rule at all and is inert in
+exactly the same silent way. To vary a glass surface on hover, name the tokens
+directly (`bg-[var(--glass-bg-secondary)] hover:bg-green-500/10`) rather than
+wearing the class; see `UNATTENDED_CHROME` in
+[setlist-card.tsx](app/components/setlist/setlist-card.tsx). That is also the
+workaround for the `!important` these classes carry, which is load-bearing:
+utilities beat `@layer components` on layer order, so without it any `bg-*` or
+`border-*` utility on the element would erase the surface. The same `!important`
+is why a `hover:border-*` or `border-dashed` set beside one of these classes
+never renders.
+
 ## Testing: assert state, never a Tailwind class
 
 **Never assert a `className` contains a Tailwind utility** (`toContain("bg-x")`,

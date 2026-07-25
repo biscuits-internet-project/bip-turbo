@@ -250,20 +250,6 @@ html body[data-scroll-locked] {
     --glass-border: hsla(263, 40%, 65%, 0.2); /* Lighter and more subtle purple borders for dark mode */
   }
 
-  /* Override the Tailwind background utility */
-  .bg-sidebar {
-    background-color: transparent !important;
-  }
-
-  /* Remove all backgrounds from sidebar and its children */
-  [data-sidebar] {
-    background: none !important;
-  }
-
-  [data-sidebar] * {
-    background: none !important;
-  }
-
   * {
     border-color: hsl(var(--border));
   }
@@ -278,27 +264,6 @@ html body[data-scroll-locked] {
 
   html {
     position: relative;
-  }
-
-  /* Remove sidebar background completely */
-  html [data-sidebar="sidebar"],
-  html .bg-sidebar,
-  html div[data-sidebar="sidebar"],
-  html [data-variant="sidebar"],
-  html [data-variant="floating"],
-  html [data-variant="inset"],
-  html [class*="bg-sidebar"],
-  html [class*="group-data-[variant=floating]:bg-sidebar"] {
-    background: transparent !important;
-    background-color: transparent !important;
-    backdrop-filter: blur(12px);
-  }
-
-  /* Remove background from any nested elements */
-  html [data-sidebar="sidebar"] *,
-  html .bg-sidebar * {
-    background: transparent !important;
-    background-color: transparent !important;
   }
 
   /* Ensure content stays above the laser effect */
@@ -336,41 +301,12 @@ html body[data-scroll-locked] {
     font-family: var(--font-mono);
   }
 
-  /* Style the sidebar title */
-  [data-sidebar="sidebar"] .text-lg {
-    font-family: var(--font-heading);
-    font-weight: 400; /* Monoton only comes in regular weight */
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    line-height: 1.4;
-  }
-
-  /* Style navigation items with Monoton font */
-  html [data-sidebar="sidebar"] nav a span {
-    font-family: var(--font-body) !important;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-transform: none;
-    opacity: 0.7;
-    font-size: 0.9em;
-    transition: opacity 0.2s ease;
-    line-height: normal;
-  }
-
-  /* Add hover effect */
-  html [data-sidebar="sidebar"] nav a:hover span {
-    opacity: 1;
-  }
-
-  /* Ensure proper spacing between nav items */
-  html [data-sidebar="sidebar"] nav a {
-    margin-bottom: 0.5em;
-  }
-
-  /* Navigation specific styles - outside of any nested rules */
-  nav[role="navigation"] a span,
-  [data-sidebar] nav a span,
-  .sidebar nav a span,
+  /* Navigation link labels: the header bar, and the in-page table-of-contents
+     navs on the resources pages. It targets the `span` itself, so it outranks
+     font utilities set on the enclosing anchor and inherited down. A header nav
+     link carrying `text-lg font-semibold` still renders its label at 0.9em and
+     weight 400. The `!important` is what holds these against a font utility
+     placed directly on the span, which would otherwise win on layer order. */
   nav a span {
     font-family: var(--font-body) !important;
     font-weight: 400 !important;
@@ -379,19 +315,6 @@ html body[data-scroll-locked] {
     opacity: 0.7;
     font-size: 0.9em;
     line-height: normal;
-  }
-
-  /* Add hover effect */
-  nav[role="navigation"] a:hover span,
-  [data-sidebar] nav a:hover span {
-    opacity: 1;
-  }
-
-  /* Add spacing between items */
-  nav[role="navigation"] a,
-  [data-sidebar] nav a {
-    margin-bottom: 0.5em;
-    display: block;
   }
 
   /* Custom keyframes for animations */
@@ -472,7 +395,23 @@ html body[data-scroll-locked] {
 }
 
 @layer components {
-  /* Glass-morphism Utility Classes */
+  /* Glass-morphism surface classes.
+   *
+   * The `!important` throughout this layer is load-bearing, not legacy. Tailwind
+   * declares `@layer theme, base, components, utilities`, so a utility beats
+   * anything here on layer order alone, whatever its specificity. Without
+   * `!important` a single `bg-*` or `border-*` utility on the same element would
+   * silently erase the surface.
+   *
+   * The cost is that it cuts the other way too: the `border` shorthand outranks
+   * border-color, -style and -width utilities, so a `hover:border-*` or
+   * `border-dashed` set alongside one of these classes never renders. To vary a
+   * surface on hover, name the tokens directly instead of wearing the class.
+   * See `UNATTENDED_CHROME` in components/setlist/setlist-card.tsx.
+   *
+   * These are plain class selectors, not `@utility` declarations, so Tailwind
+   * variants do not compose with them: `hover:glass-content` generates nothing.
+   */
   .glass {
     background-color: var(--glass-bg) !important;
     border: 1px solid var(--glass-border) !important;
@@ -495,10 +434,9 @@ html body[data-scroll-locked] {
   }
 
   /* The auth form field surface (login / register / password reset). A frosted
-     purple glass that matches the translucent auth card — kept separate from
-     the card/panel `glass-content` token so restyling content surfaces never
-     touches auth inputs. `!important` overrides the shadcn Input base
-     (`bg-background` / `border-input`). */
+     purple glass that matches the translucent auth card, kept separate from the
+     card/panel `glass-content` token so restyling content surfaces never
+     touches auth inputs. */
   .auth-input {
     background-color: var(--content-glass) !important;
     border: 1px solid var(--content-glass-border) !important;
