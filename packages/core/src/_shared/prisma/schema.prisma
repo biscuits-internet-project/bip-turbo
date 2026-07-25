@@ -977,6 +977,36 @@ model RatingSettings {
   @@map("rating_settings")
 }
 
+/// Same-person rater identities: one row per normalized username, naming the identity
+/// (`groupKey`) that username's votes fold into. `aliasKey` reads these, so this table
+/// is what makes "one human, one vote" work across a person's several logins.
+///
+/// `merged = false` holds a normalized username OUT of merging, so each account sharing
+/// that name stays its own identity — the hold-out case for a name whose accounts might
+/// be different people.
+///
+/// `source = 'curated'` rows are hand-decided; `'email_detector'` rows are written by the
+/// prod-only duplicate-account job, which proves one inbox from an email address local can
+/// never see. `namespaceFingerprint` is a salted hash so two groups under different alias
+/// subdomains stay distinguishable without publishing either subdomain.
+model RaterAliasGroup {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  normalizedUsername   String   @unique(map: "rater_alias_groups_normalized_username_unique") @map("normalized_username") @db.VarChar
+  groupKey             String   @map("group_key") @db.VarChar
+  merged               Boolean  @default(true)
+  source               String   @default("curated") @db.VarChar
+  reasonCodes          String[] @default([]) @map("reason_codes")
+  namespaceSignal      String?  @map("namespace_signal") @db.VarChar
+  namespaceFingerprint String?  @map("namespace_fingerprint") @db.VarChar
+  note                 String?
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@index([groupKey])
+  @@index([updatedAt])
+  @@map("rater_alias_groups")
+}
+
 /// Scope a RaterStats row is computed at: GLOBAL spans all of a user's ratings;
 /// the others are the Disco Biscuits drummer eras. Mirrors RaterEra in @bip/domain.
 enum RaterEra {

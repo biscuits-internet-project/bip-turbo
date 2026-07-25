@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 vi.mock("~/server/services", () => ({ services: {} }));
+vi.mock("~/server/env", () => ({ env: {} }));
 
 const { action } = await import("./$action");
 
@@ -26,6 +27,7 @@ describe("cron action route", () => {
     expect(response.status).toBe(404);
     expect(body.error).toContain("Unknown cron action: community-refresh");
     expect(body.error).toContain("recompute-ratings");
+    expect(body.error).toContain("detect-duplicate-accounts");
   });
 
   // Cron endpoints are only reachable by the GitHub Actions curl; anything

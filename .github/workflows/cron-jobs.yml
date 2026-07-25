@@ -11,17 +11,22 @@ on:
         type: choice
         options:
           - recompute-ratings
+          - detect-duplicate-accounts
       timeout:
         description: 'Timeout in minutes'
         required: false
         default: '10'
         type: string
   
-  # Scheduled triggers
+  # Scheduled triggers. Each cron expression maps to one job below, so adding a
+  # schedule means adding its expression to that mapping too.
   schedule:
     # Run the ratings recompute every hour (dirty-gated server-side, so it's
     # a cheap no-op when no ratings changed)
     - cron: '0 * * * *'
+    # Look for duplicate rater accounts weekly, Mondays at 09:00 UTC. Signups are
+    # rare and the findings are read by hand, so daily would just be churn.
+    - cron: '0 9 * * 1'
 
 env:
   PRODUCTION_URL: 'https://discobiscuits.net'
@@ -33,9 +38,16 @@ jobs:
     timeout-minutes: ${{ fromJSON(github.event.inputs.timeout || '10') }}
     
     steps:
+      # GitHub fires one run per matching cron expression, so the two schedules
+      # produce two independent runs even when they coincide (Mondays at 09:00).
       - name: Set job from schedule
         if: github.event_name == 'schedule'
-        run: echo "CRON_JOB=recompute-ratings" >> $GITHUB_ENV
+        run: |
+          case "${{ github.event.schedule }}" in
+            "0 9 * * 1") job=detect-duplicate-accounts ;;
+            *)           job=recompute-ratings ;;
+          esac
+          echo "CRON_JOB=$job" >> $GITHUB_ENV
 
       - name: Set job from manual trigger
         if: github.event_name == 'workflow_dispatch'

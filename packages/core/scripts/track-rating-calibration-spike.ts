@@ -1,5 +1,6 @@
 import { type DrummerEra, drummerEraForDate, shrinkToward } from "@bip/domain";
 import prisma from "../src/_shared/prisma/client";
+import { AliasRulesetService } from "../src/ratings/alias-ruleset-service";
 import { aliasKey, mostRecentPerKey } from "../src/ratings/rater-aliases";
 import { computeShowWeighted, type RaterScopeStat, type StatByUserEra } from "../src/ratings/rater-weight-service";
 import {
@@ -464,11 +465,12 @@ async function buildCanonicalUserMap(): Promise<Map<string, string>> {
     select: { id: true, username: true },
   });
   const counts = await prisma.rating.groupBy({ by: ["userId"], _count: { id: true } });
+  const ruleset = await new AliasRulesetService(prisma).get();
   const ratingCount = new Map(counts.map((count) => [count.userId, count._count.id]));
   const groups = new Map<string, Array<{ id: string; n: number }>>();
   for (const user of users) {
     if (!user.username) continue;
-    const key = aliasKey(user.username, user.id);
+    const key = aliasKey(user.username, user.id, ruleset);
     const group = groups.get(key) ?? [];
     group.push({ id: user.id, n: ratingCount.get(user.id) ?? 0 });
     groups.set(key, group);
@@ -901,7 +903,12 @@ async function main(): Promise<void> {
   const minDistRatings = Number(process.env.MIN_DIST_RATINGS ?? 5);
   const minShared = Number(process.env.MIN_SHARED ?? 20);
   const gamma = Number(process.env.GAMMA ?? 3);
-  const email = process.env.USER_EMAIL ?? "evan@foo.net";
+  // Opt-in only, and never defaulted to a real address: the two personal reports below
+  // look one account up by email, and a committed default would put a real address in a
+  // public repo. Empty also can't be passed through — `findFirst({ where: { email:
+  // undefined } })` is an unfiltered query that would return an arbitrary user and label
+  // their votes as yours.
+  const email = process.env.USER_EMAIL;
 
   const canonical = await buildCanonicalUserMap();
   const ratings = await loadTrackRatings(canonical);
@@ -936,8 +943,12 @@ async function main(): Promise<void> {
 
   distributionReport(ratings, full, minDistRatings);
   await discriminationReport(ratings, full, minRatings);
-  await raterSimilarityReport(ratings, canonical, email, minShared);
-  await zeroPointFiveReport(ratings, full, canonical, email);
+  if (email) {
+    await raterSimilarityReport(ratings, canonical, email, minShared);
+    await zeroPointFiveReport(ratings, full, canonical, email);
+  } else {
+    console.log("\nPersonal reports — skipped (set USER_EMAIL to include them)");
+  }
   variantSweepReport(ratings, { gamma, repeats, minPerHalf, minDistRatings });
   await allFivesShowDemo(ratings, gamma, 5, 5);
 

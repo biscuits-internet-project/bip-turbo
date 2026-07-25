@@ -6,6 +6,7 @@ import { BlogPostService } from "../blog-posts/blog-post-service";
 import { FileService } from "../files/file-service";
 import { InstrumentService, MusicianService } from "../musicians/musician-service";
 import { SongPageComposer } from "../page-composers/song-page-composer";
+import { AliasRulesetService } from "../ratings/alias-ruleset-service";
 import { RaterWeightService } from "../ratings/rater-weight-service";
 import { RatingService } from "../ratings/rating-service";
 import { ReviewService } from "../reviews/review-service";
@@ -50,6 +51,7 @@ export interface Services {
   rockOperas: RockOperaService;
   ratings: RatingService;
   raterWeights: RaterWeightService;
+  aliasRules: AliasRulesetService;
   attendances: AttendanceService;
   songPageComposer: SongPageComposer;
   tourDatesService: TourDatesService;
@@ -87,9 +89,15 @@ export function createServices(container: ServiceContainer): Services {
   const nugsService = new NugsService(container.redis, container.logger);
   const archiveDotOrgService = new ArchiveDotOrgService(container.redis, container.logger);
 
+  // One shared alias-ruleset loader so both rating services read the same-person
+  // merge rules from one memo instead of querying the table per aggregate. Both
+  // MUST receive it: without it they fold login variants only, silently
+  // un-merging every curated duplicate account.
+  const aliasRulesetService = new AliasRulesetService(container.db);
+
   // RaterWeightService is constructed before RatingService so rating mutations
   // can flag the calibrated-rating tables dirty + recompute the touched show.
-  const raterWeightService = new RaterWeightService(container.db);
+  const raterWeightService = new RaterWeightService(container.db, aliasRulesetService);
 
   return {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
@@ -114,8 +122,9 @@ export function createServices(container: ServiceContainer): Services {
     personalSongHistory: new PersonalSongHistoryService(container.db, container.cache),
     reviews: new ReviewService(container.db, container.logger),
     rockOperas: rockOperaService,
-    ratings: new RatingService(container.db, raterWeightService),
+    ratings: new RatingService(container.db, raterWeightService, aliasRulesetService),
     raterWeights: raterWeightService,
+    aliasRules: aliasRulesetService,
     attendances: new AttendanceService(container.db, container.logger),
     songPageComposer: new SongPageComposer(container.db, songService, statsService),
     tourDatesService: new TourDatesService(container.redis),

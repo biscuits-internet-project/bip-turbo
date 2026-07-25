@@ -270,6 +270,20 @@ const tools = [
     },
   },
   {
+    name: "list_rater_alias_groups_since",
+    description:
+      "Paginated listing of the same-person rater merge rules (normalized username, identity key, reason codes, redacted namespace signal). Non-PII by construction — no email addresses. Used by the local sync script so local dedupes ratings exactly as prod does.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
+        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
+        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
+      },
+      required: ["since"],
+    },
+  },
+  {
     name: "list_attendances_since",
     description:
       "Paginated listing of attendance rows (id, userId, showId, timestamps) updated after a given time. Used by the local sync script.",
@@ -922,6 +936,25 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       const last = rows[rows.length - 1];
       return {
         ratings: rows,
+        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
+      };
+    }
+
+    // Every column of a merge rule is publishable (see AliasRulesetService.listForSync),
+    // so like the other sync tools this passes the service projection through directly.
+    case "list_rater_alias_groups_since": {
+      const since = new Date(args.since as string);
+      const cursor = decodeSyncCursor(args.cursor as string | undefined);
+      const limit = clampSyncLimit(args.limit);
+      const rows = await services.aliasRules.listForSync({
+        since,
+        cursorId: cursor?.id,
+        cursorUpdatedAt: cursor?.updatedAt,
+        limit,
+      });
+      const last = rows[rows.length - 1];
+      return {
+        raterAliasGroups: rows,
         nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
       };
     }
