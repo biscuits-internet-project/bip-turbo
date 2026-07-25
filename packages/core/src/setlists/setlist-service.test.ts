@@ -948,7 +948,7 @@ describe("Setlist.show payload weight", () => {
   // (sets[].tracks, lineup, venue), so spreading them onto `show` doubled the
   // cached payload — ~60% of a 50-show blob — while the declared `Show` return
   // type hid it (excess-property checks don't apply to spreads).
-  test("omits the raw query relations and search text from the mapped show", async () => {
+  test("omits the raw query relations and non-domain columns from the mapped show", async () => {
     const db = makeMockDb();
     const service = new SetlistService(db as never, makeRockOperaStub());
     db.show.findUnique.mockResolvedValue({
@@ -970,7 +970,7 @@ describe("Setlist.show payload weight", () => {
       countForStats: true,
       dayOrder: null,
       duration: null,
-      searchText: "2024-07-26 red rocks morrison co",
+      weightedRating: 4.2,
       tracks: [],
       showMusicians: [],
       venue: {
@@ -989,7 +989,7 @@ describe("Setlist.show payload weight", () => {
     expect(setlist?.show).not.toHaveProperty("tracks");
     expect(setlist?.show).not.toHaveProperty("showMusicians");
     expect(setlist?.show).not.toHaveProperty("venue");
-    expect(setlist?.show).not.toHaveProperty("searchText");
+    expect(setlist?.show).not.toHaveProperty("weightedRating");
     // The fields the pages actually render still come through.
     expect(setlist?.show.averageRating).toBe(4.5);
     expect(setlist?.show.ratingsCount).toBe(12);
