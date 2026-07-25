@@ -3,6 +3,7 @@ import type { DehydratedState } from "@tanstack/react-query";
 import { Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BlogCard } from "~/components/blog/blog-card";
+import { CollapsiblePodcastCard, PodcastCard } from "~/components/home/podcast-card";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
 import { Card, cardVariants } from "~/components/ui/card";
@@ -10,6 +11,7 @@ import { DonationBanner } from "~/components/ui/donation-banner";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
+import { isNewPodcastEpisode } from "~/lib/podcast-recency";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { ROCK_OPERA_SLUG, rockOperaPath } from "~/lib/rock-operas";
@@ -25,8 +27,9 @@ interface LoaderData {
   desktopRecentShows: Setlist[];
   recentBlogPosts: Array<BlogPostWithUser>;
   latestEpisode: AcastEpisode | null;
+  /** Whether `latestEpisode` is fresh enough to open the mobile podcast card. */
+  isNewEpisode: boolean;
   nextTourDate: TourDate | null;
-  recentShows: Setlist[];
   onThisDayCounts: { showCount: number; allTimerCount: number };
   externalSources: Record<string, ShowExternalSources>;
   dehydratedState: DehydratedState;
@@ -39,10 +42,6 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
   // Find next tour date (first upcoming show)
   const now = new Date();
   const nextTourDate = allTourDates.find((date) => new Date(date.date) >= now) || null;
-
-  // Get recent setlists from last 3 days
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
   // Cache the recent setlists (core show data only - user-specific data
   // handled separately). Light payload: the cards use none of the full
@@ -63,12 +62,6 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
   );
 
   logger.info(`Home page setlists loaded: ${recentSetlists.length} shows`);
-
-  // Filter to shows from last 3 days
-  const recentShows = recentSetlists.filter((setlist) => {
-    const showDate = new Date(setlist.show.date);
-    return showDate >= threeDaysAgo;
-  });
 
   // Limit to next 8 upcoming dates for home page
   const tourDates = allTourDates.slice(0, 8);
@@ -104,11 +97,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
   // Collect every show id rendered on the page so we seed the client's
   // React Query cache with attendance/rating data in one server-side fetch.
   const allShowIds = [
-    ...new Set([
-      ...recentShows.map((s) => s.show.id),
-      ...mobileRecentShows.map((s) => s.show.id),
-      ...desktopRecentShows.map((s) => s.show.id),
-    ]),
+    ...new Set([...mobileRecentShows.map((s) => s.show.id), ...desktopRecentShows.map((s) => s.show.id)]),
   ];
 
   const queryClient = createPrefetchClient();
@@ -118,6 +107,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
   });
 
   const latestEpisode = await getLatestPodcastEpisode();
+  const isNewEpisode = latestEpisode ? isNewPodcastEpisode(latestEpisode.publishDate, now) : false;
 
   const today = new Date();
   const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -130,7 +120,7 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     { ttl: 3600 },
   );
 
-  const shownSetlists = [...recentShows, ...desktopRecentShows, ...mobileRecentShows];
+  const shownSetlists = [...desktopRecentShows, ...mobileRecentShows];
   const externalSources = await computeShowExternalSources(
     shownSetlists.map((s) => s.show).filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i),
   );
@@ -141,8 +131,8 @@ export const loader = publicLoader<LoaderData>(async ({ context }) => {
     desktopRecentShows,
     recentBlogPosts,
     latestEpisode,
+    isNewEpisode,
     nextTourDate,
-    recentShows,
     onThisDayCounts,
     externalSources,
     dehydratedState: dehydrateAndClear(queryClient),
@@ -160,8 +150,8 @@ export default function Index() {
     desktopRecentShows = [],
     recentBlogPosts = [],
     latestEpisode,
+    isNewEpisode,
     nextTourDate,
-    recentShows = [],
     onThisDayCounts,
     externalSources,
   } = useSerializedLoaderData<LoaderData>();
@@ -169,41 +159,14 @@ export default function Index() {
   return (
     <div className="w-full p-0">
       {/* Hero section */}
-      <div className="pt-0 pb-3 text-center mb-4 md:mb-8">
+      <div className="pt-0 pb-1 text-center mb-2 md:pb-3 md:mb-8">
         <h1 className="text-3xl md:text-5xl font-bold font-tron-audiowide tron-outline-brand text-black">
           BISCUITS INTERNET PROJECT 3.0
         </h1>
       </div>
 
       {/* Donation Banner */}
-      <DonationBanner className="mb-6" />
-
-      {/* Recent Shows - Only on mobile */}
-      <div className="md:hidden">
-        <div className="mb-6">
-          <div className="space-y-4">
-            <SetlistList setlists={recentShows.slice(0, 2)} externalSources={externalSources} />
-          </div>
-        </div>
-
-        {/* Next Show Banner - Mobile only */}
-        {nextTourDate && (
-          <div className="mb-6">
-            <Card>
-              <div className="p-4 text-center">
-                <div className="flex items-center justify-center mb-1">
-                  <Calendar className="h-4 w-4 mr-2 text-brand-primary" />
-                  <h3 className="text-sm font-semibold text-brand-primary">Next Show</h3>
-                </div>
-                <div className="text-lg font-bold text-content-text-primary">{nextTourDate.formattedStartDate}</div>
-                <div className="text-sm text-content-text-secondary">
-                  {nextTourDate.venueName} • {nextTourDate.address}
-                </div>
-              </div>
-            </Card>
-          </div>
-        )}
-      </div>
+      <DonationBanner className="mb-4 md:mb-6" />
 
       {/* Desktop Layout */}
       <div className="hidden md:block">
@@ -217,7 +180,7 @@ export default function Index() {
                   to="/shows"
                   className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
                 >
-                  View all shows →
+                  All Shows →
                 </Link>
                 {onThisDayCounts.showCount > 0 && (
                   <Link
@@ -258,44 +221,7 @@ export default function Index() {
                   </Link>
                 </div>
 
-                <div className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}>
-                  {latestEpisode.image && (
-                    <div className="relative">
-                      <img src={latestEpisode.image} alt={latestEpisode.title} className="w-full h-32 object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      <div className="absolute bottom-2 left-3 right-3">
-                        <h4 className="text-white text-sm font-semibold line-clamp-2">{latestEpisode.title}</h4>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4">
-                    <div
-                      className="text-content-text-secondary text-sm mb-3 line-clamp-3"
-                      dangerouslySetInnerHTML={{ __html: latestEpisode.description }}
-                    />
-
-                    <div className="flex justify-between items-center">
-                      <div className="text-content-text-tertiary text-xs">
-                        {Math.floor(latestEpisode.duration / 60)} min •{" "}
-                        {latestEpisode.publishDate
-                          ? new Date(latestEpisode.publishDate).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })
-                          : ""}
-                      </div>
-                      <a
-                        href={latestEpisode.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-primary hover:text-brand-secondary text-xs font-medium hover:underline transition-colors"
-                      >
-                        Listen →
-                      </a>
-                    </div>
-                  </div>
-                </div>
+                <PodcastCard episode={latestEpisode} />
               </div>
             )}
 
@@ -394,71 +320,48 @@ export default function Index() {
       </div>
 
       {/* Mobile Layout */}
-      <div className="md:hidden space-y-8">
-        {/* Latest Podcast Episode - Mobile */}
-        {latestEpisode && (
-          <div>
-            <div className="mb-4">
-              <h2 className="text-xl font-bold">Touchdowns All Day Podcast</h2>
-              <Link
-                to="/resources/touchdowns"
-                className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
-              >
-                View all episodes →
-              </Link>
-            </div>
-
-            <div className={cardVariants({ variant: "elevated", className: "rounded-lg overflow-hidden" })}>
-              {latestEpisode.image && (
-                <div className="relative">
-                  <img src={latestEpisode.image} alt={latestEpisode.title} className="w-full h-32 object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="absolute bottom-2 left-3 right-3">
-                    <h3 className="text-white text-sm font-semibold line-clamp-2">{latestEpisode.title}</h3>
-                  </div>
+      <div className="md:hidden space-y-6">
+        {/* The two compact status rows sit tighter to each other than to the
+            content sections below, so they read as one block under the hero
+            rather than as two more full sections. */}
+        <div className="space-y-3">
+          {/* Next Show Banner - Mobile */}
+          {nextTourDate && (
+            <Card>
+              <div className="px-4 py-3 text-center">
+                {/* Centered, not baseline-aligned: the heading is itself a flex
+                    row led by an icon, so its synthesized baseline is the icon's
+                    bottom edge rather than the text's, which drops the date. */}
+                <div className="flex flex-wrap items-center justify-center gap-x-3">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold text-brand-primary">
+                    <Calendar className="h-4 w-4" />
+                    Next Show
+                  </h3>
+                  <span className="text-base font-bold text-content-text-primary">
+                    {nextTourDate.formattedStartDate}
+                  </span>
                 </div>
-              )}
-
-              <div className="p-4">
-                <div
-                  className="text-content-text-secondary text-sm mb-3 line-clamp-2"
-                  dangerouslySetInnerHTML={{ __html: latestEpisode.description }}
-                />
-
-                <div className="flex justify-between items-center">
-                  <div className="text-content-text-tertiary text-xs">
-                    {Math.floor(latestEpisode.duration / 60)} min •{" "}
-                    {latestEpisode.publishDate
-                      ? new Date(latestEpisode.publishDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })
-                      : ""}
-                  </div>
-                  <a
-                    href={latestEpisode.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-brand-primary hover:text-brand-secondary text-xs font-medium hover:underline transition-colors"
-                  >
-                    Listen →
-                  </a>
+                <div className="text-sm text-content-text-secondary">
+                  {nextTourDate.venueName} • {nextTourDate.address}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            </Card>
+          )}
 
-        {/* Recent Shows Section - Mobile (limited to 2 shows) */}
+          {/* Latest Podcast Episode - Mobile */}
+          {latestEpisode && <CollapsiblePodcastCard episode={latestEpisode} isNew={isNewEpisode} />}
+        </div>
+
+        {/* Recent Shows Section - Mobile */}
         <div>
-          <div className="mb-6">
+          <div className="mb-4">
             <h2 className="text-xl font-bold">Recent Shows</h2>
             <div className="flex gap-4">
               <Link
                 to="/shows"
                 className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors"
               >
-                View all shows →
+                All Shows →
               </Link>
               {onThisDayCounts.showCount > 0 && (
                 <Link
@@ -471,7 +374,7 @@ export default function Index() {
             </div>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-4">
             <SetlistList
               setlists={mobileRecentShows}
               externalSources={externalSources}
@@ -486,7 +389,7 @@ export default function Index() {
 
         {/* Upcoming Tour Dates Section - Mobile */}
         <div>
-          <div className="mb-6">
+          <div className="mb-4">
             <h2 className="text-xl font-bold">Upcoming Tour Dates</h2>
             <Link
               to="/shows/tour-dates"
@@ -530,7 +433,7 @@ export default function Index() {
 
         {/* Recent Blog Posts Section - Mobile */}
         <div>
-          <div className="mb-6">
+          <div className="mb-4">
             <h2 className="text-xl font-bold">Latest from the Blog</h2>
             <Link to="/blog" className="text-sm text-content-text-tertiary hover:text-brand-primary transition-colors">
               View all blog posts →
