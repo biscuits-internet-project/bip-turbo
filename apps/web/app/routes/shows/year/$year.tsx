@@ -2,7 +2,8 @@ import { CacheKeys, type Setlist } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ClientLoaderFunctionArgs } from "react-router";
+import type { ClientLoaderFunctionArgs, HeadersArgs } from "react-router";
+import { data } from "react-router";
 import { useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
@@ -45,34 +46,43 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 // Minimum characters required to trigger search
 const MIN_SEARCH_CHARS = 4;
 
-// Cache headers for CDN edge caching - different TTLs for current vs past years
-export function headers({ loaderHeaders, data }: { loaderHeaders: Headers; data: LoaderData | undefined }): Headers {
-  const headers = new Headers(loaderHeaders);
-  const loaderData = data;
-  const currentYear = new Date().getFullYear();
-  const isCurrentYear = loaderData?.year === currentYear;
-  const hasSearchQuery = !!loaderData?.searchQuery;
+/**
+ * Edge-cache policy for one year-listing response.
+ *
+ * Lives here rather than in the `headers` export because React Router's
+ * `HeadersArgs` carries only `loaderHeaders` / `parentHeaders` /
+ * `actionHeaders` / `errorHeaders`. A `headers` export cannot see loader data,
+ * so any policy that depends on the request has to be decided here and handed
+ * over as headers on the loader's own response.
+ */
+function yearListingCacheHeaders(url: URL, { isSearchResult }: { isSearchResult: boolean }): Record<string, string> {
+  // Search results are one-offs keyed by whatever someone typed. Caching them
+  // publicly fills the edge with single-use entries and serves a stale index
+  // to the next person who searches the same words.
+  if (isSearchResult) return { "Cache-Control": "private, no-cache" };
 
-  // Don't cache search results
-  if (hasSearchQuery) {
-    headers.set("Cache-Control", "private, no-cache");
-    return headers;
-  }
+  // Only the bare URL is purgeable: Cloudflare's cache key includes the query
+  // string, purge-by-URL matches a key exactly, and `purgeYearListings` emits
+  // exactly `/shows/year/:year` plus its `.data` twin. Every other spelling
+  // (any of the 3^5 media-filter combinations, a below-threshold `?q`, a
+  // tracking parameter) forks the key beyond a purge's reach, so it gets a TTL
+  // short enough to self-heal instead of a day-long one that cannot.
+  if (url.search !== "") return { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=300" };
 
-  // Current year: shorter cache (5 min CDN) since new shows may be added
-  // Past years: longer cache (1 day CDN) since data is stable
-  if (isCurrentYear) {
-    headers.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
-    headers.set("Cache-Tag", `year-${loaderData?.year}`);
-  } else {
-    headers.set("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600");
-    headers.set("Cache-Tag", `year-${loaderData?.year}`);
-  }
-
-  return headers;
+  return { "Cache-Control": "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600" };
 }
 
-export const loader = publicLoader(async ({ request, params, context }): Promise<LoaderData> => {
+/**
+ * Forward the loader's headers verbatim. Keep this a pure pass-through: adding
+ * request-dependent logic here means reading a `data` field that `HeadersArgs`
+ * does not have, which yields `undefined` and silently picks the wrong branch.
+ * Route-level policy belongs in {@link yearListingCacheHeaders}.
+ */
+export function headers({ loaderHeaders }: HeadersArgs): Headers {
+  return loaderHeaders;
+}
+
+export const loader = publicLoader(async ({ request, params, context }) => {
   const url = new URL(request.url);
   const year = params.year || new Date().getFullYear();
   const yearInt = Number.parseInt(year as string, 10);
@@ -106,7 +116,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
       queryKey: showUserDataQueryKey(searchShowIds),
       queryFn: () => computeShowUserData(context, searchShowIds),
     });
-    return {
+    const searchPayload: LoaderData = {
       setlists,
       year: yearInt,
       searchQuery,
@@ -116,6 +126,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
       filters,
       dehydratedState: dehydrateAndClear(searchClient),
     };
+    return data(searchPayload, { headers: yearListingCacheHeaders(url, { isSearchResult: true }) });
   }
 
   // Cache one unfiltered set per (year, sort). All five media/source filters
@@ -158,7 +169,7 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     queryFn: () => computeShowUserData(context, filteredShowIds),
   });
 
-  return {
+  const payload: LoaderData = {
     setlists: filteredSetlists,
     year: yearInt,
     externalSources,
@@ -167,10 +178,13 @@ export const loader = publicLoader(async ({ request, params, context }): Promise
     filters,
     dehydratedState: dehydrateAndClear(queryClient),
   };
+  return data(payload, { headers: yearListingCacheHeaders(url, { isSearchResult: false }) });
 });
 
-export function meta({ data }: { data: LoaderData }) {
-  return getShowsMeta(data.year, data.searchQuery);
+// Destructured as `loaderData` because `data` is the React Router helper this
+// module imports to attach cache headers.
+export function meta({ data: loaderData }: { data: LoaderData }) {
+  return getShowsMeta(loaderData.year, loaderData.searchQuery);
 }
 
 // Client loader enables hydration when page is served from CDN cache

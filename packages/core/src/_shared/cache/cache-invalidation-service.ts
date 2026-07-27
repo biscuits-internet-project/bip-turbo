@@ -65,7 +65,7 @@ export class CacheInvalidationService {
    *
    * `years` lists the calendar years whose `/shows/year/:year` Cloudflare
    * edge entries need purging — typically the year(s) of the mutated show.
-   * Pass an empty array when no year tag is affected; the Redis layer is
+   * Pass an empty array when no year listing is affected; the Redis layer is
    * purged unconditionally.
    */
   async invalidateShowListings(years: number[]): Promise<void> {
@@ -202,7 +202,7 @@ export class CacheInvalidationService {
    * Bulk invalidation for multiple shows (useful for admin operations).
    *
    * Each show carries a `date` (preferred — Show.date is `YYYY-MM-DD`) or
-   * a `slug` that starts with the date; both feed the Cloudflare year-tag
+   * a `slug` that starts with the date; both feed the Cloudflare year-listing
    * purge so every affected year's listing is evicted.
    */
   async invalidateShows(shows: Array<{ id: string; slug?: string; date?: string | Date }>): Promise<void> {

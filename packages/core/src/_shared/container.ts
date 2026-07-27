@@ -36,6 +36,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
     {
       zoneId: env.CLOUDFLARE_ZONE_ID,
       apiToken: env.CLOUDFLARE_CACHE_PURGE_TOKEN,
+      siteUrl: env.BASE_URL,
     },
     logger,
   );
