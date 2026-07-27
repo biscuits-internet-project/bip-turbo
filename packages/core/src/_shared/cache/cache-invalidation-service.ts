@@ -77,6 +77,7 @@ export class CacheInvalidationService {
       this.cache.del(CacheKeys.stats.showsByYear()), // shows-per-year aggregate is tied to the show catalog
       this.cache.del(CacheKeys.stats.showDates()), // sorted stats-show-dates array backs Gap to Now on /songs
       this.cache.del(CacheKeys.stats.songPlayDates()), // catalog play-history blob backs gap-chart Played Before column
+      this.cache.del(CacheKeys.shows.statsRows()), // shows stats table holds every show's rating, duration, and gap numbers
       // Per-user attended-setlists caches include each show's setlist + venue;
       // wipe them all when any show metadata moves.
       this.cache.delPattern(CacheKeys.users.allAttendedSetlists()),
@@ -152,17 +153,21 @@ export class CacheInvalidationService {
   }
 
   /**
-   * Invalidate the performance-listing caches — All-Timers, Jam Charts, and
-   * the per-day On-This-Day all-timer lists. Each renders a per-track row (the
-   * Time column, plus all_timer / note membership), so any track mutation that
-   * changes a duration, the all_timer flag, or a note can stale them.
+   * Invalidate the performance-listing caches — All-Timers, Jam Charts, the
+   * per-day On-This-Day all-timer lists, and the shows stats table. Each
+   * renders a per-track row (the Time column, plus all_timer / note
+   * membership), so any track mutation that changes a duration, the all_timer
+   * flag, or a note can stale them.
    */
   async invalidatePerformanceListings(): Promise<void> {
-    this.logger.info("Invalidating performance-listing caches (all-timers, jam-charts, on-this-day)");
+    this.logger.info("Invalidating performance-listing caches (all-timers, jam-charts, on-this-day, shows stats)");
     await Promise.all([
       this.cache.del(CacheKeys.songs.allTimers()),
       this.cache.del(CacheKeys.songs.jamCharts()),
       this.cache.delPattern(CacheKeys.songs.jamChartsOnThisDayAll()),
+      // The stats table's Show time and Jam charts columns aggregate exactly
+      // these per-track fields.
+      this.cache.del(CacheKeys.shows.statsRows()),
     ]);
   }
 

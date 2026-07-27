@@ -126,4 +126,25 @@ describe("ShowExternalBadges", () => {
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
+
+  // The shows table shares a narrow fixed column between the whole strip, where
+  // a three-digit count squeezes the favicons out of the row. The badge keeps
+  // its camera and its tooltip; only the visible number goes.
+  test("hidePhotosCount drops the number but keeps the badge and its tooltip", async () => {
+    await setupWithRouter(
+      <ShowExternalBadges sources={{}} photosHref="/shows/2004-12-31#photos" photosCount={128} hidePhotosCount />,
+    );
+
+    const link = screen.getByRole("link", { name: "128 photos" });
+    expect(link).toHaveAttribute("href", "/shows/2004-12-31#photos");
+    expect(link.textContent).toBe("");
+    expect(screen.queryByText("128")).not.toBeInTheDocument();
+  });
+
+  // Without the flag the count still renders, so setlist cards are unaffected.
+  test("shows the count by default", async () => {
+    await setupWithRouter(<ShowExternalBadges sources={{}} photosHref="/shows/2004-12-31#photos" photosCount={128} />);
+
+    expect(screen.getByText("128")).toBeInTheDocument();
+  });
 });

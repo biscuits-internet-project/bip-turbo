@@ -1,4 +1,4 @@
-import type { SegueRecurrenceKind } from "@bip/domain";
+import type { SegueRecurrenceKind, ShowStatsRow } from "@bip/domain";
 import { CacheKeys, countSortedAfter } from "@bip/domain";
 import type { CacheService } from "../_shared/cache/cache-service";
 import type { DbClient } from "../_shared/database/models";
@@ -16,6 +16,7 @@ import {
   sortTracksForGapWalk,
   standalonePredicate,
 } from "../_shared/track-gap";
+import { mapShowStatsRow, type RawShowStatsRow, showStatsRowsSql } from "../shows/show-stats-rows";
 
 const ONE_DAY_SECONDS = 86400;
 
@@ -93,6 +94,26 @@ export class StatsService {
           out[row.year] = Number(row.count);
         }
         return out;
+      },
+      { ttl: ONE_DAY_SECONDS },
+    );
+  }
+
+  /**
+   * Every show with its setlist rarity numbers, newest first — the whole
+   * catalog in one payload, because the shows stats table sorts, filters, and
+   * paginates client-side. Roughly 2k rows / 640KB of JSON, so it's cached for
+   * a day and invalidated by show mutations via CacheInvalidationService.
+   */
+  async getShowStatsRows(): Promise<ShowStatsRow[]> {
+    if (!this.cache) {
+      throw new Error("StatsService.getShowStatsRows() requires a cache; constructed without one");
+    }
+    return this.cache.getOrSet(
+      CacheKeys.shows.statsRows(),
+      async () => {
+        const rows = await this.db.$queryRaw<RawShowStatsRow[]>(showStatsRowsSql());
+        return rows.map(mapShowStatsRow);
       },
       { ttl: ONE_DAY_SECONDS },
     );

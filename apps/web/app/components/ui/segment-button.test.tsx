@@ -1,7 +1,7 @@
-import { setup } from "@test/test-utils";
+import { setup, setupWithRouter } from "@test/test-utils";
 import { screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import { SegmentButton } from "./segment-button";
+import { SegmentButton, SegmentLink } from "./segment-button";
 
 describe("SegmentButton", () => {
   // aria-pressed reflects the `active` prop so screen readers announce the
@@ -50,5 +50,45 @@ describe("SegmentButton", () => {
     const button = container.querySelector("button");
     expect(button).not.toBeNull();
     expect(button).toHaveAttribute("type", "button");
+  });
+});
+
+describe("SegmentLink", () => {
+  // The navigating counterpart, for toggles where each segment is its own
+  // route rather than local state. `aria-current="page"` is the right state for
+  // a link pointing at the page you're already on — `aria-pressed` would claim
+  // it's a toggle button.
+  test("marks the active segment with aria-current, not aria-pressed", async () => {
+    await setupWithRouter(
+      <SegmentLink active={true} to="/shows/stats">
+        table
+      </SegmentLink>,
+    );
+
+    const link = screen.getByRole("link", { name: "table" });
+    expect(link).toHaveAttribute("aria-current", "page");
+    expect(link).not.toHaveAttribute("aria-pressed");
+  });
+
+  test("leaves aria-current off the inactive segment", async () => {
+    await setupWithRouter(
+      <SegmentLink active={false} to="/shows/year/2001">
+        setlist
+      </SegmentLink>,
+    );
+
+    expect(screen.getByRole("link", { name: "setlist" })).not.toHaveAttribute("aria-current");
+  });
+
+  // Renders a real anchor so the segment is middle-clickable and shareable —
+  // the whole reason this exists alongside the button form.
+  test("renders an anchor pointing at its destination", async () => {
+    await setupWithRouter(
+      <SegmentLink active={false} to="/shows/stats?timeRange=2001">
+        table
+      </SegmentLink>,
+    );
+
+    expect(screen.getByRole("link", { name: "table" })).toHaveAttribute("href", "/shows/stats?timeRange=2001");
   });
 });

@@ -13,9 +13,20 @@ import { cn } from "~/lib/utils";
  * Shared across every data-table numeric column (songs, gap-chart, performance)
  * so they read consistently.
  */
-export function NumberCell({ width, className, children }: { width: string; className?: string; children: ReactNode }) {
+export function NumberCell({
+  width,
+  className,
+  title,
+  children,
+}: {
+  width: string;
+  className?: string;
+  /** Hover explanation, for values that need a caveat (e.g. a partial total). */
+  title?: string;
+  children: ReactNode;
+}) {
   return (
-    <span className={cn("inline-block text-right tabular-nums", className)} style={{ minWidth: width }}>
+    <span className={cn("inline-block text-right tabular-nums", className)} style={{ minWidth: width }} title={title}>
       {children}
     </span>
   );

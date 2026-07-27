@@ -7,12 +7,10 @@ import { SelectFilter } from "~/components/ui/filters";
 import { GroupedToggleFilters } from "~/components/ui/filters/grouped-toggle-filters";
 import { ToggleFilterGroup } from "~/components/ui/filters/toggle-filter-group";
 import { Input } from "~/components/ui/input";
+import { filterLabelClass, filterSearchInputClass } from "~/lib/form-styles";
 import { STANDALONE_TOGGLE_KEY, TIME_RANGE_GROUPS, TOGGLE_FILTER_DEFINITIONS } from "~/lib/song-filters";
 
 const ALL_TOGGLE_FILTERS = TOGGLE_FILTER_DEFINITIONS as unknown as Array<{ key: string; label: string }>;
-
-const labelClass =
-  "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
 
 interface PerformanceFilterControlsProps {
   selectedTimeRange: string;
@@ -132,7 +130,7 @@ export function PerformanceFilterControls({
             placeholder="Search..."
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            className="w-full sm:w-auto sm:min-w-[250px] sm:max-w-md h-[34px] text-sm border text-white focus-visible:outline-none focus-visible:ring-1 placeholder:text-content-text-tertiary"
+            className={filterSearchInputClass}
           />
         )}
         {!hideTimeRange && (
@@ -148,7 +146,7 @@ export function PerformanceFilterControls({
         )}
         {selectedMusician !== undefined && (
           <div className="flex flex-col">
-            <label htmlFor="musician-search" className={labelClass}>
+            <label htmlFor="musician-search" className={filterLabelClass}>
               Musician
             </label>
             <MusicianSearch
@@ -185,7 +183,7 @@ export function PerformanceFilterControls({
         )}
         {selectedAuthor !== undefined && (
           <div className="flex flex-col">
-            <label htmlFor="author-search" className={labelClass}>
+            <label htmlFor="author-search" className={filterLabelClass}>
               Author
             </label>
             <AuthorSearch

@@ -40,6 +40,13 @@ interface ShowExternalBadgesProps {
   photosHref?: string;
   /** Count of photos attached to the show; suppresses the photos badge when zero. */
   photosCount?: number;
+  /**
+   * Drop the number beside the camera, keeping the icon as a plain "has photos"
+   * marker. Set where the strip shares a narrow fixed column with everything
+   * else (the shows table), since a three-digit count there squeezes the
+   * favicons out of the row.
+   */
+  hidePhotosCount?: boolean;
 }
 
 /**
@@ -64,6 +71,8 @@ interface PhotosBadgeProps {
   href: string | undefined;
   /** Count shown next to the camera icon; <= 0 collapses the badge. */
   count: number | undefined;
+  /** Render the icon alone; the count stays in the tooltip. */
+  hideCount?: boolean;
 }
 
 const BADGE_ICON_CLASS = "h-5 w-5 shrink-0";
@@ -102,7 +111,7 @@ export function FaviconLink({ domain, href, label }: FaviconLinkProps) {
  * it. An outline covers far fewer pixels than a filled tile, so at an equal
  * value it reads lighter — the extra step buys equal presence, not equal color.
  */
-function PhotosBadge({ href, count }: PhotosBadgeProps) {
+function PhotosBadge({ href, count, hideCount }: PhotosBadgeProps) {
   if (!href || !count || count <= 0) return null;
   return (
     <Link
@@ -112,7 +121,7 @@ function PhotosBadge({ href, count }: PhotosBadgeProps) {
     >
       <Camera className={BADGE_ICON_CLASS} />
       {/* Count crowds the icon strip on mobile; show it from `sm` up. */}
-      <span className="hidden sm:inline text-sm">{count}</span>
+      {!hideCount && <span className="hidden sm:inline text-sm">{count}</span>}
     </Link>
   );
 }
@@ -123,7 +132,7 @@ function PhotosBadge({ href, count }: PhotosBadgeProps) {
  * photos anchor. Returns null when nothing matches so listing pages don't
  * show an empty strip.
  */
-export function ShowExternalBadges({ sources, photosHref, photosCount }: ShowExternalBadgesProps) {
+export function ShowExternalBadges({ sources, photosHref, photosCount, hidePhotosCount }: ShowExternalBadgesProps) {
   const nugsUrls = sources.nugsUrls ?? [];
   const hasAny =
     nugsUrls.length > 0 ||
@@ -134,7 +143,9 @@ export function ShowExternalBadges({ sources, photosHref, photosCount }: ShowExt
   if (!hasAny) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    // Wraps rather than clips: nugs contributes one favicon per release, so the
+    // badge count isn't bounded by the number of services.
+    <div className="flex flex-wrap items-center gap-2">
       {/* One favicon per nugs release so dual-billed nights (Disco Biscuits +
           Tractorbeam) read as "two releases" at a glance — that double-icon
           is the cue users have asked for. Single-release nights look the same
@@ -154,7 +165,7 @@ export function ShowExternalBadges({ sources, photosHref, photosCount }: ShowExt
         label="Available on archive.org"
       />
       <FaviconLink domain={EXTERNAL_SOURCE_DOMAINS.relisten} href={sources.relistenUrl} label="Available on Relisten" />
-      <PhotosBadge href={photosHref} count={photosCount} />
+      <PhotosBadge href={photosHref} count={photosCount} hideCount={hidePhotosCount} />
     </div>
   );
 }

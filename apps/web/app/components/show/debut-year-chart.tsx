@@ -1,4 +1,4 @@
-import { average, median } from "@bip/domain";
+import { average, median, START_YEAR } from "@bip/domain";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -6,7 +6,6 @@ import { cardVariants } from "~/components/ui/card";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
 import { CHART_BAR_CURSOR, CHART_COLORS } from "~/lib/chart-colors";
-import { START_YEAR } from "~/lib/song-filters";
 
 type SongRef = { title: string; slug: string };
 

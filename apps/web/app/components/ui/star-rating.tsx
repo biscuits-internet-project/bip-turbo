@@ -6,6 +6,7 @@ import { useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
 import { usePreferences } from "~/hooks/use-preferences";
 import { useSession } from "~/hooks/use-session";
+import { withShowRating } from "~/hooks/use-show-user-data";
 import { ratingColor } from "~/lib/rating-colors";
 import { cn } from "~/lib/utils";
 import type { ShowUserDataResponse } from "~/server/show-user-data";
@@ -26,6 +27,15 @@ interface RatingResponse {
   userRating: number | null;
   averageRating: number | null;
   ratingsCount?: number;
+}
+
+/**
+ * The community average from a rating write, or null when the response didn't
+ * carry a complete one — in which case the cached average stays as it was.
+ */
+function freshAverage(data: RatingResponse): { average: number; count: number } | null {
+  if (data.averageRating === null || data.ratingsCount === undefined) return null;
+  return { average: data.averageRating, count: data.ratingsCount };
 }
 
 export function StarRating({
@@ -131,23 +141,9 @@ export function StarRating({
 
       // Update React Query cache with new rating data for this specific show
       if (rateableType === "Show") {
-        queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            userRatings: {
-              ...oldData.userRatings,
-              [rateableId]: data.userRating,
-            },
-            averageRatings: {
-              ...oldData.averageRatings,
-              [rateableId]:
-                data.averageRating !== null && data.ratingsCount !== undefined
-                  ? { average: data.averageRating, count: data.ratingsCount }
-                  : oldData.averageRatings[rateableId],
-            },
-          };
-        });
+        queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) =>
+          oldData ? withShowRating(oldData, rateableId, data.userRating, freshAverage(data)) : oldData,
+        );
       }
 
       // Revalidate to update any other cached data (skip for track ratings to avoid table re-render)
@@ -199,23 +195,9 @@ export function StarRating({
       // userRating so the badge drops the amber chrome without waiting for
       // a route revalidation.
       if (rateableType === "Show") {
-        queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) => {
-          if (!oldData) return oldData;
-          return {
-            ...oldData,
-            userRatings: {
-              ...oldData.userRatings,
-              [rateableId]: null,
-            },
-            averageRatings: {
-              ...oldData.averageRatings,
-              [rateableId]:
-                data.averageRating !== null && data.ratingsCount !== undefined
-                  ? { average: data.averageRating, count: data.ratingsCount }
-                  : oldData.averageRatings[rateableId],
-            },
-          };
-        });
+        queryClient.setQueriesData<ShowUserDataResponse>({ queryKey: ["shows", "user-data"] }, (oldData) =>
+          oldData ? withShowRating(oldData, rateableId, null, freshAverage(data)) : oldData,
+        );
       }
 
       if (!skipRevalidation) {

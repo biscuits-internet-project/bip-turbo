@@ -44,6 +44,11 @@ export const CacheKeys = {
 
     /** Show + all-timer counts for a calendar day (On This Day home page widget) */
     onThisDayCounts: (monthDay: string) => `shows:on-this-day-counts:${monthDay}`,
+
+    /** Every show with its setlist rarity numbers, backing the shows stats table */
+    // :v3 bump: the gap and vintage medians now match what a show's own page
+    // reports — one row per song, continuous median.
+    statsRows: () => `shows:stats-rows:v3`,
   },
 
   /**

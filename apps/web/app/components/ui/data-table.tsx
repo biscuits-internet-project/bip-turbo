@@ -8,6 +8,7 @@ import {
   getSortedRowModel,
   type RowData,
   type SortingState,
+  type Updater,
   useReactTable,
   type VisibilityState,
 } from "@tanstack/react-table";
@@ -48,6 +49,15 @@ declare module "@tanstack/react-table" {
      */
     headerClassName?: string;
     hideOnMobile?: boolean;
+    /**
+     * Wrapper width (px) below which this column hides entirely. Use when one
+     * `sm` cliff isn't enough — a table with many columns can fit its full set
+     * on a desktop, its core on a phone, and needs something in between for the
+     * tablet range, where `hideOnMobile` alone leaves every remaining column
+     * squeezed. `hideOnMobile` is the same mechanism pinned to `sm`; set one or
+     * the other, and `hideBelow` wins if both are present.
+     */
+    hideBelow?: number;
   }
 }
 
@@ -99,6 +109,37 @@ const SM_BREAKPOINT_PX = 640;
  * ignores the fixed columns), but the misalignment lasts one paint
  * before pixel measurement takes over.
  */
+/**
+ * Which columns survive at a given wrapper width, as a TanStack
+ * `columnVisibility` patch. A column declares its own floor via
+ * `meta.hideBelow`; `meta.hideOnMobile` is the same thing pinned to `sm`.
+ * Columns declaring neither aren't in the result at all, so they keep whatever
+ * visibility the table already had.
+ *
+ * `wrapperWidth` 0 means unmeasured — SSR and the first client paint, before
+ * the ResizeObserver fires. Everything shows then, so the table renders full
+ * rather than flashing its narrowest layout and expanding.
+ *
+ * Exported (like `computeColumnWidths`) because jsdom neither lays out nor
+ * fires ResizeObserver, so the only way to exercise the width branches is to
+ * drive them directly.
+ */
+export function computeColumnVisibility<TData, TValue>(
+  cols: readonly ColumnDef<TData, TValue>[],
+  wrapperWidth: number,
+): VisibilityState {
+  const visibility: VisibilityState = {};
+  for (const col of cols) {
+    const hideBelow = col.meta?.hideBelow ?? (col.meta?.hideOnMobile ? SM_BREAKPOINT_PX : undefined);
+    if (hideBelow === undefined) continue;
+    const identified = col as { id?: string; accessorKey?: string };
+    const id = identified.id ?? identified.accessorKey;
+    if (!id) continue;
+    visibility[id] = wrapperWidth === 0 || wrapperWidth >= hideBelow;
+  }
+  return visibility;
+}
+
 export function computeColumnWidths<TData, TValue>(
   cols: readonly { id: string; columnDef: ColumnDef<TData, TValue> }[],
   wrapperWidth: number,
@@ -149,6 +190,14 @@ interface DataTableProps<TData, TValue> {
    */
   rowAttributes?: (data: TData, index: number) => Record<string, string | undefined>;
   initialSorting?: SortingState;
+  /**
+   * Sort state owned by the caller. Pass alongside `onSortingChange` to drive
+   * sorting from somewhere outside the table — the shows table keeps it in the
+   * URL so a sorted view is shareable. Omit both and the table holds its own
+   * state, seeded from `initialSorting`.
+   */
+  sorting?: SortingState;
+  onSortingChange?: (next: SortingState) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -167,9 +216,19 @@ export function DataTable<TData, TValue>({
   rowClassName,
   rowAttributes,
   initialSorting,
+  sorting: controlledSorting,
+  onSortingChange,
   getRowId,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>(initialSorting ?? []);
+  const [internalSorting, setInternalSorting] = useState<SortingState>(initialSorting ?? []);
+  const sorting = controlledSorting ?? internalSorting;
+  // TanStack hands us either a value or an updater; resolve it before passing the
+  // result out, so a controlling caller only ever deals in plain sort state.
+  const setSorting = (updater: Updater<SortingState>) => {
+    const next = typeof updater === "function" ? updater(sorting) : updater;
+    if (onSortingChange) onSortingChange(next);
+    else setInternalSorting(next);
+  };
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   // `?all=1` opts the user into a single-page render of every row. `hidePagination`
@@ -197,24 +256,16 @@ export function DataTable<TData, TValue>({
     return () => ro.disconnect();
   }, []);
 
-  // Drop `hideOnMobile` columns below the `sm` breakpoint via TanStack's
-  // columnVisibility (not CSS) so `<colgroup>` indices stay aligned with
-  // the rendered TDs — CSS-hiding leaves phantom column slots in the
-  // colgroup that Chrome's table-fixed layout mis-allocates space to.
-  const hideOnMobileColumnIds = columns
-    .map((c) => (c.meta?.hideOnMobile ? (c as { id?: string; accessorKey?: string }) : null))
-    .filter((c): c is { id?: string; accessorKey?: string } => Boolean(c))
-    .map((c) => c.id ?? (c.accessorKey as string))
-    .filter(Boolean) as string[];
-  const isMobile = wrapperWidth > 0 && wrapperWidth < SM_BREAKPOINT_PX;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: hideOnMobileColumnIds is derived from columns and stable across renders for a given table.
+  // Drop columns below their declared width via TanStack's columnVisibility
+  // (not CSS) so `<colgroup>` indices stay aligned with the rendered TDs —
+  // CSS-hiding leaves phantom column slots in the colgroup that Chrome's
+  // table-fixed layout mis-allocates space to.
+  const responsiveVisibility = computeColumnVisibility(columns, wrapperWidth);
+  const responsiveVisibilityKey = JSON.stringify(responsiveVisibility);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: responsiveVisibility is keyed by its own serialization, so the effect reruns exactly when the decision changes.
   useEffect(() => {
-    setColumnVisibility((prev) => {
-      const next: VisibilityState = { ...prev };
-      for (const id of hideOnMobileColumnIds) next[id] = !isMobile;
-      return next;
-    });
-  }, [isMobile, hideOnMobileColumnIds.join(",")]);
+    setColumnVisibility((prev) => ({ ...prev, ...responsiveVisibility }));
+  }, [responsiveVisibilityKey]);
 
   const table = useReactTable({
     data,

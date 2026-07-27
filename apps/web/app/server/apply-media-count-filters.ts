@@ -1,18 +1,8 @@
 import type { Setlist } from "@bip/domain";
-import { isAnyTriStateActive, matchesTriState, type TriState } from "~/lib/tri-state-filter";
+import { type MediaCountFilterFlags, matchesMediaCounts } from "~/lib/show-source-filters";
+import { isAnyTriStateActive } from "~/lib/tri-state-filter";
 
-/**
- * Tri-state flags for the year-page media toggles that ride on a show's
- * denormalized counts (showPhotosCount / showYoutubesCount).
- *
- * - "positive" → keep only shows WITH the media
- * - "negative" → keep only shows WITHOUT the media
- * - "empty" / undefined → no filter
- */
-export type MediaCountFilterFlags = {
-  photos?: TriState;
-  youtube?: TriState;
-};
+export type { MediaCountFilterFlags };
 
 /**
  * Drop setlists whose show media counts don't match the active flags. The year
@@ -28,9 +18,7 @@ export function applyMediaCountFilters<T extends Pick<Setlist, "show">>(
 ): T[] {
   if (!isAnyTriStateActive(flags)) return setlists;
 
-  return setlists.filter(
-    (setlist) =>
-      matchesTriState(flags.photos, setlist.show.showPhotosCount > 0) &&
-      matchesTriState(flags.youtube, setlist.show.showYoutubesCount > 0),
+  return setlists.filter((setlist) =>
+    matchesMediaCounts(flags, setlist.show.showPhotosCount, setlist.show.showYoutubesCount),
   );
 }

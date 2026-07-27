@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, test } from "vitest";
-import { computeColumnWidths, DataTable } from "./data-table";
+import { computeColumnVisibility, computeColumnWidths, DataTable } from "./data-table";
 
 type Row = { id: string; name: string; count: number };
 
@@ -393,5 +393,59 @@ describe("computeColumnWidths", () => {
     // Fixed col still applied. The shares ignore the fixedWidth and may sum > 100% for
     // a single frame before measurement takes over — intentional, documented in the helper.
     expect(widths).toEqual(["75%", "4rem", "25%"]);
+  });
+});
+
+describe("computeColumnVisibility", () => {
+  // Same reason as computeColumnWidths above: jsdom never measures the wrapper,
+  // so the width branches are only reachable by driving the helper directly.
+  type R = { id: string };
+  const col = (id: string, meta?: { hideOnMobile?: boolean; hideBelow?: number }) =>
+    ({ id, meta }) as ColumnDef<R, unknown>;
+
+  test("leaves columns that declare no floor out of the patch entirely", () => {
+    // Absent, not `true` — the table keeps whatever visibility it already had
+    // for those columns instead of this helper stomping it.
+    expect(computeColumnVisibility<R, unknown>([col("date"), col("rating")], 375)).toEqual({});
+  });
+
+  test("shows everything while the wrapper is still unmeasured", () => {
+    const cols = [col("sources", { hideBelow: 900 }), col("time", { hideOnMobile: true })];
+
+    expect(computeColumnVisibility<R, unknown>(cols, 0)).toEqual({ sources: true, time: true });
+  });
+
+  test("reveals a column in tiers as the wrapper grows", () => {
+    const cols = [col("time", { hideOnMobile: true }), col("sources", { hideBelow: 900 })];
+    const at = (width: number) => computeColumnVisibility<R, unknown>(cols, width);
+
+    // A phone gets neither; the tablet band gets the sm-gated one; only a wide
+    // table gets the 900px one. This middle band is the case a single
+    // hideOnMobile cliff couldn't express, which left the rating badge
+    // squeezed off the right edge at ~700px.
+    expect(at(375)).toEqual({ time: false, sources: false });
+    expect(at(700)).toEqual({ time: true, sources: false });
+    expect(at(900)).toEqual({ time: true, sources: true });
+  });
+
+  test("treats the declared width as inclusive", () => {
+    const cols = [col("sources", { hideBelow: 900 })];
+
+    expect(computeColumnVisibility<R, unknown>(cols, 899).sources).toBe(false);
+    expect(computeColumnVisibility<R, unknown>(cols, 900).sources).toBe(true);
+  });
+
+  test("lets an explicit hideBelow override hideOnMobile", () => {
+    const cols = [col("sources", { hideOnMobile: true, hideBelow: 900 })];
+
+    // Both set: the explicit width wins, so this stays hidden at a width the
+    // sm cliff alone would have revealed it at.
+    expect(computeColumnVisibility<R, unknown>(cols, 700).sources).toBe(false);
+  });
+
+  test("falls back to the accessorKey when a column declares no id", () => {
+    const cols = [{ accessorKey: "duration", meta: { hideOnMobile: true } } as ColumnDef<R, unknown>];
+
+    expect(computeColumnVisibility<R, unknown>(cols, 375)).toEqual({ duration: false });
   });
 });

@@ -28,6 +28,23 @@ export const authInputClass = "auth-input text-content-text-primary";
 export const formLabelClass = "block text-sm font-medium text-content-text-secondary mb-1";
 
 /**
+ * The caption above one control in a filter bar. The fixed height keeps every
+ * control's label on the same baseline whether its own text wraps or not, so a
+ * row of dropdowns, search boxes, and toggle groups stays level.
+ */
+export const filterLabelClass =
+  "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
+
+/**
+ * The free-text search box inside a filter bar. Sized to sit level with the
+ * compact `<Dropdown size="compact">` triggers beside it, and full-width on
+ * phones where the bar stacks. Shared by every table's filter chrome so the
+ * search boxes don't drift apart.
+ */
+export const filterSearchInputClass =
+  "w-full sm:w-auto sm:min-w-[250px] sm:max-w-md h-[34px] text-sm border text-white focus-visible:outline-none focus-visible:ring-1 placeholder:text-content-text-tertiary";
+
+/**
  * Surface treatment shared by list rows across the app (track rows,
  * curated-video rows, etc.): a faint dark fill, rounded corners, and a
  * subtle border in the project's secondary-border tone. Padding stays

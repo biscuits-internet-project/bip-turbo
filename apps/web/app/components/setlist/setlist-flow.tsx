@@ -6,7 +6,7 @@ import { usePreferences } from "~/hooks/use-preferences";
 import { cn } from "~/lib/utils";
 import { buildShowFootnotes } from "./footnotes";
 import { countSetlistEncores } from "./set-label";
-import { formatSetHeading, summarizeDurations } from "./setlist-duration";
+import { formatSetHeading, PARTIAL_DURATION_MARKER, partialDurationNote, summarizeDurations } from "./setlist-duration";
 import { TrackRatingOverlay } from "./track-rating-overlay";
 
 /**
@@ -47,14 +47,10 @@ export function SetlistFlow({ setlist }: { setlist: Setlist }) {
                 {showSetlistTimes && setDuration.known > 0 && (
                   <span
                     className="text-sm text-content-text-tertiary tabular-nums"
-                    title={
-                      setDuration.missing > 0
-                        ? `Partial: ${setDuration.missing} track${setDuration.missing > 1 ? "s" : ""} not yet timed`
-                        : undefined
-                    }
+                    title={partialDurationNote(setDuration.missing) ?? undefined}
                   >
                     {formatDuration(setDuration.seconds)}
-                    {setDuration.missing > 0 && "*"}
+                    {setDuration.missing > 0 && PARTIAL_DURATION_MARKER}
                   </span>
                 )}
               </div>
@@ -102,13 +98,13 @@ export function SetlistFlow({ setlist }: { setlist: Setlist }) {
           <span className="font-medium text-content-text-tertiary">Total</span>{" "}
           <span className="tabular-nums">
             {formatDuration(showDuration.seconds)}
-            {showDuration.missing > 0 && "*"}
+            {showDuration.missing > 0 && PARTIAL_DURATION_MARKER}
           </span>
         </div>
       )}
       {showSetlistTimes && showDuration.known > 0 && showDuration.missing > 0 && (
         <div className={cn(isSoleSet ? "mt-4" : "mt-1", "text-xs text-content-text-tertiary")}>
-          * Partial: {showDuration.missing} track{showDuration.missing > 1 ? "s" : ""} not yet timed
+          {PARTIAL_DURATION_MARKER} {partialDurationNote(showDuration.missing)}
         </div>
       )}
 

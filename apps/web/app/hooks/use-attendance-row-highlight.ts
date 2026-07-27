@@ -19,11 +19,13 @@ export function useAttendanceRowHighlight<T>(items: T[], getShowId: (item: T) =>
 
   const showIds = useMemo(() => [...new Set(items.map(getShowId))], [items, getShowId]);
 
-  const { attendanceMap, userRatingMap, averageRatingMap, isLoading } = useShowUserData(user ? showIds : []);
+  const { attendanceMap, userRatingMap, averageRatingMap, displayedRatingMap, isLoading } = useShowUserData(
+    user ? showIds : [],
+  );
 
   const isAttended = useCallback((item: T) => !!attendanceMap.get(getShowId(item)), [attendanceMap, getShowId]);
 
   const rowClassName = useCallback((item: T) => (isAttended(item) ? ATTENDED_ROW_CLASS : undefined), [isAttended]);
 
-  return { rowClassName, isAttended, attendanceMap, userRatingMap, averageRatingMap, isLoading };
+  return { rowClassName, isAttended, attendanceMap, userRatingMap, averageRatingMap, displayedRatingMap, isLoading };
 }

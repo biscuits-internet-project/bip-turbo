@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
+import { ShowsViewToggle } from "~/components/show/shows-view-toggle";
 import { ShowFiltersNav } from "~/components/show-filters-nav";
 import { Button } from "~/components/ui/button";
 import { cardVariants } from "~/components/ui/card";
@@ -216,10 +217,17 @@ export default function ShowsByYear() {
         {/* Header Section */}
         <div className="relative">
           <h1 className="page-heading">SHOWS</h1>
-          <div className="absolute top-0 right-0 flex items-start gap-2">
+          {!searchQuery && (
+            <div className="absolute top-0 left-0 hidden sm:block">
+              <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+            </div>
+          )}
+          <div className="absolute top-0 right-0 flex items-start gap-3">
+            {/* The corners flank a centered heading, which leaves no room for
+                them on a phone — both drop into the flow row below instead. */}
             {!searchQuery && (
               <div className="hidden sm:block">
-                <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+                <ShowsViewToggle active="setlist" currentURLParameters={currentURLParameters} year={year} />
               </div>
             )}
             <AdminOnly>
@@ -235,7 +243,8 @@ export default function ShowsByYear() {
             )}
           </div>
           {!searchQuery && (
-            <div className="mt-3 flex justify-center sm:hidden">
+            <div className="mt-3 flex flex-col items-center gap-3 sm:hidden">
+              <ShowsViewToggle active="setlist" currentURLParameters={currentURLParameters} year={year} />
               <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
             </div>
           )}
