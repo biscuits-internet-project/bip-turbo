@@ -16,6 +16,12 @@ vi.mock("~/lib/filtered-song-performance-table", () => ({
     <div data-testid="perf-table" data-preset={JSON.stringify(presetFilters ?? null)} />
   ),
 }));
+// Same reasoning for the shows table: it reads the session and client-fetches
+// per-viewer data. The marker echoes its row count so the page's scoping stays
+// assertable.
+vi.mock("~/components/show/shows-stats-table", () => ({
+  ShowsStatsTable: ({ rows }: { rows: unknown[] }) => <div data-testid="shows-table" data-rows={rows.length} />,
+}));
 
 vi.mock("~/components/admin/admin-only", () => ({
   AdminOnly: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -68,10 +74,10 @@ function makeData({ slug = "mike-greenfield", tier = "guest", songs, performance
       (hasTables
         ? [
             {
-              showId: "s1",
-              slug: "2024-01-01",
+              id: "s1",
+              slug: "2024-01-01-the-capitol-theatre-port-chester-ny",
               date: "2024-01-01",
-              venueName: "The Cap",
+              venueName: "The Capitol Theatre",
               venueCity: "Port Chester",
               venueState: "NY",
             },
@@ -81,6 +87,7 @@ function makeData({ slug = "mike-greenfield", tier = "guest", songs, performance
     performances: performances ?? (hasTables ? [{ trackId: "t-1" }] : []),
     authorId: null,
     songsWritten: [],
+    externalSources: {},
   };
 }
 

@@ -1,12 +1,10 @@
-import { DRUMMER_ERA_INFO, eraDateWindow } from "@bip/domain";
+import { DRUMMER_ERA_INFO, eraDateWindow, START_YEAR } from "@bip/domain";
 
 export interface SongFilterConfig {
   label: string;
   startDate?: Date;
   endDate?: Date;
 }
-
-export const START_YEAR = 1995;
 
 const yearFilters: Record<string, SongFilterConfig> = Object.fromEntries(
   Array.from({ length: new Date().getFullYear() - START_YEAR + 1 }, (_, i) => {

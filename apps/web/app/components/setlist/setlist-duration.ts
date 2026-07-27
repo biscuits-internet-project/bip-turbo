@@ -28,6 +28,24 @@ export function summarizeDurations(tracks: ReadonlyArray<{ duration: number | nu
 }
 
 /**
+ * Marker appended to a running time that only covers the tracks we've resolved.
+ * Every surface showing a duration total wears the same asterisk so the symbol
+ * means one thing site-wide.
+ */
+export const PARTIAL_DURATION_MARKER = "*";
+
+/**
+ * Why a total carries the marker, phrased for a tooltip or a footnote line.
+ * Null when nothing is missing, so callers can render it unconditionally.
+ * Shared by the setlist flow view (footnote + per-set tooltip) and the shows
+ * table's Show time column.
+ */
+export function partialDurationNote(missing: number): string | null {
+  if (missing <= 0) return null;
+  return `Partial: ${missing} track${missing > 1 ? "s" : ""} not yet timed`;
+}
+
+/**
  * Block-style set heading for the flow view: spelled-out "Set 1" / "Encore" /
  * "Encore 2" (vs the compact "1" / "E" the table views use). A lone encore
  * drops its number, so pass the show's distinct-encore count. A show with a

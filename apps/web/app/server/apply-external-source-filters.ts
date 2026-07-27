@@ -1,22 +1,9 @@
 import type { Setlist } from "@bip/domain";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
-import { isAnyTriStateActive, matchesTriState, type TriState } from "~/lib/tri-state-filter";
+import { type ExternalSourceFilterFlags, matchesExternalSources } from "~/lib/show-source-filters";
+import { isAnyTriStateActive } from "~/lib/tri-state-filter";
 
-/**
- * Tri-state flags for the external-source filters that are NOT queryable in
- * Prisma (nugs/archive/relisten live in Redis catalogs). The photo/youtube
- * counterpart lives on the denormalized show counts and is applied by
- * applyMediaCountFilters.
- *
- * - "positive" → keep only setlists with the source
- * - "negative" → keep only setlists without the source
- * - "empty" / undefined → no filter
- */
-export type ExternalSourceFilterFlags = {
-  nugs?: TriState;
-  archive?: TriState;
-  relisten?: TriState;
-};
+export type { ExternalSourceFilterFlags };
 
 /**
  * Drop setlists whose resolved external sources don't match the active
@@ -31,15 +18,5 @@ export function applyExternalSourceFilters<T extends Pick<Setlist, "show">>(
 ): T[] {
   if (!isAnyTriStateActive(flags)) return setlists;
 
-  return setlists.filter((setlist) => {
-    const sources = externalSources[setlist.show.id];
-    const hasNugs = Boolean(sources?.nugsUrls?.length);
-    const hasArchive = Boolean(sources?.archiveUrl);
-    const hasRelisten = Boolean(sources?.relistenUrl);
-    return (
-      matchesTriState(flags.nugs, hasNugs) &&
-      matchesTriState(flags.archive, hasArchive) &&
-      matchesTriState(flags.relisten, hasRelisten)
-    );
-  });
+  return setlists.filter((setlist) => matchesExternalSources(flags, externalSources[setlist.show.id]));
 }

@@ -1,5 +1,5 @@
 import type { RatingYearBucket } from "@bip/core";
-import { formatRatingScore } from "@bip/domain";
+import { formatRatingScore, START_YEAR } from "@bip/domain";
 import { useState } from "react";
 import {
   Bar,
@@ -25,7 +25,6 @@ import {
   type HistogramMode,
   histogramYAxisConfig,
 } from "~/lib/rating-charts";
-import { START_YEAR } from "~/lib/song-filters";
 import { cn } from "~/lib/utils";
 
 interface RatingChartsProps {

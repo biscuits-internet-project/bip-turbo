@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { formatSetHeading, summarizeDurations } from "./setlist-duration";
+import { formatSetHeading, partialDurationNote, summarizeDurations } from "./setlist-duration";
 
 describe("summarizeDurations", () => {
   test("sums known durations and counts none missing when all are timed", () => {
@@ -36,5 +36,22 @@ describe("formatSetHeading", () => {
 
   test("renders an unrecognized label verbatim", () => {
     expect(formatSetHeading("Soundcheck", 0)).toBe("Soundcheck");
+  });
+});
+
+describe("partialDurationNote", () => {
+  // The setlist's footnote line, its per-set tooltip, and the shows table's
+  // Show time tooltip all read this one sentence, so a total marked partial
+  // says the same thing wherever it appears.
+  test("explains how many tracks are missing", () => {
+    expect(partialDurationNote(5)).toBe("Partial: 5 tracks not yet timed");
+  });
+
+  test("uses the singular for a lone untimed track", () => {
+    expect(partialDurationNote(1)).toBe("Partial: 1 track not yet timed");
+  });
+
+  test("returns null for a complete total so callers can render it unconditionally", () => {
+    expect(partialDurationNote(0)).toBeNull();
   });
 });

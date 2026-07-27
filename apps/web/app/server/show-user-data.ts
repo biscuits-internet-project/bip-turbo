@@ -6,9 +6,9 @@ import { services } from "~/server/services";
 import { resolveViewerRatingMode } from "~/server/viewer-rating";
 
 export interface ShowUserDataResponse {
-  attendances: Record<string, Attendance | null>;
-  userRatings: Record<string, number | null>;
-  averageRatings: Record<string, { average: number; count: number } | null>;
+  attendances: Record<string, Attendance>;
+  userRatings: Record<string, number>;
+  averageRatings: Record<string, { average: number; count: number }>;
   /**
    * The calibrated (shrunk) score + its contributing count per show, populated only
    * when the viewer's resolved mode is "calibrated"; absent means the headline falls
@@ -32,6 +32,11 @@ export interface ShowUserDataResponse {
  * mode (simple vs calibrated) and the comparison overlay are resolved server-side
  * from the viewer's prefs + the feature flags, so the heavy calibrated/rank queries
  * only run for viewers who actually see them.
+ *
+ * Every map holds ONLY the shows that have a value. A show absent from a map has
+ * no attendance / no rating / no average — consumers read through `?? null`
+ * rather than expecting a key per id. Writing an explicit null per show instead
+ * would cost ~170KB of `"<uuid>":null` on a catalog-sized batch.
  */
 export async function computeShowUserData(
   context: Pick<PublicContext, "currentUser">,
@@ -44,12 +49,6 @@ export async function computeShowUserData(
     displayedRatings: {},
     rankComparisons: {},
   };
-
-  for (const showId of showIds) {
-    response.attendances[showId] = null;
-    response.userRatings[showId] = null;
-    response.averageRatings[showId] = null;
-  }
 
   if (showIds.length === 0) return response;
 

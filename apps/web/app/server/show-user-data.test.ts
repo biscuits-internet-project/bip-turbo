@@ -89,8 +89,8 @@ describe("computeShowUserData", () => {
 
   // Public browsing (no logged-in user) still shows average ratings — they are
   // aggregate data, visible to everyone. Personal attendance / rating fields
-  // stay null for every requested show.
-  test("populates average ratings for all showIds and leaves user fields null when no currentUser", async () => {
+  // are absent entirely.
+  test("populates average ratings and omits the personal fields when there's no currentUser", async () => {
     getAveragesForRateables.mockResolvedValue({
       "show-1": { average: 4.5, count: 10 },
     });
@@ -98,15 +98,25 @@ describe("computeShowUserData", () => {
     const result = await computeShowUserData({ currentUser: undefined }, ["show-1", "show-2"]);
 
     expect(result.averageRatings["show-1"]).toEqual({ average: 4.5, count: 10 });
-    expect(result.averageRatings["show-2"]).toBeNull();
-    expect(result.attendances).toEqual({ "show-1": null, "show-2": null });
-    expect(result.userRatings).toEqual({ "show-1": null, "show-2": null });
+    expect(result.attendances).toEqual({});
+    expect(result.userRatings).toEqual({});
     expect(findByEmail).not.toHaveBeenCalled();
+  });
+
+  // The maps carry only the shows that have a value. Writing an explicit null
+  // per requested show would add ~170KB of `"<uuid>":null` on a catalog-sized
+  // batch like the shows stats table's.
+  test("omits an unrated show rather than mapping it to null", async () => {
+    getAveragesForRateables.mockResolvedValue({ "show-1": { average: 4.5, count: 10 } });
+
+    const result = await computeShowUserData({ currentUser: undefined }, ["show-1", "show-2"]);
+
+    expect("show-2" in result.averageRatings).toBe(false);
   });
 
   // A Supabase user with no matching local users row (unusual — typically
   // ensureLocalUserRecord creates one on login). The function must still
-  // return a well-formed response with average ratings and null user fields,
+  // return a well-formed response with average ratings and empty user fields,
   // not throw.
   test("skips user lookups when the local users record is missing", async () => {
     getAveragesForRateables.mockResolvedValue({});
@@ -117,15 +127,15 @@ describe("computeShowUserData", () => {
       ["show-1"],
     );
 
-    expect(result.attendances["show-1"]).toBeNull();
-    expect(result.userRatings["show-1"]).toBeNull();
+    expect(result.attendances).toEqual({});
+    expect(result.userRatings).toEqual({});
     expect(findManyByUserIdAndShowIds).not.toHaveBeenCalled();
     expect(findManyByUserIdAndRateableIds).not.toHaveBeenCalled();
   });
 
   // Happy path: logged-in user whose local users row exists. The returned
   // record has attendance and user rating entries only for the specific shows
-  // the user attended / rated; other shows stay null.
+  // the user attended / rated; other shows are absent.
   test("populates attendances and user ratings only for shows the user has interacted with", async () => {
     getAveragesForRateables.mockResolvedValue({
       "show-1": { average: 4.0, count: 5 },
@@ -144,8 +154,8 @@ describe("computeShowUserData", () => {
     );
 
     expect(result.attendances["show-1"]).toBe(attendance1);
-    expect(result.attendances["show-2"]).toBeNull();
-    expect(result.userRatings["show-1"]).toBeNull();
+    expect("show-2" in result.attendances).toBe(false);
+    expect("show-1" in result.userRatings).toBe(false);
     expect(result.userRatings["show-2"]).toBe(5);
     expect(result.averageRatings["show-1"]).toEqual({ average: 4.0, count: 5 });
     expect(result.averageRatings["show-2"]).toEqual({ average: 3.0, count: 2 });

@@ -1,20 +1,25 @@
-import type { Instrument, Musician, MusicianAppearanceShow, Song, SongPagePerformance } from "@bip/domain";
+import type {
+  Instrument,
+  Musician,
+  MusicianAppearanceShow,
+  ShowStatsRow,
+  Song,
+  SongPagePerformance,
+} from "@bip/domain";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import type { DehydratedState } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { Pencil } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
-import { DateVenueCell } from "~/components/performance/date-venue-cell";
+import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
+import { ShowsStatsTable } from "~/components/show/shows-stats-table";
 import { ShowDate } from "~/components/show-date";
 import { FilteredSongsStatsTable } from "~/components/song/filtered-songs-stats-table";
 import { cardVariants } from "~/components/ui/card";
 import { CollapsibleSection } from "~/components/ui/collapsible-section";
-import { DataTable } from "~/components/ui/data-table";
 import { LinkButton } from "~/components/ui/link-button";
 import { PageHeader } from "~/components/ui/page-header";
-import { SortableHeader } from "~/components/ui/sortable-header";
 import { StatBox } from "~/components/ui/stat-box";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
@@ -33,6 +38,7 @@ import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getMusicianMeta } from "~/lib/seo";
 import { fetchFilteredSongs } from "~/lib/song-utilities";
 import { services } from "~/server/services";
+import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
 import { computeTrackUserRatings } from "~/server/track-user-ratings";
 
@@ -45,15 +51,6 @@ interface MusicianWithInstrument extends Musician {
   defaultInstrument: Instrument | null;
 }
 
-interface ShowRow {
-  showId: string;
-  slug: string;
-  date: string;
-  venueName: string;
-  venueCity: string | null;
-  venueState: string | null;
-}
-
 /** The cached, non-user-scoped half of the profile payload. */
 interface MusicianPageData {
   musician: MusicianWithInstrument;
@@ -62,7 +59,7 @@ interface MusicianPageData {
   firstShow: MusicianAppearanceShow | null;
   lastShow: MusicianAppearanceShow | null;
   // Empty for core members; for drummers, shows outside their era; else all shows.
-  shows: ShowRow[];
+  shows: ShowStatsRow[];
   // Songs the musician played (By Song table base list), scoped through the
   // /songs pipeline. Empty for core members.
   songs: Song[];
@@ -74,7 +71,12 @@ interface MusicianPageData {
   songsWritten: Song[];
 }
 
-type LoaderData = MusicianPageData & { dehydratedState: DehydratedState };
+type LoaderData = MusicianPageData & {
+  // Resolved every request rather than inside the slug cache: the nugs/archive/
+  // relisten catalogs live in their own Redis maps with their own lifetimes.
+  externalSources: Record<string, ShowExternalSources>;
+  dehydratedState: DehydratedState;
+};
 
 export const loader = publicLoader(async ({ params, context }): Promise<LoaderData> => {
   const slug = params.slug;
@@ -112,35 +114,29 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
       // omitted; only counts render.
       let songs: Song[] = [];
       let performances: SongPagePerformance[] = [];
-      let shows: ShowRow[] = [];
+      let shows: ShowStatsRow[] = [];
       if (tier !== "core" && showIds.length > 0) {
         const songsUrl = new URL(`https://bip.local/?musician=${slug}`);
         if (era?.startDate) songsUrl.searchParams.set("excludeStart", era.startDate.toISOString().slice(0, 10));
         if (era?.endDate) songsUrl.searchParams.set("excludeEnd", era.endDate.toISOString().slice(0, 10));
 
-        const [songsPlayed, view, setlists] = await Promise.all([
+        const [songsPlayed, view, statsRows] = await Promise.all([
           fetchFilteredSongs(songsUrl, context),
           services.songPageComposer.buildSongPerformances({
             playedByMusicianId: musician.id,
             ...(era?.startDate ? { excludeRangeStart: era.startDate } : {}),
             ...(era?.endDate ? { excludeRangeEnd: era.endDate } : {}),
           }),
-          services.setlists.findManyByShowIds(showIds, { sort: [{ field: "date", direction: "desc" }] }),
+          // The shows table reads from the catalog-wide cached row set (already
+          // newest-first) rather than its own query, so this profile's numbers
+          // are the same ones /shows/stats shows.
+          services.stats.getShowStatsRows(),
         ]);
 
         songs = songsPlayed;
         performances = view.performances;
-        const visibleSetlists = era
-          ? setlists.filter((setlist) => isOutsideEra(new Date(setlist.show.date), era))
-          : setlists;
-        shows = visibleSetlists.map((setlist) => ({
-          showId: setlist.show.id,
-          slug: setlist.show.slug,
-          date: setlist.show.date,
-          venueName: setlist.venue.name,
-          venueCity: setlist.venue.city,
-          venueState: setlist.venue.state,
-        }));
+        const appearedAt = new Set(showIds);
+        shows = statsRows.filter((row) => appearedAt.has(row.id) && (!era || isOutsideEra(new Date(row.date), era)));
       }
 
       return {
@@ -165,7 +161,7 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
   const trackIds = data.performances.map((performance) => performance.trackId);
   const showIds = [...new Set(data.performances.map((performance) => performance.show.id))];
   const queryClient = createPrefetchClient();
-  await Promise.all([
+  const [, , externalSources] = await Promise.all([
     queryClient.prefetchQuery({
       queryKey: trackUserRatingsQueryKey(trackIds),
       queryFn: () => computeTrackUserRatings(context, trackIds),
@@ -174,9 +170,10 @@ export const loader = publicLoader(async ({ params, context }): Promise<LoaderDa
       queryKey: showUserDataQueryKey(showIds),
       queryFn: () => computeShowUserData(context, showIds),
     }),
+    computeShowExternalSources(data.shows),
   ]);
 
-  return { ...data, dehydratedState: dehydrateAndClear(queryClient) };
+  return { ...data, externalSources, dehydratedState: dehydrateAndClear(queryClient) };
 });
 
 export function meta({ data }: { data?: LoaderData }) {
@@ -214,25 +211,20 @@ function PerformanceStatBox({ label, show }: { label: string; show: MusicianAppe
   );
 }
 
-const showColumns: ColumnDef<ShowRow>[] = [
-  {
-    accessorKey: "date",
-    meta: { weight: 1 },
-    header: ({ column }) => <SortableHeader column={column} label="Date" />,
-    cell: ({ row }) => (
-      <Link to={`/shows/${row.original.slug}`} className="text-brand-primary hover:text-brand-secondary block">
-        <DateVenueCell
-          date={<ShowDate date={row.original.date} />}
-          venue={{ name: row.original.venueName, city: row.original.venueCity, state: row.original.venueState }}
-        />
-      </Link>
-    ),
-  },
-];
-
 export default function MusicianPage() {
-  const { musician, tier, stats, firstShow, lastShow, shows, songs, performances, authorId, songsWritten } =
-    useSerializedLoaderData<LoaderData>();
+  const {
+    musician,
+    tier,
+    stats,
+    firstShow,
+    lastShow,
+    shows,
+    songs,
+    performances,
+    authorId,
+    songsWritten,
+    externalSources,
+  } = useSerializedLoaderData<LoaderData>();
 
   // Framed by the musician's relationship to the band. Drummers' tables are
   // scoped to out-of-era plays (their everyday in-era shows are implied), so a
@@ -339,13 +331,10 @@ export default function MusicianPage() {
                 titleClassName={sectionTitleClass}
                 contentClassName="pt-4"
               >
-                <DataTable
-                  columns={showColumns}
-                  data={shows}
-                  getRowId={(show) => show.showId}
-                  initialSorting={[{ id: "date", desc: true }]}
-                  hideSearch
-                />
+                {/* No filter chrome: this page already spends `timeRange` /
+                    `q` on the song tables, and the two would filter each
+                    other. Sorting and the columns are the point here. */}
+                <ShowsStatsTable rows={shows} externalSources={externalSources} />
               </CollapsibleSection>
             )}
           </>

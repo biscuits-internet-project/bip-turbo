@@ -1,5 +1,6 @@
 export * from "./archive-dot-org";
 export * from "./cache-keys";
+export * from "./catalog";
 export * from "./drummer-era";
 export * from "./duration";
 export * from "./math";
@@ -29,4 +30,5 @@ export * from "./segue-run";
 export * from "./show-ordering";
 export * from "./sorted-dates";
 export * from "./views/blog-post";
+export * from "./views/show-stats";
 export * from "./views/song-page";

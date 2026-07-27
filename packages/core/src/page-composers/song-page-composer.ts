@@ -23,6 +23,7 @@ import {
 } from "../setlists/setlist-service";
 import type { SongService } from "../songs/song-service";
 import type { StatsService } from "../stats/stats-service";
+import { noteworthyTrackSql } from "../tracks/noteworthy-track";
 
 /**
  * Filters for querying performances. All fields are optional — only active
@@ -544,13 +545,8 @@ export class SongPageComposer {
     // slug (not a resolved id). An unknown slug yields no rows.
     songSlug: (o) =>
       o.songSlug ? { condition: Prisma.sql`tracks.song_id = (SELECT id FROM songs WHERE slug = ${o.songSlug})` } : null,
-    // "Jam chart" = the curated/noteworthy set: all-timer OR a non-empty note.
-    // Parenthesized because it carries a top-level OR and gets AND-joined into
-    // the surrounding WHERE.
-    jamChart: (o) =>
-      o.jamChart
-        ? { condition: Prisma.sql`(tracks.all_timer = true OR (tracks.note IS NOT NULL AND tracks.note <> ''))` }
-        : null,
+    // "Jam chart" = the curated/noteworthy set, defined once in noteworthyTrackSql.
+    jamChart: (o) => (o.jamChart ? { condition: noteworthyTrackSql("tracks") } : null),
     monthDay: (o) => (o.monthDay ? { condition: Prisma.sql`shows.date LIKE ${`%-${o.monthDay}`}` } : null),
     inverted: (o) =>
       o.inverted

@@ -1,10 +1,10 @@
+import { START_YEAR } from "@bip/domain";
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cardVariants } from "~/components/ui/card";
 import { ChartTooltipCard } from "~/components/ui/chart-tooltip";
 import { SegmentButton } from "~/components/ui/segment-button";
 import { CHART_COLORS } from "~/lib/chart-colors";
-import { START_YEAR } from "~/lib/song-filters";
 import {
   buildYearlyChartData,
   expandPlayedYears,

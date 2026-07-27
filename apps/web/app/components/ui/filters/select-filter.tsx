@@ -1,7 +1,5 @@
 import { Dropdown } from "~/components/ui/dropdown";
-
-const labelClass =
-  "text-xs font-medium text-content-text-secondary uppercase tracking-wide mb-1.5 h-[18px] flex items-center";
+import { filterLabelClass } from "~/lib/form-styles";
 
 export interface SelectFilterOptionGroup {
   label: string;
@@ -31,7 +29,7 @@ export function SelectFilter({
 }: SelectFilterProps) {
   return (
     <div className="flex flex-col">
-      <label htmlFor={id} className={labelClass}>
+      <label htmlFor={id} className={filterLabelClass}>
         {label}
       </label>
       <Dropdown
