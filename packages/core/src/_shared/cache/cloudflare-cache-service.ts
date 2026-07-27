@@ -3,27 +3,81 @@ import type { Logger } from "@bip/domain";
 export interface CloudflareCacheConfig {
   zoneId: string;
   apiToken: string;
+  /** Public origin of the site, e.g. `https://discobiscuits.net`. Purge-by-URL
+   *  needs absolute URLs that match the edge cache key exactly. */
+  siteUrl: string;
 }
+
+/**
+ * Cloudflare rejects a purge request holding more than this many URLs on
+ * non-Enterprise plans, so `purgeUrls` splits a long list into several calls
+ * rather than truncating it.
+ */
+const MAX_URLS_PER_PURGE = 30;
 
 export class CloudflareCacheService {
   private readonly baseUrl: string;
+  /** `config.siteUrl` without a trailing slash, so path concatenation cannot
+   *  produce a `//shows/...` URL that matches no cache key. */
+  private readonly siteUrl: string;
 
   constructor(
     private readonly config: CloudflareCacheConfig,
     private readonly logger: Logger,
   ) {
     this.baseUrl = `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`;
+    this.siteUrl = config.siteUrl.replace(/\/+$/, "");
   }
 
   /**
-   * Purge cache by tags. Cloudflare will purge all cached responses
-   * that have any of the specified Cache-Tag headers.
+   * Purge specific URLs from the edge. Available on every Cloudflare plan,
+   * unlike purge-by-tag, which is Enterprise-only and fails silently
+   * elsewhere.
+   *
+   * Each URL must match the edge cache key exactly, query string included, so
+   * a caller that wants a filtered variant gone has to name that variant.
    */
-  async purgeByTags(tags: string[]): Promise<void> {
-    if (tags.length === 0) return;
+  private async purgeUrls(urls: string[]): Promise<void> {
+    if (urls.length === 0) return;
 
-    this.logger.info("Purging Cloudflare cache by tags", { tags });
+    this.logger.info("Purging Cloudflare cache by URL", { urls });
 
+    for (let start = 0; start < urls.length; start += MAX_URLS_PER_PURGE) {
+      await this.postPurge({ files: urls.slice(start, start + MAX_URLS_PER_PURGE) });
+    }
+  }
+
+  /**
+   * Purge the `/shows/year/:year` listing for each given year.
+   *
+   * Both the document URL and its single-fetch `.data` twin are separate edge
+   * entries, and a client-side navigation to the year page reads `.data`
+   * without ever requesting the document, so leaving either behind keeps a
+   * stale setlist on screen after a show is edited.
+   */
+  async purgeYearListings(years: number[]): Promise<void> {
+    const urls = years.flatMap((year) => {
+      const yearUrl = `${this.siteUrl}/shows/year/${year}`;
+      return [yearUrl, `${yearUrl}.data`];
+    });
+    await this.purgeUrls(urls);
+  }
+
+  /**
+   * Purge all cached content (use sparingly)
+   */
+  async purgeAll(): Promise<void> {
+    this.logger.info("Purging all Cloudflare cache");
+    await this.postPurge({ purge_everything: true });
+  }
+
+  /**
+   * POST one purge body and report the outcome. Purge failures never throw:
+   * the caller has already wiped Redis, and a stale edge entry expires on its
+   * own, so breaking the mutation that triggered the purge would be worse
+   * than serving a stale page.
+   */
+  private async postPurge(body: Record<string, unknown>): Promise<void> {
     try {
       const response = await fetch(this.baseUrl, {
         method: "POST",
@@ -31,7 +85,7 @@ export class CloudflareCacheService {
           Authorization: `Bearer ${this.config.apiToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ tags }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -40,7 +94,6 @@ export class CloudflareCacheService {
           status: response.status,
           error: errorText,
         });
-        // Don't throw - cache purge failures shouldn't break the app
         return;
       }
 
@@ -52,50 +105,9 @@ export class CloudflareCacheService {
         return;
       }
 
-      this.logger.info("Cloudflare cache purged successfully", { tags });
+      this.logger.info("Cloudflare cache purged successfully");
     } catch (error) {
       this.logger.error("Cloudflare cache purge error", { error });
-      // Don't throw - cache purge failures shouldn't break the app
-    }
-  }
-
-  /**
-   * Purge cache for year listing pages
-   */
-  async purgeYearListings(years?: number[]): Promise<void> {
-    const currentYear = new Date().getFullYear();
-    const tagsToInvalidate = years?.map((y) => `year-${y}`) ?? [`year-${currentYear}`];
-    await this.purgeByTags(tagsToInvalidate);
-  }
-
-  /**
-   * Purge all cached content (use sparingly)
-   */
-  async purgeAll(): Promise<void> {
-    this.logger.info("Purging all Cloudflare cache");
-
-    try {
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.config.apiToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ purge_everything: true }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger.error("Cloudflare cache purge all failed", {
-          status: response.status,
-          error: errorText,
-        });
-        return;
-      }
-
-      this.logger.info("Cloudflare cache purged completely");
-    } catch (error) {
-      this.logger.error("Cloudflare cache purge all error", { error });
     }
   }
 }

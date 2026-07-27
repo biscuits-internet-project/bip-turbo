@@ -130,11 +130,10 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
     expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.show.allData());
   });
 
-  // The `/shows/year/:year` route is edge-cached with a `year-YYYY`
-  // Cache-Tag (24h s-maxage past years, 5m current). Mutations on a show
-  // must purge exactly the year(s) tied to that show; otherwise the year
-  // listing stays stale at the edge even though Redis has been wiped.
-  test("purges Cloudflare year tags for the supplied years", async () => {
+  // The unfiltered `/shows/year/:year` response is edge-cached for a day, so
+  // a mutation must purge exactly the year(s) tied to that show; otherwise the
+  // year listing stays stale at the edge even though Redis has been wiped.
+  test("purges Cloudflare year listings for the supplied years", async () => {
     const cache = makeCache();
     const cloudflareCache = { purgeYearListings: vi.fn().mockResolvedValue(undefined) };
     const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
@@ -160,7 +159,7 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
   // Date-move edits pass both the old and new year, which collapse to one
   // year when the move stays within a calendar year. Dedupe lives in the
   // service so callers can pass duplicates without spamming Cloudflare.
-  test("dedupes year tags before calling Cloudflare", async () => {
+  test("dedupes years before calling Cloudflare", async () => {
     const cache = makeCache();
     const cloudflareCache = { purgeYearListings: vi.fn().mockResolvedValue(undefined) };
     const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);

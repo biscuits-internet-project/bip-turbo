@@ -510,7 +510,7 @@ export class ShowService {
 
     const show = mapDbShowToDomainEntity(result);
 
-    // Year-tag purges cover both the old date (so its listing evicts) and
+    // Year-listing purges cover both the old date (so its listing evicts) and
     // the new date (so its listing picks the row up). `||` not `??` so an
     // empty-string date falls through to currentShow.date, matching the
     // slug-regen guard above.
