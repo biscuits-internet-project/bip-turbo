@@ -12,8 +12,8 @@ function ids(setlists: { show: { id: string } }[]) {
 }
 
 describe("applyMediaCountFilters", () => {
-  // No active flags → input passes through by reference. The year loader runs
-  // this on every request, so the no-op path must preserve reference equality.
+  // No active flags → input passes through by reference. The year page runs
+  // this on every render, so the no-op path must preserve reference equality.
   test("returns setlists unchanged when no filters are active", () => {
     const setlists = [setlist("astronaut", 0, 0), setlist("basis", 3, 0)];
     expect(applyMediaCountFilters(setlists, {})).toBe(setlists);

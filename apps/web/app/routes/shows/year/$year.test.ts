@@ -1,5 +1,5 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { describe, expect, test, vi } from "vitest";
+import type { LoaderFunctionArgs, ShouldRevalidateFunctionArgs } from "react-router";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Server-side modules, stubbed so the route file can be imported without
 // pulling Prisma/Supabase into the test bundle. `publicLoader` becomes an
@@ -8,39 +8,122 @@ vi.mock("~/lib/base-loaders", () => ({
   publicLoader: (fn: (args: LoaderFunctionArgs & { context: unknown }) => unknown) => (args: LoaderFunctionArgs) =>
     fn({ ...args, context: {} }),
 }));
+const getOrSet = vi.fn();
 vi.mock("~/server/services", () => ({
   services: {
-    cache: { getOrSet: vi.fn().mockResolvedValue([]) },
+    cache: { getOrSet: (key: string, fill: () => unknown) => getOrSet(key, fill) },
     setlists: { findMany: vi.fn().mockResolvedValue([]), findManyByShowIds: vi.fn().mockResolvedValue([]) },
     shows: { search: vi.fn().mockResolvedValue([]) },
   },
 }));
 vi.mock("~/server/show-external-sources", () => ({ computeShowExternalSources: vi.fn().mockResolvedValue({}) }));
-vi.mock("~/server/show-counts-by-year", () => ({ computeShowCountsByYear: vi.fn().mockResolvedValue({}) }));
-vi.mock("~/server/show-user-data", () => ({ computeShowUserData: vi.fn().mockResolvedValue({}) }));
-vi.mock("~/server/apply-external-source-filters", () => ({
-  applyExternalSourceFilters: (setlists: unknown) => setlists,
-}));
-vi.mock("~/server/apply-media-count-filters", () => ({ applyMediaCountFilters: (setlists: unknown) => setlists }));
+const computeShowCountFacets = vi.fn();
+vi.mock("~/server/show-count-facets", () => ({ computeShowCountFacets: () => computeShowCountFacets() }));
 vi.mock("~/lib/query-prefetch", () => ({
   createPrefetchClient: () => ({ prefetchQuery: vi.fn().mockResolvedValue(undefined) }),
   dehydrateAndClear: () => ({}),
 }));
 
-import { headers, loader } from "./$year";
+import { headers, loader, shouldRevalidate } from "./$year";
 
-/** Run the loader for one year-page URL and return the headers it attached. */
-async function loadHeaders(url: string): Promise<Headers> {
-  const result = (await (loader as (args: LoaderFunctionArgs) => Promise<{ init: ResponseInit }>)({
+interface LoadResult {
+  data: { setlists: Array<{ show: { id: string } }>; showCountFacets: Record<number, Record<number, number>> };
+  init: ResponseInit;
+}
+
+/** Run the loader for one year-page URL. */
+async function load(url: string): Promise<LoadResult> {
+  return (await (loader as (args: LoaderFunctionArgs) => Promise<LoadResult>)({
     request: new Request(`https://discobiscuits.net${url}`),
     params: { year: url.slice("/shows/year/".length, "/shows/year/".length + 4) },
     context: {},
-  } as unknown as LoaderFunctionArgs)) as { init: ResponseInit };
-  return new Headers(result.init.headers);
+  } as unknown as LoaderFunctionArgs)) as LoadResult;
+}
+
+async function loadHeaders(url: string): Promise<Headers> {
+  return new Headers((await load(url)).init.headers);
+}
+
+/** Minimal setlist shape — the loader only ever reads `show.id` / `show.date`. */
+function setlist(id: string, date: string) {
+  return { show: { id, date } };
 }
 
 const LONG_TTL = "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600";
 const SHORT_TTL = "public, max-age=60, s-maxage=300, stale-while-revalidate=300";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  getOrSet.mockResolvedValue([]);
+  computeShowCountFacets.mockResolvedValue({});
+});
+
+describe("year listing payload", () => {
+  // The whole point of the client-side filtering: every filter combination
+  // resolves to the same loader payload, so the cached year blob is reused and
+  // a toggle has nothing left to refetch.
+  test("returns the full year regardless of which filters the URL carries", async () => {
+    getOrSet.mockResolvedValue([setlist("show-a", "2001-03-17"), setlist("show-b", "2001-08-10")]);
+
+    const unfiltered = await load("/shows/year/2001");
+    const filtered = await load("/shows/year/2001?nugs=yes&photos=no&archive=yes");
+
+    expect(unfiltered.data.setlists.map((s) => s.show.id)).toEqual(["show-a", "show-b"]);
+    expect(filtered.data.setlists.map((s) => s.show.id)).toEqual(["show-a", "show-b"]);
+  });
+
+  // Filter-by-Year counts are derived in the browser from this blob, so the
+  // loader ships the joint distribution rather than one filtered total.
+  test("returns the show-count facet blob", async () => {
+    computeShowCountFacets.mockResolvedValue({ 2001: { 0: 40, 4: 63 } });
+
+    expect((await load("/shows/year/2001")).data.showCountFacets).toEqual({ 2001: { 0: 40, 4: 63 } });
+  });
+
+  // A search hits the DB for whatever was typed and spans every year, so there
+  // are no per-year counts to render alongside it.
+  test("returns no facets for a search", async () => {
+    computeShowCountFacets.mockResolvedValue({ 2001: { 0: 40 } });
+
+    const result = await load("/shows/year/2001?q=wetlands");
+
+    expect(result.data.showCountFacets).toEqual({});
+    expect(computeShowCountFacets).not.toHaveBeenCalled();
+  });
+});
+
+describe("shouldRevalidate", () => {
+  const run = (current: string, next: string) =>
+    shouldRevalidate({
+      currentUrl: new URL(`https://discobiscuits.net${current}`),
+      nextUrl: new URL(`https://discobiscuits.net${next}`),
+      defaultShouldRevalidate: true,
+    } as ShouldRevalidateFunctionArgs);
+
+  // The payload no longer depends on the filters, so a toggle only rewrites the
+  // query string. Refetching would re-pay a multi-megabyte render for data the
+  // browser already holds.
+  test("skips revalidation when only the media filters change", () => {
+    expect(run("/shows/year/2001", "/shows/year/2001?nugs=yes")).toBe(false);
+    expect(run("/shows/year/2001?nugs=yes", "/shows/year/2001?nugs=no&photos=yes")).toBe(false);
+    expect(run("/shows/year/2001?photos=yes", "/shows/year/2001")).toBe(false);
+  });
+
+  // Search results come from a server query, not from the year blob, so a
+  // changed `q` is the one query-string edit that still needs fresh data.
+  test("revalidates when the search query changes", () => {
+    expect(run("/shows/year/2001", "/shows/year/2001?q=wetlands")).toBe(true);
+    expect(run("/shows/year/2001?q=wetlands", "/shows/year/2001")).toBe(true);
+    expect(run("/shows/year/2001?q=wet", "/shows/year/2001?q=wetlands")).toBe(true);
+    expect(run("/shows/year/2001?q=wetlands", "/shows/year/2001?q=wetlands&nugs=yes")).toBe(false);
+  });
+
+  // Switching years is a different year blob, so it defers to the router.
+  test("defers to the default when the path changes", () => {
+    expect(run("/shows/year/2001", "/shows/year/1998")).toBe(true);
+    expect(run("/shows/year/2001?nugs=yes", "/shows/year/1998?nugs=yes")).toBe(true);
+  });
+});
 
 describe("year listing cache headers", () => {
   // The bare URL is the one a show mutation can actually purge
@@ -52,9 +135,11 @@ describe("year listing cache headers", () => {
     expect(headers.get("Cache-Control")).toBe(LONG_TTL);
   });
 
-  // Cloudflare's default cache key includes the query string and purge-by-URL
-  // matches keys exactly, so no filtered variant is reachable by a purge. A
-  // short TTL bounds their staleness instead of leaving them a day behind.
+  // Filter combinations are still distinct document URLs — a shared link or a
+  // cold load lands on one — and Cloudflare's cache key includes the query
+  // string, so no purge reaches them. A short TTL bounds their staleness
+  // instead of leaving them a day behind. Client-side filtering changed only
+  // who applies the filters, not which URLs a purge can name.
   test("gives a filtered variant a short edge TTL", async () => {
     const headers = await loadHeaders("/shows/year/2001?nugs=yes");
 

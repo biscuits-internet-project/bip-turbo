@@ -13,6 +13,15 @@ Otherwise the route WILL NOT WORK and you'll get 404s.
 
 If a route component references a runtime value from a `.ts` helper under `app/routes/` that imports `~/server/*`, `@bip/core`, or `@prisma/*`, Vite evaluates the server helper in the client bundle and silently breaks `<Link>` navigation (see PR #58). The route component may only `import type` from the helper — never value imports. When the component needs a value the loader also uses, return it from the loader as part of the loader data (preferred) or factor it into a sibling `*-constants.ts` file with no server imports. Enforced by [app/lib/server-import-leak.test.ts](app/lib/server-import-leak.test.ts).
 
+## Client-side filtering: the payload must be filter-independent, including its aggregates
+
+When a route applies filters in the component and pairs that with a `shouldRevalidate` that returns `false` on query-string-only changes ([shows/stats.tsx](app/routes/shows/stats.tsx), [shows/year/$year.tsx](app/routes/shows/year/$year.tsx)), *everything* the loader returns has to be filter-independent — not just the row list.
+
+- **Derived aggregates freeze if you miss one.** A per-year or per-group count computed server-side from the active filters silently stops updating the moment the refetch is suppressed. Either derive it in the component from data the payload already carries, or ship it in a form the client can re-derive from. Precedent: `$year.tsx` ships `showCountFacets` (`year → 5-bit media/source mask → count`, ~1.5KB for the whole catalog) instead of one filtered `Record<year, count>`, and the component collapses it per filter combination.
+- **Exempt any param the server actually reads.** `shouldRevalidate` must still defer to the default when a server-backed param changes — `$year.tsx` skips revalidation for the five media filters but not for `q`, which drives a DB search.
+- **Keep prefetch query keys on the unfiltered set.** `useShowUserData` keys on the show ids it's given, so a component rendering a filtered subset would miss the loader's dehydrated entry and refetch on every toggle. Pass the full set via `SetlistList`'s `userDataShowIds`.
+- **The short edge TTL on filtered URLs still applies.** Filter combinations remain distinct document URLs that purge-by-URL cannot name; moving the filtering client-side changed who applies the filters, not the cache key.
+
 ## Architecture
 
 - **Router**: React Router v7 with file-based routing in `app/routes/`

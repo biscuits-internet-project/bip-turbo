@@ -3,12 +3,10 @@ import type { ShowExternalSources } from "~/components/setlist/show-external-bad
 import { type ExternalSourceFilterFlags, matchesExternalSources } from "~/lib/show-source-filters";
 import { isAnyTriStateActive } from "~/lib/tri-state-filter";
 
-export type { ExternalSourceFilterFlags };
-
 /**
  * Drop setlists whose resolved external sources don't match the active
  * flags. Returns the input reference unchanged when no flag is active so
- * callers can use it unconditionally on every request without breaking
+ * callers can use it unconditionally on every render without breaking
  * downstream reference equality.
  */
 export function applyExternalSourceFilters<T extends Pick<Setlist, "show">>(
