@@ -75,8 +75,9 @@ export class YoutubeService {
 
   /**
    * Adds a curated video to a show. Also bumps the denormalized
-   * `Show.showYoutubesCount` so the `hasYoutube` filter sees the new row, and
-   * invalidates the show's cached pages.
+   * `Show.showYoutubesCount` so the per-row badge and the listing media filters
+   * (which read it through {@link ShowService.getShowDatesWithFlags}) see the
+   * new row, and invalidates the show's cached pages.
    */
   async createForShow(showId: string, videoId: string): Promise<ShowYoutubeEntry> {
     const now = new Date();

@@ -221,6 +221,23 @@ describe("SetlistList", () => {
     expect(passed).toEqual(["show-a", "show-b", "show-c"]);
   });
 
+  // The year page renders a client-filtered slice of a year its loader
+  // prefetched whole. Keying the hook on the whole year keeps that prefetched
+  // cache entry a hit across filter toggles instead of refetching every time
+  // the rendered subset changes.
+  test("keys useShowUserData on userDataShowIds when given, not the rendered subset", async () => {
+    setMockReturn();
+    await setupWithRouter(
+      <SetlistList
+        setlists={[makeSetlist("show-a", "Basis for a Day")]}
+        externalSources={{}}
+        userDataShowIds={["show-a", "show-b", "show-c"]}
+      />,
+    );
+
+    expect(useShowUserDataMock.mock.calls[0][0]).toEqual(["show-a", "show-b", "show-c"]);
+  });
+
   // Empty list with no `empty` prop: render nothing, no cards, no stray DOM.
   test("renders nothing when setlists is empty and no empty prop is given", async () => {
     setMockReturn();

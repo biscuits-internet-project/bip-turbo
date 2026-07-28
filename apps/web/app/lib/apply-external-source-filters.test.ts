@@ -13,7 +13,7 @@ function sources(partial: Partial<ShowExternalSources>): ShowExternalSources {
 }
 
 describe("applyExternalSourceFilters", () => {
-  // No filter flags active → input passes through untouched. The year loader
+  // No filter flags active → input passes through untouched. The year page
   // uses this helper unconditionally, so the no-op path has to be cheap and
   // return-by-reference (preserves React Query reference equality downstream).
   test("returns setlists unchanged when no filters are active", () => {

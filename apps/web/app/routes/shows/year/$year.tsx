@@ -2,7 +2,7 @@ import { CacheKeys, type Setlist } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ClientLoaderFunctionArgs, HeadersArgs } from "react-router";
+import type { ClientLoaderFunctionArgs, HeadersArgs, ShouldRevalidateFunction } from "react-router";
 import { data } from "react-router";
 import { useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -16,28 +16,33 @@ import { CollapsibleSection } from "~/components/ui/collapsible-section";
 import { LinkButton } from "~/components/ui/link-button";
 import { YearFilterNav } from "~/components/year-filter-nav";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
+import { applyExternalSourceFilters } from "~/lib/apply-external-source-filters";
+import { applyMediaCountFilters } from "~/lib/apply-media-count-filters";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getShowsMeta } from "~/lib/seo";
-import { parseTriState, type TriState } from "~/lib/tri-state-filter";
+import { type ShowCountFacets, showCountsByYearFromFacets } from "~/lib/show-count-facets";
+import { parseTriState } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
-import { applyExternalSourceFilters } from "~/server/apply-external-source-filters";
-import { applyMediaCountFilters } from "~/server/apply-media-count-filters";
 import { services } from "~/server/services";
-import { computeShowCountsByYear } from "~/server/show-counts-by-year";
+import { computeShowCountFacets } from "~/server/show-count-facets";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 import { computeShowUserData } from "~/server/show-user-data";
 
+/**
+ * Deliberately filter-independent: the same payload serves every media-filter
+ * combination, and the component narrows it. That's what lets one cached year
+ * blob back all 3^5 combinations and lets {@link shouldRevalidate} skip the
+ * refetch on a toggle.
+ */
 interface LoaderData {
   setlists: Setlist[];
   year: number;
   searchQuery?: string;
   externalSources: Record<string, ShowExternalSources>;
-  showCountsByYear: Record<number, number>;
-  monthCounts: Record<number, number>;
-  filters: { photos: TriState; youtube: TriState; nugs: TriState; archive: TriState; relisten: TriState };
+  showCountFacets: ShowCountFacets;
   dehydratedState: DehydratedState;
 }
 
@@ -88,15 +93,6 @@ export const loader = publicLoader(async ({ request, params, context }) => {
   const yearInt = Number.parseInt(year as string, 10);
   const searchQuery = url.searchParams.get("q") || undefined;
 
-  const filters = {
-    photos: parseTriState(url.searchParams.get("photos")),
-    youtube: parseTriState(url.searchParams.get("youtube")),
-    nugs: parseTriState(url.searchParams.get("nugs")),
-    archive: parseTriState(url.searchParams.get("archive")),
-    relisten: parseTriState(url.searchParams.get("relisten")),
-  };
-  const emptyCounts: Record<number, number> = {};
-
   let setlists: Setlist[] = [];
 
   // If there's a search query with at least MIN_SEARCH_CHARS characters, use the search functionality.
@@ -121,16 +117,16 @@ export const loader = publicLoader(async ({ request, params, context }) => {
       year: yearInt,
       searchQuery,
       externalSources: await computeShowExternalSources(setlists.map((s) => s.show)),
-      showCountsByYear: emptyCounts,
-      monthCounts: emptyCounts,
-      filters,
+      // Search spans every year and hides the Filter-by-Year nav, so there are
+      // no per-year counts to derive.
+      showCountFacets: {},
       dehydratedState: dehydrateAndClear(searchClient),
     };
     return data(searchPayload, { headers: yearListingCacheHeaders(url, { isSearchResult: true }) });
   }
 
   // Cache one unfiltered set per (year, sort). All five media/source filters
-  // are applied in memory below, so the tri-state combinations share a single
+  // are applied by the component, so the tri-state combinations share a single
   // cached year blob instead of each caching a near-full-year payload.
   const currentYear = new Date().getFullYear();
   const sortDirection = yearInt === currentYear ? "desc" : "asc";
@@ -145,41 +141,50 @@ export const loader = publicLoader(async ({ request, params, context }) => {
     });
   });
 
-  const externalSources = await computeShowExternalSources(setlists.map((s) => s.show));
-  const filteredSetlists = applyExternalSourceFilters(
-    applyMediaCountFilters(setlists, { photos: filters.photos, youtube: filters.youtube }),
-    externalSources,
-    { nugs: filters.nugs, archive: filters.archive, relisten: filters.relisten },
-  );
+  const [externalSources, showCountFacets] = await Promise.all([
+    computeShowExternalSources(setlists.map((s) => s.show)),
+    computeShowCountFacets(),
+  ]);
 
-  const showCountsByYear = await computeShowCountsByYear(filters);
+  logger.info(`Year ${yearInt} shows loaded: ${setlists.length} shows`);
 
-  const monthCounts: Record<number, number> = {};
-  for (const setlist of filteredSetlists) {
-    const month = new Date(setlist.show.date).getMonth();
-    monthCounts[month] = (monthCounts[month] ?? 0) + 1;
-  }
-
-  logger.info(`Year ${yearInt} shows loaded: ${filteredSetlists.length} shows`);
-
-  const filteredShowIds = filteredSetlists.map((s) => s.show.id);
+  // Prefetched for the whole year, matching the `userDataShowIds` the component
+  // hands SetlistList — a key derived from the filtered subset would miss on
+  // every toggle and refetch what's already here.
+  const showIds = setlists.map((s) => s.show.id);
   const queryClient = createPrefetchClient();
   await queryClient.prefetchQuery({
-    queryKey: showUserDataQueryKey(filteredShowIds),
-    queryFn: () => computeShowUserData(context, filteredShowIds),
+    queryKey: showUserDataQueryKey(showIds),
+    queryFn: () => computeShowUserData(context, showIds),
   });
 
   const payload: LoaderData = {
-    setlists: filteredSetlists,
+    setlists,
     year: yearInt,
     externalSources,
-    showCountsByYear,
-    monthCounts,
-    filters,
+    showCountFacets,
     dehydratedState: dehydrateAndClear(queryClient),
   };
   return data(payload, { headers: yearListingCacheHeaders(url, { isSearchResult: false }) });
 });
+
+/**
+ * A media-filter toggle only rewrites the query string: the payload covers the
+ * whole year regardless, and the component re-derives the visible list, the
+ * month counts, and the per-year counts from what it already has. Refetching
+ * would re-pay a full SSR render (~880ms and 2.4MB for a year like 2001) for
+ * identical data. `q` is the exception — search results come from a server
+ * query, so a changed search still needs the loader.
+ *
+ * This also swallows the `revalidator.revalidate()` that a star rating fires,
+ * which is only ever redundant here: nothing in this payload carries ratings or
+ * attendance. Those ride React Query, which StarRating updates directly.
+ */
+export const shouldRevalidate: ShouldRevalidateFunction = ({ currentUrl, nextUrl, defaultShouldRevalidate }) => {
+  if (currentUrl.pathname !== nextUrl.pathname) return defaultShouldRevalidate;
+  if (currentUrl.searchParams.get("q") !== nextUrl.searchParams.get("q")) return defaultShouldRevalidate;
+  return false;
+};
 
 // Destructured as `loaderData` because `data` is the React Router helper this
 // module imports to attach cache headers.
@@ -194,8 +199,7 @@ export const clientLoader = async ({ serverLoader }: ClientLoaderFunctionArgs) =
 clientLoader.hydrate = true;
 
 export default function ShowsByYear() {
-  const { setlists, year, searchQuery, externalSources, showCountsByYear, monthCounts } =
-    useSerializedLoaderData<LoaderData>();
+  const { setlists, year, searchQuery, externalSources, showCountFacets } = useSerializedLoaderData<LoaderData>();
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Current URL search params drive the filter bar's active state and the
@@ -203,6 +207,46 @@ export default function ShowsByYear() {
   // useLocation keeps this in sync with react-router navigations (SSR-safe).
   const location = useLocation();
   const currentURLParameters = useMemo(() => new URLSearchParams(location.search), [location.search]);
+
+  const filters = useMemo(
+    () => ({
+      photos: parseTriState(currentURLParameters.get("photos")),
+      youtube: parseTriState(currentURLParameters.get("youtube")),
+      nugs: parseTriState(currentURLParameters.get("nugs")),
+      archive: parseTriState(currentURLParameters.get("archive")),
+      relisten: parseTriState(currentURLParameters.get("relisten")),
+    }),
+    [currentURLParameters],
+  );
+
+  // Search replaces the browse nav, filter bar included, so a filter left over
+  // from browsing must not silently narrow what the search turned up.
+  const visibleSetlists = useMemo(() => {
+    if (searchQuery) return setlists;
+    return applyExternalSourceFilters(
+      applyMediaCountFilters(setlists, { photos: filters.photos, youtube: filters.youtube }),
+      externalSources,
+      { nugs: filters.nugs, archive: filters.archive, relisten: filters.relisten },
+    );
+  }, [setlists, searchQuery, filters, externalSources]);
+
+  const monthCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (const setlist of visibleSetlists) {
+      const month = new Date(setlist.show.date).getMonth();
+      counts[month] = (counts[month] ?? 0) + 1;
+    }
+    return counts;
+  }, [visibleSetlists]);
+
+  const showCountsByYear = useMemo(
+    () => showCountsByYearFromFacets(showCountFacets, filters),
+    [showCountFacets, filters],
+  );
+
+  // The loader prefetched per-user data for the whole year; keying on that same
+  // set keeps the hydrated cache entry a hit as filters narrow the list.
+  const userDataShowIds = useMemo(() => setlists.map((s) => s.show.id), [setlists]);
 
   // Months with at least one show — drives the Jump-to-Month nav active state.
   const monthsWithShows = useMemo(() => Object.keys(monthCounts).map(Number), [monthCounts]);
@@ -317,7 +361,7 @@ export default function ShowsByYear() {
           {/* Search Results Count */}
           {searchQuery && (
             <div className="text-content-text-secondary">
-              Found {setlists.length} {setlists.length === 1 ? "show" : "shows"}
+              Found {visibleSetlists.length} {visibleSetlists.length === 1 ? "show" : "shows"}
             </div>
           )}
 
@@ -327,7 +371,8 @@ export default function ShowsByYear() {
           <div>
             <div className="space-y-8">
               <SetlistList
-                setlists={setlists}
+                setlists={visibleSetlists}
+                userDataShowIds={userDataShowIds}
                 externalSources={externalSources}
                 groupByMonth={!searchQuery}
                 empty={

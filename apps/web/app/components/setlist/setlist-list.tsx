@@ -32,6 +32,14 @@ interface SetlistListProps {
   numbered?: boolean;
   /** Forwarded to each SetlistCard; see SetlistCard's `collapsible` prop. */
   collapsible?: boolean;
+  /**
+   * Show ids to load per-user data for, when that set is wider than what's
+   * rendered. The year page renders a client-filtered slice of a year whose
+   * loader prefetched the whole thing; keying on the whole year keeps that
+   * prefetched cache entry a hit across filter toggles instead of refetching
+   * every time the visible subset changes. Defaults to the rendered setlists.
+   */
+  userDataShowIds?: string[];
 }
 
 export function SetlistList({
@@ -41,10 +49,12 @@ export function SetlistList({
   groupByMonth,
   numbered,
   collapsible,
+  userDataShowIds,
 }: SetlistListProps) {
-  const showIds = useMemo(() => setlists.map((s) => s.show.id), [setlists]);
-  const { attendanceMap, userRatingMap, averageRatingMap, displayedRatingMap, rankComparisonMap } =
-    useShowUserData(showIds);
+  const renderedShowIds = useMemo(() => setlists.map((s) => s.show.id), [setlists]);
+  const { attendanceMap, userRatingMap, averageRatingMap, displayedRatingMap, rankComparisonMap } = useShowUserData(
+    userDataShowIds ?? renderedShowIds,
+  );
 
   if (setlists.length === 0) {
     return <>{empty ?? null}</>;

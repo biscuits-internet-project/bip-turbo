@@ -43,28 +43,12 @@ import {
 } from "../_shared/show-ordering";
 import type { RockOperaService } from "../rock-operas/rock-opera-service";
 
-/**
- * Filter options for setlist queries. The `hasPhotos` / `hasYoutube` flags
- * are tri-state: `true` requires the media, `false` requires its absence,
- * and `undefined` skips the filter. Drives the year-page tri-state media
- * toggles where users can include OR exclude shows by media presence.
- */
+/** Scope options for setlist queries; every field is optional and ANDs. */
 export type SetlistFilter = {
   year?: number;
   monthDay?: string;
   venueId?: string;
-  hasPhotos?: boolean;
-  hasYoutube?: boolean;
 };
-
-/**
- * Translate a tri-state media filter into a Prisma numeric where-clause for
- * a denormalized count column (showPhotosCount, showYoutubesCount).
- */
-function countFilter(flag: boolean | undefined) {
-  if (flag === undefined) return undefined;
-  return flag ? { gt: 0 } : { equals: 0 };
-}
 
 type DbTrackLight = {
   id: string;
@@ -865,8 +849,8 @@ export class SetlistService {
   }
 
   /**
-   * Find setlists by year / calendar-day / venue / media filters. Powers the
-   * homepage recents and the year, on-this-day, and venue-detail listings.
+   * Find setlists by year / calendar-day / venue. Powers the homepage recents
+   * and the year, on-this-day, and venue-detail listings.
    */
   async findMany(options?: {
     pagination?: PaginationOptions;
@@ -876,8 +860,6 @@ export class SetlistService {
     const year = options?.filters?.year;
     const monthDay = options?.filters?.monthDay;
     const venueId = options?.filters?.venueId;
-    const hasPhotos = options?.filters?.hasPhotos;
-    const hasYoutube = options?.filters?.hasYoutube;
 
     const orderBy = resolveShowOrderBy(options?.sort, SHOW_ORDER_ASC);
     const skip =
@@ -900,8 +882,6 @@ export class SetlistService {
                 lt: `${year + 1}-01-01`,
               }
             : undefined,
-        showPhotosCount: countFilter(hasPhotos),
-        showYoutubesCount: countFilter(hasYoutube),
       },
       orderBy,
       skip,

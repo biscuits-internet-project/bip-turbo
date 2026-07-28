@@ -42,18 +42,6 @@ export function writeTriState(params: URLSearchParams, key: string, state: TriSt
 }
 
 /**
- * Convert a tri-state to the `boolean | undefined` shape used by the core
- * `SetlistFilter` for `hasPhotos` / `hasYoutube`.
- *   empty → undefined (no filter)
- *   positive → true (must have)
- *   negative → false (must NOT have)
- */
-export function triStateToBoolean(state: TriState): boolean | undefined {
-  if (state === "empty") return undefined;
-  return state === "positive";
-}
-
-/**
  * Keep-predicate for a single tri-state media/source filter: positive keeps
  * items that HAVE the thing, negative keeps items that LACK it, empty keeps
  * everything. The one place the positive/negative match lives so the DB-query
