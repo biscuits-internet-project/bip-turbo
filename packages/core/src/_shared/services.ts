@@ -27,7 +27,7 @@ import { TrackService } from "../tracks/track-service";
 import { PersonalSongHistoryService } from "../users/personal-song-history-service";
 import { UserService } from "../users/user-service";
 import { VenueService } from "../venues/venue-service";
-import type { CacheService, CloudflareCacheService } from "./cache";
+import type { CacheService, CloudflareCacheService, YearPurgeRegistry } from "./cache";
 import type { CacheInvalidationService } from "./cache/cache-invalidation-service";
 import type { ServiceContainer } from "./container";
 import type { RedisService } from "./redis";
@@ -66,6 +66,7 @@ export interface Services {
   cache: CacheService;
   cacheInvalidation: CacheInvalidationService;
   cloudflareCache: CloudflareCacheService;
+  yearPurgeRegistry: YearPurgeRegistry;
   logger: Logger;
 }
 
@@ -142,6 +143,7 @@ export function createServices(container: ServiceContainer): Services {
     cache: container.cache,
     cacheInvalidation: container.cacheInvalidation,
     cloudflareCache: container.cloudflareCache,
+    yearPurgeRegistry: container.yearPurgeRegistry,
     logger: container.logger,
   };
 }

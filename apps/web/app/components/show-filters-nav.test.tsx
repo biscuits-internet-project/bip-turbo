@@ -85,6 +85,20 @@ describe("ShowFiltersNav", () => {
     expect(next.get("youtube")).toBe("yes");
   });
 
+  // The href is an edge cache key, and Cloudflare keys on the literal string.
+  // Emitting filters in the order they were toggled would let two users who
+  // picked the same filters land on two different cached entries, both of which
+  // a show edit then has to purge.
+  test("emits filters in a fixed order whatever order they were toggled in", async () => {
+    await setupWithRouter(
+      <ShowFiltersNav basePath="/shows/year/2024" currentURLParameters={new URLSearchParams("photos=yes&nugs=no")} />,
+    );
+
+    const href = screen.getByRole("link", { name: /youtube/i }).getAttribute("href") ?? "";
+
+    expect(href).toBe("/shows/year/2024?nugs=no&youtube=yes&photos=yes");
+  });
+
   // Non-filter query params (e.g. `?q=` from external search links) must
   // survive a toggle click so users don't lose unrelated state.
   test("preserves unrelated query params", async () => {

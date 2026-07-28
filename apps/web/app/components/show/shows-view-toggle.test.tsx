@@ -16,6 +16,16 @@ describe("showsViewHref", () => {
     expect(href).toBe("/shows/year/2001?photos=no");
   });
 
+  // The setlist branch lands on the year listing, whose edge entries are keyed
+  // by the literal query string. The stats table writes its filters in its own
+  // order, so passing them through verbatim would fork a second cache entry
+  // holding exactly the same bytes.
+  test("canonicalizes the filter order when returning to the year listing", () => {
+    const href = showsViewHref("setlist", new URLSearchParams("photos=yes&nugs=no"), 2001, CURRENT_YEAR);
+
+    expect(href).toBe("/shows/year/2001?nugs=no&photos=yes");
+  });
+
   test("lands on the current year when the table spans more than one year", () => {
     // Setlists are year-scoped by route, so an all-time or era range has no
     // equivalent — the viewer has to land somewhere.
