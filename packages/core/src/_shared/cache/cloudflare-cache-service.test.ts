@@ -1,12 +1,19 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { CloudflareCacheService } from "./cloudflare-cache-service";
+import type { YearPurgeRegistry } from "./year-purge-registry";
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
-function makeService() {
+/** A registry that reports the given paths for every year. */
+function stubRegistry(pathsByYear: Record<number, string[]> = {}) {
+  return { servedPaths: vi.fn(async (year: number) => pathsByYear[year] ?? []) } as unknown as YearPurgeRegistry;
+}
+
+function makeService(registry: YearPurgeRegistry = stubRegistry()) {
   return new CloudflareCacheService(
     { zoneId: "zone-1", apiToken: "token-1", siteUrl: "https://discobiscuits.net" },
     logger as never,
+    registry,
   );
 }
 
@@ -51,6 +58,66 @@ describe("CloudflareCacheService.purgeYearListings", () => {
     ]);
   });
 
+  // The filter variants only became cacheable for a day because the origin
+  // records what it served. Purging has to name each one, or the day-long TTL
+  // is exactly the staleness the short TTL used to prevent.
+  test("purges every recorded variant alongside the bare URL", async () => {
+    const fetchMock = stubFetch();
+    const registry = stubRegistry({
+      2001: ["/shows/year/2001", "/shows/year/2001?photos=yes", "/shows/year/2001?nugs=no&photos=yes"],
+    });
+
+    await makeService(registry).purgeYearListings([2001]);
+
+    expect(purgedFileBatches(fetchMock)[0]).toEqual([
+      "https://discobiscuits.net/shows/year/2001",
+      "https://discobiscuits.net/shows/year/2001.data",
+      "https://discobiscuits.net/shows/year/2001?photos=yes",
+      "https://discobiscuits.net/shows/year/2001.data?photos=yes",
+      "https://discobiscuits.net/shows/year/2001?nugs=no&photos=yes",
+      "https://discobiscuits.net/shows/year/2001.data?nugs=no&photos=yes",
+    ]);
+  });
+
+  // React Router's single-fetch URL suffixes the *pathname*, so the query
+  // string stays on the end. Appending `.data` to the whole string would
+  // produce `?photos=yes.data`, which matches no cache key and purges nothing.
+  test("suffixes the pathname, not the query string, on the .data twin", async () => {
+    const fetchMock = stubFetch();
+    const registry = stubRegistry({ 2001: ["/shows/year/2001?photos=yes"] });
+
+    await makeService(registry).purgeYearListings([2001]);
+
+    expect(purgedFileBatches(fetchMock).flat()).toContain("https://discobiscuits.net/shows/year/2001.data?photos=yes");
+  });
+
+  // The bare URL is purgeable whether or not anything was recorded, so a cold
+  // Redis or a capped-out year still evicts the listing everyone lands on.
+  test("purges the bare URL when the registry is empty", async () => {
+    const fetchMock = stubFetch();
+
+    await makeService(stubRegistry({})).purgeYearListings([2001]);
+
+    expect(purgedFileBatches(fetchMock)[0]).toEqual([
+      "https://discobiscuits.net/shows/year/2001",
+      "https://discobiscuits.net/shows/year/2001.data",
+    ]);
+  });
+
+  // The registry records the bare URL too, so without dedup every purge would
+  // name it twice and waste two of the 30 slots per call.
+  test("names each URL once when the registry repeats the bare path", async () => {
+    const fetchMock = stubFetch();
+    const registry = stubRegistry({ 2001: ["/shows/year/2001"] });
+
+    await makeService(registry).purgeYearListings([2001]);
+
+    expect(purgedFileBatches(fetchMock)[0]).toEqual([
+      "https://discobiscuits.net/shows/year/2001",
+      "https://discobiscuits.net/shows/year/2001.data",
+    ]);
+  });
+
   test("authenticates against the configured zone", async () => {
     const fetchMock = stubFetch();
 
@@ -86,6 +153,7 @@ describe("CloudflareCacheService.purgeYearListings", () => {
     const service = new CloudflareCacheService(
       { zoneId: "zone-1", apiToken: "token-1", siteUrl: "https://discobiscuits.net/" },
       logger as never,
+      stubRegistry(),
     );
 
     await service.purgeYearListings([2018]);

@@ -9,11 +9,13 @@ vi.mock("~/lib/base-loaders", () => ({
     fn({ ...args, context: {} }),
 }));
 const getOrSet = vi.fn();
+const recordPurgePath = vi.fn();
 vi.mock("~/server/services", () => ({
   services: {
     cache: { getOrSet: (key: string, fill: () => unknown) => getOrSet(key, fill) },
     setlists: { findMany: vi.fn().mockResolvedValue([]), findManyByShowIds: vi.fn().mockResolvedValue([]) },
     shows: { search: vi.fn().mockResolvedValue([]) },
+    yearPurgeRegistry: { record: (year: number, path: string) => recordPurgePath(year, path) },
   },
 }));
 vi.mock("~/server/show-external-sources", () => ({ computeShowExternalSources: vi.fn().mockResolvedValue({}) }));
@@ -135,24 +137,77 @@ describe("year listing cache headers", () => {
     expect(headers.get("Cache-Control")).toBe(LONG_TTL);
   });
 
-  // Filter combinations are still distinct document URLs — a shared link or a
-  // cold load lands on one — and Cloudflare's cache key includes the query
-  // string, so no purge reaches them. A short TTL bounds their staleness
-  // instead of leaving them a day behind. Client-side filtering changed only
-  // who applies the filters, not which URLs a purge can name.
-  test("gives a filtered variant a short edge TTL", async () => {
+  // Filter variants earn the same long TTL as the bare URL because the origin
+  // records each one it serves, so a show edit can name them all. Before that
+  // record existed they had to expire on their own every five minutes, which
+  // put every filter permutation back on the origin 288 times a day.
+  test("gives a filtered variant the same day-long edge TTL", async () => {
     const headers = await loadHeaders("/shows/year/2001?nugs=yes");
 
-    expect(headers.get("Cache-Control")).toBe(SHORT_TTL);
+    expect(headers.get("Cache-Control")).toBe(LONG_TTL);
   });
 
   // A `q` shorter than the search threshold falls through to the normal
   // listing branch, so it renders the same content as the bare URL but under
-  // its own cache key, which no purge reaches.
+  // its own cache key. It is deliberately not recorded, so it keeps the short
+  // self-healing TTL rather than a day-long one nothing would purge.
   test("gives a below-threshold search query a short edge TTL", async () => {
     const headers = await loadHeaders("/shows/year/2001?q=ab");
 
     expect(headers.get("Cache-Control")).toBe(SHORT_TTL);
+  });
+
+  // Any inbound social or email link can carry a tracking parameter, and each
+  // one forks the cache key. Recording them would let a single shared link
+  // consume the registry's per-year cap, so they self-heal instead.
+  test("gives a tracking parameter a short edge TTL", async () => {
+    expect((await loadHeaders("/shows/year/2001?utm_source=newsletter")).get("Cache-Control")).toBe(SHORT_TTL);
+    expect((await loadHeaders("/shows/year/2001?nugs=yes&fbclid=abc")).get("Cache-Control")).toBe(SHORT_TTL);
+  });
+});
+
+describe("year listing purge registry", () => {
+  // Cloudflare keys on the exact request line, so the recorded string has to be
+  // the one the edge saw. Re-serializing the params could reorder them into a
+  // URL that was never cached, and the real entry would survive the purge.
+  test("records the served path verbatim, query string and all", async () => {
+    await load("/shows/year/2001?nugs=yes&photos=no");
+
+    expect(recordPurgePath).toHaveBeenCalledWith(2001, "/shows/year/2001?nugs=yes&photos=no");
+  });
+
+  // The bare URL is recorded too: `purgeYearListings` adds it unconditionally,
+  // so this only has to not blow the cap, but it keeps one code path.
+  test("records the bare path", async () => {
+    await load("/shows/year/2001");
+
+    expect(recordPurgePath).toHaveBeenCalledWith(2001, "/shows/year/2001");
+  });
+
+  // This loader also answers the single-fetch `.data` request. Recording that
+  // pathname would store `/shows/year/2001.data`, which `purgeYearListings`
+  // expands to `.data.data` — a URL matching no cache key, so the real entry
+  // would survive every purge. The document path covers both twins.
+  test("records the document path for a single-fetch .data request", async () => {
+    await load("/shows/year/2001.data?nugs=yes");
+
+    expect(recordPurgePath).toHaveBeenCalledWith(2001, "/shows/year/2001?nugs=yes");
+  });
+
+  // A private, no-cache response never becomes an edge entry, so recording it
+  // would spend the year's cap on URLs that can't go stale.
+  test("does not record a search", async () => {
+    await load("/shows/year/2001?q=wetlands");
+
+    expect(recordPurgePath).not.toHaveBeenCalled();
+  });
+
+  // Only the URLs granted a long TTL are worth naming; the short-TTL ones
+  // expire on their own.
+  test("does not record a URL carrying a param outside the media filters", async () => {
+    await load("/shows/year/2001?nugs=yes&utm_source=newsletter");
+
+    expect(recordPurgePath).not.toHaveBeenCalled();
   });
 
   // Search results are one-offs keyed by whatever someone typed. Caching them

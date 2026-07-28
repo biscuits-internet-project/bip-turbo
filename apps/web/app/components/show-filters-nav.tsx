@@ -3,17 +3,16 @@ import { TriStateFilterButton } from "~/components/tri-state-filter-button";
 import { cardVariants } from "~/components/ui/card";
 import { EXTERNAL_SOURCE_DOMAINS, faviconSrc } from "~/lib/favicon";
 import { filterLabelClass } from "~/lib/form-styles";
-import { parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
+import {
+  canonicalizeFilterParams,
+  MEDIA_FILTER_PARAMS,
+  type MediaFilterParam,
+  parseTriState,
+  TRI_STATE_NEXT,
+  writeTriState,
+} from "~/lib/tri-state-filter";
 
-/**
- * The URL param names for the five media filters. Order matches the badge
- * strip in SetlistCard so filter buttons and the per-row indicators read the
- * same way.
- */
-const FILTER_KEYS = ["nugs", "youtube", "archive", "relisten", "photos"] as const;
-type FilterKey = (typeof FILTER_KEYS)[number];
-
-const FILTER_LABELS: Record<FilterKey, string> = {
+const FILTER_LABELS: Record<MediaFilterParam, string> = {
   nugs: "Nugs",
   youtube: "YouTube",
   archive: "Archive",
@@ -22,7 +21,7 @@ const FILTER_LABELS: Record<FilterKey, string> = {
 };
 
 /** Favicon domain per filter — null means "use a lucide icon instead". */
-const FILTER_FAVICON_DOMAINS: Record<FilterKey, string | null> = {
+const FILTER_FAVICON_DOMAINS: Record<MediaFilterParam, string | null> = {
   nugs: EXTERNAL_SOURCE_DOMAINS.nugs,
   youtube: EXTERNAL_SOURCE_DOMAINS.youtube,
   archive: EXTERNAL_SOURCE_DOMAINS.archive,
@@ -52,11 +51,13 @@ interface ShowFiltersNavProps {
  */
 export function ShowFiltersNav({ basePath, currentURLParameters, variant = "card" }: ShowFiltersNavProps) {
   const inline = variant === "inline";
-  const buttons = FILTER_KEYS.map((key) => {
+  const buttons = MEDIA_FILTER_PARAMS.map((key) => {
     const state = parseTriState(currentURLParameters.get(key));
     const next = new URLSearchParams(currentURLParameters);
     writeTriState(next, key, TRI_STATE_NEXT[state]);
-    const search = next.toString();
+    // Canonicalized after the toggle so the link is the same string no matter
+    // which order the filters were switched on — one edge entry, not several.
+    const search = canonicalizeFilterParams(next).toString();
 
     return (
       <TriStateFilterButton
@@ -88,7 +89,7 @@ export function ShowFiltersNav({ basePath, currentURLParameters, variant = "card
   );
 }
 
-function FilterFavicon({ filterKey }: { filterKey: FilterKey }) {
+function FilterFavicon({ filterKey }: { filterKey: MediaFilterParam }) {
   const domain = FILTER_FAVICON_DOMAINS[filterKey];
   if (domain) {
     return <img src={faviconSrc(domain)} alt="" aria-hidden="true" className="h-3.5 w-3.5" />;

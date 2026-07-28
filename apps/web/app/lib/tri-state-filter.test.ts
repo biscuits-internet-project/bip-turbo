@@ -1,5 +1,68 @@
 import { describe, expect, test } from "vitest";
-import { matchesTriState, parseTriState, TRI_STATE_NEXT, writeTriState } from "~/lib/tri-state-filter";
+import {
+  canonicalizeFilterParams,
+  MEDIA_FILTER_PARAMS,
+  matchesTriState,
+  parseTriState,
+  readMediaFilters,
+  TRI_STATE_NEXT,
+  writeTriState,
+} from "~/lib/tri-state-filter";
+
+describe("readMediaFilters", () => {
+  // Derived from MEDIA_FILTER_PARAMS rather than spelled out per key, so this
+  // proves the derivation actually reads each param's value rather than, say,
+  // returning the key name or a constant.
+  test("reads each filter's own tri-state from the params", () => {
+    const filters = readMediaFilters(new URLSearchParams("nugs=yes&photos=no"));
+
+    expect(filters.nugs).toBe("positive");
+    expect(filters.photos).toBe("negative");
+    expect(filters.youtube).toBe("empty");
+    expect(filters.archive).toBe("empty");
+    expect(filters.relisten).toBe("empty");
+  });
+
+  // A reader that skipped a filter would silently stop narrowing the list when
+  // that toggle is switched on, which is invisible until someone counts rows.
+  test("covers every filter the nav can emit", () => {
+    const filters = readMediaFilters(new URLSearchParams());
+
+    expect(Object.keys(filters).sort()).toEqual([...MEDIA_FILTER_PARAMS].sort());
+  });
+});
+
+describe("canonicalizeFilterParams", () => {
+  const canonical = (search: string) => canonicalizeFilterParams(new URLSearchParams(search)).toString();
+
+  // Cloudflare keys on the literal query string, so two toggle orders that mean
+  // the same thing would otherwise occupy two edge entries holding identical
+  // bytes — and a show edit would have to purge both.
+  test("emits the media filters in a fixed order regardless of input order", () => {
+    expect(canonical("photos=no&nugs=yes")).toBe(canonical("nugs=yes&photos=no"));
+  });
+
+  test("orders the filters nugs, youtube, archive, relisten, photos", () => {
+    expect(canonical("photos=yes&relisten=no&nugs=yes")).toBe("nugs=yes&relisten=no&photos=yes");
+  });
+
+  // A search term is a server-backed param, not a media filter, so it keeps its
+  // place ahead of the filter block rather than being reordered or dropped.
+  test("keeps non-filter params ahead of the filter block", () => {
+    expect(canonical("photos=yes&q=wetlands")).toBe("q=wetlands&photos=yes");
+  });
+
+  // Absent filters stay absent: writeTriState deletes on empty, and inventing
+  // explicit defaults here would fork the cache key for a no-op filter.
+  test("does not introduce params for inactive filters", () => {
+    expect(canonical("nugs=yes")).toBe("nugs=yes");
+    expect(canonical("")).toBe("");
+  });
+
+  test("preserves repeated non-filter params", () => {
+    expect(canonical("tag=a&tag=b&photos=yes")).toBe("tag=a&tag=b&photos=yes");
+  });
+});
 
 describe("matchesTriState", () => {
   // Positive keeps only items that have the thing.

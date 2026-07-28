@@ -1,4 +1,4 @@
-import { CacheKeys, type Setlist } from "@bip/domain";
+import { CacheKeys, type Setlist, yearListingPath } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,7 +24,7 @@ import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getShowsMeta } from "~/lib/seo";
 import { type ShowCountFacets, showCountsByYearFromFacets } from "~/lib/show-count-facets";
-import { parseTriState } from "~/lib/tri-state-filter";
+import { canonicalizeFilterParams, isMediaFilterParam, readMediaFilters } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
 import { services } from "~/server/services";
 import { computeShowCountFacets } from "~/server/show-count-facets";
@@ -51,37 +51,49 @@ const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 // Minimum characters required to trigger search
 const MIN_SEARCH_CHARS = 4;
 
+/** A day at the edge, for URLs a show edit can name and purge. */
+const PURGEABLE_CACHE_CONTROL = "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600";
+
+/** Short enough to self-heal, for URLs no purge reaches. */
+const SELF_HEALING_CACHE_CONTROL = "public, max-age=60, s-maxage=300, stale-while-revalidate=300";
+
 /**
- * Edge-cache policy for one year-listing response.
+ * Edge-cache policy for one year-listing response, plus whether the URL is one
+ * a show edit can purge.
  *
  * Lives here rather than in the `headers` export because React Router's
  * `HeadersArgs` carries only `loaderHeaders` / `parentHeaders` /
  * `actionHeaders` / `errorHeaders`. A `headers` export cannot see loader data,
  * so any policy that depends on the request has to be decided here and handed
  * over as headers on the loader's own response.
+ *
+ * The long TTL is granted exactly where a purge can reach: Cloudflare's cache
+ * key includes the query string, so a variant is only purgeable if something
+ * names it, and `YearPurgeRegistry` only names what the origin recorded.
+ * Anything carrying a param outside the media filters — a below-threshold `?q`,
+ * a tracking parameter — is left to self-heal on a short TTL instead, which
+ * also stops an inbound `utm_*` link from filling the registry.
  */
-function yearListingCacheHeaders(url: URL, { isSearchResult }: { isSearchResult: boolean }): Record<string, string> {
+function yearListingCachePolicy(
+  url: URL,
+  { isSearchResult }: { isSearchResult: boolean },
+): { headers: Record<string, string>; purgeable: boolean } {
   // Search results are one-offs keyed by whatever someone typed. Caching them
   // publicly fills the edge with single-use entries and serves a stale index
   // to the next person who searches the same words.
-  if (isSearchResult) return { "Cache-Control": "private, no-cache" };
+  if (isSearchResult) return { headers: { "Cache-Control": "private, no-cache" }, purgeable: false };
 
-  // Only the bare URL is purgeable: Cloudflare's cache key includes the query
-  // string, purge-by-URL matches a key exactly, and `purgeYearListings` emits
-  // exactly `/shows/year/:year` plus its `.data` twin. Every other spelling
-  // (any of the 3^5 media-filter combinations, a below-threshold `?q`, a
-  // tracking parameter) forks the key beyond a purge's reach, so it gets a TTL
-  // short enough to self-heal instead of a day-long one that cannot.
-  if (url.search !== "") return { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=300" };
+  const onlyMediaFilters = [...url.searchParams.keys()].every(isMediaFilterParam);
+  if (!onlyMediaFilters) return { headers: { "Cache-Control": SELF_HEALING_CACHE_CONTROL }, purgeable: false };
 
-  return { "Cache-Control": "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600" };
+  return { headers: { "Cache-Control": PURGEABLE_CACHE_CONTROL }, purgeable: true };
 }
 
 /**
  * Forward the loader's headers verbatim. Keep this a pure pass-through: adding
  * request-dependent logic here means reading a `data` field that `HeadersArgs`
  * does not have, which yields `undefined` and silently picks the wrong branch.
- * Route-level policy belongs in {@link yearListingCacheHeaders}.
+ * Route-level policy belongs in {@link yearListingCachePolicy}.
  */
 export function headers({ loaderHeaders }: HeadersArgs): Headers {
   return loaderHeaders;
@@ -122,7 +134,7 @@ export const loader = publicLoader(async ({ request, params, context }) => {
       showCountFacets: {},
       dehydratedState: dehydrateAndClear(searchClient),
     };
-    return data(searchPayload, { headers: yearListingCacheHeaders(url, { isSearchResult: true }) });
+    return data(searchPayload, { headers: yearListingCachePolicy(url, { isSearchResult: true }).headers });
   }
 
   // Cache one unfiltered set per (year, sort). All five media/source filters
@@ -165,7 +177,25 @@ export const loader = publicLoader(async ({ request, params, context }) => {
     showCountFacets,
     dehydratedState: dehydrateAndClear(queryClient),
   };
-  return data(payload, { headers: yearListingCacheHeaders(url, { isSearchResult: false }) });
+  const cachePolicy = yearListingCachePolicy(url, { isSearchResult: false });
+
+  // Recorded before the response goes out so the edge entry this request is
+  // about to create is already named by the time a show edit purges the year.
+  // A day-long TTL is only safe because of this; the registry swallows its own
+  // failures, so an unreachable Redis costs a stale variant, not the page.
+  //
+  // The path is rebuilt from the year rather than taken from `url.pathname`,
+  // because this loader also serves the single-fetch `/shows/year/:year.data`
+  // request. Recording that pathname would store a `.data` path that
+  // `purgeYearListings` would then expand to `.data.data`, purging nothing.
+  // Only the query string comes from the request, and it has to stay verbatim:
+  // it is the part Cloudflare keys on. `yearListingPath` is shared with the
+  // purge service so the recorded path and the purged one cannot drift.
+  if (cachePolicy.purgeable) {
+    await services.yearPurgeRegistry.record(yearInt, `${yearListingPath(yearInt)}${url.search}`);
+  }
+
+  return data(payload, { headers: cachePolicy.headers });
 });
 
 /**
@@ -205,19 +235,19 @@ export default function ShowsByYear() {
   // Current URL search params drive the filter bar's active state and the
   // Filter-by-Year links preserving filters across year switches. Using
   // useLocation keeps this in sync with react-router navigations (SSR-safe).
+  //
+  // Canonicalized here so every nav that composes on top of these params emits
+  // the same string for the same filter set. YearFilterNav forwards them
+  // verbatim, so a legacy link that spells the filters in another order would
+  // otherwise carry that spelling into the next year's URL and fork its edge
+  // cache key.
   const location = useLocation();
-  const currentURLParameters = useMemo(() => new URLSearchParams(location.search), [location.search]);
-
-  const filters = useMemo(
-    () => ({
-      photos: parseTriState(currentURLParameters.get("photos")),
-      youtube: parseTriState(currentURLParameters.get("youtube")),
-      nugs: parseTriState(currentURLParameters.get("nugs")),
-      archive: parseTriState(currentURLParameters.get("archive")),
-      relisten: parseTriState(currentURLParameters.get("relisten")),
-    }),
-    [currentURLParameters],
+  const currentURLParameters = useMemo(
+    () => canonicalizeFilterParams(new URLSearchParams(location.search)),
+    [location.search],
   );
+
+  const filters = useMemo(() => readMediaFilters(currentURLParameters), [currentURLParameters]);
 
   // Search replaces the browse nav, filter bar included, so a filter left over
   // from browsing must not silently narrow what the search turned up.
@@ -277,7 +307,7 @@ export default function ShowsByYear() {
           <h1 className="page-heading">SHOWS</h1>
           {!searchQuery && (
             <div className="absolute top-0 left-0 hidden sm:block">
-              <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+              <ShowFiltersNav basePath={yearListingPath(year)} currentURLParameters={currentURLParameters} />
             </div>
           )}
           <div className="absolute top-0 right-0 flex items-start gap-3">
@@ -303,7 +333,7 @@ export default function ShowsByYear() {
           {!searchQuery && (
             <div className="mt-3 flex flex-col items-center gap-3 sm:hidden">
               <ShowsViewToggle active="setlist" currentURLParameters={currentURLParameters} year={year} />
-              <ShowFiltersNav basePath={`/shows/year/${year}`} currentURLParameters={currentURLParameters} />
+              <ShowFiltersNav basePath={yearListingPath(year)} currentURLParameters={currentURLParameters} />
             </div>
           )}
         </div>

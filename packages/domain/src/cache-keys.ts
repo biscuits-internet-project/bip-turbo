@@ -49,6 +49,13 @@ export const CacheKeys = {
     // :v3 bump: the gap and vintage medians now match what a show's own page
     // reports — one row per song, continuous median.
     statsRows: () => `shows:stats-rows:v3`,
+
+    /**
+     * Set of `/shows/year/:year` request paths, query string included, that
+     * were served with a long edge TTL. A show edit purges exactly these, so
+     * the filter variants stay cacheable for a day without going stale.
+     */
+    yearPurgePaths: (year: number) => `shows:year-purge-paths:${year}:v1`,
   },
 
   /**

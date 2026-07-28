@@ -1,4 +1,6 @@
+import { yearListingPath } from "@bip/domain";
 import { SegmentLink } from "~/components/ui/segment-button";
+import { canonicalizeFilterParams } from "~/lib/tri-state-filter";
 
 export const SHOWS_TABLE_PATH = "/shows/stats";
 
@@ -32,7 +34,11 @@ export function showsViewHref(
   }
 
   next.delete("timeRange");
-  return withSearch(`/shows/year/${year ?? fallbackYear}`, next);
+  // Canonicalized because this lands on the year listing, whose edge entries are
+  // keyed by the literal query string. The stats table it comes from writes its
+  // filters in its own order, which would otherwise fork a second cache entry
+  // holding the same bytes.
+  return withSearch(yearListingPath(year ?? fallbackYear), canonicalizeFilterParams(next));
 }
 
 function withSearch(path: string, parameters: URLSearchParams): string {

@@ -28,6 +28,7 @@ export * from "./recurrence";
 export * from "./search";
 export * from "./segue-run";
 export * from "./show-ordering";
+export * from "./site-paths";
 export * from "./sorted-dates";
 export * from "./views/blog-post";
 export * from "./views/show-stats";

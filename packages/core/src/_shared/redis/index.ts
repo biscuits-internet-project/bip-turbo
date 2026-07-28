@@ -91,6 +91,33 @@ export class RedisService {
     return result === 1;
   }
 
+  /**
+   * Set commands, used where membership matters more than a value: several
+   * writers add to one collection concurrently and each addition has to be
+   * atomic. Members are stored raw rather than JSON-encoded, because the
+   * values are already strings and a purge has to hand Cloudflare the exact
+   * text it was given.
+   */
+  async sAdd(key: string, member: string): Promise<void> {
+    await this.connect();
+    await this.client.sAdd(key, member);
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    await this.connect();
+    return await this.client.sMembers(key);
+  }
+
+  async sCard(key: string): Promise<number> {
+    await this.connect();
+    return await this.client.sCard(key);
+  }
+
+  async expire(key: string, seconds: number): Promise<void> {
+    await this.connect();
+    await this.client.expire(key, seconds);
+  }
+
   getClient(): RedisClientType {
     if (!globalIsConnected) {
       throw new Error("Redis client not connected. Call connect() first");

@@ -1,3 +1,4 @@
+import { yearListingPath } from "@bip/domain";
 import {
   BookOpen,
   Building2,
@@ -32,7 +33,9 @@ const navigation = [
   { name: "blog", href: "/blog", icon: FileText },
   { name: "top rated", href: "/shows/top-rated", icon: TrendingUp },
   { name: "tour dates", href: "/shows/tour-dates", icon: CalendarDays },
-  { name: "photos", href: `/shows/year/${new Date().getFullYear()}?photos=true`, icon: Camera, mobileOnly: true },
+  // `photos=yes` is the canonical spelling `writeTriState` emits. `photos=true`
+  // parses the same but is a second edge cache key for an identical response.
+  { name: "photos", href: `${yearListingPath(new Date().getFullYear())}?photos=yes`, icon: Camera, mobileOnly: true },
 ];
 
 export function Header() {

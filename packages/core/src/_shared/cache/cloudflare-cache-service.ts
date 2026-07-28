@@ -1,4 +1,5 @@
-import type { Logger } from "@bip/domain";
+import { type Logger, yearListingPath } from "@bip/domain";
+import type { YearPurgeRegistry } from "./year-purge-registry";
 
 export interface CloudflareCacheConfig {
   zoneId: string;
@@ -15,6 +16,17 @@ export interface CloudflareCacheConfig {
  */
 const MAX_URLS_PER_PURGE = 30;
 
+/**
+ * The single-fetch twin of a request path. React Router suffixes the pathname,
+ * so the query string has to stay on the end: `foo?bar` becomes `foo.data?bar`,
+ * never `foo?bar.data`, which would match no cache key and purge nothing.
+ */
+function dataTwin(path: string): string {
+  const queryStart = path.indexOf("?");
+  if (queryStart === -1) return `${path}.data`;
+  return `${path.slice(0, queryStart)}.data${path.slice(queryStart)}`;
+}
+
 export class CloudflareCacheService {
   private readonly baseUrl: string;
   /** `config.siteUrl` without a trailing slash, so path concatenation cannot
@@ -24,6 +36,7 @@ export class CloudflareCacheService {
   constructor(
     private readonly config: CloudflareCacheConfig,
     private readonly logger: Logger,
+    private readonly yearPurgeRegistry: YearPurgeRegistry,
   ) {
     this.baseUrl = `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`;
     this.siteUrl = config.siteUrl.replace(/\/+$/, "");
@@ -48,7 +61,13 @@ export class CloudflareCacheService {
   }
 
   /**
-   * Purge the `/shows/year/:year` listing for each given year.
+   * Purge the `/shows/year/:year` listing for each given year, including every
+   * filter variant the origin recorded serving.
+   *
+   * The bare path goes first and unconditionally: it is the URL everyone lands
+   * on, and it stays purgeable even when Redis is cold or the year hit the
+   * registry's cap. The recorded variants follow, which is what lets them hold
+   * a day-long edge TTL instead of the short self-healing one.
    *
    * Both the document URL and its single-fetch `.data` twin are separate edge
    * entries, and a client-side navigation to the year page reads `.data`
@@ -56,10 +75,15 @@ export class CloudflareCacheService {
    * stale setlist on screen after a show is edited.
    */
   async purgeYearListings(years: number[]): Promise<void> {
-    const urls = years.flatMap((year) => {
-      const yearUrl = `${this.siteUrl}/shows/year/${year}`;
-      return [yearUrl, `${yearUrl}.data`];
-    });
+    const pathsByYear = await Promise.all(
+      years.map(async (year) => {
+        const barePath = yearListingPath(year);
+        const recorded = await this.yearPurgeRegistry.servedPaths(year);
+        return [barePath, ...recorded.filter((path) => path !== barePath)];
+      }),
+    );
+
+    const urls = pathsByYear.flat().flatMap((path) => [`${this.siteUrl}${path}`, `${this.siteUrl}${dataTwin(path)}`]);
     await this.purgeUrls(urls);
   }
 
