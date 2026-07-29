@@ -1,6 +1,43 @@
 import type { Setlist, Song, Venue } from "@bip/domain";
 import { describe, expect, it } from "vitest";
-import { getShowMeta, getSongMeta, getVenueMeta } from "./seo";
+import { getShowMeta, getShowsMeta, getSongMeta, getSongsMeta, getVenueMeta } from "./seo";
+
+/**
+ * Canonical links must use React Router's `{ tagName: "link", ... }` descriptor.
+ * The Remix v2 shape `{ link: { rel, href } }` still *typechecks*, because the
+ * `MetaDescriptor` union ends in an index-signature catch-all, but React Router
+ * skips descriptors it does not recognize and renders nothing at all. Every
+ * canonical tag in this app was silently absent from production for exactly that
+ * reason, so these assert the rendered shape rather than the presence of a key.
+ */
+function canonicalHref(meta: Array<Record<string, unknown>>): string | undefined {
+  const tag = meta.find((m) => m.tagName === "link" && m.rel === "canonical");
+  return tag?.href as string | undefined;
+}
+
+describe("canonical links", () => {
+  it("emits a canonical for the shows listing that React Router will render", () => {
+    expect(canonicalHref(getShowsMeta(1998))).toBe("https://discobiscuits.net/shows/year/1998");
+  });
+
+  it("emits a canonical for the songs listing", () => {
+    expect(canonicalHref(getSongsMeta())).toBe("https://discobiscuits.net/songs");
+  });
+
+  // A filtered spelling is a duplicate of the bare listing, so its canonical
+  // must point at the bare URL rather than at itself. This is what tells a
+  // crawler the 3^5 filter permutations are not separate pages worth crawling.
+  it("points a filtered shows listing at the bare year URL", () => {
+    expect(canonicalHref(getShowsMeta(1998))).not.toContain("?");
+  });
+
+  // The old shape is what shipped inert. Guard against it coming back.
+  it("uses no Remix-style link descriptors", () => {
+    for (const meta of [getShowsMeta(1998), getSongsMeta()]) {
+      expect(meta.some((m) => "link" in m)).toBe(false);
+    }
+  });
+});
 
 /**
  * Page titles/descriptions are built from the venue location. International

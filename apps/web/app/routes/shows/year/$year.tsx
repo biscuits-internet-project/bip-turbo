@@ -2,7 +2,7 @@ import { CacheKeys, type Setlist, yearListingPath, yearScope } from "@bip/domain
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ClientLoaderFunctionArgs, HeadersArgs, ShouldRevalidateFunction } from "react-router";
+import type { ClientLoaderFunctionArgs, HeadersArgs, MetaArgs, ShouldRevalidateFunction } from "react-router";
 import { data } from "react-router";
 import { useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -220,8 +220,18 @@ export const shouldRevalidate: ShouldRevalidateFunction = ({ currentUrl, nextUrl
 
 // Destructured as `loaderData` because `data` is the React Router helper this
 // module imports to attach cache headers.
-export function meta({ data: loaderData }: { data: LoaderData }) {
-  return getShowsMeta(loaderData.year, loaderData.searchQuery);
+export function meta({ data: loaderData, location }: MetaArgs) {
+  const data = loaderData as LoaderData;
+  const base = getShowsMeta(data.year, data.searchQuery);
+
+  // Every spelling carrying a query string renders a subset of the bare
+  // listing's content, so a search index should treat it as a duplicate rather
+  // than as one of 3^5 separate pages. `follow` still lets crawlers traverse to
+  // the show pages, which is where the content worth indexing actually lives.
+  // Paired with the canonical link in `getShowsMeta`, which already points at
+  // the bare URL.
+  if (location.search) return [...base, { name: "robots", content: "noindex,follow" }];
+  return base;
 }
 
 // Client loader enables hydration when page is served from CDN cache
