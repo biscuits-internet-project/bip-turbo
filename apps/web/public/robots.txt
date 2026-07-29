@@ -1,2 +1,18 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
+
+# Filtered and scoped listing views render the same shows as their bare URL —
+# the media filters and the stats table's time range are applied to a payload
+# that does not depend on them. Each permutation is a distinct URL, so crawling
+# them costs one full origin render each while adding nothing to the index.
+#
+# This is load-bearing, not tidiness. The five tri-state media filters span 3^5
+# spellings per year, and production request logs showed a crawler walking that
+# space across both listings at ~30-50 requests/minute, which is what drives the
+# container into its memory ceiling (2026-07 OOM incidents).
+#
+# The bare URLs stay crawlable: neither pattern matches a URL without a query
+# string.
+Disallow: /shows/year/*?
+Disallow: /shows/stats?
+Disallow: /shows/stats/*?

@@ -1,5 +1,29 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { drainRequestCounts, recordRequest } from "./request-counts";
+import { drainRequestCounts, recordCachePolicy, recordRequest } from "./request-counts";
+
+describe("recordCachePolicy", () => {
+  // A listing only earns its day-long edge TTL when a purge can name the URL.
+  // Whether that actually applies to real crawler traffic was inferred, never
+  // measured: production shows heavy query-carrying traffic on both listings,
+  // and this is the field that says whether those hits got the long policy or
+  // fell through to the short self-healing one.
+  test("splits a route by whether the response was purgeable", () => {
+    recordCachePolicy("shows/year", true);
+    recordCachePolicy("shows/year", true);
+    recordCachePolicy("shows/year", false);
+
+    expect(drainRequestCounts()).toEqual({ "shows/year:long": 2, "shows/year:short": 1 });
+  });
+
+  // Counted alongside the route buckets on the same line, so one interval's
+  // policy mix can be read against that interval's RSS delta.
+  test("coexists with the route buckets", () => {
+    recordRequest("/shows/stats", "?timeRange=2001");
+    recordCachePolicy("shows/stats", false);
+
+    expect(drainRequestCounts()).toEqual({ "shows/stats?": 1, "shows/stats:short": 1 });
+  });
+});
 
 beforeEach(() => {
   drainRequestCounts();

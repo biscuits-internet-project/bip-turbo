@@ -51,11 +51,12 @@ export const CacheKeys = {
     statsRows: () => `shows:stats-rows:v3`,
 
     /**
-     * Set of `/shows/year/:year` request paths, query string included, that
-     * were served with a long edge TTL. A show edit purges exactly these, so
-     * the filter variants stay cacheable for a day without going stale.
+     * Set of listing request paths, query string included, that were served
+     * with a long edge TTL. A show edit purges exactly these, so the filter
+     * variants stay cacheable for a day without going stale. Scoped per listing
+     * (`year:2001`, `shows-stats`) because each is purged independently.
      */
-    yearPurgePaths: (year: number) => `shows:year-purge-paths:${year}:v1`,
+    servedUrlPaths: (scope: string) => `shows:served-url-paths:${scope}:v1`,
   },
 
   /**

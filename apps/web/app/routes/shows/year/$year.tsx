@@ -1,4 +1,4 @@
-import { CacheKeys, type Setlist, yearListingPath } from "@bip/domain";
+import { CacheKeys, type Setlist, yearListingPath, yearScope } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -26,6 +26,7 @@ import { getShowsMeta } from "~/lib/seo";
 import { type ShowCountFacets, showCountsByYearFromFacets } from "~/lib/show-count-facets";
 import { canonicalizeFilterParams, isMediaFilterParam, readMediaFilters } from "~/lib/tri-state-filter";
 import { cn } from "~/lib/utils";
+import { recordCachePolicy } from "~/server/request-counts";
 import { services } from "~/server/services";
 import { computeShowCountFacets } from "~/server/show-count-facets";
 import { computeShowExternalSources } from "~/server/show-external-sources";
@@ -69,7 +70,7 @@ const SELF_HEALING_CACHE_CONTROL = "public, max-age=60, s-maxage=300, stale-whil
  *
  * The long TTL is granted exactly where a purge can reach: Cloudflare's cache
  * key includes the query string, so a variant is only purgeable if something
- * names it, and `YearPurgeRegistry` only names what the origin recorded.
+ * names it, and `ServedUrlRegistry` only names what the origin recorded.
  * Anything carrying a param outside the media filters — a below-threshold `?q`,
  * a tracking parameter — is left to self-heal on a short TTL instead, which
  * also stops an inbound `utm_*` link from filling the registry.
@@ -191,8 +192,9 @@ export const loader = publicLoader(async ({ request, params, context }) => {
   // Only the query string comes from the request, and it has to stay verbatim:
   // it is the part Cloudflare keys on. `yearListingPath` is shared with the
   // purge service so the recorded path and the purged one cannot drift.
+  recordCachePolicy("shows/year", cachePolicy.purgeable);
   if (cachePolicy.purgeable) {
-    await services.yearPurgeRegistry.record(yearInt, `${yearListingPath(yearInt)}${url.search}`);
+    await services.servedUrlRegistry.record(yearScope(yearInt), `${yearListingPath(yearInt)}${url.search}`);
   }
 
   return data(payload, { headers: cachePolicy.headers });

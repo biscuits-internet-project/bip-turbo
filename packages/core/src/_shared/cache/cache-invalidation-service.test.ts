@@ -135,7 +135,10 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
   // year listing stays stale at the edge even though Redis has been wiped.
   test("purges Cloudflare year listings for the supplied years", async () => {
     const cache = makeCache();
-    const cloudflareCache = { purgeYearListings: vi.fn().mockResolvedValue(undefined) };
+    const cloudflareCache = {
+      purgeYearListings: vi.fn().mockResolvedValue(undefined),
+      purgeShowsStats: vi.fn().mockResolvedValue(undefined),
+    };
     const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
 
     await service.invalidateShowListings([2018, 2024]);
@@ -148,7 +151,10 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
   // fallback to a default year would hide caller bugs.
   test("skips Cloudflare purge when years is empty", async () => {
     const cache = makeCache();
-    const cloudflareCache = { purgeYearListings: vi.fn().mockResolvedValue(undefined) };
+    const cloudflareCache = {
+      purgeYearListings: vi.fn().mockResolvedValue(undefined),
+      purgeShowsStats: vi.fn().mockResolvedValue(undefined),
+    };
     const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
 
     await service.invalidateShowListings([]);
@@ -156,12 +162,31 @@ describe("CacheInvalidationService.invalidateShowListings", () => {
     expect(cloudflareCache.purgeYearListings).not.toHaveBeenCalled();
   });
 
+  // The stats table renders from the whole catalog, so unlike the year
+  // listings it is staled by any show mutation regardless of which year moved.
+  // Gating it on `years` would leave it serving a day-old table after an edit.
+  test("purges the stats table even when no year listing is affected", async () => {
+    const cache = makeCache();
+    const cloudflareCache = {
+      purgeYearListings: vi.fn().mockResolvedValue(undefined),
+      purgeShowsStats: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
+
+    await service.invalidateShowListings([]);
+
+    expect(cloudflareCache.purgeShowsStats).toHaveBeenCalled();
+  });
+
   // Date-move edits pass both the old and new year, which collapse to one
   // year when the move stays within a calendar year. Dedupe lives in the
   // service so callers can pass duplicates without spamming Cloudflare.
   test("dedupes years before calling Cloudflare", async () => {
     const cache = makeCache();
-    const cloudflareCache = { purgeYearListings: vi.fn().mockResolvedValue(undefined) };
+    const cloudflareCache = {
+      purgeYearListings: vi.fn().mockResolvedValue(undefined),
+      purgeShowsStats: vi.fn().mockResolvedValue(undefined),
+    };
     const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
 
     await service.invalidateShowListings([2018, 2018, 2019]);

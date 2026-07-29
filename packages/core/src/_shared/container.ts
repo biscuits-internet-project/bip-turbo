@@ -1,6 +1,6 @@
 import type { Logger } from "@bip/domain";
 import type { RedisClientType } from "redis";
-import { CacheInvalidationService, CacheService, CloudflareCacheService, YearPurgeRegistry } from "./cache";
+import { CacheInvalidationService, CacheService, CloudflareCacheService, ServedUrlRegistry } from "./cache";
 import type { DbClient } from "./database/models";
 import type { Env } from "./env";
 import { RedisService } from "./redis";
@@ -12,7 +12,7 @@ export interface ServiceContainer {
   cache: CacheService;
   cloudflareCache: CloudflareCacheService;
   cacheInvalidation: CacheInvalidationService;
-  yearPurgeRegistry: YearPurgeRegistry;
+  servedUrlRegistry: ServedUrlRegistry;
   logger: Logger;
 }
 
@@ -33,7 +33,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
 
   // Create cache services
   const cache = new CacheService(redis, logger);
-  const yearPurgeRegistry = new YearPurgeRegistry(redis, logger);
+  const servedUrlRegistry = new ServedUrlRegistry(redis, logger);
   const cloudflareCache = new CloudflareCacheService(
     {
       zoneId: env.CLOUDFLARE_ZONE_ID,
@@ -41,7 +41,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
       siteUrl: env.BASE_URL,
     },
     logger,
-    yearPurgeRegistry,
+    servedUrlRegistry,
   );
   const cacheInvalidation = new CacheInvalidationService(cache, logger, cloudflareCache);
 
@@ -52,7 +52,7 @@ export function createContainer(args: ContainerArgs): ServiceContainer {
     cache,
     cloudflareCache,
     cacheInvalidation,
-    yearPurgeRegistry,
+    servedUrlRegistry,
     logger,
   };
 }

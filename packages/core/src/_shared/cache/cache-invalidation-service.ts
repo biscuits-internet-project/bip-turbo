@@ -99,6 +99,10 @@ export class CacheInvalidationService {
       // data, refreshed via invalidateSongCaches.)
       this.cache.delPattern(CacheKeys.musicians.allPages()),
       dedupedYears.length > 0 ? this.cloudflareCache?.purgeYearListings(dedupedYears) : Promise.resolve(),
+      // Unconditional, unlike the year listings: the stats table renders from
+      // the whole catalog, so any show mutation stales it regardless of which
+      // year moved.
+      this.cloudflareCache?.purgeShowsStats() ?? Promise.resolve(),
     ]);
   }
 
