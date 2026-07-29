@@ -1,5 +1,46 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { drainRequestCounts, recordCachePolicy, recordRequest } from "./request-counts";
+import {
+  drainRequestCounts,
+  MAX_TRACKED_PARAM_NAMES,
+  recordCachePolicy,
+  recordRequest,
+  recordUnrecognizedParams,
+} from "./request-counts";
+
+describe("recordUnrecognizedParams", () => {
+  // Production shows 30-50% of /shows/stats hits falling to the short TTL,
+  // meaning the crawler sends params the route's own controls never emit.
+  // Widening the recognized list needs their names, and nothing records them.
+  test("counts the param names that cost a request its long TTL", () => {
+    recordUnrecognizedParams("shows/stats", ["fbclid", "ref"]);
+    recordUnrecognizedParams("shows/stats", ["fbclid"]);
+
+    expect(drainRequestCounts()).toEqual({
+      "shows/stats:param:fbclid": 2,
+      "shows/stats:param:ref": 1,
+    });
+  });
+
+  // Names, never values: a value can carry anything a visitor typed, and these
+  // lines are printed into world-readable run logs by ops.yml.
+  test("records only names", () => {
+    recordUnrecognizedParams("shows/stats", ["q"]);
+
+    expect(JSON.stringify(drainRequestCounts())).not.toContain("wetlands");
+  });
+
+  // A crawler can invent unbounded distinct param names, so the map that exists
+  // to diagnose a memory problem must not grow without limit. Past the cap the
+  // rest collapse into one overflow bucket.
+  test("caps the distinct names tracked", () => {
+    const names = Array.from({ length: MAX_TRACKED_PARAM_NAMES + 25 }, (_, index) => `p${index}`);
+    recordUnrecognizedParams("shows/stats", names);
+
+    const counts = drainRequestCounts();
+    expect(Object.keys(counts).length).toBeLessThanOrEqual(MAX_TRACKED_PARAM_NAMES + 1);
+    expect(counts["shows/stats:param:overflow"]).toBe(25);
+  });
+});
 
 describe("recordCachePolicy", () => {
   // A listing only earns its day-long edge TTL when a purge can name the URL.
