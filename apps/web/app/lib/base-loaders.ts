@@ -1,6 +1,7 @@
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { redirect } from "react-router-dom";
+import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
 import { getRequestUser } from "~/server/request-user";
 import { services } from "~/server/services";
@@ -39,6 +40,15 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
   return async (args) => {
     const context = {} as TContext;
     const startTime = performance.now();
+
+    // Before anything else, including the user lookup: a request whose `&`
+    // separators arrived as the literal `&amp;` should cost a redirect, not a
+    // render. These were ~74% of /shows/stats traffic in production, each one
+    // rendering the whole catalog under a spelling no purge can reach. The 301
+    // also tells the crawler which URL to ask for next time. Loaders only —
+    // `createAction` serves POSTs, where a 301 may change the method.
+    const repaired = normalizeEscapedAmpersands(new URL(args.request.url));
+    if (repaired) throw redirect(repaired, 301);
 
     try {
       const user = await getUser(args.request, {
