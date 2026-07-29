@@ -23,6 +23,16 @@ lint:
 test:
 	bun run test
 
+# Guard the heaviest routes against per-request memory regressions before
+# shipping. Needs a current build plus the local Postgres/Redis. See the header
+# of scripts/memory-check.sh for what the numbers do and don't mean.
+mem-check:
+	bash scripts/memory-check.sh
+
+# Re-baseline the budgets from this machine. Review the diff before committing.
+mem-check-update:
+	bash scripts/memory-check.sh update
+
 # Run a package's tests filtered to certain files (vitest path/name substrings).
 # Defaults to the core package. Examples:
 #   make test-file FILES="quonfig"

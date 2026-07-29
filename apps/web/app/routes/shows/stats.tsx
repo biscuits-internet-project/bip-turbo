@@ -13,7 +13,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { getShowsMeta } from "~/lib/seo";
 import { MEDIA_FILTER_PARAMS } from "~/lib/tri-state-filter";
-import { recordCachePolicy } from "~/server/request-counts";
+import { recordCachePolicy, recordUnrecognizedParams } from "~/server/request-counts";
 import { services } from "~/server/services";
 import { computeShowExternalSources } from "~/server/show-external-sources";
 
@@ -41,8 +41,13 @@ export const loader = publicLoader(async ({ request }) => {
   const rows = await services.stats.getShowStatsRows();
   const payload: LoaderData = { rows, externalSources: await computeShowExternalSources(rows) };
 
-  const purgeable = [...url.searchParams.keys()].every((key) => TABLE_PARAMS.has(key));
+  const unrecognized = [...url.searchParams.keys()].filter((key) => !TABLE_PARAMS.has(key));
+  const purgeable = unrecognized.length === 0;
   recordCachePolicy("shows/stats", purgeable);
+  // Only this route records them: `shows/year` measures 100% purgeable in
+  // production, so there is nothing to name there, while a third to half of
+  // this route's hits fall to the short TTL for reasons nothing yet reports.
+  if (!purgeable) recordUnrecognizedParams("shows/stats", unrecognized);
 
   // Recorded before the response goes out so the edge entry this request is
   // about to create is already named by the time a show edit purges. The whole

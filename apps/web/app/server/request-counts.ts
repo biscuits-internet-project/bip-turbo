@@ -48,6 +48,13 @@ const OTHER_BUCKET = "other";
 let counts = new Map<string, number>();
 
 /**
+ * Held separately from `counts` so the cap in `recordUnrecognizedParams` bounds
+ * only the attacker-influenced keys. Mixing them would let a crawler's invented
+ * param names crowd out the fixed route buckets.
+ */
+let paramNames = new Map<string, number>();
+
+/**
  * Total requests in the interval whose user-agent identified a bot. Kept as one
  * flat number rather than a per-bucket split so the key set stays small: the
  * question it answers is "what share of this interval was crawlers", which the
@@ -75,6 +82,43 @@ export function recordRequest(pathname: string, search: string, isBot = false): 
  * this is the field that answers it. Callers pass a fixed route name, so the
  * key set stays bounded at two per route.
  */
+/**
+ * Distinct unrecognized param names tracked per interval.
+ *
+ * A crawler can invent unbounded param names, and the map that exists to
+ * diagnose a memory problem must not become one. Past the cap the rest collapse
+ * into a single overflow bucket, which is enough to say "there is a long tail"
+ * without holding it.
+ */
+export const MAX_TRACKED_PARAM_NAMES = 20;
+
+/**
+ * Record which param names cost a request its long edge TTL.
+ *
+ * Production shows a large share of `/shows/stats` hits falling to the short
+ * self-healing TTL, which means the crawler sends params the route's own
+ * controls never emit. Widening the recognized list needs their names, and
+ * inferring them from URL shapes is what this instrumentation exists to stop.
+ *
+ * Names only, never values: a value can carry anything a visitor typed, and
+ * `ops.yml` prints these lines into world-readable run logs.
+ */
+export function recordUnrecognizedParams(route: string, names: Iterable<string>): void {
+  for (const name of names) {
+    const key = `${route}:param:${name}`;
+    if (paramNames.has(key)) {
+      paramNames.set(key, (paramNames.get(key) ?? 0) + 1);
+      continue;
+    }
+    if (paramNames.size >= MAX_TRACKED_PARAM_NAMES) {
+      const overflow = `${route}:param:overflow`;
+      paramNames.set(overflow, (paramNames.get(overflow) ?? 0) + 1);
+      continue;
+    }
+    paramNames.set(key, 1);
+  }
+}
+
 export function recordCachePolicy(route: string, purgeable: boolean): void {
   const key = `${route}:${purgeable ? "long" : "short"}`;
   counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -86,7 +130,8 @@ export function recordCachePolicy(route: string, purgeable: boolean): void {
  * what makes it comparable against that interval's RSS delta.
  */
 export function drainRequestCounts(): Record<string, number> {
-  const drained = Object.fromEntries(counts);
+  const drained = { ...Object.fromEntries(counts), ...Object.fromEntries(paramNames) };
   counts = new Map();
+  paramNames = new Map();
   return drained;
 }

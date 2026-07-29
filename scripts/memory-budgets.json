@@ -1,0 +1,25 @@
+{
+  "comment": "Memory retained per request, in MB, for the routes most able to hurt production. Measured by scripts/memory-check.sh against the local prod-restore. Run-to-run spread on an identical build is ~3%, so toleranceRatio sits far outside the noise while still catching real regressions: the /shows/year filter path went 9.60 -> 16.10 (+68%) between two shipped PRs, which this would have failed. Baselines are both machine-relative and specific to requestsPerRoute, since fixed warmup cost amortizes over however many requests the run makes — always re-baseline with `make mem-check-update` rather than editing these numbers by hand, and treat a baseline change in a diff as something to justify.",
+  "toleranceRatio": 1.2,
+  "requestsPerRoute": 30,
+  "routes": [
+    {
+      "name": "year-listing",
+      "url": "/shows/year/2001",
+      "budgetMbPerRequest": 17.33,
+      "why": "Highest-traffic route and the one production crawlers walk hardest."
+    },
+    {
+      "name": "year-listing-filtered",
+      "url": "/shows/year/2001?nugs=yes&photos=no",
+      "budgetMbPerRequest": 16.3,
+      "why": "Filter permutations are ~100% of the year traffic production actually sees, and they cost more than the bare URL since the loader returns the whole year regardless."
+    },
+    {
+      "name": "shows-stats",
+      "url": "/shows/stats",
+      "budgetMbPerRequest": 13.73,
+      "why": "Ships the entire catalog on every request; the most expensive single payload in the app."
+    }
+  ]
+}
