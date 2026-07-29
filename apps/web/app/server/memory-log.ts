@@ -1,4 +1,5 @@
 import type { Logger } from "@bip/domain";
+import { drainRequestCounts } from "./request-counts";
 
 export const MEMORY_LOG_INTERVAL_MS = 60_000;
 
@@ -9,6 +10,13 @@ const BYTES_PER_MB = 1024 * 1024;
  * logs carry a minute-by-minute RSS/heap timeline: the evidence needed to
  * tell a slow leak from allocation churn ratcheting the heap high-water mark
  * (see the 2026-07 OOM incidents).
+ *
+ * `requests` carries the per-route counts for the same interval, so a reader
+ * can attribute an RSS jump to the traffic that caused it. Diagnosing the
+ * 2026-07 incidents meant inferring traffic from cache TTLs, which cost several
+ * production rollbacks that this field would have made unnecessary. The counts
+ * are bucketed by route pattern and never carry slugs or query strings, because
+ * `ops.yml` prints these lines into world-readable run logs.
  */
 export function logMemoryUsage(logger: Pick<Logger, "info">): void {
   const usage = process.memoryUsage();
@@ -17,6 +25,7 @@ export function logMemoryUsage(logger: Pick<Logger, "info">): void {
     heapTotalMb: Math.round(usage.heapTotal / BYTES_PER_MB),
     heapUsedMb: Math.round(usage.heapUsed / BYTES_PER_MB),
     externalMb: Math.round(usage.external / BYTES_PER_MB),
+    requests: drainRequestCounts(),
   });
 }
 

@@ -8,6 +8,7 @@ import { ServerRouter } from "react-router";
 import honeybadger from "~/lib/honeybadger";
 import { createLogger, logger } from "~/server/logger";
 import { startMemoryLogging } from "~/server/memory-log";
+import { recordRequest } from "~/server/request-counts";
 
 export const streamTimeout = 5_000;
 
@@ -27,10 +28,20 @@ export default function handleRequest(
     let timeoutId: NodeJS.Timeout | null = null;
     const userAgent = request.headers.get("user-agent");
 
+    const isBot = Boolean(userAgent && isbot(userAgent));
+
+    // Counts document renders only: single-fetch `.data` requests never reach
+    // this entry point, so a client-side navigation is invisible here even
+    // though it still costs the origin a loader run. Reading the counts as
+    // "cold loads that hit the origin" is correct; reading them as total
+    // traffic is not.
+    const { pathname, search } = new URL(request.url);
+    recordRequest(pathname, search, isBot);
+
     // Ensure requests from bots and SPA Mode renders wait for all content to load before responding
     // https://react.dev/reference/react-dom/server/renderToPipeableStream#waiting-for-all-content-to-load-for-crawlers-and-static-generation
     const readyOption: keyof RenderToPipeableStreamOptions =
-      (userAgent && isbot(userAgent)) || routerContext.isSpaMode ? "onAllReady" : "onShellReady";
+      isBot || routerContext.isSpaMode ? "onAllReady" : "onShellReady";
 
     const { pipe, abort } = renderToPipeableStream(<ServerRouter context={routerContext} url={request.url} />, {
       [readyOption]() {

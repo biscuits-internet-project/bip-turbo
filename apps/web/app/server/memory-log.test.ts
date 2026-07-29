@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { logMemoryUsage, MEMORY_LOG_INTERVAL_MS, startMemoryLogging } from "./memory-log";
+import { drainRequestCounts, recordRequest } from "./request-counts";
 
 function makeLoggerMock() {
   return { info: vi.fn() };
@@ -21,6 +22,33 @@ describe("logMemoryUsage", () => {
       expect(Number.isInteger(fields[key])).toBe(true);
     }
     expect(fields.rssMb).toBeGreaterThan(0);
+  });
+
+  // The RSS number alone can't say what caused a jump. Carrying the interval's
+  // route counts on the same line is what makes the timeline attributable —
+  // the 2026-07 investigation had to infer traffic from cache TTLs instead.
+  test("carries the interval's per-route request counts", () => {
+    drainRequestCounts();
+    recordRequest("/shows/year/2001", "?photos=yes", true);
+    const logger = makeLoggerMock();
+
+    logMemoryUsage(logger);
+
+    expect(logger.info.mock.calls[0][1].requests).toEqual({ "shows/year?": 1, bot: 1 });
+  });
+
+  // Draining on emit is what scopes each line to its own interval; without it
+  // every line would report cumulative traffic since boot and no line could be
+  // compared against its own RSS delta.
+  test("resets the counts so the next line covers only new traffic", () => {
+    drainRequestCounts();
+    recordRequest("/songs", "");
+    const logger = makeLoggerMock();
+
+    logMemoryUsage(logger);
+    logMemoryUsage(logger);
+
+    expect(logger.info.mock.calls[1][1].requests).toEqual({});
   });
 });
 

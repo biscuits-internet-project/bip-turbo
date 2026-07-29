@@ -218,11 +218,28 @@ describe("computeRecurrenceForSong", () => {
 function makeStubbedService(rows: unknown[] = []) {
   const queryRaw = vi.fn().mockResolvedValue(rows);
   const db = { $queryRaw: queryRaw } as unknown as ConstructorParameters<typeof StatsService>[0];
-  const cache = {
-    getOrSet: async <T>(_key: unknown, producer: () => Promise<T>) => producer(),
-  } as unknown as CacheService;
-  return { service: new StatsService(db, cache), queryRaw };
+  const getOrSet = vi.fn(async <T>(_key: unknown, producer: () => Promise<T>, _options?: unknown) => producer());
+  const cache = { getOrSet } as unknown as CacheService;
+  return { service: new StatsService(db, cache), queryRaw, getOrSet };
 }
+
+describe("StatsService in-process memoization", () => {
+  // The stats-rows blob is the whole catalog (~2k rows / 640KB of JSON) and it
+  // backs both /shows/stats and every musician profile. A Redis-only cache
+  // still re-parses all of it into 2000 objects on every request, which route
+  // probing measured at ~14MB retained per request — the single most expensive
+  // payload in the app. `memoTtlSeconds` is the existing lever for exactly this
+  // (see the homepage's recent-shows fetch); without it the parse cost is paid
+  // per request no matter how warm Redis is.
+  test("memoizes the whole-catalog stats rows in process, not just in Redis", async () => {
+    const { service, getOrSet } = makeStubbedService();
+
+    await service.getShowStatsRows();
+
+    const options = getOrSet.mock.calls[0][2] as { memoTtlSeconds?: number } | undefined;
+    expect(options?.memoTtlSeconds).toBeGreaterThan(0);
+  });
+});
 
 // Both getShowsByYear and getStatsShowDates feed denominators for rarity
 // stats — % since debut, shows since last played. Prod's per-date "stub"

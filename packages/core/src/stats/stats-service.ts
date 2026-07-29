@@ -20,6 +20,14 @@ import { mapShowStatsRow, type RawShowStatsRow, showStatsRowsSql } from "../show
 
 const ONE_DAY_SECONDS = 86400;
 
+/**
+ * How long the whole-catalog stats rows stay parsed in process memory. Matches
+ * the homepage's memo window: long enough that a burst of requests parses the
+ * payload once, short enough that a delete which bypasses the app entirely
+ * (redis-cli surgery) cannot serve stale rows for long.
+ */
+const STATS_ROWS_MEMO_SECONDS = 300;
+
 /** A track loaded for the gap / recurrence walk: scalar fields plus its show and flags. */
 type RebuildSongTrack = {
   id: string;
@@ -104,6 +112,13 @@ export class StatsService {
    * catalog in one payload, because the shows stats table sorts, filters, and
    * paginates client-side. Roughly 2k rows / 640KB of JSON, so it's cached for
    * a day and invalidated by show mutations via CacheInvalidationService.
+   *
+   * Memoized in process as well as in Redis. A Redis-only cache still pays a
+   * 640KB JSON parse into 2000 objects on every request, and this payload backs
+   * both `/shows/stats` and every musician profile; route probing measured that
+   * parse at roughly 14MB retained per request, the most expensive payload in
+   * the app. The memo window is short so a show mutation's `del` (which drops
+   * matching memo entries) stays the thing that actually governs freshness.
    */
   async getShowStatsRows(): Promise<ShowStatsRow[]> {
     if (!this.cache) {
@@ -115,7 +130,7 @@ export class StatsService {
         const rows = await this.db.$queryRaw<RawShowStatsRow[]>(showStatsRowsSql());
         return rows.map(mapShowStatsRow);
       },
-      { ttl: ONE_DAY_SECONDS },
+      { ttl: ONE_DAY_SECONDS, memoTtlSeconds: STATS_ROWS_MEMO_SECONDS },
     );
   }
 
