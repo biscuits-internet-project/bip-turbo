@@ -26,7 +26,42 @@ vi.mock("~/lib/query-prefetch", () => ({
   dehydrateAndClear: () => ({}),
 }));
 
-import { headers, loader, shouldRevalidate } from "./$year";
+import { headers, loader, meta, shouldRevalidate } from "./$year";
+
+/** Run the route's `meta` for one URL and return the descriptors. */
+function metaFor(search: string): Array<Record<string, unknown>> {
+  return meta({
+    data: { year: 1998, searchQuery: undefined },
+    location: { search },
+  } as never) as Array<Record<string, unknown>>;
+}
+
+describe("year listing indexing directives", () => {
+  // Every filtered spelling renders a subset of the bare listing's content, so
+  // it is a duplicate as far as a search index is concerned. `noindex` keeps
+  // the 3^5 permutations out of the index; `follow` keeps crawlers traversing
+  // to the show pages, which is where the real content lives.
+  test("marks a filtered spelling noindex, follow", () => {
+    const robots = metaFor("?nugs=yes&photos=no").find((tag) => tag.name === "robots");
+
+    expect(robots?.content).toBe("noindex,follow");
+  });
+
+  // The bare listing is the canonical page and must stay indexable, or the
+  // year pages drop out of search entirely.
+  test("leaves the bare listing indexable", () => {
+    expect(metaFor("").some((tag) => tag.name === "robots")).toBe(false);
+  });
+
+  // Both spellings point at the same canonical URL, which is what tells a
+  // crawler they are one page rather than hundreds.
+  test("points every spelling at the bare canonical URL", () => {
+    for (const search of ["", "?nugs=yes", "?utm_source=nl"]) {
+      const canonical = metaFor(search).find((tag) => tag.tagName === "link" && tag.rel === "canonical");
+      expect(canonical?.href).toBe("https://discobiscuits.net/shows/year/1998");
+    }
+  });
+});
 
 interface LoadResult {
   data: { setlists: Array<{ show: { id: string } }>; showCountFacets: Record<number, Record<number, number>> };

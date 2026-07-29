@@ -65,7 +65,7 @@ export function getHomeMeta() {
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -112,7 +112,7 @@ export function getShowMeta(setlist: Setlist) {
     { property: "og:type", content: "article" },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -153,7 +153,7 @@ export function getShowsMeta(year?: number, searchQuery?: string) {
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -171,7 +171,7 @@ export function getSongsMeta() {
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -203,7 +203,7 @@ export function getSongMeta(song: Song & { timesPlayed?: number; debutDate?: str
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -221,7 +221,7 @@ export function getVenuesMeta() {
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -256,7 +256,7 @@ export function getVenueMeta(venue: Venue & { showCount?: number; firstShowYear?
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -282,7 +282,7 @@ export function getAuthorMeta(author: { name: string; slug: string; songCount?: 
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -325,7 +325,7 @@ export function getMusicianMeta(musician: {
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -343,7 +343,7 @@ export function getBlogsMeta() {
     { property: "og:url", content: url },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 
@@ -371,7 +371,7 @@ export function getBlogMeta(blogPost: { title: string; blurb?: string; slug: str
     { property: "og:type", content: "article" },
     { name: "twitter:title", content: title },
     { name: "twitter:description", content: description },
-    { link: { rel: "canonical", href: url } },
+    { tagName: "link", rel: "canonical", href: url },
   ];
 }
 

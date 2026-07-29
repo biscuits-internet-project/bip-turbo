@@ -16,7 +16,24 @@ vi.mock("~/lib/base-loaders", () => ({
   publicLoader: (fn: (args: LoaderFunctionArgs) => unknown) => (args: LoaderFunctionArgs) => fn(args),
 }));
 
-import { loader, shouldRevalidate } from "./stats";
+import { loader, meta, shouldRevalidate } from "./stats";
+
+describe("shows stats indexing directives", () => {
+  const robotsFor = (search: string) =>
+    (meta({ location: { search } } as never) as Array<Record<string, unknown>>).find((tag) => tag.name === "robots");
+
+  // Every scoped or filtered spelling renders a subset of the same catalog, so
+  // it is a duplicate for indexing. `follow` keeps crawlers traversing to the
+  // show pages, which hold the content worth indexing.
+  test("marks a scoped spelling noindex, follow", () => {
+    expect(robotsFor("?timeRange=2001")?.content).toBe("noindex,follow");
+  });
+
+  // The bare table is the canonical page and has to stay indexable.
+  test("leaves the bare table indexable", () => {
+    expect(robotsFor("")).toBeUndefined();
+  });
+});
 
 const LONG_TTL = "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600";
 const SHORT_TTL = "public, max-age=60, s-maxage=300, stale-while-revalidate=300";

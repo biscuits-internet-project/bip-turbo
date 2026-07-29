@@ -1,7 +1,7 @@
 import { SHOWS_STATS_SCOPE, type ShowStatsRow, showsStatsPath } from "@bip/domain";
 import { Plus } from "lucide-react";
 import { useMemo } from "react";
-import type { HeadersArgs, ShouldRevalidateFunction } from "react-router";
+import type { HeadersArgs, MetaArgs, ShouldRevalidateFunction } from "react-router";
 import { data } from "react-router";
 import { useLocation } from "react-router-dom";
 import { AdminOnly } from "~/components/admin/admin-only";
@@ -72,8 +72,14 @@ export function headers({ loaderHeaders }: HeadersArgs): Headers {
   return loaderHeaders;
 }
 
-export function meta() {
-  return getShowsMeta();
+export function meta({ location }: MetaArgs) {
+  const base = getShowsMeta();
+
+  // Same reasoning as the year listing: every scoped or filtered spelling
+  // renders a subset of the same catalog, so it is a duplicate for indexing
+  // purposes. `follow` keeps crawlers moving through to the show pages.
+  if (location.search) return [...base, { name: "robots", content: "noindex,follow" }];
+  return base;
 }
 
 /**
