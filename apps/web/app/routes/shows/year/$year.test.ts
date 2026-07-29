@@ -15,7 +15,7 @@ vi.mock("~/server/services", () => ({
     cache: { getOrSet: (key: string, fill: () => unknown) => getOrSet(key, fill) },
     setlists: { findMany: vi.fn().mockResolvedValue([]), findManyByShowIds: vi.fn().mockResolvedValue([]) },
     shows: { search: vi.fn().mockResolvedValue([]) },
-    yearPurgeRegistry: { record: (year: number, path: string) => recordPurgePath(year, path) },
+    servedUrlRegistry: { record: (scope: string, path: string) => recordPurgePath(scope, path) },
   },
 }));
 vi.mock("~/server/show-external-sources", () => ({ computeShowExternalSources: vi.fn().mockResolvedValue({}) }));
@@ -173,7 +173,7 @@ describe("year listing purge registry", () => {
   test("records the served path verbatim, query string and all", async () => {
     await load("/shows/year/2001?nugs=yes&photos=no");
 
-    expect(recordPurgePath).toHaveBeenCalledWith(2001, "/shows/year/2001?nugs=yes&photos=no");
+    expect(recordPurgePath).toHaveBeenCalledWith("year:2001", "/shows/year/2001?nugs=yes&photos=no");
   });
 
   // The bare URL is recorded too: `purgeYearListings` adds it unconditionally,
@@ -181,7 +181,7 @@ describe("year listing purge registry", () => {
   test("records the bare path", async () => {
     await load("/shows/year/2001");
 
-    expect(recordPurgePath).toHaveBeenCalledWith(2001, "/shows/year/2001");
+    expect(recordPurgePath).toHaveBeenCalledWith("year:2001", "/shows/year/2001");
   });
 
   // This loader also answers the single-fetch `.data` request. Recording that
@@ -191,7 +191,7 @@ describe("year listing purge registry", () => {
   test("records the document path for a single-fetch .data request", async () => {
     await load("/shows/year/2001.data?nugs=yes");
 
-    expect(recordPurgePath).toHaveBeenCalledWith(2001, "/shows/year/2001?nugs=yes");
+    expect(recordPurgePath).toHaveBeenCalledWith("year:2001", "/shows/year/2001?nugs=yes");
   });
 
   // A private, no-cache response never becomes an edge entry, so recording it

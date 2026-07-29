@@ -67,6 +67,20 @@ export function recordRequest(pathname: string, search: string, isBot = false): 
 }
 
 /**
+ * Record which edge-cache policy a listing response received.
+ *
+ * A listing only earns its day-long TTL when a purge can name the URL, and
+ * everything else falls back to a short self-healing one. Which of those real
+ * crawler traffic actually gets was inferred from URL shapes, never measured;
+ * this is the field that answers it. Callers pass a fixed route name, so the
+ * key set stays bounded at two per route.
+ */
+export function recordCachePolicy(route: string, purgeable: boolean): void {
+  const key = `${route}:${purgeable ? "long" : "short"}`;
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/**
  * Return the counts since the last drain and reset. Each memory line therefore
  * describes the traffic in its own interval rather than since boot, which is
  * what makes it comparable against that interval's RSS delta.

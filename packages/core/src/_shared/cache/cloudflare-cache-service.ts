@@ -1,5 +1,5 @@
-import { type Logger, yearListingPath } from "@bip/domain";
-import type { YearPurgeRegistry } from "./year-purge-registry";
+import { type Logger, SHOWS_STATS_SCOPE, showsStatsPath, yearListingPath, yearScope } from "@bip/domain";
+import type { ServedUrlRegistry } from "./served-url-registry";
 
 export interface CloudflareCacheConfig {
   zoneId: string;
@@ -36,7 +36,7 @@ export class CloudflareCacheService {
   constructor(
     private readonly config: CloudflareCacheConfig,
     private readonly logger: Logger,
-    private readonly yearPurgeRegistry: YearPurgeRegistry,
+    private readonly servedUrlRegistry: ServedUrlRegistry,
   ) {
     this.baseUrl = `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`;
     this.siteUrl = config.siteUrl.replace(/\/+$/, "");
@@ -76,15 +76,37 @@ export class CloudflareCacheService {
    */
   async purgeYearListings(years: number[]): Promise<void> {
     const pathsByYear = await Promise.all(
-      years.map(async (year) => {
-        const barePath = yearListingPath(year);
-        const recorded = await this.yearPurgeRegistry.servedPaths(year);
-        return [barePath, ...recorded.filter((path) => path !== barePath)];
-      }),
+      years.map(async (year) => this.scopedPaths(yearScope(year), yearListingPath(year))),
     );
+    await this.purgeUrls(this.toAbsoluteUrls(pathsByYear.flat()));
+  }
 
-    const urls = pathsByYear.flat().flatMap((path) => [`${this.siteUrl}${path}`, `${this.siteUrl}${dataTwin(path)}`]);
-    await this.purgeUrls(urls);
+  /**
+   * Purge the `/shows/stats` table, including every scoped variant the origin
+   * recorded serving.
+   *
+   * Separate from `purgeYearListings` because the payload is the whole catalog:
+   * any show mutation stales it, not just one year's. Every filter and
+   * time-range spelling renders from that same payload, which is why they all
+   * have to be named here rather than left to expire.
+   */
+  async purgeShowsStats(): Promise<void> {
+    const paths = await this.scopedPaths(SHOWS_STATS_SCOPE, showsStatsPath());
+    await this.purgeUrls(this.toAbsoluteUrls(paths));
+  }
+
+  /**
+   * The bare path plus every recorded variant, deduped. The bare path goes
+   * first and unconditionally: it is the URL everyone lands on, and it stays
+   * purgeable even when Redis is cold or the scope hit the registry's cap.
+   */
+  private async scopedPaths(scope: string, barePath: string): Promise<string[]> {
+    const recorded = await this.servedUrlRegistry.servedPaths(scope);
+    return [barePath, ...recorded.filter((path) => path !== barePath)];
+  }
+
+  private toAbsoluteUrls(paths: string[]): string[] {
+    return paths.flatMap((path) => [`${this.siteUrl}${path}`, `${this.siteUrl}${dataTwin(path)}`]);
   }
 
   /**

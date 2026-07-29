@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { CloudflareCacheService } from "./cloudflare-cache-service";
-import type { YearPurgeRegistry } from "./year-purge-registry";
+import type { ServedUrlRegistry } from "./served-url-registry";
 
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
 /** A registry that reports the given paths for every year. */
-function stubRegistry(pathsByYear: Record<number, string[]> = {}) {
-  return { servedPaths: vi.fn(async (year: number) => pathsByYear[year] ?? []) } as unknown as YearPurgeRegistry;
+function stubRegistry(pathsByScope: Record<string, string[]> = {}) {
+  return { servedPaths: vi.fn(async (scope: string) => pathsByScope[scope] ?? []) } as unknown as ServedUrlRegistry;
 }
 
-function makeService(registry: YearPurgeRegistry = stubRegistry()) {
+function makeService(registry: ServedUrlRegistry = stubRegistry()) {
   return new CloudflareCacheService(
     { zoneId: "zone-1", apiToken: "token-1", siteUrl: "https://discobiscuits.net" },
     logger as never,
@@ -64,7 +64,7 @@ describe("CloudflareCacheService.purgeYearListings", () => {
   test("purges every recorded variant alongside the bare URL", async () => {
     const fetchMock = stubFetch();
     const registry = stubRegistry({
-      2001: ["/shows/year/2001", "/shows/year/2001?photos=yes", "/shows/year/2001?nugs=no&photos=yes"],
+      "year:2001": ["/shows/year/2001", "/shows/year/2001?photos=yes", "/shows/year/2001?nugs=no&photos=yes"],
     });
 
     await makeService(registry).purgeYearListings([2001]);
@@ -84,7 +84,7 @@ describe("CloudflareCacheService.purgeYearListings", () => {
   // produce `?photos=yes.data`, which matches no cache key and purges nothing.
   test("suffixes the pathname, not the query string, on the .data twin", async () => {
     const fetchMock = stubFetch();
-    const registry = stubRegistry({ 2001: ["/shows/year/2001?photos=yes"] });
+    const registry = stubRegistry({ "year:2001": ["/shows/year/2001?photos=yes"] });
 
     await makeService(registry).purgeYearListings([2001]);
 
@@ -108,7 +108,7 @@ describe("CloudflareCacheService.purgeYearListings", () => {
   // name it twice and waste two of the 30 slots per call.
   test("names each URL once when the registry repeats the bare path", async () => {
     const fetchMock = stubFetch();
-    const registry = stubRegistry({ 2001: ["/shows/year/2001"] });
+    const registry = stubRegistry({ "year:2001": ["/shows/year/2001"] });
 
     await makeService(registry).purgeYearListings([2001]);
 
@@ -197,5 +197,54 @@ describe("CloudflareCacheService.purgeYearListings", () => {
     await makeService().purgeYearListings([2018]);
 
     expect(logger.error).toHaveBeenCalledWith("Cloudflare cache purge failed", { error: "Invalid zone" });
+  });
+});
+
+describe("CloudflareCacheService.purgeShowsStats", () => {
+  // The stats table renders from the whole catalog, so any show mutation
+  // stales every spelling of it, not just one year's. Production request logs
+  // showed 100% of its traffic carrying a query string, so purging only the
+  // bare URL would leave every URL a real visitor actually lands on stale.
+  test("purges the bare table and every recorded variant", async () => {
+    const fetchMock = stubFetch();
+    const registry = stubRegistry({
+      "shows-stats": ["/shows/stats", "/shows/stats?timeRange=2001", "/shows/stats?nugs=yes&timeRange=2011"],
+    });
+
+    await makeService(registry).purgeShowsStats();
+
+    expect(purgedFileBatches(fetchMock)[0]).toEqual([
+      "https://discobiscuits.net/shows/stats",
+      "https://discobiscuits.net/shows/stats.data",
+      "https://discobiscuits.net/shows/stats?timeRange=2001",
+      "https://discobiscuits.net/shows/stats.data?timeRange=2001",
+      "https://discobiscuits.net/shows/stats?nugs=yes&timeRange=2011",
+      "https://discobiscuits.net/shows/stats.data?nugs=yes&timeRange=2011",
+    ]);
+  });
+
+  // Cold Redis or a capped-out scope still has to evict the URL everyone lands
+  // on, the same guarantee the year listings get.
+  test("purges the bare table when the registry is empty", async () => {
+    const fetchMock = stubFetch();
+
+    await makeService().purgeShowsStats();
+
+    expect(purgedFileBatches(fetchMock)[0]).toEqual([
+      "https://discobiscuits.net/shows/stats",
+      "https://discobiscuits.net/shows/stats.data",
+    ]);
+  });
+
+  // The stats scope is global, so a year scope's paths must never leak into it
+  // (and vice versa) — that would purge URLs that were never served and waste
+  // slots against Cloudflare's 30-per-call cap.
+  test("reads only the stats scope", async () => {
+    const fetchMock = stubFetch();
+    const registry = stubRegistry({ "year:2001": ["/shows/year/2001?photos=yes"] });
+
+    await makeService(registry).purgeShowsStats();
+
+    expect(purgedFileBatches(fetchMock).flat()).not.toContain("https://discobiscuits.net/shows/year/2001?photos=yes");
   });
 });

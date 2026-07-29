@@ -1,13 +1,76 @@
-import type { ShouldRevalidateFunctionArgs } from "react-router";
-import { describe, expect, test, vi } from "vitest";
+import type { LoaderFunctionArgs, ShouldRevalidateFunctionArgs } from "react-router";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Server-side modules — stubbed so the route file can be imported without
-// pulling Prisma/Supabase into the test bundle.
-vi.mock("~/server/services", () => ({ services: {} }));
-vi.mock("~/server/show-external-sources", () => ({ computeShowExternalSources: vi.fn() }));
-vi.mock("~/lib/base-loaders", () => ({ publicLoader: vi.fn() }));
+// pulling Prisma/Supabase into the test bundle. `publicLoader` is an identity
+// wrapper so the loader itself is callable.
+const recordServedPath = vi.fn();
+vi.mock("~/server/services", () => ({
+  services: {
+    stats: { getShowStatsRows: vi.fn().mockResolvedValue([]) },
+    servedUrlRegistry: { record: (scope: string, path: string) => recordServedPath(scope, path) },
+  },
+}));
+vi.mock("~/server/show-external-sources", () => ({ computeShowExternalSources: vi.fn().mockResolvedValue({}) }));
+vi.mock("~/lib/base-loaders", () => ({
+  publicLoader: (fn: (args: LoaderFunctionArgs) => unknown) => (args: LoaderFunctionArgs) => fn(args),
+}));
 
-import { shouldRevalidate } from "./stats";
+import { loader, shouldRevalidate } from "./stats";
+
+const LONG_TTL = "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600";
+const SHORT_TTL = "public, max-age=60, s-maxage=300, stale-while-revalidate=300";
+
+async function loadHeaders(url: string): Promise<Headers> {
+  const result = (await (loader as (args: LoaderFunctionArgs) => Promise<{ init: ResponseInit }>)({
+    request: new Request(`https://discobiscuits.net${url}`),
+    params: {},
+    context: {},
+  } as unknown as LoaderFunctionArgs)) as { init: ResponseInit };
+  return new Headers(result.init.headers);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("shows stats cache policy", () => {
+  // The whole catalog renders on every miss, and production logs showed 100%
+  // of this route's traffic carrying a query string against a 5-minute TTL —
+  // every spelling returning to the origin 288 times a day. The long TTL is
+  // safe only because each served URL is recorded and therefore purgeable.
+  test("gives the bare table a day-long edge TTL", async () => {
+    expect((await loadHeaders("/shows/stats")).get("Cache-Control")).toBe(LONG_TTL);
+  });
+
+  test("gives the table's own params the same day-long TTL", async () => {
+    expect((await loadHeaders("/shows/stats?timeRange=2001")).get("Cache-Control")).toBe(LONG_TTL);
+    expect((await loadHeaders("/shows/stats?nugs=yes&statsOnly=0")).get("Cache-Control")).toBe(LONG_TTL);
+  });
+
+  // A tracking parameter is unbounded and arrives from outside, so recording it
+  // would let one shared link consume the scope's cap and starve the URLs that
+  // matter. Left to self-heal instead.
+  test("gives an unrecognized param the short self-healing TTL", async () => {
+    expect((await loadHeaders("/shows/stats?utm_source=newsletter")).get("Cache-Control")).toBe(SHORT_TTL);
+  });
+
+  // `q` is applied client-side like the rest, so the payload is identical — but
+  // it is whatever someone typed, so recording it would fill the scope with
+  // one-off entries.
+  test("gives a search query the short self-healing TTL", async () => {
+    expect((await loadHeaders("/shows/stats?q=wetlands")).get("Cache-Control")).toBe(SHORT_TTL);
+  });
+
+  test("records only the purgeable spellings, verbatim", async () => {
+    await loadHeaders("/shows/stats?timeRange=2001");
+    expect(recordServedPath).toHaveBeenCalledWith("shows-stats", "/shows/stats?timeRange=2001");
+
+    recordServedPath.mockClear();
+    await loadHeaders("/shows/stats?utm_source=newsletter");
+    expect(recordServedPath).not.toHaveBeenCalled();
+  });
+});
 
 const run = (current: string, next: string) =>
   shouldRevalidate({
