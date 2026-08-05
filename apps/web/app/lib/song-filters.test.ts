@@ -93,6 +93,18 @@ describe("TOGGLE_FILTER_GROUPS", () => {
     const attributes = TOGGLE_FILTER_GROUPS.find((group) => group.label === "Attributes");
     expect(attributes?.keys).toContain("split");
   });
+
+  // The partial-performance chips (only one section of the song was played)
+  // sit alongside the other track_flags-backed attributes.
+  test.each([
+    ["beginningOnly", "Beginning Only"],
+    ["middleOnly", "Middle Only"],
+    ["endingOnly", "Ending Only"],
+  ])("%s is an Attributes toggle labeled %s", (key, label) => {
+    expect(TOGGLE_FILTER_DEFINITIONS.find((filter) => filter.key === key)).toEqual({ key, label });
+    const attributes = TOGGLE_FILTER_GROUPS.find((group) => group.label === "Attributes");
+    expect(attributes?.keys).toContain(key);
+  });
 });
 
 describe("getTimeRangeParam", () => {

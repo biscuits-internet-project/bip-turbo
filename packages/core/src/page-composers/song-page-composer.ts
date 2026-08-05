@@ -66,6 +66,13 @@ export interface PerformanceFilterOptions {
   dyslexic?: boolean;
   unfinished?: boolean;
   /**
+   * Partial performances: only the named section of the song was played. A
+   * track can carry more than one, so the three are independent toggles.
+   */
+  beginningOnly?: boolean;
+  middleOnly?: boolean;
+  endingOnly?: boolean;
+  /**
    * Narrow to "jam chart" tracks: the curated/noteworthy set — tracks flagged
    * all-timer OR carrying a non-empty curated note. Drives both the "Jam Chart"
    * toggle chip and the /songs/jam-charts page scope (they're the same thing).
@@ -86,6 +93,37 @@ export interface PerformanceFilterOptions {
    */
   songSlug?: string;
 }
+
+/**
+ * The attribute toggles backed by the `track_flags` bridge: filter option key →
+ * the `TrackFlag` enum value the track must carry. Both the SQL builders and
+ * `isNarrowingFilter` read this map, so a new flag chip is one entry rather
+ * than a copy of the EXISTS subquery in each place.
+ */
+const TRACK_FLAG_FILTERS = {
+  inverted: "INVERTED",
+  dyslexic: "DYSLEXIC",
+  unfinished: "UNFINISHED",
+  beginningOnly: "BEGINNING_ONLY",
+  middleOnly: "MIDDLE_ONLY",
+  endingOnly: "ENDING_ONLY",
+} as const;
+
+type TrackFlagFilterKey = keyof typeof TRACK_FLAG_FILTERS;
+
+const TRACK_FLAG_FILTER_BUILDERS = Object.fromEntries(
+  Object.entries(TRACK_FLAG_FILTERS).map(([key, flag]) => [
+    key,
+    (options: PerformanceFilterOptions) =>
+      options[key as TrackFlagFilterKey]
+        ? {
+            // The flag is a literal from the closed map above, not caller
+            // input, so it is safe to inline rather than parameterize.
+            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = ${Prisma.raw(`'${flag}'::track_flag`)})`,
+          }
+        : null,
+  ]),
+);
 
 export class SongPageComposer {
   constructor(
@@ -548,24 +586,7 @@ export class SongPageComposer {
     // "Jam chart" = the curated/noteworthy set, defined once in noteworthyTrackSql.
     jamChart: (o) => (o.jamChart ? { condition: noteworthyTrackSql("tracks") } : null),
     monthDay: (o) => (o.monthDay ? { condition: Prisma.sql`shows.date LIKE ${`%-${o.monthDay}`}` } : null),
-    inverted: (o) =>
-      o.inverted
-        ? {
-            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'INVERTED'::track_flag)`,
-          }
-        : null,
-    dyslexic: (o) =>
-      o.dyslexic
-        ? {
-            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'DYSLEXIC'::track_flag)`,
-          }
-        : null,
-    unfinished: (o) =>
-      o.unfinished
-        ? {
-            condition: Prisma.sql`EXISTS (SELECT 1 FROM track_flags WHERE track_flags.track_id = tracks.id AND track_flags.flag = 'UNFINISHED'::track_flag)`,
-          }
-        : null,
+    ...TRACK_FLAG_FILTER_BUILDERS,
     // "Played by musician": the track matches when the musician is in the
     // show lineup AND has no sat-out delta on this track, OR has a sit-in
     // (present=true) delta on this track. EXISTS (not a JOIN) so the track
@@ -788,6 +809,7 @@ export function buildSetPositionKey(showId: string, set: string): string {
  */
 export function isNarrowingFilter(options: PerformanceFilterOptions | undefined): boolean {
   if (!options) return false;
+  if ((Object.keys(TRACK_FLAG_FILTERS) as TrackFlagFilterKey[]).some((key) => options[key])) return true;
   return Boolean(
     options.startDate ||
       options.endDate ||
@@ -801,9 +823,6 @@ export function isNarrowingFilter(options: PerformanceFilterOptions | undefined)
       options.segueOut ||
       options.standalone ||
       options.split ||
-      options.inverted ||
-      options.dyslexic ||
-      options.unfinished ||
       options.jamChart ||
       options.allTimer ||
       options.monthDay ||

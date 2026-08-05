@@ -60,6 +60,26 @@ describe("parsePerformanceFilters — jamChart scope", () => {
 
     expect(filters.split).toBe(true);
   });
+
+  // Every grouped toggle chip must survive the round trip through the URL, or
+  // the chip renders active while the fetch silently ignores it.
+  test.each(["beginningOnly", "middleOnly", "endingOnly"])("parses ?filters=%s into its option", async (key) => {
+    const url = new URL(`https://x.test/songs?filters=${key}`);
+
+    const filters = await parsePerformanceFilters(url, emptyContext);
+
+    expect(filters[key as keyof typeof filters]).toBe(true);
+  });
+
+  // An unknown key must not become a filter option: the params come from the
+  // URL, so anything outside the toggle vocabulary is dropped.
+  test("ignores a filters key that is not a defined toggle", async () => {
+    const url = new URL("https://x.test/songs?filters=notARealToggle");
+
+    const filters = await parsePerformanceFilters(url, emptyContext);
+
+    expect(filters).not.toHaveProperty("notARealToggle");
+  });
 });
 
 describe("parsePerformanceFilters — excludeRange", () => {
