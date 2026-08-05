@@ -408,12 +408,15 @@ describe("buildFilterQuery", () => {
     expect(sql).toContain("tracks.set LIKE");
   });
 
-  // The inverted/dyslexic/unfinished filters query the structured track_flags
-  // table by enum value, not free-text annotations.
+  // The attribute filters query the structured track_flags table by enum
+  // value, not free-text annotations.
   test.each([
     ["inverted", { inverted: true }, "INVERTED"],
     ["dyslexic", { dyslexic: true }, "DYSLEXIC"],
     ["unfinished", { unfinished: true }, "UNFINISHED"],
+    ["beginningOnly", { beginningOnly: true }, "BEGINNING_ONLY"],
+    ["middleOnly", { middleOnly: true }, "MIDDLE_ONLY"],
+    ["endingOnly", { endingOnly: true }, "ENDING_ONLY"],
   ] as const)("%s filters on the track_flags enum", (_label, options, flag) => {
     const { conditions } = SongPageComposer.buildFilterQuery([], options);
     const sql = conditions[0].strings.join("");
@@ -802,6 +805,9 @@ describe("isNarrowingFilter", () => {
     ["inverted", { inverted: true }],
     ["dyslexic", { dyslexic: true }],
     ["unfinished", { unfinished: true }],
+    ["beginningOnly", { beginningOnly: true }],
+    ["middleOnly", { middleOnly: true }],
+    ["endingOnly", { endingOnly: true }],
     ["allTimer", { allTimer: true }],
     ["jamChart", { jamChart: true }],
     ["monthDay", { monthDay: "07-26" }],

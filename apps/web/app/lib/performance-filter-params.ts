@@ -1,25 +1,20 @@
 import type { PerformanceFilterOptions } from "@bip/core/page-composers/song-page-composer";
 import { CacheKeys } from "@bip/domain/cache-keys";
 import type { PublicContext } from "~/lib/base-loaders";
-import { getTimeRangeParam, SONG_FILTERS } from "~/lib/song-filters";
+import { getTimeRangeParam, SONG_FILTERS, STANDALONE_TOGGLE_KEY, TOGGLE_FILTER_DEFINITIONS } from "~/lib/song-filters";
 import { services } from "~/server/services";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const VALID_FILTER_KEYS = new Set([
-  "encore",
-  "setOpener",
-  "setCloser",
-  "segueIn",
-  "segueOut",
-  "standalone",
-  "split",
-  "inverted",
-  "dyslexic",
-  "unfinished",
-  "jamChart",
-  "allTimer",
-]);
+/**
+ * The toggle keys the `filters` CSV param may carry — the chip vocabulary
+ * itself, so a chip can never render without a matching server-side filter.
+ * `attended` is excluded: it rides its own `attended` param (it needs a user,
+ * not a boolean).
+ */
+const VALID_FILTER_KEYS = new Set<string>(
+  TOGGLE_FILTER_DEFINITIONS.map((filter) => filter.key).filter((key) => key !== STANDALONE_TOGGLE_KEY),
+);
 
 /**
  * Resolve the "attended" param to a user ID. Supports both:
