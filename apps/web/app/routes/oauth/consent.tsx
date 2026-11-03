@@ -23,9 +23,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    // Redirect to login, then back here
-    const returnUrl = encodeURIComponent(request.url);
-    return redirect(`/auth/login?returnTo=${returnUrl}`);
+    // Redirect to login, then back here. Login reads `next` and only honors a
+    // same-origin relative path, so pass the path and query, not the absolute URL.
+    const next = encodeURIComponent(url.pathname + url.search);
+    return redirect(`/auth/login?next=${next}`);
   }
 
   // Get authorization details
