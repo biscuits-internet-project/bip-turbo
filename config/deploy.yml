@@ -90,7 +90,9 @@ accessories:
     cmd: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
 
   postgres:
-    image: postgres:18-alpine
+    # pgvector adds the vector extension the search embeddings need; pg_trgm and
+    # unaccent ship with Postgres.
+    image: pgvector/pgvector:pg18
     host: 5.161.124.129
     port: "127.0.0.1:5432:5432"
     env:
@@ -99,7 +101,14 @@ accessories:
         POSTGRES_DB: bip
       secret:
         - POSTGRES_PASSWORD
-    directories:
-      - bip-web-postgres-data:/var/lib/postgresql/data
+    # PG 18 images keep data in /var/lib/postgresql/18/docker. Mounting the old
+    # /var/lib/postgresql/data path left the real data in an anonymous volume
+    # that a container recreate would orphan, so mount the parent instead.
+    volumes:
+      - bip-web-postgres-data:/var/lib/postgresql
+    # Same reasoning as the web cap: on this shared 3.7GB host, a runaway
+    # postgres should be OOM-killed and restarted, not freeze the box.
+    cmd: postgres -c shared_buffers=256MB -c max_connections=50
     options:
       shm-size: 256m
+      memory: 768m
