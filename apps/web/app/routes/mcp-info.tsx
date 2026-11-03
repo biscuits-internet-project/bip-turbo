@@ -298,7 +298,7 @@ export default function McpInfo() {
       <Card variant="panel" className="mt-8">
         <CardHeader className="space-y-1">
           <CardTitle>Available Tools</CardTitle>
-          <CardDescription>16 tools exposed by the MCP server</CardDescription>
+          <CardDescription>17 tools exposed by the MCP server</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
@@ -400,9 +400,13 @@ export default function McpInfo() {
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_songs</h5>
                   <p className="text-content-text-secondary text-sm mt-1">Get detailed info for multiple songs</p>
                 </div>
-                <div>
+                <div className="border-b border-white/5 pb-3">
                   <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_venues</h5>
                   <p className="text-content-text-secondary text-sm mt-1">Get detailed info for multiple venues</p>
+                </div>
+                <div>
+                  <h5 className="font-mono text-brand-secondary font-semibold text-sm">get_rock_operas</h5>
+                  <p className="text-content-text-secondary text-sm mt-1">List the rock operas and their slugs</p>
                 </div>
               </div>
             </div>

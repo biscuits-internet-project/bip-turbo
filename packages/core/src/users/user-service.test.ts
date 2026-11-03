@@ -264,3 +264,92 @@ describe("topUsersByMetric", () => {
     expect(stats.map((s) => s.user.username)).toEqual(["magner", "barber"]);
   });
 });
+
+describe("UserService.getUserStats — public payload", () => {
+  // /community serializes every user's stats into its SSR HTML, and each profile does the
+  // same for its owner. Before this, the full user row rode along, so the page source
+  // carried every member's email address.
+  test("returned users carry no email", async () => {
+    const db = {
+      user: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "u-1",
+            username: "magner",
+            email: "aron@example.com",
+            showRatingComparisonDebug: true,
+            createdAt: new Date("2020-01-01"),
+            updatedAt: new Date("2020-01-01"),
+            _count: { reviews: 1, attendances: 2, ratings: 3, blogPosts: 0 },
+            ratings: [{ value: 4 }],
+          },
+        ]),
+      },
+    } as never;
+
+    const [stats] = await new UserService(db, logger).getUserStats();
+
+    expect(stats.user.username).toBe("magner");
+    expect(stats.user).not.toHaveProperty("email");
+    // Allowlist, so per-user settings (and any future column) stay off public pages too.
+    expect(Object.keys(stats.user).sort()).toEqual(["avatarUrl", "createdAt", "id", "username"]);
+    expect(JSON.stringify(stats)).not.toContain("aron@example.com");
+  });
+});
+
+describe("UserService.findOrCreate — first-request races", () => {
+  const row = (over: Record<string, unknown>) => ({
+    id: "u-1",
+    email: "a@example.com",
+    username: "barber",
+    createdAt: new Date("2020-01-01"),
+    updatedAt: new Date("2020-01-01"),
+    ...over,
+  });
+  const p2002 = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+
+  // Parallel loaders for the same person: one insert wins, the rest trip the unique index.
+  // The row they wanted now exists, so they should get it back, not a 500.
+  test("returns the row a sibling request just created", async () => {
+    const db = {
+      user: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce(null) // username check: free
+          .mockResolvedValueOnce(row({})), // findByEmail after the conflict
+        upsert: vi.fn().mockRejectedValueOnce(p2002),
+      },
+    } as never;
+
+    const user = await new UserService(db, logger).findOrCreate({ email: "a@example.com", username: "barber" });
+
+    expect(user.id).toBe("u-1");
+  });
+
+  // Two different people asking for the same username in the same instant: the loser's
+  // email has no row, so it must re-pick a name rather than fail its first request.
+  test("re-picks the username when a different user took it concurrently", async () => {
+    const upsert = vi
+      .fn()
+      .mockRejectedValueOnce(p2002)
+      .mockImplementationOnce(async (args: { create: { username: string } }) =>
+        row({ username: args.create.username }),
+      );
+    const db = {
+      user: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce(null) // first username check: "barber" free
+          .mockResolvedValueOnce(null) // findByEmail after conflict: not ours
+          .mockResolvedValueOnce(row({ email: "other@example.com" })) // re-check: "barber" taken now
+          .mockResolvedValueOnce(null), // "barber1" free
+        upsert,
+      },
+    } as never;
+
+    const user = await new UserService(db, logger).findOrCreate({ email: "a@example.com", username: "barber" });
+
+    expect(user.username).toBe("barber1");
+    expect(upsert).toHaveBeenCalledTimes(2);
+  });
+});

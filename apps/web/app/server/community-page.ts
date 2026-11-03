@@ -1,7 +1,9 @@
 import { topUsersByMetric, type UserStats } from "@bip/core";
 import { services } from "~/server/services";
 
-const CACHE_KEY = "community-page-data:v2";
+// v3: user objects carry only id/username/avatarUrl/createdAt (no email or settings).
+// Bumped so no instance serves a v2 payload.
+const CACHE_KEY = "community-page-data:v3";
 
 /**
  * The community page is not linked from anywhere in normal navigation, so the
@@ -10,9 +12,10 @@ const CACHE_KEY = "community-page-data:v2";
  */
 export const COMMUNITY_PAGE_CACHE_TTL_SECONDS = 60 * 60;
 
-/** Cache keys written by the retired hourly community-refresh cron. The main
- * one is ~786KB with no TTL, so it never expires on its own. */
-const LEGACY_CACHE_KEYS = ["community-page-data", "community-last-updated"];
+/** Superseded cache keys, deleted on each rebuild. The first two are from the retired
+ * hourly community-refresh cron (~786KB, no TTL, so they never expire on their own);
+ * `:v2` carried every user's email and must not outlive its TTL. */
+const LEGACY_CACHE_KEYS = ["community-page-data", "community-last-updated", "community-page-data:v2"];
 
 export interface CommunityPageData {
   allUserStats: UserStats[];

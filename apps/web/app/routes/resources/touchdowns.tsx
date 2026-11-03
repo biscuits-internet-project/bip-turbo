@@ -1,10 +1,22 @@
-import { useEffect, useState } from "react";
 import { BackLink } from "~/components/ui/back-link";
 import { cardVariants } from "~/components/ui/card";
+import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
 import { formatDateLong } from "~/lib/utils";
+import { type AcastEpisode, getRecentPodcastEpisodes } from "~/server/latest-podcast-episode";
 
-export const loader = publicLoader<void>(async () => {});
+// Fetched here rather than in the browser: each description is a third party's HTML
+// rendered with dangerouslySetInnerHTML, so it has to be sanitized before it reaches a
+// client. The server helper also caches the feed, so acast is hit once per TTL instead of
+// once per visitor.
+interface LoaderData {
+  episodes: AcastEpisode[];
+}
+
+export const loader = publicLoader<LoaderData>(async () => {
+  const episodes = await getRecentPodcastEpisodes();
+  return { episodes };
+});
 
 export function meta() {
   return [
@@ -18,38 +30,8 @@ export function meta() {
   ];
 }
 
-interface AcastEpisode {
-  id: string;
-  title: string;
-  description: string;
-  publishDate: string;
-  duration: number;
-  mediaUrl: string;
-  image: string;
-  url: string;
-}
-
-interface AcastApiResponse {
-  episodes: AcastEpisode[];
-}
-
 export default function Touchdowns() {
-  const [episodes, setEpisodes] = useState<AcastEpisode[]>([]);
-
-  useEffect(() => {
-    const fetchEpisodes = async () => {
-      try {
-        const response = await fetch(
-          "https://feeder.acast.com/api/v1/shows/d690923d-524e-5c8b-b29f-d66517615b5b?limit=30&from=0",
-        );
-        const data: AcastApiResponse = await response.json();
-
-        setEpisodes(data.episodes || []);
-      } catch (_error) {}
-    };
-
-    fetchEpisodes();
-  }, []);
+  const { episodes } = useSerializedLoaderData<LoaderData>();
 
   return (
     <div>
@@ -66,7 +48,7 @@ export default function Touchdowns() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {episodes?.map((episode) => (
             <div
-              key={episode.id}
+              key={episode.id ?? episode.url}
               className={cardVariants({
                 variant: "elevated",
                 className: "rounded-lg overflow-hidden h-full flex flex-col",
@@ -110,7 +92,7 @@ export default function Touchdowns() {
 
         {episodes.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-content-text-secondary">Loading episodes...</p>
+            <p className="text-content-text-secondary">Episodes are unavailable right now.</p>
           </div>
         )}
       </div>

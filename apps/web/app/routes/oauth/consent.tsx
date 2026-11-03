@@ -54,6 +54,16 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const { supabase } = getServerClient(request);
 
+  // The loader gates on a session but the action did not, so approval was reachable
+  // without one. Re-check here: this mints an access token against the caller's account.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Response("Not authenticated", { status: 401 });
+  }
+
   if (decision === "approve") {
     const { data, error } = await supabase.auth.oauth.approveAuthorization(authorizationId);
     if (error) {

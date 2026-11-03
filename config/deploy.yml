@@ -26,6 +26,12 @@ proxy:
   host: discobiscuits.net
   app_port: 8080
   response_timeout: 30
+  # Cap request bodies at the proxy. Every action fully buffers its body before
+  # inspecting it, and the container has a hard 1536m ceiling, so without this a
+  # single large POST OOM-kills the app. 12MB clears the largest legitimate upload
+  # (MAX_IMAGE_FILE_SIZE is 10MB) plus the multipart envelope.
+  buffering:
+    max_request_body: 12000000
   healthcheck:
     path: /healthcheck
     # Probe often enough that a container is promoted as soon as it listens.
@@ -56,6 +62,7 @@ env:
     - CLOUDFLARE_ZONE_ID
     - CLOUDFLARE_CACHE_PURGE_TOKEN
     - DATABASE_URL
+    - ADMIN_API_KEY
   clear:
     APP_ENV: production
     PORT: "8080"

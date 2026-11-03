@@ -38,11 +38,13 @@
     "dotenv": "^17.2.3",
     "postgres": "^3.4.7",
     "redis": "^5.10.0",
+    "sanitize-html": "^2.18.1",
     "winston": "^3.19.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",
+    "@types/sanitize-html": "^2.16.1",
     "pg": "^8.16.3",
     "prisma": "^7.2.0",
     "supabase": "^2.70.4",

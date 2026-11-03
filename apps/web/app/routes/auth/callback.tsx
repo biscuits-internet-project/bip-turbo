@@ -10,7 +10,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const type = requestUrl.searchParams.get("type");
   const next = getSafeRedirectUrl(requestUrl.searchParams.get("next"));
 
-  logger.info("Auth callback", { url: requestUrl.toString(), code: !!code, type });
+  // Log the path only — the full URL carries the PKCE/recovery `code` in its query.
+  logger.info("Auth callback", { path: requestUrl.pathname, code: !!code, type });
 
   if (code) {
     const { supabase, headers } = getServerClient(request);
@@ -42,7 +43,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
         logger.info("Local user synced", {
           authUserId: authUser.id,
           localUserId: localUser.id,
-          email: authUser.email,
         });
 
         // ALWAYS store the internal user ID in Supabase metadata

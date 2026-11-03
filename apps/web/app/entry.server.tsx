@@ -9,12 +9,26 @@ import honeybadger from "~/lib/honeybadger";
 import { createLogger, logger } from "~/server/logger";
 import { startMemoryLogging } from "~/server/memory-log";
 import { recordRequest } from "~/server/request-counts";
+import { preventSharedCachingForCredentialedRequests, setSecurityHeaders } from "~/server/response-headers";
 
 export const streamTimeout = 5_000;
 
 // Dedicated info-level logger: production's default level is `warn`, which
 // would swallow the memory timeline the line exists to produce.
 startMemoryLogging(createLogger({ level: "info" }));
+
+/**
+ * Single-fetch `.data` responses skip handleRequest, so they get the same headers here —
+ * including the shared-cache guard, since `/shows/year/1999.data` carries the same public
+ * Cache-Control and the same root `sessionUser` as the document.
+ */
+export function handleDataRequest(response: Response, { request }: { request: Request }): Response {
+  // Copy rather than mutate: a redirect Response's headers are immutable and would throw.
+  const headers = new Headers(response.headers);
+  setSecurityHeaders(headers);
+  preventSharedCachingForCredentialedRequests(request, headers);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 export default function handleRequest(
   request: Request,
@@ -64,6 +78,8 @@ export default function handleRequest(
         const stream = createReadableStreamFromReadable(body);
 
         responseHeaders.set("Content-Type", "text/html");
+        setSecurityHeaders(responseHeaders);
+        preventSharedCachingForCredentialedRequests(request, responseHeaders);
 
         resolve(
           new Response(stream, {

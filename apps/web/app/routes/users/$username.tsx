@@ -196,8 +196,26 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     queryFn: () => computeShowUserData(context, attendedShowIds),
   });
 
+  // This payload is serialized into the SSR HTML of a public page, so it must carry no
+  // PII. `isOwnProfile` above is the only consumer of `user.email`, and it has already
+  // been computed — strip the address before it reaches the client. The display
+  // settings only render on the owner's own Settings tab, so a visitor gets nulls.
+  const { email: _email, ...ownerView } = user;
+  const publicUser = isOwnProfile
+    ? ownerView
+    : {
+        ...ownerView,
+        showCalibratedRatings: null,
+        showRatingComparisonDebug: null,
+        trackCalibratedRatings: null,
+        trackRatingComparisonDebug: null,
+        colorCodeRatings: null,
+        showSetlistTimes: null,
+        ratingDecimalPlaces: null,
+      };
+
   return {
-    user,
+    user: publicUser,
     reviews,
     blogPosts,
     attendedSetlists,

@@ -154,6 +154,8 @@ export default [
     route("stats/song-play-dates", "routes/api/stats/song-play-dates.tsx"),
     route("contact", "routes/api/contact.tsx"),
     route("cron/:action", "routes/api/cron/$action.tsx"),
+    // Prod → local replication feed for the sync script. Admin-key gated; not product API.
+    route("sync/:resource", "routes/api/sync/$resource.tsx"),
     route("images/upload", "routes/api/images/upload.tsx"),
     route("admin/cache", "routes/api/admin/cache.tsx"),
     route("admin/authors", "routes/api/admin/authors.tsx"),

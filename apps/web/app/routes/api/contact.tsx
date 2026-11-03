@@ -8,11 +8,28 @@ import { env } from "~/server/env";
 const resend = new Resend(env.RESEND_API_KEY);
 
 const contactFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Please enter a valid email address"),
-  subject: z.string().min(1, "Subject is required"),
-  message: z.string().min(10, "Message must be at least 10 characters long"),
+  name: z.string().min(1, "Name is required").max(100, "Name is too long"),
+  email: z.string().email("Please enter a valid email address").max(254, "Email is too long"),
+  subject: z.string().min(1, "Subject is required").max(200, "Subject is too long"),
+  message: z
+    .string()
+    .min(10, "Message must be at least 10 characters long")
+    .max(5000, "Message must be at most 5000 characters"),
 });
+
+/**
+ * Escape submitter-controlled text before it goes into the HTML mail body. Without this
+ * the operator receives a DKIM-signed message from our own domain whose markup the
+ * sender controls end to end — arbitrary links, spoofed styling, tracking pixels.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 export const action = publicAction(async ({ request }) => {
   if (request.method !== "POST") {
@@ -44,21 +61,21 @@ export const action = publicAction(async ({ request }) => {
           </h2>
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 0 0 10px 0;"><strong>From:</strong> ${validatedData.name}</p>
-            <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${validatedData.email}</p>
-            <p style="margin: 0 0 10px 0;"><strong>Subject:</strong> ${validatedData.subject}</p>
+            <p style="margin: 0 0 10px 0;"><strong>From:</strong> ${escapeHtml(validatedData.name)}</p>
+            <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${escapeHtml(validatedData.email)}</p>
+            <p style="margin: 0 0 10px 0;"><strong>Subject:</strong> ${escapeHtml(validatedData.subject)}</p>
           </div>
           
           <div style="margin: 20px 0;">
             <h3 style="color: #333; margin-bottom: 10px;">Message:</h3>
             <div style="background-color: #ffffff; padding: 15px; border-left: 4px solid #6366f1; border-radius: 4px;">
-              ${validatedData.message.replace(/\n/g, "<br>")}
+              ${escapeHtml(validatedData.message).replace(/\n/g, "<br>")}
             </div>
           </div>
           
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px;">
             <p>This message was sent from the Biscuits Internet Project contact form.</p>
-            <p>Reply directly to this email to respond to ${validatedData.name}.</p>
+            <p>Reply directly to this email to respond to ${escapeHtml(validatedData.name)}.</p>
           </div>
         </div>
       `,

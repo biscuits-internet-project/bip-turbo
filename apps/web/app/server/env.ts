@@ -17,6 +17,10 @@ export const envSchema = z.object({
   CLOUDFLARE_IMAGES_API_TOKEN: z.string(),
   CLOUDFLARE_ZONE_ID: z.string(),
   CLOUDFLARE_CACHE_PURGE_TOKEN: z.string(),
+  // Shared secret for machine callers (the cron workflow, ops scripts). Optional so a
+  // missing value can't crash boot in dev or CI — the check site fails closed instead,
+  // rejecting every request when it is unset rather than taking the app down.
+  ADMIN_API_KEY: z.string().optional(),
   // Salts the published fingerprint of a shared email-alias namespace, so two
   // duplicate-account groups under different subdomains stay distinguishable without
   // either subdomain ever leaving the database. Optional on purpose: absent, the

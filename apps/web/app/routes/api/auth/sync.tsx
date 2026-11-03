@@ -42,7 +42,6 @@ export async function action({ request }: ActionFunctionArgs) {
     logger.info("User sync successful", {
       authUserId: authUser.id,
       localUserId: localUser.id,
-      email: authUser.email,
     });
 
     // Update Supabase metadata with internal_user_id if needed

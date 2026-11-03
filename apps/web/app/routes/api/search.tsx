@@ -1,3 +1,4 @@
+import { MAX_SEARCH_QUERY_LENGTH } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
@@ -36,7 +37,7 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
     const body = (await request.json()) as SearchRequest;
     const { query, limit = 30 } = body;
 
-    if (!query || query.trim().length === 0) {
+    if (typeof query !== "string" || query.trim().length === 0) {
       throw new Response(JSON.stringify({ error: "Query is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -45,6 +46,23 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
 
     if (query.trim().length < 2) {
       throw new Response(JSON.stringify({ error: "Query must be at least 2 characters" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // The body is only cast to SearchRequest, so nothing above validates it at runtime.
+    // Bound the query before it becomes a LIKE pattern over full-table scans and is
+    // persisted verbatim to search_histories.
+    if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+      throw new Response(JSON.stringify({ error: `Query must be at most ${MAX_SEARCH_QUERY_LENGTH} characters` }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (limit !== undefined && (typeof limit !== "number" || !Number.isFinite(limit) || limit < 1)) {
+      throw new Response(JSON.stringify({ error: "limit must be a positive number" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
@@ -73,9 +91,14 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
       },
     });
   } catch (error) {
+    // The validation above throws its 400s as Responses; let them through instead of
+    // reporting a client mistake as a server failure.
+    if (error instanceof Response) throw error;
+
     logger.error("Search API error", { error });
 
-    const errorMessage = error instanceof Error ? error.message : "Search failed";
+    // Fixed text: the underlying message can be a Prisma invocation dump. It is logged above.
+    const errorMessage = "Search failed";
     const executionTimeMs = Date.now() - startTime;
 
     return new Response(

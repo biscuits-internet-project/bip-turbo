@@ -77,5 +77,11 @@ ENV QUONFIG_ENVIRONMENT=production
 
 EXPOSE 8080
 
+# Run as the base image's unprivileged `bun` user, so a code-execution bug in the app
+# lands as that user rather than root. Nothing writes under /app at runtime; the
+# chown covers deploy-time tooling (prisma, bun) that may touch its own files.
+RUN chown -R bun:bun /app
+USER bun
+
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["bun", "run", "start"]

@@ -55,20 +55,45 @@ describe("getLatestPodcastEpisode", () => {
   });
 
   // The raw acast episode is ~15KB of fields the page never uses. Only the
-  // six rendered fields may reach the cache and the loader payload.
+  // rendered fields may reach the cache and the loader payload.
   test("maps the newest episode to exactly the rendered fields", async () => {
     mockFetchResponse(ACAST_FIXTURE);
 
     const episode = await getLatestPodcastEpisode();
 
     expect(episode).toEqual({
+      id: "69b83e33a0bc40a270d6e41d",
       title: "E120 - 2026 And Beyond (w/Marc Brownstein)",
-      description: ACAST_FIXTURE.episodes[0].description,
+      // Prose and the link survive sanitizing; outbound feed links pick up rel.
+      description:
+        '<p>E120 - 2026 And Beyond - <a href="https://www.instagram.com/marcbrownstein" rel="noopener noreferrer nofollow">Marc Brownstein</a> returns to discuss The Disco Biscuits\' new lineup.</p>',
       publishDate: "2026-03-17T19:15:09.000Z",
       duration: 4916,
       image: ACAST_FIXTURE.episodes[0].image,
       url: ACAST_FIXTURE.episodes[0].url,
     });
+  });
+
+  // The description is rendered with dangerouslySetInnerHTML into the server-rendered
+  // homepage, so a script tag in the feed would execute. The trust boundary here is
+  // whatever the podcast publisher types into acast, and there is no CSP behind it.
+  test("strips scripts and event handlers from the feed description", async () => {
+    mockFetchResponse({
+      episodes: [
+        {
+          ...ACAST_FIXTURE.episodes[0],
+          description:
+            '<p>Real prose.</p><script>alert(1)</script><img src=x onerror="alert(2)"><a href="javascript:alert(3)">click</a>',
+        },
+      ],
+    });
+
+    const episode = await getLatestPodcastEpisode();
+
+    expect(episode?.description).toContain("Real prose.");
+    expect(episode?.description).not.toContain("script");
+    expect(episode?.description).not.toContain("onerror");
+    expect(episode?.description).not.toContain("javascript:");
   });
 
   // The fetch goes through the Redis cache so the homepage stops hitting

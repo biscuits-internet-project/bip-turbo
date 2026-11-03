@@ -222,19 +222,34 @@ export const CacheKeys = {
 } as const;
 
 /**
- * Simple hash function for filter objects to create consistent cache keys
+ * Hash a filter object into a cache-key segment.
+ *
+ * Widened from a single 32-bit accumulator: several filter values are free-form strings
+ * taken straight off the query string, so the hash is attacker-reachable. At 32 bits a
+ * birthday search needs only ~2^16 requests to find two filter sets sharing a key, at
+ * which point one request is served the other's cached payload. Two independently seeded
+ * accumulators combine to 53 bits (the exact-integer range), moving that to ~2^26.5.
+ *
+ * Not a security boundary — nothing here crosses an auth check, and the worst case is a
+ * wrong public song list — but it should not be brute-forceable in an afternoon.
+ * Deliberately dependency-free and pure JS: this module is imported by client code, so it
+ * cannot reach for node:crypto.
  */
 function hashFilters(filters: CacheFilters): string {
   const sortedKeys = Object.keys(filters).sort();
   const normalized = sortedKeys.map((key) => `${key}:${filters[key]}`).join("|");
 
-  // Simple hash - could use a proper hash function if needed
-  let hash = 0;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
   for (let i = 0; i < normalized.length; i++) {
     const char = normalized.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    h1 = Math.imul(h1 ^ char, 2654435761);
+    h2 = Math.imul(h2 ^ char, 1597334677);
   }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
 
-  return Math.abs(hash).toString(36);
+  // 53 bits: the high accumulator contributes 21, the low one 32.
+  const combined = 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  return combined.toString(36);
 }

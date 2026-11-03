@@ -19,14 +19,18 @@ concurrency:
   group: deploy-web-app
   cancel-in-progress: false
 
+# Least privilege: nothing here writes to the repo, so a compromised step gets a
+# read-only token instead of the repo's default write token.
+permissions:
+  contents: read
+
 jobs:
   ops:
     name: ${{ inputs.action }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: ruby/setup-ruby@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
         with:
           ruby-version: '3.3'
 
@@ -34,7 +38,7 @@ jobs:
         run: gem install kamal
 
       - name: Configure SSH
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
@@ -42,8 +46,7 @@ jobs:
         run: ssh-keyscan -t ed25519 5.161.124.129 >> ~/.ssh/known_hosts
 
       - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
-
+        uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
       - name: Disk usage
         if: inputs.action == 'diagnose'
         run: kamal server exec 'df -h /'

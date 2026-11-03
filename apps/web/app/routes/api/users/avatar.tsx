@@ -1,3 +1,5 @@
+import { ALLOWED_IMAGE_MIME_TYPES, type AllowedImageMimeType, MAX_IMAGE_FILE_SIZE } from "@bip/domain";
+import { matchesImageSignature } from "~/server/image-signature";
 import type { ActionFunctionArgs } from "react-router-dom";
 import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/lib/logger";
@@ -38,7 +40,33 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Only process the first file for avatar
     const file = files[0];
+
+    // Validate before buffering: `arrayBuffer()` pulls the whole upload into memory, and
+    // the container has a hard 1536MB ceiling. Same constraints the sibling image-upload
+    // route enforces (routes/api/images/upload.tsx).
+    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type as AllowedImageMimeType)) {
+      return new Response(
+        JSON.stringify({ error: `File type must be one of: ${ALLOWED_IMAGE_MIME_TYPES.join(", ")}` }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (file.size > MAX_IMAGE_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ error: `File size must be less than ${MAX_IMAGE_FILE_SIZE / 1024 / 1024}MB` }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // file.type is client-declared; confirm the bytes agree before anything is stored.
+    if (!matchesImageSignature(buffer, file.type as AllowedImageMimeType)) {
+      return new Response(JSON.stringify({ error: "File contents don't match its image type" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Upload to Cloudflare Images
     const uploadResult = await services.files.uploadImage({

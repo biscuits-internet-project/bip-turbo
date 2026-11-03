@@ -4,15 +4,14 @@ import { CacheKeys } from "@bip/domain/cache-keys";
 import type { PublicContext } from "~/lib/base-loaders";
 import { dateToISOStringSansTime } from "~/lib/date";
 import {
+  normalizeFilterKeyParts,
   parsePerformanceFilters,
   resolveAttendedUserId,
   resolveLast10ShowsDateRange,
 } from "~/lib/performance-filter-params";
 import { shouldShowNotPlayed } from "~/lib/played-filter";
-import { getTimeRangeParam, SONG_FILTERS } from "~/lib/song-filters";
+import { SONG_FILTERS } from "~/lib/song-filters";
 import { services } from "~/server/services";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface BaseFilter {
   authorId?: string;
@@ -34,29 +33,29 @@ interface BaseFilter {
  */
 export async function fetchFilteredSongs(url: URL, context: PublicContext): Promise<Song[]> {
   const params = url.searchParams;
-  const timeRangeParam = getTimeRangeParam(params);
-  const playedParam = params.get("played");
-  const authorParam = params.get("author");
-  const kindParam = params.get("kind");
-  const attendedParam = params.get("attended");
-  const filtersParam = params.get("filters");
-  const musicianParam = params.get("musician");
-  const excludeStartParam = params.get("excludeStart");
-  const excludeEndParam = params.get("excludeEnd");
 
-  const kindFilter =
-    kindParam === "original" || kindParam === "cover" || kindParam === "mashup" || kindParam === "improvisation"
-      ? kindParam
-      : undefined;
-  const authorId = authorParam && UUID_REGEX.test(authorParam) ? authorParam : undefined;
+  // One canonical read of the filter params, shared by the query below AND the cache key.
+  // These must not diverge: if a junk value activates the narrowing query path but is
+  // dropped from the key, a filtered payload gets written under the unfiltered key —
+  // turning a cache-miss nuisance into cache poisoning of the default page.
+  const keyParts = normalizeFilterKeyParts(params);
+
+  const attendedParam = params.get("attended");
+
+  // `?? undefined` matters: the normalizer returns null for "absent", but the baseFilter
+  // guard below tests `!== undefined`, so a null would be passed to Prisma as
+  // `kind: null` — which means "where kind IS NULL", not "no filter".
+  const kindFilter = keyParts.kind ?? undefined;
+  const authorId = keyParts.author ?? undefined;
   const attendedUserId = await resolveAttendedUserId(attendedParam, context);
 
-  const hasDateRange = timeRangeParam === "last10shows" || (timeRangeParam !== null && timeRangeParam in SONG_FILTERS);
-  const hasToggleFilters = !!filtersParam;
-  const hasMusician = !!musicianParam;
+  const hasDateRange =
+    keyParts.timeRange === "last10shows" || (keyParts.timeRange !== null && keyParts.timeRange in SONG_FILTERS);
+  const hasToggleFilters = !!keyParts.filters;
+  const hasMusician = !!keyParts.musician;
   const hasAttendedUser = !!attendedUserId;
   const showNotPlayed = shouldShowNotPlayed({
-    playedParam,
+    playedParam: keyParts.played,
     hasDateRange,
     hasAttendedUser,
     hasToggleFilters,
@@ -68,15 +67,21 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
   if (kindFilter !== undefined) baseFilter.kind = kindFilter;
 
   const cacheKey = CacheKeys.songs.filtered({
-    timeRange: timeRangeParam || null,
-    played: playedParam || null,
+    timeRange: keyParts.timeRange,
+    played: keyParts.played,
     author: authorId || null,
-    kind: kindParam || null,
-    musician: musicianParam || null,
+    kind: keyParts.kind,
+    musician: keyParts.musician,
     attended: attendedUserId || null,
-    filters: filtersParam || null,
-    excludeStart: excludeStartParam || null,
-    excludeEnd: excludeEndParam || null,
+    filters: keyParts.filters,
+    excludeStart: keyParts.excludeStart,
+    excludeEnd: keyParts.excludeEnd,
+    // `slug` and `monthDay` are honored by parsePerformanceFilters inside the cached
+    // factory (computeScopeCounts / populateRarityFields), so they narrow the payload and
+    // must be keyed. Omitting them let ?filters=setOpener&slug=<song> write a one-song
+    // result under the plain ?filters=setOpener key for the full 24h TTL.
+    slug: keyParts.slug,
+    monthDay: keyParts.monthDay,
   });
 
   return await services.cache.getOrSet(
@@ -89,7 +94,7 @@ export async function fetchFilteredSongs(url: URL, context: PublicContext): Prom
         context,
         baseFilter,
         attendedUserId,
-        timeRangeParam,
+        timeRangeParam: keyParts.timeRange,
         hasDateRange,
         hasAttendedUser,
         hasToggleFilters,

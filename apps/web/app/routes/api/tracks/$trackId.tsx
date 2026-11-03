@@ -1,5 +1,5 @@
 import { trackUpdateSchema } from "@bip/domain";
-import { protectedAction, publicLoader } from "~/lib/base-loaders";
+import { adminAction, publicLoader } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
 import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
@@ -71,7 +71,7 @@ export const loader = publicLoader(async ({ params, context }) => {
   );
 });
 
-export const action = protectedAction(async ({ request, params }) => {
+export const action = adminAction(async ({ request, params }) => {
   const { trackId } = params;
 
   if (!trackId) return badRequest();

@@ -21,7 +21,7 @@ export const loader = publicLoader(async ({ context }) => {
   try {
     const user = await services.users.findByEmail(currentUser.email);
     if (!user) {
-      logger.warn("Personal song history: local user record missing", { email: currentUser.email });
+      logger.warn("Personal song history: local user record missing", { userId: currentUser.id });
       return Response.json(EMPTY_HISTORY);
     }
     const history = await services.personalSongHistory.getSongHistory(user.id);

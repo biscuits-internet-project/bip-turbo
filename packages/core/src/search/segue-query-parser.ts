@@ -14,6 +14,8 @@ interface EntityMatch {
   type: "song" | "venue";
 }
 
+const MAX_SEGUE_SEGMENTS = 8;
+
 export class SegueQueryParser {
   constructor(private readonly db: PrismaClient) {}
 
@@ -30,11 +32,14 @@ export class SegueQueryParser {
       return this.parseSimpleQuery(query);
     }
 
-    // Split on > to get segments
+    // Split on > to get segments. Capped because each segment fans out into two
+    // sequential-scan similarity queries dispatched concurrently below — an uncapped
+    // split lets one request saturate the connection pool.
     const segments = query
       .split(">")
       .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+      .filter((s) => s.length > 0)
+      .slice(0, MAX_SEGUE_SEGMENTS);
 
     if (segments.length < 2) {
       // Not a valid segue query
