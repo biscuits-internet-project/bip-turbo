@@ -280,19 +280,25 @@ function validateToolArgs(toolName: string, rawArgs: unknown): Record<string, un
       if (required.includes(key)) throw new ToolInputError(`${key} is required`);
       continue;
     }
+    // LLM clients often send numbers as strings ({"year":"1999"}); the handlers used to
+    // coerce those implicitly, so accept a purely numeric string and convert it here.
+    const coerced =
+      schema.type === "number" && typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())
+        ? Number(value)
+        : value;
     const ok =
       schema.type === "string"
-        ? typeof value === "string" && (!schema.enum || schema.enum.includes(value))
+        ? typeof coerced === "string" && (!schema.enum || schema.enum.includes(coerced))
         : schema.type === "number"
-          ? typeof value === "number" && Number.isFinite(value)
+          ? typeof coerced === "number" && Number.isFinite(coerced)
           : schema.type === "array"
-            ? Array.isArray(value) && value.every((item) => typeof item === "string")
+            ? Array.isArray(coerced) && coerced.every((item) => typeof item === "string")
             : false;
     if (!ok) {
       const expected = schema.enum ? `one of ${schema.enum.join(", ")}` : schema.type;
       throw new ToolInputError(`${key} must be ${expected === "array" ? "an array of strings" : expected}`);
     }
-    args[key] = value;
+    args[key] = coerced;
   }
   return args;
 }

@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const findBySlug = vi.fn();
+const searchSongs = vi.fn().mockResolvedValue([]);
 const logError = vi.fn();
 
 class InvalidSearchQueryError extends Error {}
 vi.mock("@bip/core", () => ({ InvalidSearchQueryError }));
 vi.mock("~/lib/logger", () => ({ logger: { error: logError, info: vi.fn(), warn: vi.fn() } }));
 vi.mock("~/server/services", () => ({
-  services: { songs: { findBySlug }, venues: { findBySlug }, shows: { findBySlug } },
+  services: { songs: { findBySlug }, venues: { findBySlug }, shows: { findBySlug }, postgresSearch: { searchSongs } },
 }));
 
 const { action } = await import("./index");
@@ -49,6 +50,19 @@ describe("MCP tool arguments are checked against the declared schema", () => {
     findBySlug.mockResolvedValueOnce(null);
     await callTool("get_song", { slug: "basis-for-a-day" });
     expect(findBySlug).toHaveBeenCalledWith("basis-for-a-day");
+  });
+
+  // Clients often stringify numbers; the handlers used to coerce them, so keep that working.
+  test("a numeric string is accepted for a number argument", async () => {
+    const result = await callTool("search_songs", { query: "basis", limit: "20" });
+    expect(result.isError).toBeUndefined();
+    expect(searchSongs).toHaveBeenCalledWith("basis", 20);
+  });
+
+  test("a non-numeric string is still rejected for a number argument", async () => {
+    const result = await callTool("search_songs", { query: "basis", limit: "twenty" });
+    expect(result.isError).toBe(true);
+    expect(searchSongs).not.toHaveBeenCalled();
   });
 
   // Internals stay in the log; the caller gets a fixed message.

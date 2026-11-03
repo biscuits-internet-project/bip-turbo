@@ -35,6 +35,7 @@ describe("PostgresSearchService query cap", () => {
     ["searchSongs", (s: PostgresSearchService) => s.searchSongs(tooLong)],
     ["searchVenues", (s: PostgresSearchService) => s.searchVenues(tooLong)],
     ["search with a non-string", (s: PostgresSearchService) => s.search({ contains: "a" } as never)],
+    ["a 9-song segue chain", (s: PostgresSearchService) => s.search("a > b > c > d > e > f > g > h > i")],
   ])("%s rejects before touching the database", async (_label, run) => {
     const db = { $queryRawUnsafe: vi.fn(), $queryRaw: vi.fn(), song: { findMany: vi.fn() } } as never;
     const service = new PostgresSearchService(db, logger);

@@ -2,6 +2,12 @@ import { sanitizeFeedHtml } from "@bip/core";
 import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
+/**
+ * Both feed reads run inside SSR loaders, so a hung acast connection would hold the page
+ * until the proxy's 30s timeout. Five seconds, then the caller degrades to no episodes.
+ */
+const ACAST_TIMEOUT_MS = 5_000;
+
 /** Touchdowns All Day feed on acast. */
 const ACAST_SHOW_ID = "d690923d-524e-5c8b-b29f-d66517615b5b";
 const acastFeedUrl = (limit: number) => `https://feeder.acast.com/api/v1/shows/${ACAST_SHOW_ID}?limit=${limit}&from=0`;
@@ -68,7 +74,7 @@ export async function getLatestPodcastEpisode(): Promise<AcastEpisode | null> {
 }
 
 async function fetchLatestEpisode(): Promise<AcastEpisode | null> {
-  const response = await fetch(ACAST_FEED_URL);
+  const response = await fetch(ACAST_FEED_URL, { signal: AbortSignal.timeout(ACAST_TIMEOUT_MS) });
   if (!response.ok) {
     logger.error("Acast feed responded non-OK", { status: response.status });
     return null;
@@ -116,7 +122,9 @@ export async function getRecentPodcastEpisodes(): Promise<AcastEpisode[]> {
 }
 
 async function fetchRecentEpisodes(): Promise<AcastEpisode[]> {
-  const response = await fetch(acastFeedUrl(PODCAST_EPISODE_LIST_LIMIT));
+  const response = await fetch(acastFeedUrl(PODCAST_EPISODE_LIST_LIMIT), {
+    signal: AbortSignal.timeout(ACAST_TIMEOUT_MS),
+  });
   if (!response.ok) {
     // Throw rather than return []: `getOrSet` caches whatever this resolves to, so a
     // returned empty array would pin "no episodes" for the full 30-minute TTL over a

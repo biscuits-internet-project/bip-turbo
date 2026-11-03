@@ -2,7 +2,7 @@ import type { Logger, SearchResult, SearchRowResult } from "@bip/domain";
 import type { DbClient } from "../_shared/database/models";
 import type { SearchHistoryService } from "./search-history-service";
 import { buildMixedSearchResults } from "./search-result-builder";
-import { SegueQueryParser } from "./segue-query-parser";
+import { MAX_SEGUE_SEGMENTS, SegueQueryParser } from "./segue-query-parser";
 
 type VenueResult = {
   venue_id: string;
@@ -71,6 +71,12 @@ export function assertSearchQuery(query: unknown): string {
   if (typeof query !== "string") throw new InvalidSearchQueryError("Query must be a string");
   if (query.length > MAX_SEARCH_QUERY_LENGTH) {
     throw new InvalidSearchQueryError(`Query must be at most ${MAX_SEARCH_QUERY_LENGTH} characters`);
+  }
+  // Rejected rather than truncated: matching only the first N songs of a longer chain
+  // would return shows for a different sequence as if they matched this one.
+  const segueSegments = query.split(">").filter((segment) => segment.trim().length > 0).length;
+  if (segueSegments > MAX_SEGUE_SEGMENTS) {
+    throw new InvalidSearchQueryError(`Segue searches can chain at most ${MAX_SEGUE_SEGMENTS} songs`);
   }
   return query;
 }

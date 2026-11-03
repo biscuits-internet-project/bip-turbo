@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { sanitizeFeedHtml } from "./sanitize";
+import { escapeHtml, sanitizeFeedHtml } from "./sanitize";
 
 /**
  * This is the only thing standing between a third party's HTML and
@@ -39,5 +39,13 @@ describe("sanitizeFeedHtml — third-party podcast descriptions", () => {
     const out = sanitizeFeedHtml('<a href="https://example.com">listen</a>');
 
     expect(out).toContain('rel="noopener noreferrer nofollow"');
+  });
+});
+
+describe("escapeHtml", () => {
+  test("neutralizes markup and attribute breakouts", () => {
+    expect(escapeHtml(`<a href="x" onclick='y'>&</a>`)).toBe(
+      "&lt;a href=&quot;x&quot; onclick=&#39;y&#39;&gt;&amp;&lt;/a&gt;",
+    );
   });
 });

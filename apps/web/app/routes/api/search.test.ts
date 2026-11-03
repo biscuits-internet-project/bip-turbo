@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const search = vi.fn();
 const error = vi.fn();
 
+class InvalidSearchQueryError extends Error {}
+vi.mock("@bip/core", () => ({ InvalidSearchQueryError, MAX_SEARCH_QUERY_LENGTH: 200 }));
+
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: (fn: unknown) => fn }));
 vi.mock("~/lib/logger", () => ({ logger: { error, info: vi.fn(), warn: vi.fn() } }));
 vi.mock("~/server/services", () => ({ services: { postgresSearch: { search } } }));
@@ -57,6 +60,13 @@ describe("POST /api/search validation", () => {
     const body = await (await post({ query: "tricycle" })).json();
 
     expect(body.error).toBe("Search failed");
+  });
+
+  test("a bound enforced by the search service is a 400", async () => {
+    search.mockRejectedValueOnce(new InvalidSearchQueryError("Segue searches can chain at most 8 songs"));
+    const res = await post({ query: "a > b > c > d > e > f > g > h > i" });
+    expect(res.status).toBe(400);
+    expect(error).not.toHaveBeenCalled();
   });
 
   test("a non-string query is a 400", async () => {

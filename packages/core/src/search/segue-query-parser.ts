@@ -14,7 +14,7 @@ interface EntityMatch {
   type: "song" | "venue";
 }
 
-const MAX_SEGUE_SEGMENTS = 8;
+export const MAX_SEGUE_SEGMENTS = 8;
 
 export class SegueQueryParser {
   constructor(private readonly db: PrismaClient) {}
@@ -34,7 +34,9 @@ export class SegueQueryParser {
 
     // Split on > to get segments. Capped because each segment fans out into two
     // sequential-scan similarity queries dispatched concurrently below — an uncapped
-    // split lets one request saturate the connection pool.
+    // split lets one request saturate the connection pool. Callers reach here through
+    // assertSearchQuery, which rejects an over-long chain outright; the slice is only a
+    // backstop, since silently dropping songs would answer a different question.
     const segments = query
       .split(">")
       .map((s) => s.trim())

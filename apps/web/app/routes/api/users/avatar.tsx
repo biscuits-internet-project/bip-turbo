@@ -1,10 +1,12 @@
 import { ALLOWED_IMAGE_MIME_TYPES, type AllowedImageMimeType, MAX_IMAGE_FILE_SIZE } from "@bip/domain";
-import { matchesImageSignature } from "~/server/image-signature";
 import type { ActionFunctionArgs } from "react-router-dom";
 import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/lib/logger";
+import { matchesImageSignature } from "~/server/image-signature";
 import { services } from "~/server/services";
 import { getServerClient, getServiceRoleClient } from "~/server/supabase";
+
+const AVATAR_MIME_TYPES: readonly string[] = ALLOWED_IMAGE_MIME_TYPES.filter((type) => type !== "image/svg+xml");
 
 export async function action({ request }: ActionFunctionArgs) {
   try {
@@ -41,14 +43,17 @@ export async function action({ request }: ActionFunctionArgs) {
     // Only process the first file for avatar
     const file = files[0];
 
-    // Validate before buffering: `arrayBuffer()` pulls the whole upload into memory, and
-    // the container has a hard 1536MB ceiling. Same constraints the sibling image-upload
-    // route enforces (routes/api/images/upload.tsx).
-    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type as AllowedImageMimeType)) {
-      return new Response(
-        JSON.stringify({ error: `File type must be one of: ${ALLOWED_IMAGE_MIME_TYPES.join(", ")}` }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+    // Reject before copying the upload into a Buffer for Cloudflare. `formData()` above has
+    // already parsed the body, so the memory bound on the request itself is the proxy's
+    // max_request_body (config/deploy.yml), not this check.
+    //
+    // SVG is excluded: an avatar is shown to every visitor, and an SVG can carry script.
+    // Raster formats only.
+    if (!AVATAR_MIME_TYPES.includes(file.type)) {
+      return new Response(JSON.stringify({ error: `File type must be one of: ${AVATAR_MIME_TYPES.join(", ")}` }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (file.size > MAX_IMAGE_FILE_SIZE) {

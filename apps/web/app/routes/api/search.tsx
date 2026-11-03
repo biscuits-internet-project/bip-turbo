@@ -1,4 +1,4 @@
-import { MAX_SEARCH_QUERY_LENGTH } from "@bip/core";
+import { InvalidSearchQueryError, MAX_SEARCH_QUERY_LENGTH } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router";
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
@@ -94,6 +94,13 @@ export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
     // The validation above throws its 400s as Responses; let them through instead of
     // reporting a client mistake as a server failure.
     if (error instanceof Response) throw error;
+    // The service's own bounds (e.g. segue chain length) are the caller's mistake too.
+    if (error instanceof InvalidSearchQueryError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     logger.error("Search API error", { error });
 

@@ -1,3 +1,4 @@
+import { escapeHtml } from "@bip/core";
 import { Resend } from "resend";
 import { z } from "zod";
 import { publicAction } from "~/lib/base-loaders";
@@ -16,20 +17,6 @@ const contactFormSchema = z.object({
     .min(10, "Message must be at least 10 characters long")
     .max(5000, "Message must be at most 5000 characters"),
 });
-
-/**
- * Escape submitter-controlled text before it goes into the HTML mail body. Without this
- * the operator receives a DKIM-signed message from our own domain whose markup the
- * sender controls end to end — arbitrary links, spoofed styling, tracking pixels.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 export const action = publicAction(async ({ request }) => {
   if (request.method !== "POST") {

@@ -1414,13 +1414,16 @@ async function syncCall<T>(toolName: string, args: Record<string, unknown>): Pro
     }
   }
 
+  // Read once, outside the retry loop: a missing key is a setup error, not a transient one.
+  const apiKey = syncApiKey();
+
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MCP_MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), MCP_REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${syncApiKey()}` },
+        headers: { Authorization: `Bearer ${apiKey}` },
         // Never follow a redirect with the admin key attached; a moved endpoint should
         // fail loudly rather than hand the credential to wherever it now points.
         redirect: "error",
