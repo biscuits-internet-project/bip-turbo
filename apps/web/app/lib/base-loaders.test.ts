@@ -5,8 +5,10 @@ import { describe, expect, test, vi } from "vitest";
 // Supabase/Prisma into the test bundle.
 vi.mock("~/server/request-user", () => ({ getRequestUser: vi.fn().mockResolvedValue(null) }));
 vi.mock("~/server/services", () => ({ services: {} }));
+vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import { publicLoader } from "~/lib/base-loaders";
+import { logger } from "~/lib/logger";
 
 /** Run a wrapped loader and return whatever it produced or threw. */
 async function run(url: string, inner = vi.fn().mockResolvedValue("rendered")) {
@@ -54,5 +56,60 @@ describe("publicLoader escaped-ampersand normalization", () => {
     expect(thrown).toBeNull();
     expect(result).toBe("rendered");
     expect(inner).toHaveBeenCalled();
+  });
+});
+
+describe("publicLoader failure logging", () => {
+  // A failure line has to say which page failed, or it can't be matched to a
+  // user's report. Only the path is logged: the ops workflow prints error lines
+  // into world-readable run logs, and query strings can carry auth codes.
+  test("logs the method and path of a failed request, without the query string", async () => {
+    const failure = new Error("Venue not found");
+    const { thrown } = await run("/venues/the-capitol-theatre?code=secret", vi.fn().mockRejectedValue(failure));
+
+    expect(thrown).toBe(failure);
+    expect(logger.error).toHaveBeenCalledWith("❌ Request failed", {
+      error: failure,
+      method: "GET",
+      path: "/venues/the-capitol-theatre",
+    });
+  });
+
+  // Redirects and not-found pages are thrown Responses. Logging them as errors
+  // buries the real failures in routine control flow.
+  test("logs a thrown redirect or not-found Response at info, not error", async () => {
+    vi.mocked(logger.error).mockClear();
+    const notFound = new Response(null, { status: 404 });
+    const { thrown } = await run("/venues/no-such-venue", vi.fn().mockRejectedValue(notFound));
+
+    expect(thrown).toBe(notFound);
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith("Request ended with a thrown response", {
+      error: notFound,
+      method: "GET",
+      path: "/venues/no-such-venue",
+    });
+  });
+
+  test("still logs a thrown 5xx Response as an error", async () => {
+    vi.mocked(logger.error).mockClear();
+    const unavailable = new Response(null, { status: 503 });
+    await run("/shows/stats", vi.fn().mockRejectedValue(unavailable));
+
+    expect(logger.error).toHaveBeenCalledWith("❌ Request failed", expect.objectContaining({ error: unavailable }));
+  });
+});
+
+describe("publicLoader success logging", () => {
+  // The ops workflow prints any prod line matching "error" or "warn" into
+  // world-readable run logs, and a success URL like ?error=access_denied
+  // matches, so the success line carries the path only.
+  test("logs the path of a completed request without its query string", async () => {
+    vi.mocked(logger.info).mockClear();
+    await run("/auth/callback?error=access_denied&code=secret");
+
+    const [line] = vi.mocked(logger.info).mock.calls[0];
+    expect(line).toContain("GET /auth/callback |");
+    expect(line).not.toContain("secret");
   });
 });

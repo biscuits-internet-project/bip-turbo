@@ -11,6 +11,7 @@ on:
           - cache-census
           - app-logs
           - memory-timeline
+          - proxy-errors
           - restart-redis
           - prune-docker
           - stop-builder
@@ -127,6 +128,49 @@ jobs:
         run: kamal app logs --since 24h --lines 20000 2>&1 | grep -F '"process memory"' | tail -1440 || echo "No memory lines found"
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+
+      # 5xx responses the proxy returned (504 = the app missed the proxy's 30s
+      # response_timeout), counted per hour against total requests so they can
+      # be lined up with the memory timeline. 5xx pages Cloudflare generates
+      # itself (origin unreachable, 522/524) never reach the proxy, so an hour
+      # with zero here can still have edge errors; check Cloudflare for those.
+      # Raw proxy lines carry client IPs, user agents and query strings, so they
+      # stay in a file on the runner and only counts are printed. The service
+      # filter runs on the host so only bip-web lines cross SSH.
+      - name: Proxy 5xx counts
+        if: inputs.action == 'proxy-errors'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          if ! kamal proxy logs --since 24h --lines 400000 --grep '"service":"bip-web-web"' > proxy-raw.txt 2>&1; then
+            # The host-side grep also exits nonzero when nothing matched.
+            echo "kamal proxy logs failed, or no bip-web lines matched; kamal's own output:"
+            grep -vF '"msg":"Request"' proxy-raw.txt | tail -5
+            exit 1
+          fi
+          grep -F '"msg":"Request"' proxy-raw.txt > requests.txt \
+            || { echo "No bip-web request lines found"; exit 1; }
+          echo "=== Requests and 5xx per hour (UTC) ==="
+          awk '!match($0, /"time":"[^"]+"/) { next }
+               { hour = substr($0, RSTART + 8, 13) }
+               !match($0, /"status":[0-9]+/) { next }
+               {
+                 status = substr($0, RSTART + 9, RLENGTH - 9) + 0
+                 total[hour]++
+                 if (status >= 500) { errors[hour]++; tally[hour, status]++ }
+               }
+               END {
+                 for (k in tally) { split(k, part, SUBSEP); detail[part[1]] = detail[part[1]] " " part[2] "x" tally[k] }
+                 for (h in total) printf "%s  %7d requests  %5d 5xx%s\n", h, total[h], errors[h], detail[h]
+               }' requests.txt | sort
+          echo ""
+          echo "=== 5xx by status and first path segment (whole window) ==="
+          awk 'match($0, /"status":5[0-9][0-9]/) {
+                 status = substr($0, RSTART + 9, 3)
+                 match($0, /"path":"\/[^"\/]*/); segment = substr($0, RSTART + 8, RLENGTH - 8)
+                 count[status " " segment]++
+               }
+               END { for (k in count) printf "%6d  %s\n", count[k], k }' requests.txt | sort -rn | head -20
 
       # Census of what's resident in redis: keys, MB, and average idle time per
       # key family, plus the biggest individual keys. MEMORY USAGE and OBJECT

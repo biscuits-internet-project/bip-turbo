@@ -62,15 +62,44 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
 
       const result = await fn({ ...args, context });
 
-      const duration = performance.now() - startTime;
-      logger.info(`✅ ${args.request.method} ${args.request.url} | completed in ${duration}ms`);
+      logRequestCompleted(args.request, startTime);
 
       return result;
     } catch (error) {
-      logger.error("❌ Request failed", { error });
+      logRequestFailure(args.request, error);
       throw error;
     }
   };
+}
+
+/**
+ * Request log lines carry the path only, never the query string: the ops
+ * workflow prints any prod line matching "error" or "warn" into world-readable
+ * run logs, and query strings can carry auth codes (a callback's
+ * `?error=access_denied&code=…` matches that grep).
+ */
+function requestPath(request: Request) {
+  return new URL(request.url).pathname;
+}
+
+function logRequestCompleted(request: Request, startTime: number) {
+  const duration = performance.now() - startTime;
+  logger.info(`✅ ${request.method} ${requestPath(request)} | completed in ${duration}ms`);
+}
+
+/**
+ * Logs a loader or action failure with the page it happened on, so a failure
+ * line can be matched to a user's report. Redirects and not-found pages are
+ * thrown Responses, i.e. routine control flow, so only a 5xx Response or a
+ * real exception is logged as an error.
+ */
+function logRequestFailure(request: Request, error: unknown) {
+  const fields = { error, method: request.method, path: requestPath(request) };
+  if (error instanceof Response && error.status < 500) {
+    logger.info("Request ended with a thrown response", fields);
+  } else {
+    logger.error("❌ Request failed", fields);
+  }
 }
 
 export function createAction<T, TContext extends PublicContext = PublicContext>(
@@ -96,12 +125,11 @@ export function createAction<T, TContext extends PublicContext = PublicContext>(
 
       const result = await fn({ ...args, context });
 
-      const duration = performance.now() - startTime;
-      logger.info(`✅ ${args.request.method} ${args.request.url} | completed in ${duration}ms`);
+      logRequestCompleted(args.request, startTime);
 
       return result;
     } catch (error) {
-      logger.error("❌ Request failed", { error });
+      logRequestFailure(args.request, error);
       throw error;
     }
   };
