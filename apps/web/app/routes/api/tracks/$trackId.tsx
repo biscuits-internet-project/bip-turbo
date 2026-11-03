@@ -133,6 +133,9 @@ export const action = adminAction(async ({ request, params }) => {
       // Get the track before deletion to retrieve songId for statistics update
       const track = await services.tracks.findById(trackId);
       const songId = track?.songId;
+      // The follower gets a new predecessor once positions are renumbered, so its
+      // song's segue recurrence can change too. Read it before the delete.
+      const followingSongId = await services.tracks.findFollowingTrackSongId(trackId);
 
       // Delete all related data first
       await services.annotations.deleteByTrackId(trackId);
@@ -143,6 +146,9 @@ export const action = adminAction(async ({ request, params }) => {
       // Update song statistics after deleting a track
       if (songId) {
         await services.songs.updateSongStatistics(songId);
+      }
+      if (followingSongId && followingSongId !== songId) {
+        await services.songs.updateSongStatistics(followingSongId);
       }
 
       return { success: true };

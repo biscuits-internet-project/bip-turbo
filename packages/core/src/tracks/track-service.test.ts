@@ -57,21 +57,75 @@ describe("TrackService — Cloudflare year-tag wiring", () => {
   // Delete shares the same invalidation path (private invalidateShowCaches),
   // so verify it also threads the show year through.
   test("delete() passes the show's year derived from show.date", async () => {
-    const db = {
-      track: {
-        findUnique: vi.fn().mockResolvedValue({ showId: "show-id" }),
-        delete: vi.fn().mockResolvedValue(undefined),
-      },
-      show: {
-        findUnique: vi.fn().mockResolvedValue({ slug: "2018-07-12-red-rocks", date: "2018-07-12" }),
-      },
-    };
+    const db = makeDeleteDb({ showId: "show-id", set: "S1", position: 3 });
     const cache = makeCacheInvalidationStub();
     const service = new TrackService(db as never, logger, cache);
 
     await service.delete("track-id");
 
     expect(cache.invalidateShowComprehensive).toHaveBeenCalledWith("show-id", "2018-07-12-red-rocks", [2018]);
+  });
+});
+
+function makeDeleteDb(track: { showId: string; set: string; position: number }) {
+  const db = {
+    track: {
+      findUnique: vi.fn().mockResolvedValue(track),
+      delete: vi.fn().mockReturnValue("delete-operation"),
+      updateMany: vi.fn().mockReturnValue("renumber-operation"),
+    },
+    show: {
+      findUnique: vi.fn().mockResolvedValue({ slug: "2018-07-12-red-rocks", date: "2018-07-12" }),
+    },
+    $transaction: vi.fn().mockResolvedValue([]),
+  };
+  return db;
+}
+
+describe("TrackService.findFollowingTrackSongId", () => {
+  test("looks up the track at the next position in the same show and set", async () => {
+    const db = {
+      track: {
+        findUnique: vi.fn().mockResolvedValue({ showId: "show-id", set: "S2", position: 2 }),
+        findFirst: vi.fn().mockResolvedValue({ songId: "hymn-song-id" }),
+      },
+    };
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await expect(service.findFollowingTrackSongId("track-id")).resolves.toBe("hymn-song-id");
+    expect(db.track.findFirst).toHaveBeenCalledWith({
+      where: { showId: "show-id", set: "S2", position: 3 },
+      select: { songId: true },
+    });
+  });
+
+  test("returns null for the last track in a set", async () => {
+    const db = {
+      track: {
+        findUnique: vi.fn().mockResolvedValue({ showId: "show-id", set: "S2", position: 8 }),
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    };
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await expect(service.findFollowingTrackSongId("track-id")).resolves.toBeNull();
+  });
+});
+
+describe("TrackService.delete renumbering", () => {
+  // Neighbor joins find a track's predecessor with `position = position - 1`,
+  // so a hole left by a delete hides a segue from the track after the hole.
+  test("closes the position gap by decrementing later tracks in the same show and set", async () => {
+    const db = makeDeleteDb({ showId: "show-id", set: "S2", position: 3 });
+    const service = new TrackService(db as never, logger, makeCacheInvalidationStub());
+
+    await service.delete("track-id");
+
+    expect(db.track.updateMany).toHaveBeenCalledWith({
+      where: { showId: "show-id", set: "S2", position: { gt: 3 } },
+      data: { position: { decrement: 1 } },
+    });
+    expect(db.$transaction).toHaveBeenCalledWith(["delete-operation", "renumber-operation"]);
   });
 });
 
