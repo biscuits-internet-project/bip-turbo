@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import type { RatingService } from "../src/ratings/rating-service";
+import type { SavedCursors, SyncCursorResource, SyncCursorStore } from "./sync-cursors";
 import {
   attendanceBindingKey,
   buildRockOperaAssignmentDiff,
@@ -27,6 +28,7 @@ import {
   type McpShow,
   matchVenue,
   parseYearsArg,
+  planGhostShows,
   planShowRenames,
   planVenueOrphans,
   ratingBindingKey,
@@ -45,15 +47,24 @@ function prismaUniqueIdError(): Error {
 }
 
 // parseYearsArg governs the "what years to sync" decision. Default (no flag)
-// must be the current calendar year per the user's chosen behavior; explicit
+// must be every year from the band's first through the current one, so prod
+// edits to older shows reach local; explicit
 // --years=... must override; malformed values must surface as an error so a
 // typo doesn't silently sync nothing.
 describe("parseYearsArg", () => {
-  // No flag, no env override: fall back to current calendar year. This is the
-  // documented default so `make db-sync-missing-shows` with no args just works.
-  test("defaults to current year when no --years flag is passed", () => {
-    const now = new Date("2026-04-23T12:00:00Z");
-    expect(parseYearsArg([], now)).toEqual([2026]);
+  // No flag: every year 1995 through the current UTC year, so
+  // `make db-sync-missing-shows` with no args mirrors older-show edits too.
+  test("defaults to every year from 1995 through the current year when no --years flag is passed", () => {
+    const years = parseYearsArg([], new Date("2026-04-23T12:00:00Z"));
+    expect(years[0]).toBe(1995);
+    expect(years.at(-1)).toBe(2026);
+    expect(years).toHaveLength(32);
+    expect(years).toEqual(Array.from({ length: 32 }, (_, index) => 1995 + index));
+  });
+
+  // The year comes from the injected clock in UTC, not the machine's zone.
+  test("default range ends at the UTC year of the injected clock", () => {
+    expect(parseYearsArg([], new Date("2027-01-01T00:30:00Z")).at(-1)).toBe(2027);
   });
 
   // A single explicit year passes through.
@@ -3031,7 +3042,7 @@ describe("syncUserActivity — incremental mode", () => {
   // Cursor: MAX(updatedAt) on the local table is the implicit checkpoint.
   // Repeated runs ask prod for rows newer than that — the first run pulls
   // everything (cursor=epoch), the second pulls only the delta.
-  test("uses local MAX(updatedAt) as the incremental cursor", async () => {
+  test("uses local MAX(updatedAt) as the incremental cursor once a cursor is saved", async () => {
     const { db } = makeStubDb({
       users: [
         {
@@ -3064,6 +3075,7 @@ describe("syncUserActivity — incremental mode", () => {
       changedSlugs: new Set(),
       now: new Date(),
       mcp,
+      cursorStore: makeMemoryCursorStore({ users: "2024-08-12T00:00:00.000Z" }).store,
     });
 
     const usersCall = calls.find((c) => c.tool === "list_users_since");
@@ -4064,5 +4076,306 @@ describe("ratingBindingKey / attendanceBindingKey", () => {
 
   test("returns an equal key for an equal tuple, so repeat lookups hit one Map entry", () => {
     expect(ratingBindingKey("u1", "r1", "Show")).toBe(ratingBindingKey("u1", "r1", "Show"));
+  });
+});
+
+/**
+ * In-memory SyncCursorStore. Mirrors the file store's only-moves-forward rule
+ * and records every save so tests can assert nothing was written.
+ */
+function makeMemoryCursorStore(initial: SavedCursors = {}) {
+  const cursors: SavedCursors = { ...initial };
+  const saves: Array<{ resource: SyncCursorResource; value: string }> = [];
+  const store: SyncCursorStore = {
+    read: () => ({ ...cursors }),
+    saveIfNewer(resource, value) {
+      const existing = cursors[resource];
+      if (existing && new Date(existing).getTime() >= value.getTime()) return;
+      cursors[resource] = value.toISOString();
+      saves.push({ resource, value: value.toISOString() });
+    },
+  };
+  return { store, cursors, saves };
+}
+
+/** Wraps an mcp stub so tests can read the `since` each tool was called with. */
+function recordSince(mcp: ReturnType<typeof makeStubMcp>) {
+  const sinceByTool: Record<string, string> = {};
+  const wrapped = async <T>(toolName: string, args: Record<string, unknown>): Promise<T> => {
+    sinceByTool[toolName] ??= args.since as string;
+    return mcp<T>(toolName, args);
+  };
+  return { wrapped, sinceByTool };
+}
+
+const emptyPullResponses = () => ({
+  list_users_since: [{ users: [], nextCursor: null }],
+  list_ratings_since: [{ ratings: [], nextCursor: null }],
+  list_attendances_since: [{ attendances: [], nextCursor: null }],
+  list_reviews_since: [{ reviews: [], nextCursor: null }],
+  list_blog_posts_since: [{ blogPosts: [], nextCursor: null }],
+});
+
+const cursorTestUser = (updatedAt: string) => ({
+  id: "u-marc",
+  email: "stub-u-marc@local.invalid",
+  passwordDigest: "STUB",
+  username: "trance-marc",
+  avatarFileId: null,
+  avatarFileUrl: null,
+  createdAt: new Date("2024-01-01T00:00:00Z"),
+  updatedAt: new Date(updatedAt),
+});
+
+const baseCursorOptions = () => ({
+  isDryRun: false,
+  pullFromEpoch: false,
+  pruneOrphans: false,
+  ratingService: stubRatingService(),
+  cacheInvalidation: null,
+  changedSlugs: new Set<string>(),
+  now: new Date("2026-11-03T00:00:00Z"),
+});
+
+describe("syncUserActivity: saved cursors", () => {
+  // A local migration stamped updated_at = now(), so the local max is today
+  // while prod's real watermark is July. The saved cursor holds the pull back.
+  test("starts every pull from the saved cursor when the local max was bumped past it", async () => {
+    const bumped = new Date("2026-11-03T00:00:00Z");
+    const { db } = makeStubDb({
+      users: [cursorTestUser("2026-11-03T00:00:00Z")],
+      ratings: [
+        {
+          id: "r-old",
+          userId: "u-marc",
+          value: 4,
+          rateableType: "Show",
+          rateableId: "show-1",
+          createdAt: bumped,
+          updatedAt: bumped,
+        },
+      ],
+      attendances: [{ id: "a-old", userId: "u-marc", showId: "show-1", createdAt: bumped, updatedAt: bumped }],
+      reviews: [
+        {
+          id: "v-old",
+          userId: "u-marc",
+          showId: "show-1",
+          content: "Great Basis jam",
+          status: "published",
+          createdAt: bumped,
+          updatedAt: bumped,
+        },
+      ],
+      blogPosts: [
+        {
+          id: "b-old",
+          slug: "tour-recap",
+          title: "Tour recap",
+          state: "published",
+          userId: "u-marc",
+          updatedAt: bumped,
+        },
+      ],
+    });
+    const { store } = makeMemoryCursorStore({
+      users: "2026-07-10T00:00:00.000Z",
+      ratings: "2026-07-11T00:00:00.000Z",
+      attendances: "2026-07-12T00:00:00.000Z",
+      reviews: "2026-07-13T00:00:00.000Z",
+      blogPosts: "2026-07-14T00:00:00.000Z",
+    });
+    const { wrapped, sinceByTool } = recordSince(makeStubMcp(emptyPullResponses()));
+
+    await syncUserActivity(db as never, { ...baseCursorOptions(), mcp: wrapped, cursorStore: store });
+
+    expect(sinceByTool.list_users_since).toBe("2026-07-10T00:00:00.000Z");
+    expect(sinceByTool.list_ratings_since).toBe("2026-07-11T00:00:00.000Z");
+    expect(sinceByTool.list_attendances_since).toBe("2026-07-12T00:00:00.000Z");
+    expect(sinceByTool.list_reviews_since).toBe("2026-07-13T00:00:00.000Z");
+    expect(sinceByTool.list_blog_posts_since).toBe("2026-07-14T00:00:00.000Z");
+  });
+
+  // The local max may be a migration's timestamp, so with nothing saved the
+  // pull is a one-time full upsert (not the --full-users reconcile).
+  test("starts from epoch when nothing is saved", async () => {
+    const { db } = makeStubDb({ users: [cursorTestUser("2026-09-01T00:00:00Z")] });
+    const { store } = makeMemoryCursorStore();
+    const { wrapped, sinceByTool } = recordSince(makeStubMcp(emptyPullResponses()));
+
+    await syncUserActivity(db as never, { ...baseCursorOptions(), mcp: wrapped, cursorStore: store });
+
+    expect(sinceByTool.list_users_since).toBe("1970-01-01T00:00:00.000Z");
+    expect(sinceByTool.list_ratings_since).toBe("1970-01-01T00:00:00.000Z");
+  });
+
+  // After a db-restore the local max is older than the saved cursor.
+  test("starts from the local max when it is older than the saved cursor", async () => {
+    const { db } = makeStubDb({ users: [cursorTestUser("2026-06-01T00:00:00Z")] });
+    const { store } = makeMemoryCursorStore({ users: "2026-10-01T00:00:00.000Z" });
+    const { wrapped, sinceByTool } = recordSince(makeStubMcp(emptyPullResponses()));
+
+    await syncUserActivity(db as never, { ...baseCursorOptions(), mcp: wrapped, cursorStore: store });
+
+    expect(sinceByTool.list_users_since).toBe("2026-06-01T00:00:00.000Z");
+  });
+
+  test("--full-users still starts at epoch regardless of the saved cursor", async () => {
+    const { db } = makeStubDb({ users: [cursorTestUser("2026-11-03T00:00:00Z")] });
+    const { store } = makeMemoryCursorStore({ users: "2026-07-10T00:00:00.000Z" });
+    const { wrapped, sinceByTool } = recordSince(makeStubMcp(emptyPullResponses()));
+
+    await syncUserActivity(db as never, {
+      ...baseCursorOptions(),
+      pullFromEpoch: true,
+      mcp: wrapped,
+      cursorStore: store,
+    });
+
+    expect(sinceByTool.list_users_since).toBe("1970-01-01T00:00:00.000Z");
+  });
+
+  // The saved value is the newest prod updatedAt received, not "now" and not
+  // the local max, and cursors for resources that returned nothing stay put.
+  test("saves the max prod updatedAt received per resource and leaves empty resources alone", async () => {
+    const { db } = makeStubDb({
+      users: [cursorTestUser("2026-11-03T00:00:00Z")],
+      shows: [{ id: "show-1", slug: "2024-08-12-cap-theatre" }],
+    } as never);
+    const { store, cursors } = makeMemoryCursorStore({
+      attendances: "2026-07-12T00:00:00.000Z",
+      reviews: "2026-07-13T00:00:00.000Z",
+    });
+    const responses = emptyPullResponses();
+    responses.list_users_since = [
+      {
+        users: [
+          { id: "u-marc", username: "trance-marc", avatarFileUrl: null, updatedAt: "2026-07-20T00:00:00Z" },
+          { id: "u-aron", username: "aron", avatarFileUrl: null, updatedAt: "2026-07-25T00:00:00Z" },
+        ],
+        nextCursor: "page-2",
+      },
+      {
+        users: [{ id: "u-jon", username: "jon", avatarFileUrl: null, updatedAt: "2026-07-22T00:00:00Z" }],
+        nextCursor: null,
+      },
+    ] as never;
+    responses.list_ratings_since = [
+      {
+        ratings: [
+          {
+            id: "r-1",
+            userId: "u-marc",
+            value: 5,
+            rateableType: "Show",
+            rateableId: "show-1",
+            createdAt: "2026-08-01T00:00:00Z",
+            updatedAt: "2026-08-02T00:00:00Z",
+          },
+        ],
+        nextCursor: null,
+      },
+    ] as never;
+
+    await syncUserActivity(db as never, { ...baseCursorOptions(), mcp: makeStubMcp(responses), cursorStore: store });
+
+    expect(cursors.users).toBe("2026-07-25T00:00:00.000Z");
+    expect(cursors.ratings).toBe("2026-08-02T00:00:00.000Z");
+    expect(cursors.attendances).toBe("2026-07-12T00:00:00.000Z");
+    expect(cursors.reviews).toBe("2026-07-13T00:00:00.000Z");
+    expect(cursors.blogPosts).toBeUndefined();
+  });
+
+  // An empty pull proves nothing about prod's watermark, and the starting
+  // point may be a migration-bumped local max.
+  test("saves nothing when a pull returns no rows", async () => {
+    const { db } = makeStubDb({ users: [cursorTestUser("2026-10-30T00:00:00Z")] });
+    const { store, saves } = makeMemoryCursorStore();
+
+    await syncUserActivity(db as never, {
+      ...baseCursorOptions(),
+      mcp: makeStubMcp(emptyPullResponses()),
+      cursorStore: store,
+    });
+
+    expect(saves).toEqual([]);
+  });
+
+  test("never writes a cursor on a dry run", async () => {
+    const { db } = makeStubDb({ users: [cursorTestUser("2026-11-03T00:00:00Z")] });
+    const { store, saves } = makeMemoryCursorStore();
+    const responses = emptyPullResponses();
+    responses.list_users_since = [
+      {
+        users: [{ id: "u-aron", username: "aron", avatarFileUrl: null, updatedAt: "2026-07-25T00:00:00Z" }],
+        nextCursor: null,
+      },
+    ] as never;
+
+    await syncUserActivity(db as never, {
+      ...baseCursorOptions(),
+      isDryRun: true,
+      mcp: makeStubMcp(responses),
+      cursorStore: store,
+    });
+
+    expect(saves).toEqual([]);
+  });
+
+  // A pull that throws partway must not advance the cursor past rows it never got.
+  test("does not save a cursor for a resource whose pull threw", async () => {
+    const { db } = makeStubDb({ users: [cursorTestUser("2026-11-03T00:00:00Z")] });
+    const { store, saves } = makeMemoryCursorStore();
+    let userPageCount = 0;
+    const failing = async <T>(toolName: string): Promise<T> => {
+      if (toolName === "list_users_since" && userPageCount++ === 0) {
+        return {
+          users: [{ id: "u-aron", username: "aron", avatarFileUrl: null, updatedAt: "2026-07-25T00:00:00Z" }],
+          nextCursor: "page-2",
+        } as T;
+      }
+      throw new Error("prod unreachable");
+    };
+
+    await expect(
+      syncUserActivity(db as never, { ...baseCursorOptions(), mcp: failing, cursorStore: store }),
+    ).rejects.toThrow("prod unreachable");
+    expect(saves).toEqual([]);
+  });
+});
+
+// planGhostShows decides which local-only shows the sync may delete. Wider
+// default year coverage means the unflagged run must not reach older years.
+describe("planGhostShows", () => {
+  const ghost = (slug: string, date: string, userDataCount: number) => ({ slug, date, userDataCount });
+  const currentYearGhost = ghost("2026-10-01-the-fillmore", "2026-10-01", 0);
+  const olderGhost = ghost("2019-05-04-the-fillmore", "2019-05-04", 0);
+  const currentYearWithData = ghost("2026-09-01-red-rocks", "2026-09-01", 3);
+
+  test("deletes a current-year ghost without user data when the flag is absent", () => {
+    const plan = planGhostShows([currentYearGhost], { pruneGhostShows: false, currentYear: 2026 });
+    expect(plan.toDelete).toEqual([currentYearGhost]);
+    expect(plan.keptOutsideCurrentYear).toEqual([]);
+  });
+
+  test("keeps an older-year ghost without user data when the flag is absent", () => {
+    const plan = planGhostShows([olderGhost], { pruneGhostShows: false, currentYear: 2026 });
+    expect(plan.toDelete).toEqual([]);
+    expect(plan.keptOutsideCurrentYear).toEqual([olderGhost]);
+  });
+
+  test("deletes an older-year ghost when the flag is present", () => {
+    const plan = planGhostShows([olderGhost], { pruneGhostShows: true, currentYear: 2026 });
+    expect(plan.toDelete).toEqual([olderGhost]);
+    expect(plan.keptOutsideCurrentYear).toEqual([]);
+  });
+
+  test("skips a ghost with user data without the flag and deletes it with the flag", () => {
+    const withoutFlag = planGhostShows([currentYearWithData], { pruneGhostShows: false, currentYear: 2026 });
+    expect(withoutFlag.toDelete).toEqual([]);
+    expect(withoutFlag.keptWithUserData).toEqual([currentYearWithData]);
+    const withFlag = planGhostShows([currentYearWithData], { pruneGhostShows: true, currentYear: 2026 });
+    expect(withFlag.toDelete).toEqual([currentYearWithData]);
+    expect(withFlag.keptWithUserData).toEqual([]);
   });
 });
