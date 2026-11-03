@@ -5,3 +5,5 @@ PATH=/usr/local/bin:/usr/bin:/bin
 # 03:45 UTC (10:45 PM EST / 11:45 PM EDT): after dipstick (03:30), before the
 # Sunday 04:00 apt/prune job.
 45 3 * * * $HOME/bin/bip-postgres-backup.sh >> $HOME/backups/bip-postgres-backup.log 2>&1
+# Weekly Supabase auth backup, Wednesdays 04:15 UTC (Tuesday 11:15 PM EST / 12:15 AM EDT).
+15 4 * * 3 $HOME/bin/supabase-auth-backup.sh >> $HOME/backups/supabase-auth-backup.log 2>&1

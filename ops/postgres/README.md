@@ -5,9 +5,10 @@ Prod runs on the Hetzner VPS (`5.161.124.129`) as the Kamal accessory `bip-web-p
 | File | What it is |
 |---|---|
 | `bip-postgres-backup.sh` | Nightly dump, verify, keep 14 days in `~deploy/backups/bip-postgres`, copy to `r2:bip-postgres-backups`, keep 90 days there |
-| `bip-postgres-backup.cron` | deploy's crontab, 03:45 UTC (10:45 PM EST) |
+| `bip-postgres-backup.cron` | deploy's crontab: nightly 03:45 UTC (10:45 PM EST), auth weekly Wednesdays 04:15 UTC (Tuesday 11:15 PM EST) |
 | `restore-drill.sh` | Restores the newest R2 dump into a throwaway container and diffs row counts with live |
 | `table-counts.sql` | Exact row count per `public` table; every restore check diffs its output |
+| `supabase-auth-backup.sh` | Weekly dump of Supabase's `auth` schema (every login), kept 28 days in `~deploy/backups/supabase-auth` and 90 days in R2 |
 | `prepare-database.sql` | **Drops** `bip` and recreates it empty with the `vector`, `pg_trgm` and `unaccent` extensions |
 
 ## Install the backups (deploy user, once)
@@ -45,6 +46,20 @@ h 'mkdir -p ~/bin ~/backups ~/.local/share/bip-postgres
 ```bash
 h 'umask 077; echo "HONEYBADGER_CHECKIN_URL=<check-in URL>" > ~/.config/bip-postgres-backup.env'
 ```
+
+## Supabase auth backup
+
+User accounts stay in Supabase Auth, and the free plan keeps no backups, so `supabase-auth-backup.sh` dumps the `auth` schema weekly. It reads the connection string from `~/.config/bip-supabase-auth.env`, written from Doppler without printing it:
+
+```bash
+doppler run -p bip -c prd_hetzner --only-secrets SUPABASE_DATABASE_URL -- sh -c 'printf "DATABASE_URL=%s\n" "$SUPABASE_DATABASE_URL"' \
+  | h 'umask 077; mkdir -p ~/.config && cat > ~/.config/bip-supabase-auth.env'
+scp -i ~/.ssh/hetzner_deploy ops/postgres/supabase-auth-backup.sh deploy@5.161.124.129:/tmp/
+h 'install -m 755 /tmp/supabase-auth-backup.sh ~/bin/supabase-auth-backup.sh && rm /tmp/supabase-auth-backup.sh'
+h 'env -i HOME=$HOME PATH=/usr/local/bin:/usr/bin:/bin ~/bin/supabase-auth-backup.sh; echo exit=$?'
+```
+
+Expected: `ok:` with about 27 tables, `uploaded: … matches local`, `exit=0`. The log is `~/backups/supabase-auth-backup.log`. When `SUPABASE_DATABASE_URL` is deleted from Doppler, keep the env file: the script needs it for as long as Supabase holds the logins.
 
 ## Check it works
 
