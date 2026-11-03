@@ -19,3 +19,5 @@ apps/web/.react-router/*
 backups/
 # Rater duplicate-account investigation: contains real user emails (PII), keep out of git
 rater-investigation/
+# Prod-to-local sync cursors, per developer database (packages/core/scripts/sync-cursors.ts)
+.sync-cursors.json

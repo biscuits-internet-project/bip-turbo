@@ -16,7 +16,7 @@
  * We therefore write directly via Prisma with the prod-supplied slugs.
  */
 
-import { SYNC_RESOURCES, type SyncResourceSegment } from "@bip/domain";
+import { START_YEAR, SYNC_RESOURCES, type SyncResourceSegment } from "@bip/domain";
 import type { Prisma, TrackFlag } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
@@ -30,6 +30,13 @@ import { runRatingsRecompute } from "../src/ratings/recompute-ratings";
 import { SegueRunGeneratorService } from "../src/segue-run/segue-run-generator-service";
 import { StatsService } from "../src/stats/stats-service";
 import { recomputeShowDuration } from "../src/tracks/show-duration";
+import {
+  createDefaultCursorStore,
+  NO_OP_CURSOR_STORE,
+  resolveStartingCursor,
+  type SyncCursorResource,
+  type SyncCursorStore,
+} from "./sync-cursors";
 
 const MCP_URL = process.env.MCP_URL ?? "https://discobiscuits.net/mcp";
 const DEFAULT_BAND_SLUG = "the-disco-biscuits";
@@ -385,11 +392,16 @@ export function isStubSlug(slug: string | null): boolean {
 /**
  * Parse `--years=` into a deduplicated, sorted year list. Accepts single
  * years, ranges (`2010-2026`), and comma-separated mixes of the two
- * (`2010-2015,2020,2025`). Range bounds are inclusive on both ends.
+ * (`2010-2015,2020,2025`). Range bounds are inclusive on both ends. Without
+ * the flag the range is every year from START_YEAR through the current
+ * UTC year, so prod edits to older shows reach the local database.
  */
 export function parseYearsArg(argv: string[], now: Date): number[] {
   const flag = argv.find((a) => a.startsWith("--years="));
-  if (!flag) return [now.getUTCFullYear()];
+  if (!flag) {
+    const currentYear = now.getUTCFullYear();
+    return Array.from({ length: currentYear - START_YEAR + 1 }, (_, index) => START_YEAR + index);
+  }
   const raw = flag.slice("--years=".length);
   const pieces = raw
     .split(",")
@@ -846,6 +858,45 @@ export function planVenueOrphans(localVenues: LocalVenueForOrphan[], orphanSlugs
     }
   }
   return { toDelete, toWarn };
+}
+
+export interface GhostShowCandidate {
+  slug: string | null;
+  date: string;
+  userDataCount: number;
+}
+
+export interface GhostShowPlan<T extends GhostShowCandidate> {
+  toDelete: T[];
+  keptWithUserData: T[];
+  keptOutsideCurrentYear: T[];
+}
+
+/**
+ * Decide which ghost shows (local, absent on prod) the sync may delete. The
+ * default year range spans every year, so without --prune-ghost-shows only
+ * ghosts dated in the current UTC year are auto-deleted (the reach the sync had
+ * before the range widened); older ghosts are reported so a bad prod response
+ * or a renamed show cannot silently drop history. A ghost carrying user data
+ * is only deleted when the flag opts in.
+ */
+export function planGhostShows<T extends GhostShowCandidate>(
+  ghosts: T[],
+  options: { pruneGhostShows: boolean; currentYear: number },
+): GhostShowPlan<T> {
+  const plan: GhostShowPlan<T> = { toDelete: [], keptWithUserData: [], keptOutsideCurrentYear: [] };
+  for (const ghost of ghosts) {
+    if (options.pruneGhostShows) {
+      plan.toDelete.push(ghost);
+    } else if (ghost.userDataCount > 0) {
+      plan.keptWithUserData.push(ghost);
+    } else if (Number(ghost.date.slice(0, 4)) !== options.currentYear) {
+      plan.keptOutsideCurrentYear.push(ghost);
+    } else {
+      plan.toDelete.push(ghost);
+    }
+  }
+  return plan;
 }
 
 // Shape-minimal local Track row used by the setlist reconciliation path.
@@ -1697,14 +1748,19 @@ interface SyncUserActivityOptions {
   // Injected to keep the function unit-testable without mocking globals.
   // Defaults to the real mcpCall in the production wiring below.
   mcp?: <T>(toolName: string, args: Record<string, unknown>) => Promise<T>;
+  // Where the per-resource prod watermarks persist between runs. Absent means
+  // nothing is remembered or saved (the production wiring passes the file store).
+  cursorStore?: SyncCursorStore;
 }
 
 /**
  * Pull users / ratings / attendances from prod and reconcile locally.
  *
- * Default mode is incremental: cursor = MAX(updatedAt) on each local table,
- * pull rows newer than that, upsert by id. Stateless — no `.sync-state.json`,
- * no cursor table. Skips deletes.
+ * Default mode is incremental: pull rows newer than min(saved cursor, local
+ * MAX(updatedAt)) per resource, upsert by id. The saved cursor (see
+ * sync-cursors.ts) is the newest prod updatedAt a previous run received; it
+ * keeps a local migration that stamps updated_at = now() from hiding prod rows
+ * the local max has jumped past. Skips deletes.
  *
  * --full-users adds a reconciliation pass: pull every prod id, delete the
  * local rows missing from prod. Run occasionally for a true mirror.
@@ -1725,6 +1781,7 @@ export async function syncUserActivity(
 ): Promise<UserActivityStats> {
   const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, changedSlugs, now } = options;
   const mcp = options.mcp ?? apiCall;
+  const cursorStore = options.cursorStore ?? NO_OP_CURSOR_STORE;
   const prodShowIdToLocalId = options.prodShowIdToLocalId ?? new Map<string, string>();
   const prodTrackIdToLocalId = options.prodTrackIdToLocalId ?? new Map<string, string>();
   const stats: UserActivityStats = {
@@ -1751,25 +1808,67 @@ export async function syncUserActivity(
     raterAliasGroupsDeleted: 0,
   };
 
-  // Cursor = local MAX(updatedAt). First run on a fresh table yields null;
-  // fall back to epoch so the first page pulls everything. Full mode forces
-  // epoch on every table so missing-older rows get backfilled — the
-  // single-cursor approach can't pull rows whose updatedAt is below the
-  // current local MAX, which happens whenever the dump that seeded the DB
-  // didn't cover those rows.
-  async function localMaxUpdatedAt(table: "user" | "rating" | "attendance" | "review" | "blogPost"): Promise<Date> {
-    if (pullFromEpoch) return new Date(0);
+  // Starting point per resource: min(saved cursor, local MAX(updatedAt)); a
+  // resource with no saved cursor starts at epoch (a one-time full upsert).
+  // Full mode forces epoch on every table so missing-older rows get
+  // backfilled, which neither cursor can reach.
+  const savedCursors = cursorStore.read();
+  async function localMaxUpdatedAt(resource: SyncCursorResource): Promise<Date> {
+    const query = { orderBy: { updatedAt: "desc" }, select: { updatedAt: true } } as const;
     let row: { updatedAt: Date } | null;
-    if (table === "user")
-      row = await db.user.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
-    else if (table === "rating")
-      row = await db.rating.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
-    else if (table === "review")
-      row = await db.review.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
-    else if (table === "blogPost")
-      row = await db.blogPost.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
-    else row = await db.attendance.findFirst({ orderBy: { updatedAt: "desc" }, select: { updatedAt: true } });
+    switch (resource) {
+      case "users":
+        row = await db.user.findFirst(query);
+        break;
+      case "ratings":
+        row = await db.rating.findFirst(query);
+        break;
+      case "attendances":
+        row = await db.attendance.findFirst(query);
+        break;
+      case "reviews":
+        row = await db.review.findFirst(query);
+        break;
+      case "blogPosts":
+        row = await db.blogPost.findFirst(query);
+        break;
+    }
     return row?.updatedAt ?? new Date(0);
+  }
+
+  // Resolves the pull's `since` for one resource and the log text saying where
+  // it came from.
+  async function startingCursor(resource: SyncCursorResource): Promise<{ cursor: Date; description: string }> {
+    if (pullFromEpoch) return { cursor: new Date(0), description: "full epoch pull" };
+    const savedValue = savedCursors[resource];
+    const { cursor, source } = resolveStartingCursor(
+      savedValue ? new Date(savedValue) : undefined,
+      await localMaxUpdatedAt(resource),
+    );
+    const description =
+      source === "no saved cursor, full pull" ? source : `incremental since ${cursor.toISOString()} (${source})`;
+    return { cursor, description };
+  }
+
+  // Remembers the newest prod updatedAt received for one resource's pull and
+  // saves it once the pull finished. Only prod's own timestamps are saved,
+  // never the local starting point, which a migration may have bumped, so a
+  // pull that returns nothing saves nothing. A pull that throws never reaches
+  // save(), and dry runs never write.
+  function newestUpdatedAtTracker(resource: SyncCursorResource) {
+    let newest: Date | null = null;
+    return {
+      observe(rows: Array<{ updatedAt: string }>) {
+        for (const row of rows) {
+          const updatedAt = new Date(row.updatedAt);
+          if (!Number.isNaN(updatedAt.getTime()) && (newest === null || updatedAt > newest)) newest = updatedAt;
+        }
+      },
+      save() {
+        if (isDryRun || newest === null) return;
+        cursorStore.saveIfNewer(resource, newest);
+      },
+    };
   }
 
   // Map from prod userId → local userId. The two diverge whenever a prod
@@ -1781,16 +1880,18 @@ export async function syncUserActivity(
   const prodIdToLocalId = new Map<string, string>();
 
   // --- Users ---
-  const userCursor = await localMaxUpdatedAt("user");
-  console.log(`👤 Users: ${pullFromEpoch ? "full epoch pull" : `incremental since ${userCursor.toISOString()}`}`);
+  const userStart = await startingCursor("users");
+  const userNewest = newestUpdatedAtTracker("users");
+  console.log(`👤 Users: ${userStart.description}`);
   let pageCursor: string | null = null;
   do {
-    const args: Record<string, unknown> = { since: userCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+    const args: Record<string, unknown> = { since: userStart.cursor.toISOString(), limit: SYNC_PAGE_LIMIT };
     if (pageCursor) args.cursor = pageCursor;
     const { users, nextCursor } = await mcp<{ users: McpSyncUser[]; nextCursor: string | null }>(
       "list_users_since",
       args,
     );
+    userNewest.observe(users);
     // Batched local lookup by BOTH id and username. The two lookups together
     // cover three dispatch cases per incoming prod user:
     //   1. id matches a local row     → update by id, prod id == local id
@@ -1905,6 +2006,7 @@ export async function syncUserActivity(
     }
     pageCursor = nextCursor;
   } while (pageCursor !== null);
+  userNewest.save();
   console.log(`👤 Users: +${stats.usersCreated} ~${stats.usersUpdated}`);
 
   // --- Ratings ---
@@ -1912,8 +2014,9 @@ export async function syncUserActivity(
   // rebuild Show.averageRating / Track.averageRating + ratingsCount and to
   // resolve cache-invalidation slugs.
   const touchedRateables = new Map<string, { rateableId: string; rateableType: string }>();
-  const ratingCursor = await localMaxUpdatedAt("rating");
-  console.log(`⭐ Ratings: ${pullFromEpoch ? "full epoch pull" : `incremental since ${ratingCursor.toISOString()}`}`);
+  const ratingStart = await startingCursor("ratings");
+  const ratingNewest = newestUpdatedAtTracker("ratings");
+  console.log(`⭐ Ratings: ${ratingStart.description}`);
 
   // Buffer the whole prod stream before writing. Epoch mode needs prod's
   // complete id→(user, rateable) picture to reconcile stale id bindings up
@@ -1921,15 +2024,17 @@ export async function syncUserActivity(
   const prodRatings: McpSyncRating[] = [];
   pageCursor = null;
   do {
-    const args: Record<string, unknown> = { since: ratingCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+    const args: Record<string, unknown> = { since: ratingStart.cursor.toISOString(), limit: SYNC_PAGE_LIMIT };
     if (pageCursor) args.cursor = pageCursor;
     const { ratings, nextCursor } = await mcp<{ ratings: McpSyncRating[]; nextCursor: string | null }>(
       "list_ratings_since",
       args,
     );
     prodRatings.push(...ratings);
+    ratingNewest.observe(ratings);
     pageCursor = nextCursor;
   } while (pageCursor !== null);
+  ratingNewest.save();
 
   // Resolve each rating's userId through prodIdToLocalId. The map is populated
   // above for every prod user we saw this run; rows owned by users we didn't
@@ -2084,20 +2189,23 @@ export async function syncUserActivity(
 
   // --- Attendances ---
   // Same buffer → resolve → epoch-reconcile → chunked-apply shape as ratings.
-  const attCursor = await localMaxUpdatedAt("attendance");
-  console.log(`🎫 Attendances: ${pullFromEpoch ? "full epoch pull" : `incremental since ${attCursor.toISOString()}`}`);
+  const attendanceStart = await startingCursor("attendances");
+  const attendanceNewest = newestUpdatedAtTracker("attendances");
+  console.log(`🎫 Attendances: ${attendanceStart.description}`);
   const prodAttendances: McpSyncAttendance[] = [];
   pageCursor = null;
   do {
-    const args: Record<string, unknown> = { since: attCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+    const args: Record<string, unknown> = { since: attendanceStart.cursor.toISOString(), limit: SYNC_PAGE_LIMIT };
     if (pageCursor) args.cursor = pageCursor;
     const { attendances, nextCursor } = await mcp<{ attendances: McpSyncAttendance[]; nextCursor: string | null }>(
       "list_attendances_since",
       args,
     );
     prodAttendances.push(...attendances);
+    attendanceNewest.observe(attendances);
     pageCursor = nextCursor;
   } while (pageCursor !== null);
+  attendanceNewest.save();
 
   // Same userId + show-id drift remap as the ratings loop.
   const resolvedAttendances = prodAttendances.map((a) => ({
@@ -2198,20 +2306,23 @@ export async function syncUserActivity(
   // — reviews skip until the MCP change deploys. Same buffer → resolve →
   // epoch-reconcile → chunked-apply shape as attendances.
   try {
-    const reviewCursor = await localMaxUpdatedAt("review");
-    console.log(`📝 Reviews: ${pullFromEpoch ? "full epoch pull" : `incremental since ${reviewCursor.toISOString()}`}`);
+    const reviewStart = await startingCursor("reviews");
+    const reviewNewest = newestUpdatedAtTracker("reviews");
+    console.log(`📝 Reviews: ${reviewStart.description}`);
     const prodReviews: McpSyncReview[] = [];
     pageCursor = null;
     do {
-      const args: Record<string, unknown> = { since: reviewCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+      const args: Record<string, unknown> = { since: reviewStart.cursor.toISOString(), limit: SYNC_PAGE_LIMIT };
       if (pageCursor) args.cursor = pageCursor;
       const { reviews, nextCursor } = await mcp<{ reviews: McpSyncReview[]; nextCursor: string | null }>(
         "list_reviews_since",
         args,
       );
       prodReviews.push(...reviews);
+      reviewNewest.observe(reviews);
       pageCursor = nextCursor;
     } while (pageCursor !== null);
+    reviewNewest.save();
 
     // Skip null-show reviews (not rendered, and no (showId, userId) key) and
     // remap userId + showId through the drift maps, same as attendances.
@@ -2309,22 +2420,23 @@ export async function syncUserActivity(
   // resolves through prodIdToLocalId. Wrapped in try/catch for pre-deploy MCP
   // tolerance (list_blog_posts_since absent until the MCP change deploys).
   try {
-    const blogCursor = await localMaxUpdatedAt("blogPost");
-    console.log(
-      `📰 Blog posts: ${pullFromEpoch ? "full epoch pull" : `incremental since ${blogCursor.toISOString()}`}`,
-    );
+    const blogStart = await startingCursor("blogPosts");
+    const blogNewest = newestUpdatedAtTracker("blogPosts");
+    console.log(`📰 Blog posts: ${blogStart.description}`);
     const prodPosts: McpBlogPost[] = [];
     pageCursor = null;
     do {
-      const args: Record<string, unknown> = { since: blogCursor.toISOString(), limit: SYNC_PAGE_LIMIT };
+      const args: Record<string, unknown> = { since: blogStart.cursor.toISOString(), limit: SYNC_PAGE_LIMIT };
       if (pageCursor) args.cursor = pageCursor;
       const { blogPosts, nextCursor } = await mcp<{ blogPosts: McpBlogPost[]; nextCursor: string | null }>(
         "list_blog_posts_since",
         args,
       );
       prodPosts.push(...blogPosts);
+      blogNewest.observe(blogPosts);
       pageCursor = nextCursor;
     } while (pageCursor !== null);
+    blogNewest.save();
 
     for (const post of prodPosts) {
       const localUserId = prodIdToLocalId.get(post.userId) ?? post.userId;
@@ -2700,8 +2812,9 @@ annotations. Idempotent — re-running only writes the rows that drifted.
 
 Options:
   --years=SPEC             Years to sync, as a comma-separated list of single
-                           years and/or inclusive ranges. Default: current
-                           calendar year (UTC). Examples:
+                           years and/or inclusive ranges. Default: every
+                           year from ${START_YEAR} through the current
+                           year (UTC). Examples:
                              --years=2025
                              --years=2024,2025
                              --years=2010-2026
@@ -2713,10 +2826,12 @@ Options:
                            (those are dump-frozen prod data; the equivalent
                            shows on prod under the new slug still carry them).
                            Without this flag, ghost shows with user data are
-                           logged and skipped.
+                           logged and skipped, and ghost shows outside the
+                           current year (UTC) are logged and kept; only
+                           current-year ghosts without user data are deleted.
   --no-users               Skip the user-activity pass (users, ratings,
                            attendances). The default pulls incrementally,
-                           keyed on local MAX(updatedAt) per table.
+                           starting from min(saved cursor, local MAX(updatedAt)) per table.
   --full-users             Full bidirectional reconcile: pull every user /
                            rating / attendance since epoch (catches rows
                            older than the local MAX cursor) AND delete any
@@ -2740,19 +2855,25 @@ Recommended cadence:
 
   Routine (daily / before testing against current data):
     make db-sync-missing-shows PRUNE_USERS=1
-      Default --years=<current year>. Catches new shows, current-year
-      admin edits (notes, setlists, rock opera tags), all rating /
-      attendance inserts + updates via the incremental cursor, and all
-      rating / attendance DELETES via --prune-users. Fast (~30s typical).
+      Default --years=${START_YEAR}-<current year>. Catches new shows,
+      admin edits to any show (notes, setlists, renames, rock opera tags),
+      all rating / attendance inserts + updates via the incremental
+      cursor, and all rating / attendance DELETES via --prune-users.
+      Takes a few minutes.
 
-  Weekly / when an admin tells you they touched an older show:
-    make db-sync-missing-shows YEARS=2024-2026 PRUNE_USERS=1
-      Widen --years to span whatever was edited. Picks up note/setlist/
-      track changes on those older shows; still gets routine user
+  Quick pass when only the current year matters:
+    make db-sync-missing-shows YEARS=<current year> PRUNE_USERS=1
+      Narrow --years to skip the older shows. Still gets routine user
       activity through the inherited flags.
 
+  Incremental user pulls start from min(saved cursor, local max updatedAt).
+  The saved cursor (.sync-cursors.json at the main checkout root, shared
+  by every worktree, per database)
+  is the newest prod updatedAt a previous run received, so a local
+  migration that bumps updated_at can't hide prod rows from the pull.
+
   Rare (clean-slate reconcile, e.g. after a fresh dump or suspected drift):
-    make db-sync-missing-shows YEARS=1995-2026 PRUNE_GHOST_SHOWS=1 FULL_USERS=1
+    make db-sync-missing-shows PRUNE_GHOST_SHOWS=1 FULL_USERS=1
       Reconciles everything against prod in both directions.
       --full-users does epoch-pull + delete (catches missing-older rows
       the cursor can't reach). --prune-ghost-shows removes local shows
@@ -2763,8 +2884,8 @@ Recommended cadence:
   What you lose by skipping each flag in the routine run:
     no --prune-users      → rating/attendance DELETES on prod stay local.
                             Inserts + updates still come through.
-    default --years only  → admin edits to OLDER shows don't sync.
-                            Current-year edits still come through.
+    narrow --years        → admin edits to shows outside the window
+                            don't sync.
     no --full-users       → not needed in steady state. Only required
                             when local is missing rows older than the
                             cursor (typically just after a stale dump).
@@ -4392,20 +4513,30 @@ async function syncMissingShows(): Promise<void> {
     if (ghostShows.length > 0) {
       console.log(`👻 ${ghostShows.length} ghost show(s) found in synced years (local but not on prod)`);
     }
-    for (const ghost of ghostShows) {
-      const userDataCount =
-        ghost._count.attendances +
-        ghost._count.favorites +
-        ghost._count.reviews +
-        ghost._count.showPhotos +
-        ghost._count.showYoutubes;
-      if (userDataCount > 0 && !pruneGhostShows) {
-        stats.showsOrphanedWithUserData++;
-        console.warn(
-          `  ⚠️  show ${ghost.slug} (${ghost._count.tracks} tracks, ${userDataCount} user-data row(s)); skipping — re-run with --prune-ghost-shows to delete`,
-        );
-        continue;
-      }
+    const ghostPlan = planGhostShows(
+      ghostShows.map((ghost) => ({
+        ...ghost,
+        userDataCount:
+          ghost._count.attendances +
+          ghost._count.favorites +
+          ghost._count.reviews +
+          ghost._count.showPhotos +
+          ghost._count.showYoutubes,
+      })),
+      { pruneGhostShows, currentYear: now.getUTCFullYear() },
+    );
+    for (const ghost of ghostPlan.keptWithUserData) {
+      stats.showsOrphanedWithUserData++;
+      console.warn(
+        `  ⚠️  show ${ghost.slug} (${ghost._count.tracks} tracks, ${ghost.userDataCount} user-data row(s)); skipping, re-run with --prune-ghost-shows to delete`,
+      );
+    }
+    for (const ghost of ghostPlan.keptOutsideCurrentYear) {
+      console.log(
+        `  ⏭️  show ${ghost.slug} (${ghost._count.tracks} tracks) kept: not on prod, but outside the current year; pass --prune-ghost-shows to delete`,
+      );
+    }
+    for (const ghost of ghostPlan.toDelete) {
       if (isDryRun) {
         console.log(`  🗑️  show ${ghost.slug} (${ghost._count.tracks} tracks) would be deleted (not on prod) (dry run)`);
         stats.showsOrphanedDeleted++;
@@ -4433,8 +4564,9 @@ async function syncMissingShows(): Promise<void> {
             data: { previousPerformanceShowId: null },
           });
           await tx.segueRun.deleteMany({ where: { showId: ghost.id } });
-          // User-data tables: only present when --prune-ghost-shows opted in
-          // (without the flag, the loop already `continue`d above). All five
+          // User-data tables: only non-empty when --prune-ghost-shows opted in
+          // (without the flag, ghosts with user data are never planned for
+          // deletion). All five
           // tables have NoAction onDelete so we have to wipe them manually.
           await tx.attendance.deleteMany({ where: { showId: ghost.id } });
           await tx.favorite.deleteMany({ where: { showId: ghost.id } });
@@ -4565,6 +4697,7 @@ async function syncMissingShows(): Promise<void> {
           now,
           prodShowIdToLocalId,
           prodTrackIdToLocalId,
+          cursorStore: createDefaultCursorStore({ databaseUrl: process.env.DATABASE_URL }),
         });
         stats.userActivity = userActivityStats;
       } catch (err) {
