@@ -1,176 +1,115 @@
 # Postgres: Supabase → Hetzner — Design
 
-**Date:** 2026-04-20
+**Date:** 2026-04-20, revised 2026-11-03
 **Status:** Approved for implementation planning
-**Scope:** Move the app's transactional Postgres database off Supabase and onto the Hetzner VPS that already runs the web app and Redis via Kamal 2.
+**Scope:** Move the app's Postgres database off Supabase and onto the Hetzner VPS that already runs the web app and Redis via Kamal 2.
 
 ## Goal
 
-Stop paying for and depending on Supabase for the transactional database. Keep everything else on Supabase unchanged.
+Stop paying $25/month for Supabase Pro. Auth and Storage stay on Supabase, on the free plan.
 
 ## Scope
 
 **In scope:**
-- Stand up Postgres 18 on the existing Hetzner VPS (`5.161.124.129`) as a Kamal accessory.
-- Migrate all `public.*` schema data (every Prisma-managed table) from Supabase Postgres to the new Hetzner Postgres.
-- Nightly `pg_dump` backups to Cloudflare R2 with 14-day retention.
-- One-time restore drill before declaring the migration complete.
-- Update `DATABASE_URL` + related secrets in Doppler and redeploy.
+- Postgres 18 with pgvector on the existing VPS (`5.161.124.129`) as a Kamal accessory.
+- Move the `public` schema (every Prisma-managed table, including `_prisma_migrations`) from Supabase to it.
+- Nightly backups, kept on the host and copied to Cloudflare R2.
+- A restore drill before cutover.
+- Point `DATABASE_URL` at the new database and redeploy.
+- After a 30-day rollback window, downgrade the Supabase project to the free plan.
 
-**Explicitly out of scope:**
-- Supabase Auth stays on Supabase. `auth.*` schema is not migrated.
-- Supabase Storage stays on Supabase. `storage.*` schema is not migrated.
-- No PgBouncer / connection pooling changes.
-- No WAL archiving, point-in-time recovery, or streaming replicas.
-- No change to local development workflow (`supabase start` keeps working).
-- No change to coaching-tree's database (different project, different owner, different VPS tenant).
-- Updating the GitHub Actions deploy workflow off Fly.io (known-stale per project memory; separate issue).
+**Out of scope:**
+- Supabase Auth (`auth.*`) and Storage (`storage.*`) stay where they are.
+- PgBouncer, WAL archiving, point-in-time recovery, replicas.
+- Local development. `make db-restore` and the local Supabase stack keep working as they do.
+- coaching-tree's database.
 
-## Context
+## Facts this design rests on
 
-- App already deployed on a Hetzner VPS (`5.161.124.129`) via Kamal 2, sharing the box with `coaching-tree`.
-- Current accessories: `bip-web-redis`.
-- Current `DATABASE_URL` points at Supabase's **session pooler** (IPv4) because the direct Supabase endpoint is IPv6-only and the Docker host can't reach it. Moving Postgres onto the same VPS eliminates that constraint.
-- Supabase is also used for Auth (routes under `apps/web/app/routes/auth/*`) and Storage (avatars via `file-service.ts`, blog images bucket). A `packages/core/scripts/sync-supabase-users.ts` syncs Supabase `auth.users` → the app's `public.users`. That sync continues to work unchanged because Auth stays on Supabase and the sync writes into Postgres (which will just be a different Postgres after cutover).
-- ORM is Prisma 7. Schema at `packages/core/src/_shared/prisma/schema.prisma`. All tables live in `public`. The schema uses `gen_random_uuid()` (built into PG 13+, no extra extension needed) and one `autoincrement` on `audits.id`.
-- DB size: **287 MB**. Dump + restore runs in under a minute.
+Checked 2026-11-03:
+
+| | |
+|---|---|
+| Supabase Postgres | 15.8; 345 MB in total: `public` 248 MB, `auth` 37 MB, `storage` 248 kB with no stored files; 1,497 auth users |
+| Extensions the app needs | `vector`, `pg_trgm`, `unaccent` (created by migrations with no `SCHEMA` clause). Which schema each lives in on prod is checked in plan Task 1. |
+| App connection | `DATABASE_URL` in Doppler `bip/prd_hetzner` points at Supabase's IPv4 session pooler. Prisma pool is capped at 5 connections (`packages/core/src/_shared/prisma/client.ts`). |
+| VPS | 3 vCPU, 3.7 GB RAM (about 1.4 GB available, 661 MB swap in use), 52 GB of 75 GB disk free, Ubuntu 24.04. Runs bip-web (capped at 1536m), redis (512mb), coaching-tree and its Postgres, dipstick, monarch-mcp, kamal-proxy. |
+| Host maintenance | Root cron runs `apt upgrade` plus `docker system prune -f` Sundays at 04:00 UTC. Prune does not touch named volumes or running containers. |
+| Existing backup pattern | `/usr/local/bin/dipstick-backup.sh` (root cron): snapshot, verify, keep 14 days locally, copy to R2 via the root `r2:` rclone remote, keep 90 days there. |
+| Stale accessory | A `bip-web-postgres` container from April (`postgres:18-alpine`) holds an unused April copy of the data. Its `config/deploy.yml` entry mounts `/var/lib/postgresql/data`, but PG 18 images keep data in `/var/lib/postgresql/18/docker`, so the data sits in an anonymous volume that a container recreate would orphan. |
+| Writes outside the app | The hourly and weekly cron jobs call the app over HTTP (`.github/workflows/cron-jobs.yml`), so Kamal maintenance mode stops them too. |
+| Kamal | 2.11, which has `kamal app maintenance` / `kamal app live`. |
 
 ## Architecture
 
-Two new Kamal accessories on the existing VPS — a Postgres server and a nightly backup job — reached over Kamal's Docker network:
-
 ```
 Hetzner VPS (5.161.124.129)
-├── bip-web              (Kamal app)
-├── bip-web-redis        (Kamal accessory — existing)
-└── bip-web-postgres     (Kamal accessory — NEW)
-└── bip-web-backup       (Kamal accessory — NEW, nightly cron)
+├── bip-web            Kamal app
+├── bip-web-redis      Kamal accessory (existing)
+├── bip-web-postgres   Kamal accessory: pgvector/pgvector:pg18
+└── deploy crontab     ~/bin/bip-postgres-backup.sh, nightly
 ```
 
-**Properties:**
-- Postgres 18, official image (`postgres:18` or `postgres:18-alpine`). Version choice is deliberate even though Supabase is on an older major — `pg_dump --format=custom` handles cross-major restores cleanly as long as the **client** matches the target version.
-- Data persisted to a Kamal-managed named volume: `bip-web-postgres-data:/var/lib/postgresql/data`.
-- Port 5432 is **not** exposed to the public internet. The web container reaches it by hostname `bip-web-postgres` over Kamal's Docker network. Host-local access (for ops) bound to `127.0.0.1:5432` so `ssh -L 5432:localhost:5432 deploy@5.161.124.129` works for remote `psql` sessions.
-- No PgBouncer. Single web container + 287 MB of data does not need pooling. Revisit if/when it becomes a bottleneck.
-- Superuser/role model: one application role `bip` owns everything in `public`. `--no-owner --no-acl` on both dump and restore means the restore doesn't try to recreate Supabase-specific roles (`supabase_admin`, `anon`, `authenticated`, etc.) that don't exist on the new cluster.
+- **Image:** `pgvector/pgvector:pg18`, the official Postgres image with pgvector added. `pg_trgm` and `unaccent` ship with Postgres.
+- **Data:** named Docker volume `bip-web-postgres-data` mounted at `/var/lib/postgresql`, which covers PG 18's `18/docker` data directory and leaves room for a future `19/docker` next to it.
+- **Network:** the web container reaches it as `bip-web-postgres:5432` on Kamal's Docker network. Port 5432 is published on `127.0.0.1` only, for SSH tunnels.
+- **Memory:** container capped at 768m, `shared_buffers=256MB`, `max_connections=50`. If available memory drops below 500 MB after cutover, move to the next Hetzner size up (the user approved this).
+- **Roles:** one role `bip` owns the `bip` database. Dump and restore use `--no-owner --no-acl`, so Supabase's roles are not needed.
 
-### New `DATABASE_URL`
+New `DATABASE_URL`: `postgresql://bip:<POSTGRES_PASSWORD>@bip-web-postgres:5432/bip`. `POSTGRES_PASSWORD` is already in Doppler and `.kamal/secrets`.
 
-```
-postgres://bip:<password>@bip-web-postgres:5432/bip
-```
+## Cutover
 
-Password generated at deploy time, stored in Doppler (`bip/prd_hetzner`), never committed.
+The app goes into Kamal maintenance mode, so no writes land on Supabase after the dump starts. 345 MB dumps and restores in a few minutes.
 
-### Secrets (Doppler `bip/prd_hetzner`)
+1. Maintenance mode on. kamal-proxy serves our own `config/error_pages/503.html` (set with `error_pages_path`), a self-contained page saying the site is moving and will be back in a few minutes.
+2. `pg_dump -Fc -n public --no-owner --no-acl` from Supabase with a PG 18 client.
+3. Restore into a freshly created `bip` database that already has the three extensions.
+4. Compare exact row counts for every `public` table on both sides. Any difference stops the cutover.
+5. Save the Supabase URL in Doppler as `SUPABASE_DATABASE_URL` (rollback), set `DATABASE_URL` to the new value, boot the app, maintenance mode off.
+6. Smoke test: log in, load a show and a song, search, post a rating and see the row in the new database.
 
-**New:**
-- `DATABASE_URL` (updated to new value)
-- `POSTGRES_PASSWORD` (for initializing the Postgres accessory)
-- `R2_BACKUP_ACCESS_KEY_ID`
-- `R2_BACKUP_SECRET_ACCESS_KEY`
-- `R2_BACKUP_BUCKET` (e.g., `bip-postgres-backups`)
-- `R2_BACKUP_ENDPOINT` (R2 S3-compatible endpoint URL)
-
-**Unchanged:** all Supabase Auth / Storage secrets (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_URL`).
-
-## Migration / cutover procedure
-
-Total expected duration of the customer-visible window: **under 5 minutes** for 287 MB. Runbook is linear and scheduled (not zero-downtime).
-
-### Pre-cutover (no user impact; days before)
-
-1. Add the `bip-web-postgres` accessory to `config/deploy.yml`. Deploy.
-2. Add `bip` role and empty `bip` database to the new Postgres.
-3. **Dry-run migration:** run `pg_dump` from Supabase against the new Hetzner DB (while app still points at Supabase). Verify:
-   - Row counts per table match source.
-   - A handful of spot-check queries return sensible data.
-   - No extension or permission errors during restore.
-4. Build and deploy the `bip-web-backup` accessory. Run the backup job manually once. Confirm the dump lands in R2.
-5. **Day-one restore drill:** pull the R2 dump to a scratch Postgres, restore it, row-count-verify against the live Hetzner DB. Script this as `scripts/restore-drill.sh` so it's repeatable quarterly.
-6. Truncate the dry-run DB so it's empty for the real cutover.
-
-### Cutover (scheduled low-traffic window)
-
-1. (Optional) Enable a maintenance page, or accept a brief 502 window — caller's choice on the day.
-2. `pg_dump --format=custom --no-owner --no-acl --schema=public` from Supabase to a local file.
-3. `pg_restore --no-owner --no-acl` into `bip-web-postgres` over SSH tunnel.
-4. Verification:
-   - Row counts on high-signal tables: `users`, `shows`, `tracks`, `ratings`, `attendances`, `annotations`.
-   - `SELECT MAX(updated_at) FROM ratings` equals source.
-   - Sequences: confirm `SELECT last_value FROM audits_id_seq` (the only autoincrement) is > the max `id` in `audits`.
-5. Update `DATABASE_URL` in Doppler to the new value. Run `kamal env push && kamal app boot` (or `kamal deploy` if cleaner).
-6. Smoke test against production:
-   - Log in (exercises Supabase Auth → `public.users` read).
-   - Load a song page (read-heavy).
-   - Load "On This Day" (recently built feature).
-   - Load the all-timers tab on a song page.
-   - Post a rating (write); confirm the row lands in Hetzner Postgres.
-7. Remove maintenance page if used.
-
-### Post-cutover
-
-- Monitor for 24–48h: Honeybadger, Kamal logs, Cloudflare analytics.
-- Keep the Supabase Postgres untouched (paused or read-only) for **~30 days** as rollback insurance. Do not delete the Supabase project; Auth and Storage still live there.
-- After 30 days of stability: no action required. Supabase project stays for Auth/Storage; only the DB side of it has been retired.
+The full command list lives in `docs/runbooks/postgres-cutover.md`.
 
 ### Rollback
 
-If smoke tests fail or something goes sideways post-cutover:
-1. Revert `DATABASE_URL` in Doppler to the Supabase value.
-2. `kamal env push && kamal app boot`.
-3. Investigate offline.
+Set `DATABASE_URL` back to `SUPABASE_DATABASE_URL` and boot the app. Writes made on Hetzner after cutover do not exist on Supabase, so a rollback later than the first hour needs a data-only dump from Hetzner restored into Supabase first. The Supabase copy stays untouched for 30 days.
 
-Rollback window is essentially instant because the Supabase DB was taken effectively read-only during the cutover (maintenance mode or zero-writes window). No write divergence to reconcile.
+## Backups
 
-## Backup design
+A cron script in the `deploy` user's crontab (docker group, no root needed), modeled on `dipstick-backup.sh`. R2 access uses a token limited to the `bip-postgres-backups` bucket:
 
-Nightly `pg_dump` to Cloudflare R2, 14-day retention enforced by an R2 lifecycle rule.
+- Nightly at 03:45 UTC: `docker exec bip-web-postgres pg_dump -Fc` of the whole `bip` database into `~deploy/backups/bip-postgres/`. Each dump is checked with `pg_restore --list` (at least 30 `TABLE DATA` entries), a 5 MB size floor, and a full read-back.
+- Nothing is kept or pruned until all three checks pass.
+- Keep 14 days on the host, prune only after a good dump.
+- Copy to `r2:bip-postgres-backups`, confirm the remote size matches, keep 90 days there.
+- On full success, ping a Honeybadger check-in. A missed check-in emails the user. Exit 2 means the local copy is good but R2 failed.
 
-### Accessory: `bip-web-backup`
+Disk: a compressed dump is roughly 100 MB, so 14 local copies take about 1.4 GB of the 52 GB free.
 
-- Off-the-shelf base: `prodrigestivill/postgres-backup-local` (or a minimal custom image on `postgres:18-alpine` + `rclone`). Final choice deferred to implementation — off-the-shelf preferred if it supports R2 via S3-compatible endpoint and PG 18 client.
-- Crontab: daily at **04:15 UTC** (low traffic).
-- Dump format: `pg_dump --format=custom --no-owner --no-acl --schema=public` against `bip-web-postgres` over Docker network.
-- Output object key: `YYYY/MM/DD/bip-YYYYMMDDHHMM.dump`.
-- Destination bucket: `bip-postgres-backups` in Cloudflare R2.
-- Credentials: bucket-scoped R2 access key (write-only to this one bucket) injected via Doppler.
+**Restore drill:** pull the newest dump from R2, restore it into a throwaway `pgvector/pgvector:pg18` container, compare row counts with the live database. Run before cutover and then quarterly.
 
-### Retention
+**Auth data:** the Supabase free plan has no backups. Before downgrading, add a weekly `pg_dump -n auth` of Supabase to the same script so the 1,497 auth users are covered.
 
-**Lifecycle rule on the R2 bucket**, not on the job: delete objects older than 14 days. This makes retention immune to a misbehaving or non-running cron.
+## Upgrades
 
-### Monitoring
+- **Minor versions** (18.1 → 18.2): the `pg18` tag tracks the latest minor. `kamal accessory reboot postgres` pulls it and restarts. Data is untouched. About 10 seconds of database downtime, so do it in a quiet hour.
+- **Major versions** (18 → 19): dump, boot a `pg19` image on a new volume, restore, switch. The same steps as this cutover, with the backup as the safety net.
+- **OS:** the weekly `apt upgrade` covers the host. Postgres does not run on the host, so apt never touches it.
 
-- **Backup health check** — a second, weekly cron (on the same accessory or the web container, TBD at implementation time). Lists the R2 bucket, confirms the newest object is <36h old, exits non-zero if not. Honeybadger catches the non-zero exit.
-- No PagerDuty / external uptime integration; excessive for a fan site.
+## After cutover
 
-### Explicitly not doing
+- `make db-dump-prod` reads prod through `DATABASE_URL`, which will name a Docker-internal host. Change it to dump over SSH with `docker exec bip-web-postgres pg_dump`.
+- After 30 days with no rollback: drop the old `public` tables on Supabase, downgrade the project to the free plan, delete `SUPABASE_DATABASE_URL`.
+- Free projects pause after 7 days without activity. Regular logins count as activity, but this needs watching for the first weeks.
 
-- No GPG / application-layer encryption on the dump. R2 server-side encryption is sufficient. Revisit if we ever add data subject to specific regulations.
-- No cross-region bucket replication. R2 durability is adequate.
-- No incremental / WAL-based backups.
-
-## Local development
-
-**No changes.** Developers continue to run `supabase start`, which spins up a local Supabase stack including Postgres. That local Postgres stays the dev database; Prisma still targets it. The flow documented in `packages/core/CLAUDE.md` (start → `db-load-data-dump` → `prisma migrate deploy`) continues to work unchanged.
-
-Rationale: developers still need the local Supabase stack for Auth and Storage emulation, which aren't changing. Ripping Postgres out of that stack would add dev-setup complexity to solve a problem that doesn't exist.
-
-## Risks and mitigations
+## Risks
 
 | Risk | Mitigation |
 |---|---|
-| VPS disk failure → total data loss | Nightly R2 backups + restore drill. Worst-case RPO: 24h. Worst-case RTO: time to restore 287 MB (<10 min) + time to redeploy (<5 min). |
-| VPS is shared with `coaching-tree`; a runaway query could starve it of resources | Accepted risk. Traffic profile doesn't warrant a second VPS. Revisit if load grows. |
-| Extension dependencies in the Supabase DB not present on vanilla Postgres | Surfaced by the dry-run restore (step 3 of pre-cutover). Schema audit indicates only `pgcrypto`/built-ins are needed. |
-| Role/ACL differences between Supabase and vanilla Postgres | `--no-owner --no-acl` on dump and restore; app role `bip` owns everything in the new cluster. |
-| R2 credentials leak | Bucket-scoped, write-only credentials. Worst case: attacker writes garbage into the backup bucket. Detected by the weekly health check reading object sizes. Rotation is a one-command Doppler update. |
-| Cutover smoke test misses a regression | 30-day Supabase rollback window. Revert `DATABASE_URL` and investigate. |
-
-## Open implementation questions (resolve when writing the plan, not now)
-
-- **Backup image choice:** off-the-shelf (`prodrigestivill/postgres-backup-local`) vs. a minimal custom image with `rclone`. Off-the-shelf preferred if PG 18 + R2 both supported.
-- **Cutover dump tooling:** Docker one-shot (`docker run --rm postgres:18 pg_dump ...`) vs. local `postgresql@18` from Homebrew. Docker one-shot is likely cleaner because it guarantees the client version.
-- **Exact Supabase Postgres version** at cutover time — for awareness only; does not affect correctness given the client version is pinned to 18 and we use `--format=custom`.
-- **Kamal accessory declaration:** whether the backup job is a separate accessory or a sidecar crontab inside the Postgres accessory. Separate accessory is cleaner (SRP) but is an extra moving part.
+| Extensions live in Supabase's `extensions` schema, so restored columns reference `extensions.vector` | Plan Task 1 checks. The new database creates each extension in the same schema prod uses. |
+| A Supabase-side trigger on `auth.users` writes into `public` and would keep writing to the old database | Plan Task 1 lists triggers on `auth.*` and `public` functions that reference other schemas. |
+| Server disk dies | Nightly R2 copy. Worst case: lose 24 hours of data and take about 15 minutes to restore. |
+| A backup quietly stops running | Honeybadger check-in alerts when a night is missed. |
+| Memory pressure on a shared 3.7 GB host | Container memory cap. Measure after cutover, and resize the server if needed. |
+| Container recreate loses data | The named volume covers the real data directory. Plan Task 2 proves this by rebooting the accessory and checking that a test database survives. |

@@ -13,6 +13,7 @@
       "!**/data-migrations",
       "!**/*.css",
       "!**/tmp",
+      "!config/error_pages",
       "!biome.json"
     ]
   },

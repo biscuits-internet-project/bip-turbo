@@ -1,0 +1,7 @@
+# Nightly bip Postgres backup, in the deploy user's crontab (install with
+# `crontab bip-postgres-backup.cron`, which replaces deploy's crontab; it has none
+# other today). Cron's default PATH lacks /usr/local/bin, where rclone may live.
+PATH=/usr/local/bin:/usr/bin:/bin
+# 03:45 UTC (10:45 PM EST / 11:45 PM EDT): after dipstick (03:30), before the
+# Sunday 04:00 apt/prune job.
+45 3 * * * $HOME/bin/bip-postgres-backup.sh >> $HOME/backups/bip-postgres-backup.log 2>&1
