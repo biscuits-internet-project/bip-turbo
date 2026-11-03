@@ -70,6 +70,10 @@ env:
     # restart, so never point this at a raw container IP.
     REDIS_URL: redis://bip-web-redis:6379
 
+# Served by kamal-proxy during `kamal app maintenance`. Kamal copies these from
+# the repo to the host on every deploy.
+error_pages_path: config/error_pages
+
 builder:
   arch: amd64
   local: true
