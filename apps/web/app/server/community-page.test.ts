@@ -52,7 +52,7 @@ describe("getCommunityPageData", () => {
 
     expect(getOrSet).toHaveBeenCalledTimes(1);
     const [key, , options] = getOrSet.mock.calls[0];
-    expect(key).toBe("community-page-data:v2");
+    expect(key).toBe("community-page-data:v3");
     expect(options).toEqual({ ttl: COMMUNITY_PAGE_CACHE_TTL_SECONDS });
   });
 
@@ -80,5 +80,12 @@ describe("getCommunityPageData", () => {
 
     expect(redisDel).toHaveBeenCalledWith("community-page-data");
     expect(redisDel).toHaveBeenCalledWith("community-last-updated");
+  });
+
+  // v2 payloads embedded every user's email; delete them rather than wait out the TTL.
+  test("deletes the email-bearing v2 payload on rebuild", async () => {
+    await getCommunityPageData();
+
+    expect(redisDel).toHaveBeenCalledWith("community-page-data:v2");
   });
 });

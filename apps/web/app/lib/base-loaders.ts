@@ -193,7 +193,7 @@ async function ensureLocalUserRecord(authUser: SupabaseUser) {
       username: authUser.user_metadata?.username || authUser.email.split("@")[0],
     });
   } catch (error) {
-    logger.error("Failed to ensure local user record", { error, authUserId: authUser.id, email: authUser.email });
+    logger.error("Failed to ensure local user record", { error, authUserId: authUser.id });
     throw error;
   }
 }

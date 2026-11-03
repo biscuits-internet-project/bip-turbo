@@ -5,6 +5,7 @@ export * from "./_shared/database/models";
 // Shared exports
 export * from "./_shared/quonfig";
 export * from "./_shared/redis";
+export * from "./_shared/sanitize";
 export * from "./_shared/services";
 export * from "./annotations/annotation-service";
 export * from "./attendances/attendance-service";

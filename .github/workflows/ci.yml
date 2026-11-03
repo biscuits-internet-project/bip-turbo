@@ -9,12 +9,17 @@ on:
       - '.github/**'
       - '!README.md'
 
+# Least privilege: nothing here writes to the repo, so a compromised step gets a
+# read-only token instead of the repo's default write token.
+permissions:
+  contents: read
+
 jobs:
   checks:
     name: Lint, Type Check, Format & Core Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup
 
       - name: Build packages
@@ -46,7 +51,7 @@ jobs:
       matrix:
         shard: [1, 2, 3]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/setup
 
       # Web tests resolve @bip/core and @bip/domain from source via

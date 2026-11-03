@@ -53,6 +53,13 @@ export const getServerClient = (request: Request) => {
             serialize(cookie.name, cookie.value, {
               ...cookie.options,
               path: "/",
+              // @supabase/ssr's defaults omit `secure`, so without this the session
+              // cookie is sent in cleartext on any plain-HTTP request to the domain.
+              // The browser client already sets it (routes/auth/login.tsx); this brings
+              // the server-side writes in line. Gated on APP_ENV, the same switch as HSTS
+              // in entry.server.tsx, so the two can't disagree; local http dev still
+              // receives cookies.
+              secure: process.env.APP_ENV === "production",
             }),
           );
         }

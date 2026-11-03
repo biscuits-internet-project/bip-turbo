@@ -68,6 +68,40 @@ describe("getRequestUser", () => {
     expect(supabaseGetUser).toHaveBeenCalledTimes(2);
   });
 
+  // Bearer callers (OAuth/MCP clients) carry no cookie, so keying on Cookie alone put
+  // every one of them in the same "_anon" slot — where a concurrent request would be
+  // handed whichever user's auth call happened to be in flight.
+  test("does not dedupe across different bearer tokens", async () => {
+    supabaseGetUser
+      .mockResolvedValueOnce({ data: { user: { id: "u1" } as User }, error: null })
+      .mockResolvedValueOnce({ data: { user: { id: "u2" } as User }, error: null });
+
+    const bearer = (token: string) =>
+      new Request("http://localhost/anything", { headers: { Authorization: `Bearer ${token}` } });
+
+    const [a, b] = await Promise.all([getRequestUser(bearer("token-1")), getRequestUser(bearer("token-2"))]);
+
+    expect(a?.id).toBe("u1");
+    expect(b?.id).toBe("u2");
+    expect(supabaseGetUser).toHaveBeenCalledTimes(2);
+  });
+
+  // A bearer request and a cookie-less anonymous request must not share a slot either.
+  test("does not dedupe a bearer request with an anonymous one", async () => {
+    supabaseGetUser
+      .mockResolvedValueOnce({ data: { user: { id: "u1" } as User }, error: null })
+      .mockResolvedValueOnce({ data: { user: null }, error: null });
+
+    const withBearer = new Request("http://localhost/", { headers: { Authorization: "Bearer token-1" } });
+    const anonymous = new Request("http://localhost/", { headers: {} });
+
+    const [a, b] = await Promise.all([getRequestUser(withBearer), getRequestUser(anonymous)]);
+
+    expect(a?.id).toBe("u1");
+    expect(b).toBeNull();
+    expect(supabaseGetUser).toHaveBeenCalledTimes(2);
+  });
+
   // Anonymous requests (no cookie) still dedupe within one HTTP request
   // — both loaders see Cookie: undefined which normalizes to a single
   // shared key.

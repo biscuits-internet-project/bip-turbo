@@ -30,6 +30,7 @@ export * from "./segue-run";
 export * from "./show-ordering";
 export * from "./site-paths";
 export * from "./sorted-dates";
+export * from "./sync-resources";
 export * from "./views/blog-post";
 export * from "./views/show-stats";
 export * from "./views/song-page";

@@ -1,9 +1,13 @@
 import { ALLOWED_IMAGE_MIME_TYPES, type AllowedImageMimeType, MAX_IMAGE_FILE_SIZE } from "@bip/domain";
 import { z } from "zod";
-import { protectedAction } from "~/lib/base-loaders";
+import { adminAction } from "~/lib/base-loaders";
 import { badRequest, methodNotAllowed } from "~/lib/errors";
 import { logger } from "~/lib/logger";
+import { matchesImageSignature } from "~/server/image-signature";
 import { services } from "~/server/services";
+
+/** Each file is a billed Cloudflare Images upload; bound one request's fan-out. */
+const MAX_FILES_PER_REQUEST = 10;
 
 const uploadSchema = z.object({
   filename: z.string().min(1),
@@ -13,7 +17,10 @@ const uploadSchema = z.object({
   size: z.number().max(MAX_IMAGE_FILE_SIZE, `File size must be less than ${MAX_IMAGE_FILE_SIZE / 1024 / 1024}MB`),
 });
 
-export const action = protectedAction(async ({ request, context }) => {
+// Admin-only. Every image stored here is billed by Cloudflare Images and nothing ties it to
+// a record, so as a plain signed-in route any free account could fill storage. No user-facing
+// UI posts here (avatars go through /api/users/avatar), so restricting it costs nothing.
+export const action = adminAction(async ({ request, context }) => {
   if (request.method !== "POST") {
     return methodNotAllowed();
   }
@@ -26,6 +33,9 @@ export const action = protectedAction(async ({ request, context }) => {
 
     if (!files.length) {
       return badRequest("No files provided");
+    }
+    if (files.length > MAX_FILES_PER_REQUEST) {
+      return badRequest(`At most ${MAX_FILES_PER_REQUEST} files per upload`);
     }
 
     // Get the actual user from the database
@@ -60,6 +70,12 @@ export const action = protectedAction(async ({ request, context }) => {
         // Convert File to Buffer for upload
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
+
+        // file.type is client-declared; confirm the bytes agree before anything is stored.
+        if (!matchesImageSignature(buffer, file.type as AllowedImageMimeType)) {
+          errors.push({ filename: file.name, error: "File contents don't match its image type" });
+          continue;
+        }
 
         // Upload to Cloudflare Images
         const result = await services.files.uploadImage({

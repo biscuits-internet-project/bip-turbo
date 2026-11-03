@@ -84,17 +84,19 @@ export async function loader({ request }: Route.LoaderArgs): Promise<RootData> {
   const user = await getRequestUser(request);
   const sessionUser = user ? toSessionUser(user) : null;
 
-  // Resolve feature flags once here for the whole app; client components read them
-  // via useFeatureFlags(). Segment-targeted flags match on username, which the
-  // session user carries, so no extra DB lookup is needed.
-  const featureFlags = await getFeatureFlags(
-    sessionUser?.username ? { user: { username: sessionUser.username } } : undefined,
-  );
-
-  // Display preferences live on the user row, so unlike the flags above this
-  // needs a lookup. Signed-out visitors skip it entirely and fall through to
-  // the defaults in `usePreferences()`.
+  // Display preferences live on the user row, so this needs a lookup. Signed-out
+  // visitors skip it entirely and fall through to the defaults in `usePreferences()`.
   const viewer = sessionUser?.email ? await services.users.findByEmail(sessionUser.email) : null;
+
+  // Resolve feature flags once here for the whole app; client components read them via
+  // useFeatureFlags(). Segment-targeted flags match on username, and the username must
+  // come from the user ROW, not from `sessionUser` — that one is read out of Supabase
+  // `user_metadata`, which the browser can write with its own JWT, so targeting on it let
+  // anyone opt themselves into a flag by renaming. The row is fetched above regardless,
+  // so reading it here costs nothing.
+  const featureFlags = await getFeatureFlags(
+    viewer?.username ? { user: { id: viewer.id, username: viewer.username } } : undefined,
+  );
 
   return {
     env: clientEnv,

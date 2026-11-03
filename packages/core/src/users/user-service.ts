@@ -11,8 +11,20 @@ export interface Badge {
   threshold: number;
 }
 
+/**
+ * A user as it may appear on a public page. `getUserStats` feeds /community (every user)
+ * and each profile, and both serialize it into the SSR HTML. An allowlist rather than
+ * `Omit<User, "email">`: the omit form also shipped every member's display and debug
+ * settings, and would ship whatever column is added to User next.
+ */
+export type PublicUser = Pick<User, "id" | "username" | "avatarUrl" | "createdAt">;
+
+function toPublicUser(user: User): PublicUser {
+  return { id: user.id, username: user.username, avatarUrl: user.avatarUrl, createdAt: user.createdAt };
+}
+
 export interface UserStats {
-  user: User;
+  user: PublicUser;
   reviewCount: number;
   attendanceCount: number;
   ratingCount: number;
@@ -44,6 +56,12 @@ export function topUsersByMetric(userStats: UserStats[], metric: UserStatsMetric
     .filter((stats) => count(stats) > 0)
     .sort((a, b) => count(b) - count(a))
     .slice(0, limit);
+}
+
+/** Prisma's unique-constraint violation. Narrowed structurally so this doesn't depend on
+ * importing Prisma's error classes into the service layer. */
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: string }).code === "P2002";
 }
 
 // Mapper functions
@@ -196,6 +214,18 @@ export class UserService {
     return result ? mapUserToDomainEntity(result) : null;
   }
 
+  /**
+   * Whether another account already holds this username, ignoring case. The unique index
+   * is case-sensitive, so "Evan" could otherwise sit beside "evan" and impersonate them.
+   */
+  async isUsernameTaken(username: string, exceptUserId: string): Promise<boolean> {
+    const match = await this.db.user.findFirst({
+      where: { username: { equals: username, mode: "insensitive" }, id: { not: exceptUserId } },
+      select: { id: true },
+    });
+    return match !== null;
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     const result = await this.db.user.findUnique({
       where: { email },
@@ -234,9 +264,28 @@ export class UserService {
   }
 
   async findOrCreate(data: { id?: string; email: string; username: string }): Promise<User> {
+    try {
+      return await this.upsertByEmail(data);
+    } catch (error) {
+      // A first page load runs several protected loaders in parallel, each calling this.
+      // They can all miss, all compute the same username, and all insert. The upsert only
+      // resolves a conflict on `email`; a concurrent insert that trips the `id` or
+      // `username` unique index raises P2002 instead, which used to surface as a 500 on
+      // someone's very first request. If the row we wanted exists by then, read it back.
+      if (!isUniqueConstraintError(error)) throw error;
+
+      const existing = await this.findByEmail(data.email);
+      if (existing) return existing;
+
+      // Otherwise a *different* person took the same username in the same instant. The
+      // name was free when we checked, so one fresh pick resolves it.
+      return await this.upsertByEmail(data);
+    }
+  }
+
+  private async upsertByEmail(data: { id?: string; email: string; username: string }): Promise<User> {
     // Ensure username is unique before creating (noop if user already exists)
     const uniqueUsername = await this.ensureUniqueUsername(data.username);
-
     const result = await this.db.user.upsert({
       where: { email: data.email },
       update: {},
@@ -249,7 +298,6 @@ export class UserService {
         updatedAt: new Date(),
       },
     });
-
     return mapUserToDomainEntity(result);
   }
 
@@ -415,7 +463,7 @@ export class UserService {
       );
 
       return {
-        user: mapUserToDomainEntity(user),
+        user: toPublicUser(mapUserToDomainEntity(user)),
         reviewCount: user._count.reviews,
         attendanceCount: user._count.attendances,
         ratingCount: user._count.ratings,

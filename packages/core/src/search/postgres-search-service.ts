@@ -2,7 +2,7 @@ import type { Logger, SearchResult, SearchRowResult } from "@bip/domain";
 import type { DbClient } from "../_shared/database/models";
 import type { SearchHistoryService } from "./search-history-service";
 import { buildMixedSearchResults } from "./search-result-builder";
-import { SegueQueryParser } from "./segue-query-parser";
+import { MAX_SEGUE_SEGMENTS, SegueQueryParser } from "./segue-query-parser";
 
 type VenueResult = {
   venue_id: string;
@@ -36,6 +36,51 @@ export interface SearchOptions {
   limit: number;
 }
 
+const DEFAULT_SEARCH_LIMIT = 30;
+const MAX_SEARCH_LIMIT = 100;
+
+/**
+ * Coerce a caller-supplied limit to a bounded integer.
+ *
+ * This is a security boundary, not just input hygiene: `limit` reaches raw SQL via
+ * `buildShowSearchSQL`, which interpolates it into a `LIMIT` clause that
+ * `$queryRawUnsafe` executes with no bound parameters. A non-numeric value there is
+ * an injection sink (Postgres accepts a subquery in `LIMIT`). Every entry point goes
+ * through `search()`, so clamping once here covers the HTTP route, the MCP tool, and
+ * anything added later.
+ */
+export function clampSearchLimit(value: unknown): number {
+  const parsed = Math.floor(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_SEARCH_LIMIT;
+  return Math.min(parsed, MAX_SEARCH_LIMIT);
+}
+
+/** Longest query any entry point accepts. Exported so the HTTP route can 400 on it. */
+export const MAX_SEARCH_QUERY_LENGTH = 200;
+
+/** A query that failed shape validation; callers should report it as a client error. */
+export class InvalidSearchQueryError extends Error {}
+
+/**
+ * Bound a caller-supplied query before it becomes trigram/LIKE/tsquery work over every
+ * song, venue and show. Enforced here rather than per route because /mcp is
+ * unauthenticated and reached these methods with no cap at all: a 20KB query took 13s
+ * locally and a 200KB one kept the database busy for minutes after the caller left.
+ */
+export function assertSearchQuery(query: unknown): string {
+  if (typeof query !== "string") throw new InvalidSearchQueryError("Query must be a string");
+  if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+    throw new InvalidSearchQueryError(`Query must be at most ${MAX_SEARCH_QUERY_LENGTH} characters`);
+  }
+  // Rejected rather than truncated: matching only the first N songs of a longer chain
+  // would return shows for a different sequence as if they matched this one.
+  const segueSegments = query.split(">").filter((segment) => segment.trim().length > 0).length;
+  if (segueSegments > MAX_SEGUE_SEGMENTS) {
+    throw new InvalidSearchQueryError(`Segue searches can chain at most ${MAX_SEGUE_SEGMENTS} songs`);
+  }
+  return query;
+}
+
 export interface SearchResponse {
   results: SearchResult[];
   searchHistoryId?: string;
@@ -52,11 +97,13 @@ export class PostgresSearchService {
     this.segueQueryParser = new SegueQueryParser(db);
   }
 
-  async search(query: string, options: SearchOptions = { limit: 30 }): Promise<SearchResponse> {
+  async search(query: string, options: SearchOptions = { limit: DEFAULT_SEARCH_LIMIT }): Promise<SearchResponse> {
+    assertSearchQuery(query);
     this.logger.info(`Performing PostgreSQL search for: "${query}"`);
+    const safeOptions: SearchOptions = { ...options, limit: clampSearchLimit(options.limit) };
 
     try {
-      const results = await this.performSearch(query, options);
+      const results = await this.performSearch(query, safeOptions);
 
       // Log the search to analytics
       const searchHistoryId = await this.logSearch(query, results);
@@ -198,8 +245,9 @@ export class PostgresSearchService {
   }
 
   async searchSongs(query: string, limit: number = 50) {
+    assertSearchQuery(query);
     const results = await this.performSongSearch(query);
-    const songIds = results.slice(0, limit).map((r) => r.song_id);
+    const songIds = results.slice(0, clampSearchLimit(limit)).map((r) => r.song_id);
 
     if (songIds.length === 0) return [];
 
@@ -229,8 +277,9 @@ export class PostgresSearchService {
   }
 
   async searchVenues(query: string, limit: number = 50) {
+    assertSearchQuery(query);
     const results = await this.performVenueSearch(query);
-    const venueIds = results.slice(0, limit).map((r) => r.venue_id);
+    const venueIds = results.slice(0, clampSearchLimit(limit)).map((r) => r.venue_id);
 
     if (venueIds.length === 0) return [];
 
@@ -545,6 +594,10 @@ export class PostgresSearchService {
   ): string {
     // Properly escape and format arrays for SQL
     const searchTermSQL = `'${searchTerm.replace(/'/g, "''")}'`;
+    // This string is executed by `$queryRawUnsafe` with no bound parameters, so every
+    // interpolation below is a SQL sink. Callers reach here through `search()`, which
+    // already clamps, but re-clamp so the sink is safe on its own terms.
+    const limitSQL = clampSearchLimit(limit);
     const songIdsSQL = songIds.length > 0 ? `ARRAY[${songIds.map((id) => `'${id}'::UUID`).join(",")}]` : "NULL::UUID[]";
     const venueIdsSQL =
       venueIds.length > 0 ? `ARRAY[${venueIds.map((id) => `'${id}'::UUID`).join(",")}]` : "NULL::UUID[]";
@@ -651,7 +704,7 @@ export class PostgresSearchService {
       JOIN shows sh ON sm.match_show_id = sh.id
       LEFT JOIN venues v ON sh.venue_id = v.id
       ORDER BY sm.final_score DESC, sh.date DESC
-      LIMIT ${limit}
+      LIMIT ${limitSQL}
     `;
   }
 

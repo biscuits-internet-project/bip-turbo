@@ -34,7 +34,7 @@ export const action = protectedAction(async ({ request, context }) => {
       // Get the actual user from the database by email
       const user = await services.users.findByEmail(currentUser.email);
       if (!user) {
-        logger.error("User not found in local database", { email: currentUser.email });
+        logger.error("User not found in local database", { userId: currentUser.id });
         return new Response(JSON.stringify({ error: "User not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },

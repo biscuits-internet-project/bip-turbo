@@ -16,6 +16,7 @@
  * We therefore write directly via Prisma with the prod-supplied slugs.
  */
 
+import { SYNC_RESOURCES, type SyncResourceSegment } from "@bip/domain";
 import type { Prisma, TrackFlag } from "@prisma/client";
 import { CacheInvalidationService, CacheService } from "../src/_shared/cache";
 import prisma from "../src/_shared/prisma/client";
@@ -1349,6 +1350,118 @@ export function diffCompletions(
 const MCP_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 const MCP_MAX_ATTEMPTS = 3;
 
+/**
+ * The replication feed moved off `/mcp` to an authenticated REST route: prod → local
+ * tooling does not belong on the public MCP tool surface, where an LLM client saw it
+ * alongside the real setlist tools and the id dumps were uncapped full-table scans
+ * anyone could call.
+ *
+ * The old tool names are kept as the internal call signature so the ~11 call sites below
+ * are untouched; this table is the only thing that knows they are now URLs.
+ */
+const SYNC_ENDPOINTS: Record<string, { resource: SyncResourceSegment; ids?: boolean }> = {
+  list_users_since: { resource: SYNC_RESOURCES.users },
+  list_ratings_since: { resource: SYNC_RESOURCES.ratings },
+  list_attendances_since: { resource: SYNC_RESOURCES.attendances },
+  list_reviews_since: { resource: SYNC_RESOURCES.reviews },
+  list_blog_posts_since: { resource: SYNC_RESOURCES.blogPosts },
+  list_rater_alias_groups_since: { resource: SYNC_RESOURCES.raterAliasGroups },
+  list_all_user_ids: { resource: SYNC_RESOURCES.users, ids: true },
+  list_all_rating_ids: { resource: SYNC_RESOURCES.ratings, ids: true },
+  list_all_attendance_ids: { resource: SYNC_RESOURCES.attendances, ids: true },
+  list_all_review_ids: { resource: SYNC_RESOURCES.reviews, ids: true },
+  list_all_blog_post_ids: { resource: SYNC_RESOURCES.blogPosts, ids: true },
+};
+
+/**
+ * Derived from MCP_URL by default so one override moves the whole sync.
+ *
+ * These were independent, which meant `MCP_URL=http://localhost:3000/mcp` pointed shows
+ * and setlists at localhost while users, ratings, attendances and reviews still came from
+ * production — the exact combination someone testing locally would least expect.
+ */
+const SYNC_URL = process.env.SYNC_URL ?? MCP_URL.replace(/\/mcp\/?$/, "/api/sync");
+
+/**
+ * The key for the environment being READ FROM, which is production — not the key for
+ * whatever environment this script happens to run in. Named separately so a local `doppler
+ * run` can't quietly send the dev key at prod and get a confusing 401.
+ */
+function syncApiKey(): string {
+  // No fallback to ADMIN_API_KEY: under `doppler run` with bip/dev that is the dev key, and
+  // sending it at prod is exactly the confusing 401 this separate name exists to prevent.
+  const key = process.env.PROD_ADMIN_API_KEY;
+  if (!key) {
+    throw new Error(
+      "PROD_ADMIN_API_KEY is not set. The sync reads production through an authenticated " +
+        "endpoint; set it in Doppler (bip/dev) to the value of ADMIN_API_KEY in bip/prd_hetzner.",
+    );
+  }
+  return key;
+}
+
+/** A 4xx from the sync route: the request itself is wrong, so retrying cannot help. */
+class SyncRequestError extends Error {}
+
+async function syncCall<T>(toolName: string, args: Record<string, unknown>): Promise<T> {
+  const endpoint = SYNC_ENDPOINTS[toolName];
+  const url = new URL(`${SYNC_URL}/${endpoint.resource}`);
+  if (endpoint.ids) {
+    url.searchParams.set("ids", "1");
+  } else {
+    for (const [key, value] of Object.entries(args)) {
+      if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+    }
+  }
+
+  // Read once, outside the retry loop: a missing key is a setup error, not a transient one.
+  const apiKey = syncApiKey();
+
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MCP_MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), MCP_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        // Never follow a redirect with the admin key attached; a moved endpoint should
+        // fail loudly rather than hand the credential to wherever it now points.
+        redirect: "error",
+        signal: controller.signal,
+      });
+      if (response.status === 401) {
+        throw new SyncRequestError(`sync ${toolName}: 401 — PROD_ADMIN_API_KEY does not match the target environment`);
+      }
+      if (response.status >= 400 && response.status < 500) {
+        throw new SyncRequestError(`sync ${toolName} HTTP ${response.status}: ${await response.text()}`);
+      }
+      if (!response.ok) {
+        throw new Error(`sync ${toolName} HTTP ${response.status}: ${await response.text()}`);
+      }
+      return (await response.json()) as T;
+    } catch (err) {
+      if (err instanceof SyncRequestError) throw err;
+      lastErr = err;
+      const isLast = attempt === MCP_MAX_ATTEMPTS;
+      console.warn(
+        `  ⚠️  sync ${toolName} attempt ${attempt}/${MCP_MAX_ATTEMPTS} failed${isLast ? "" : "; retrying"}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      if (isLast) break;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2000));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error(`sync ${toolName} failed after ${MCP_MAX_ATTEMPTS} attempts: ${String(lastErr)}`);
+}
+
+/** Route replication reads to the authenticated feed; everything else stays on MCP. */
+async function apiCall<T>(toolName: string, args: Record<string, unknown>): Promise<T> {
+  return SYNC_ENDPOINTS[toolName] ? syncCall<T>(toolName, args) : mcpCall<T>(toolName, args);
+}
+
 async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MCP_MAX_ATTEMPTS; attempt++) {
@@ -1611,7 +1724,7 @@ export async function syncUserActivity(
   options: SyncUserActivityOptions,
 ): Promise<UserActivityStats> {
   const { isDryRun, pullFromEpoch, pruneOrphans, ratingService, changedSlugs, now } = options;
-  const mcp = options.mcp ?? mcpCall;
+  const mcp = options.mcp ?? apiCall;
   const prodShowIdToLocalId = options.prodShowIdToLocalId ?? new Map<string, string>();
   const prodTrackIdToLocalId = options.prodTrackIdToLocalId ?? new Map<string, string>();
   const stats: UserActivityStats = {

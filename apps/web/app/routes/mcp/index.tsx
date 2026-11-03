@@ -1,5 +1,7 @@
+import { InvalidSearchQueryError } from "@bip/core";
 import type { Instrument, TrackMusicianDelta } from "@bip/domain";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
 // MCP JSON-RPC Protocol Handler
@@ -238,147 +240,83 @@ const tools = [
       required: [],
     },
   },
-  // Sync tools — for the local sync-missing-shows script. Strictly PII-free:
-  // user rows return only id/username/avatar/timestamps; ratings + attendance
-  // carry no user PII on the model itself.
-  {
-    name: "list_users_since",
-    description:
-      "Paginated listing of non-PII user fields (id, username, avatar, timestamps) for users updated after a given time. Used by the local sync script.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
-        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
-        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
-      },
-      required: ["since"],
-    },
-  },
-  {
-    name: "list_ratings_since",
-    description:
-      "Paginated listing of ratings (id, userId, value, rateableType, rateableId, timestamps) updated after a given time. Used by the local sync script.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
-        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
-        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
-      },
-      required: ["since"],
-    },
-  },
-  {
-    name: "list_rater_alias_groups_since",
-    description:
-      "Paginated listing of the same-person rater merge rules (normalized username, identity key, reason codes, redacted namespace signal). Non-PII by construction — no email addresses. Used by the local sync script so local dedupes ratings exactly as prod does.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
-        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
-        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
-      },
-      required: ["since"],
-    },
-  },
-  {
-    name: "list_attendances_since",
-    description:
-      "Paginated listing of attendance rows (id, userId, showId, timestamps) updated after a given time. Used by the local sync script.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
-        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
-        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
-      },
-      required: ["since"],
-    },
-  },
-  {
-    name: "list_reviews_since",
-    description:
-      "Paginated listing of reviews (id, userId, showId, content, status, timestamps) updated after a given time. Public review prose, PII-free. Used by the local sync script.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
-        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
-        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
-      },
-      required: ["since"],
-    },
-  },
-  {
-    name: "list_all_user_ids",
-    description: "Every user id on prod. Used by the local sync script's --full-users reconciliation pass.",
-    inputSchema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "list_all_rating_ids",
-    description: "Every rating id on prod. Used by the local sync script's --full-users reconciliation pass.",
-    inputSchema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "list_all_attendance_ids",
-    description: "Every attendance id on prod. Used by the local sync script's --full-users reconciliation pass.",
-    inputSchema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "list_all_review_ids",
-    description: "Every review id on prod. Used by the local sync script's --full-users reconciliation pass.",
-    inputSchema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "list_blog_posts_since",
-    description:
-      "Paginated listing of PUBLISHED blog posts (title, blurb, content, slug, state, postType, timestamps, embedded cover image) updated after a given time. PII-free. Used by the local sync script.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        since: { type: "string", description: "ISO-8601 timestamp; rows with updatedAt > since are returned" },
-        cursor: { type: "string", description: "Opaque cursor from a prior page (base64 of updatedAt|id)" },
-        limit: { type: "number", description: "Max rows per page (default 2000, max 5000)" },
-      },
-      required: ["since"],
-    },
-  },
-  {
-    name: "list_all_blog_post_ids",
-    description:
-      "Every published blog post id on prod. Used by the local sync script's --full-users reconciliation pass.",
-    inputSchema: { type: "object", properties: {}, required: [] },
-  },
 ];
 
-const DEFAULT_SYNC_LIMIT = 2000;
-const MAX_SYNC_LIMIT = 5000;
+const MAX_BATCH_SLUGS = 100;
 
-// Opaque cursor for the sync list endpoints. Encodes the last-seen
-// (updatedAt, id) so the next page starts after that boundary regardless of
-// rows landing at the same timestamp.
-function encodeSyncCursor(updatedAt: Date, id: string): string {
-  return Buffer.from(`${updatedAt.toISOString()}|${id}`, "utf8").toString("base64");
+/** A tool call whose arguments don't match the tool's declared schema. Safe to echo. */
+class ToolInputError extends Error {}
+
+interface ArgSchema {
+  type: string;
+  enum?: string[];
+  items?: { type: string };
 }
 
-function decodeSyncCursor(cursor: string | undefined): { updatedAt: Date; id: string } | null {
-  if (!cursor) return null;
-  try {
-    const decoded = Buffer.from(cursor, "base64").toString("utf8");
-    const [iso, id] = decoded.split("|");
-    if (!iso || !id) return null;
-    return { updatedAt: new Date(iso), id };
-  } catch {
-    return null;
+/**
+ * Check a call's arguments against the tool's own `inputSchema` before any handler runs.
+ *
+ * The handlers cast `args.x as string`, which checks nothing at runtime, and the values go
+ * straight into Prisma: `{"slug":{"contains":"a"}}` ran as a filter, and `{"slug":123}`
+ * came back as Prisma's full invocation dump. Validating centrally against the schema the
+ * client already sees means a new tool is covered by declaring its schema. Undeclared keys
+ * are dropped rather than rejected, so a client sending extras keeps working.
+ */
+function validateToolArgs(toolName: string, rawArgs: unknown): Record<string, unknown> {
+  const tool = tools.find((t) => t.name === toolName);
+  if (!tool) throw new ToolInputError(`Unknown tool: ${String(toolName).slice(0, 100)}`);
+  if (rawArgs === null || typeof rawArgs !== "object" || Array.isArray(rawArgs)) {
+    throw new ToolInputError("arguments must be an object");
   }
+
+  const properties = tool.inputSchema.properties as Record<string, ArgSchema>;
+  const required = (tool.inputSchema as { required?: string[] }).required ?? [];
+  const input = rawArgs as Record<string, unknown>;
+  const args: Record<string, unknown> = {};
+
+  for (const [key, schema] of Object.entries(properties)) {
+    const value = input[key];
+    if (value === undefined || value === null) {
+      if (required.includes(key)) throw new ToolInputError(`${key} is required`);
+      continue;
+    }
+    // LLM clients often send numbers as strings ({"year":"1999"}); the handlers used to
+    // coerce those implicitly, so accept a purely numeric string and convert it here.
+    const coerced =
+      schema.type === "number" && typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())
+        ? Number(value)
+        : value;
+    const ok =
+      schema.type === "string"
+        ? typeof coerced === "string" && (!schema.enum || schema.enum.includes(coerced))
+        : schema.type === "number"
+          ? typeof coerced === "number" && Number.isFinite(coerced)
+          : schema.type === "array"
+            ? Array.isArray(coerced) && coerced.every((item) => typeof item === "string")
+            : false;
+    if (!ok) {
+      const expected = schema.enum ? `one of ${schema.enum.join(", ")}` : schema.type;
+      throw new ToolInputError(`${key} must be ${expected === "array" ? "an array of strings" : expected}`);
+    }
+    args[key] = coerced;
+  }
+  return args;
 }
 
-function clampSyncLimit(raw: unknown): number {
-  const n = typeof raw === "number" ? raw : DEFAULT_SYNC_LIMIT;
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_SYNC_LIMIT;
-  return Math.min(Math.floor(n), MAX_SYNC_LIMIT);
+/**
+ * Bound a batch getter's slug array. Each entry costs at least one DB round trip (up to
+ * four for get_shows), so an uncapped array turns one unauthenticated request into
+ * arbitrarily many sequential queries against a single connection.
+ *
+ * Over the cap is an error, not a silent truncation: a caller handed 100 of its 150 shows
+ * with no `errors` entry would read the other 50 as not existing.
+ */
+function clampSlugs(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  if (raw.length > MAX_BATCH_SLUGS) {
+    throw new ToolInputError(`At most ${MAX_BATCH_SLUGS} slugs per call; got ${raw.length}. Split the request.`);
+  }
+  return raw.filter((s): s is string => typeof s === "string");
 }
 
 async function handleToolCall(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -657,7 +595,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
 
     // Batch getters
     case "get_setlists": {
-      const showSlugs = args.showSlugs as string[];
+      const showSlugs = clampSlugs(args.showSlugs);
       const setlists = [];
       const errors = [];
 
@@ -750,7 +688,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     }
 
     case "get_shows": {
-      const slugs = args.slugs as string[];
+      const slugs = clampSlugs(args.slugs);
       const shows = [];
       const errors = [];
 
@@ -819,7 +757,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     }
 
     case "get_songs": {
-      const slugs = args.slugs as string[];
+      const slugs = clampSlugs(args.slugs);
       const songs = [];
       const errors = [];
 
@@ -867,7 +805,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     }
 
     case "get_venues": {
-      const slugs = args.slugs as string[];
+      const slugs = clampSlugs(args.slugs);
       const venues = [];
       const errors = [];
 
@@ -900,134 +838,6 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       }
 
       return { venues, ...(errors.length > 0 && { errors }) };
-    }
-
-    // Sync tools. The service's `select` allowlist already enforces the
-    // PII-free shape — see UserService.listForSync. We pass through directly
-    // here (no re-mapping) so any future widening of the projection has to
-    // happen in one place, with the test guarding it.
-    case "list_users_since": {
-      const since = new Date(args.since as string);
-      const cursor = decodeSyncCursor(args.cursor as string | undefined);
-      const limit = clampSyncLimit(args.limit);
-      const rows = await services.users.listForSync({
-        since,
-        cursorId: cursor?.id,
-        cursorUpdatedAt: cursor?.updatedAt,
-        limit,
-      });
-      const last = rows[rows.length - 1];
-      return {
-        users: rows,
-        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
-      };
-    }
-
-    case "list_ratings_since": {
-      const since = new Date(args.since as string);
-      const cursor = decodeSyncCursor(args.cursor as string | undefined);
-      const limit = clampSyncLimit(args.limit);
-      const rows = await services.ratings.listForSync({
-        since,
-        cursorId: cursor?.id,
-        cursorUpdatedAt: cursor?.updatedAt,
-        limit,
-      });
-      const last = rows[rows.length - 1];
-      return {
-        ratings: rows,
-        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
-      };
-    }
-
-    // Every column of a merge rule is publishable (see AliasRulesetService.listForSync),
-    // so like the other sync tools this passes the service projection through directly.
-    case "list_rater_alias_groups_since": {
-      const since = new Date(args.since as string);
-      const cursor = decodeSyncCursor(args.cursor as string | undefined);
-      const limit = clampSyncLimit(args.limit);
-      const rows = await services.aliasRules.listForSync({
-        since,
-        cursorId: cursor?.id,
-        cursorUpdatedAt: cursor?.updatedAt,
-        limit,
-      });
-      const last = rows[rows.length - 1];
-      return {
-        raterAliasGroups: rows,
-        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
-      };
-    }
-
-    case "list_attendances_since": {
-      const since = new Date(args.since as string);
-      const cursor = decodeSyncCursor(args.cursor as string | undefined);
-      const limit = clampSyncLimit(args.limit);
-      const rows = await services.attendances.listForSync({
-        since,
-        cursorId: cursor?.id,
-        cursorUpdatedAt: cursor?.updatedAt,
-        limit,
-      });
-      const last = rows[rows.length - 1];
-      return {
-        attendances: rows,
-        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
-      };
-    }
-
-    case "list_reviews_since": {
-      const since = new Date(args.since as string);
-      const cursor = decodeSyncCursor(args.cursor as string | undefined);
-      const limit = clampSyncLimit(args.limit);
-      const rows = await services.reviews.listForSync({
-        since,
-        cursorId: cursor?.id,
-        cursorUpdatedAt: cursor?.updatedAt,
-        limit,
-      });
-      const last = rows[rows.length - 1];
-      return {
-        reviews: rows,
-        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
-      };
-    }
-
-    case "list_all_user_ids": {
-      return { ids: await services.users.listAllIdsForSync() };
-    }
-
-    case "list_all_rating_ids": {
-      return { ids: await services.ratings.listAllIdsForSync() };
-    }
-
-    case "list_all_attendance_ids": {
-      return { ids: await services.attendances.listAllIdsForSync() };
-    }
-
-    case "list_all_review_ids": {
-      return { ids: await services.reviews.listAllIdsForSync() };
-    }
-
-    case "list_blog_posts_since": {
-      const since = new Date(args.since as string);
-      const cursor = decodeSyncCursor(args.cursor as string | undefined);
-      const limit = clampSyncLimit(args.limit);
-      const rows = await services.blogPosts.listForSync({
-        since,
-        cursorId: cursor?.id,
-        cursorUpdatedAt: cursor?.updatedAt,
-        limit,
-      });
-      const last = rows[rows.length - 1];
-      return {
-        blogPosts: rows,
-        nextCursor: rows.length === limit && last ? encodeSyncCursor(last.updatedAt, last.id) : null,
-      };
-    }
-
-    case "list_all_blog_post_ids": {
-      return { ids: await services.blogPosts.listAllIdsForSync() };
     }
 
     default:
@@ -1099,15 +909,19 @@ export async function action({ request }: ActionFunctionArgs) {
 
     case "tools/call": {
       const toolName = (params as { name: string })?.name;
-      const toolArgs = (params as { arguments?: Record<string, unknown> })?.arguments || {};
+      const rawArgs = (params as { arguments?: unknown })?.arguments ?? {};
       try {
-        const toolResult = await handleToolCall(toolName, toolArgs);
+        const toolResult = await handleToolCall(toolName, validateToolArgs(toolName, rawArgs));
         result = {
           content: [{ type: "text", text: JSON.stringify(toolResult, null, 2) }],
         };
       } catch (error) {
+        // Only our own validation messages go back to the caller. Anything else (a Prisma
+        // error, say) carries query internals, so it is logged and replaced.
+        const isClientError = error instanceof ToolInputError || error instanceof InvalidSearchQueryError;
+        if (!isClientError) logger.error("MCP tool call failed", { toolName, error });
         result = {
-          content: [{ type: "text", text: `Error: ${error instanceof Error ? error.message : "Unknown error"}` }],
+          content: [{ type: "text", text: `Error: ${isClientError ? error.message : "Internal error"}` }],
           isError: true,
         };
       }

@@ -1,12 +1,15 @@
 import { describe, expect, test, vi } from "vitest";
 import type { PublicContext } from "~/lib/base-loaders";
+import { STANDALONE_TOGGLE_KEY, TOGGLE_FILTER_DEFINITIONS } from "~/lib/song-filters";
 
 // The module imports `~/server/services`, which validates server env at
 // import time. Stub it with just the musician lookup the filter needs.
 const findBySlug = vi.fn();
 vi.mock("~/server/services", () => ({ services: { musicians: { findBySlug } } }));
 
-const { buildFilteredCacheKey, parsePerformanceFilters } = await import("./performance-filter-params");
+const { buildFilteredCacheKey, normalizeFilterKeyParts, parsePerformanceFilters } = await import(
+  "./performance-filter-params"
+);
 
 // A context with no logged-in user. The musician/author/cache-key paths under
 // test never touch the user service (only the `attended` param does).
@@ -142,5 +145,114 @@ describe("buildFilteredCacheKey — musician", () => {
     const a = buildFilteredCacheKey(new URL("https://x.test/songs?musician=sam-altman"), "songs-index");
     const b = buildFilteredCacheKey(new URL("https://x.test/songs?musician=allen-aucoin"), "songs-index");
     expect(a).not.toBe(b);
+  });
+});
+
+describe("normalizeFilterKeyParts — cache-key canonicalization", () => {
+  const key = (qs: string) => buildFilteredCacheKey(new URL(`https://x.test/songs${qs}`), "songs-index");
+
+  // Junk filter values are ignored by the query but used to vary the cache key, so every
+  // one was a guaranteed miss that ran the uncapped aggregate and then wrote a payload to
+  // Redis for 24h. Walking ?filters=x1,x2,... was a DB-burn and cache-fill primitive.
+  test("unrecognized filter values collapse onto the unfiltered key", () => {
+    const base = key("");
+    expect(key("?filters=nonsense")).toBe(base);
+    expect(key("?filters=nonsense2")).toBe(base);
+    expect(key("?timeRange=notareal-range")).toBe(base);
+    expect(key("?kind=notakind")).toBe(base);
+    expect(key("?monthDay=whatever")).toBe(base);
+    expect(key("?excludeStart=drop-tables")).toBe(base);
+    expect(key("?musician=../../etc/passwd")).toBe(base);
+  });
+
+  // Real filters must still key distinctly, or the fix would serve wrong results.
+  test("recognized filters still produce distinct keys", () => {
+    const base = key("");
+    expect(key("?filters=setOpener")).not.toBe(base);
+    expect(key("?filters=setOpener")).not.toBe(key("?filters=encore"));
+    expect(key("?kind=cover")).not.toBe(base);
+    expect(key("?excludeStart=1999-12-31")).not.toBe(base);
+  });
+
+  // Toggle order is a UI accident; without sorting, one filter set forks into several
+  // cache entries that each pay for their own aggregate.
+  test("toggle order does not fork the cache key", () => {
+    expect(key("?filters=setOpener,encore")).toBe(key("?filters=encore,setOpener"));
+    expect(key("?filters=encore,encore")).toBe(key("?filters=encore"));
+  });
+
+  test("a valid date passes through and an impossible one does not", () => {
+    expect(normalizeFilterKeyParts(new URLSearchParams("excludeStart=1999-12-31")).excludeStart).toBe("1999-12-31");
+    expect(normalizeFilterKeyParts(new URLSearchParams("excludeStart=1999-13-45")).excludeStart).toBeNull();
+    expect(normalizeFilterKeyParts(new URLSearchParams("excludeStart=99-12-31")).excludeStart).toBeNull();
+  });
+});
+
+describe("normalizeFilterKeyParts — values must match what the UI emits", () => {
+  // Regression: the allowlist was written as "not-played" while the select emits
+  // "notPlayed" (performance-filter-controls.tsx) and played-filter.ts matches on that
+  // exact string. The value was therefore dropped from the cache key while still driving
+  // shouldShowNotPlayed, so ?filters=encore and ?filters=encore&played=notPlayed — two
+  // different result sets — shared one Redis entry for 24h.
+  test("keeps the played value the UI actually sends", () => {
+    expect(normalizeFilterKeyParts(new URLSearchParams("played=notPlayed")).played).toBe("notPlayed");
+    expect(normalizeFilterKeyParts(new URLSearchParams("played=all")).played).toBe("all");
+  });
+
+  test("a played value nothing emits is dropped", () => {
+    expect(normalizeFilterKeyParts(new URLSearchParams("played=whatever")).played).toBeNull();
+  });
+
+  // Each of these is a real UI-emitted value; if the normalizer nulls one, the query still
+  // narrows on it while the key forgets it.
+  test("keeps every kind the UI offers", () => {
+    for (const kind of ["original", "cover", "mashup", "improvisation"]) {
+      expect(normalizeFilterKeyParts(new URLSearchParams(`kind=${kind}`)).kind).toBe(kind);
+    }
+  });
+
+  test("keeps every toggle filter key the UI offers", () => {
+    for (const key of TOGGLE_FILTER_DEFINITIONS.map((f) => f.key)) {
+      const out = normalizeFilterKeyParts(new URLSearchParams(`filters=${key}`)).filters;
+      if (key === STANDALONE_TOGGLE_KEY) continue;
+      expect(out, `toggle "${key}" was dropped from the cache key`).toBe(key);
+    }
+  });
+});
+
+describe("normalizeFilterKeyParts — song slug", () => {
+  // `slug` narrows the /songs payload and keys its cache entry. Passed raw, every junk
+  // value minted a fresh 24h Redis entry after running the aggregate.
+  test("a real slug survives and a junk one is dropped", () => {
+    expect(normalizeFilterKeyParts(new URLSearchParams("slug=basis-for-a-day")).slug).toBe("basis-for-a-day");
+    expect(normalizeFilterKeyParts(new URLSearchParams("slug=%3Cscript%3E")).slug).toBeNull();
+    expect(normalizeFilterKeyParts(new URLSearchParams("slug=a/b")).slug).toBeNull();
+  });
+});
+
+describe("parsePerformanceFilters reads the normalized values", () => {
+  // The query and the cache key must agree on every param; a value the key drops must
+  // not narrow the query either.
+  test("junk kind, author, slug and filters do not narrow the query", async () => {
+    const filters = await parsePerformanceFilters(
+      new URL("https://x.test/songs?kind=nope&author=nope&slug=%3Cx%3E&filters=nope"),
+      emptyContext,
+    );
+    expect(filters).toEqual({});
+  });
+
+  test("valid values do", async () => {
+    const author = "0b0e8a52-7c7d-4f60-9e1a-2d5f0c3b9a11";
+    const filters = await parsePerformanceFilters(
+      new URL(`https://x.test/songs?kind=cover&author=${author}&slug=basis-for-a-day&filters=encore,setOpener`),
+      emptyContext,
+    );
+    expect(filters).toMatchObject({
+      kind: "cover",
+      authorId: author,
+      songSlug: "basis-for-a-day",
+      encore: true,
+      setOpener: true,
+    });
   });
 });

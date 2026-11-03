@@ -7,6 +7,7 @@ import {
 } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
+import { adminApiKeyUnauthorized, isAuthorizedAdminRequest } from "~/server/admin-api-key";
 import { env } from "~/server/env";
 import { services } from "~/server/services";
 
@@ -116,16 +117,12 @@ export async function action({ params, request }: ActionFunctionArgs) {
     });
   }
 
-  // Simple security check - require specific user agent from GitHub Actions
-  const userAgent = request.headers.get("user-agent") || "";
-  const isGitHubActions = userAgent.includes("curl") || userAgent.includes("GitHub-Actions");
-
-  if (!isGitHubActions) {
-    logger.warn(`Unauthorized cron access attempt from: ${userAgent}`);
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+  // These jobs are expensive and mutate ratings data, so they require the shared admin
+  // secret. The previous check tested whether the User-Agent contained "curl" — a header
+  // any caller chooses, which authenticated nothing.
+  if (!isAuthorizedAdminRequest(request)) {
+    logger.warn("Unauthorized cron access attempt", { action });
+    return adminApiKeyUnauthorized();
   }
 
   const cronJob = cronJobs[action];

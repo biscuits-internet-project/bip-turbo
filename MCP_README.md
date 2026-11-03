@@ -203,33 +203,30 @@ List all shows from a specific year.
 
 **Returns:** `{ year, shows }` — each show `{ slug, date, venueName, venueCity, averageRating }`.
 
-### 🔄 Sync / Replication Tools (internal)
+### 🔄 Sync / Replication — moved off MCP
 
-These tools mirror prod's user-activity and public-content tables (users, ratings, attendances, reviews, blog posts) into local dev databases (see `packages/core/scripts/sync-missing-shows.ts`); they are not meant for general LLM querying. They expose a PII-free projection only — the service-layer `select` allowlist enforces the shape.
+The replication feed that mirrors prod's user-activity and public-content tables into a
+local dev database **is no longer part of the MCP surface.** It previously appeared here as
+eleven `list_*` tools, which meant an MCP client saw 28 tools with no way to tell the 12
+internal ones from the real setlist tools, and the id dumps were uncapped full-table reads
+on an unauthenticated endpoint.
 
-#### `list_users_since`, `list_ratings_since`, `list_attendances_since`, `list_reviews_since`
+It now lives at `GET /api/sync/:resource`, behind `Authorization: Bearer $ADMIN_API_KEY`:
 
-Cursor-paginated pulls of rows changed since a timestamp.
+| Old tool | Now |
+| --- | --- |
+| `list_users_since` | `GET /api/sync/users?since=&cursor=&limit=` |
+| `list_ratings_since` | `GET /api/sync/ratings?since=&cursor=&limit=` |
+| `list_attendances_since` | `GET /api/sync/attendances?since=&cursor=&limit=` |
+| `list_reviews_since` | `GET /api/sync/reviews?since=&cursor=&limit=` |
+| `list_blog_posts_since` | `GET /api/sync/blog-posts?since=&cursor=&limit=` |
+| `list_rater_alias_groups_since` | `GET /api/sync/rater-alias-groups?since=&cursor=&limit=` |
+| `list_all_*_ids` | `GET /api/sync/<resource>?ids=1` |
 
-**Input:** `since` (required, ISO-8601 timestamp), `cursor` (optional, opaque base64 of `updatedAt|id`), `limit` (default 2000, max 5000)
-
-**Returns:** A `users` / `ratings` / `attendances` / `reviews` array plus `nextCursor` (null when the page isn't full). Users carry no email or password — only the fields needed to attach activity (`id`, `username`, avatar references, timestamps). Ratings carry `id`, `userId`, `value`, `rateableType`, `rateableId`, timestamps; attendances carry `id`, `userId`, `showId`, timestamps; reviews carry `id`, `userId`, `showId`, `content` (the public review prose), `status`, timestamps.
-
-#### `list_blog_posts_since`
-
-Cursor-paginated pull of **published** blog posts changed since a timestamp, with the cover image embedded so the sync can mirror the post's File + cover link in one call.
-
-**Input:** `since` (required, ISO-8601 timestamp), `cursor` (optional), `limit` (default 2000, max 5000)
-
-**Returns:** `blogPosts` plus `nextCursor`. Each post carries `id`, `slug`, `title`, `blurb`, `content`, `state`, `postType`, `publishedAt`, `userId`, timestamps, and `coverFile` (`{ cloudflareId, path, filename, size, type, variants, metadata }`, or `null`). Drafts are never returned.
-
-#### `list_all_user_ids`, `list_all_rating_ids`, `list_all_attendance_ids`, `list_all_review_ids`, `list_all_blog_post_ids`
-
-Full id dumps used by the sync's `--full-users` / prune reconcile to delete local rows no longer present on prod. (`list_all_blog_post_ids` returns published post ids only.)
-
-**Input:** None
-
-**Returns:** `{ ids: string[] }`
+Payload shapes are unchanged — same row keys, same opaque `updatedAt|id` cursor, same
+PII-free projections enforced by each service's `select` allowlist. `packages/core/scripts/
+sync-missing-shows.ts` is the only consumer; it reads `PROD_ADMIN_API_KEY` (the credential
+of the environment being *read from*, not the one it runs in).
 
 ## Example Queries
 

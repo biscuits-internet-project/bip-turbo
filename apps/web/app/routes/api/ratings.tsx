@@ -3,6 +3,8 @@ import { badRequest, methodNotAllowed } from "~/lib/errors";
 import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 
+const RATEABLE_TYPES = ["Show", "Track"] as const;
+
 export const loader = publicLoader(async ({ request, context }) => {
   const { currentUser } = context;
 
@@ -37,7 +39,10 @@ export const action = protectedAction(async ({ request, context }) => {
       const body = await request.json();
       const { rateableId, rateableType, value, showSlug } = body;
 
-      if (!rateableId || !rateableType || !value || value < 0.5 || value > 5) {
+      // `rateableType` is part of the (userId, rateableId, rateableType) unique key, so an
+      // unvalidated value lets one user mint unlimited rows for a single rateable — which
+      // inflates the rating counts and leaderboards that don't filter on type.
+      if (!rateableId || !RATEABLE_TYPES.includes(rateableType) || !value || value < 0.5 || value > 5) {
         return badRequest();
       }
 

@@ -7,6 +7,9 @@ import { ResetPasswordForm } from "~/components/reset-password-form";
 import type { RootData } from "~/root";
 import { getServerClient } from "~/server/supabase";
 
+/** Mirrors the Supabase dashboard minimum; the server is authoritative. */
+const MIN_PASSWORD_LENGTH = 6;
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase, headers } = getServerClient(request);
 
@@ -45,9 +48,12 @@ export default function ResetPassword() {
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirmPassword") as string;
 
-    // Client-side validation
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
+    // Client-side validation. The authority is the Supabase dashboard setting
+    // (Authentication → Sign In / Providers → Email → Minimum password length); this is a
+    // courtesy check so the user gets told before a round trip. If the two drift, the
+    // server still rejects correctly and its message is surfaced verbatim below.
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
       return;
     }
 
@@ -81,7 +87,18 @@ export default function ResetPassword() {
       if (errorMessage.includes("New password should be different")) {
         toast.error("Your new password must be different from your current password.");
       } else if (errorMessage.includes("Password should be at least")) {
-        toast.error("Password must be at least 6 characters long.");
+        // Surface Supabase's own text rather than a hardcoded number: the minimum is a
+        // dashboard setting, and a baked-in "6" starts lying the moment someone raises it.
+        toast.error(errorMessage);
+      } else if (
+        errorMessage.includes("weak") ||
+        errorMessage.includes("easy to guess") ||
+        errorMessage.includes("pwned")
+      ) {
+        // Leaked-password rejection (HaveIBeenPwned). Without this branch it fell through
+        // to the generic handler, which tells the user to request a new reset link — the
+        // one action that cannot help, so they retry the same password and loop.
+        toast.error("That password appears in a known data breach. Please choose a different one.");
       } else if (errorMessage.includes("Auth session missing")) {
         toast.error("Your session has expired. Please request a new password reset link.");
         navigate("/auth/forgot-password");

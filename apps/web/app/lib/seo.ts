@@ -25,6 +25,17 @@ export const SEO_CONFIG = {
 };
 
 // Base meta tags that should be on every page
+/**
+ * Serialize a JSON-LD payload for embedding in a <script> block.
+ *
+ * `JSON.stringify` does not escape "<", so a value containing "</script>" would close the
+ * block early and let the remainder parse as markup. Escaping the three characters that
+ * can start a tag or comment keeps the payload valid JSON while making that impossible.
+ */
+function serializeJsonLd(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
+}
+
 export function getBaseMeta() {
   return [
     { charset: "utf-8" },
@@ -412,7 +423,7 @@ export function getShowStructuredData(setlist: Setlist) {
     },
   };
 
-  return JSON.stringify(musicEvent);
+  return serializeJsonLd(musicEvent);
 }
 
 // Generate JSON-LD structured data for venue
@@ -431,7 +442,7 @@ export function getVenueStructuredData(venue: Venue) {
     description: `${venue.name} - Music venue in ${formatVenueLocation(venue)}`,
   };
 
-  return JSON.stringify(venueData);
+  return serializeJsonLd(venueData);
 }
 
 // Generate JSON-LD structured data for song
@@ -449,7 +460,7 @@ export function getSongStructuredData(song: Song & { timesPlayed?: number }) {
     description: `${song.title} by ${SEO_CONFIG.bandName}${song.timesPlayed ? ` - Played ${song.timesPlayed} times` : ""}`,
   };
 
-  return JSON.stringify(songData);
+  return serializeJsonLd(songData);
 }
 
 // Generate JSON-LD structured data for blog post
@@ -481,7 +492,7 @@ export function getBlogStructuredData(blogPost: {
     },
   };
 
-  return JSON.stringify(blogData);
+  return serializeJsonLd(blogData);
 }
 
 // Generate JSON-LD breadcrumb structured data
@@ -497,7 +508,7 @@ export function getBreadcrumbStructuredData(items: Array<{ name: string; url: st
     })),
   };
 
-  return JSON.stringify(breadcrumbData);
+  return serializeJsonLd(breadcrumbData);
 }
 
 // Generate canonical URL

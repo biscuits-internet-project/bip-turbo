@@ -31,6 +31,11 @@ on:
 env:
   PRODUCTION_URL: 'https://discobiscuits.net'
 
+# Least privilege: nothing here writes to the repo, so a compromised step gets a
+# read-only token instead of the repo's default write token.
+permissions:
+  contents: read
+
 jobs:
   cron-job:
     name: Run Cron Job
@@ -53,14 +58,33 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: echo "CRON_JOB=${{ github.event.inputs.job }}" >> $GITHUB_ENV
       
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
       - name: Run cron job
+        # The key is read from Doppler at run time rather than duplicated as a GitHub
+        # secret, so bip/prd_hetzner stays the single source of truth: rotating it there
+        # is enough, with no second copy to drift out of sync. Same DOPPLER_TOKEN the
+        # deploy workflow already uses to reach that config.
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         run: |
           echo "Running cron job: $CRON_JOB"
           echo "Timeout: ${{ github.event.inputs.timeout || '10' }} minutes"
-          
+
+          ADMIN_API_KEY=$(doppler secrets get ADMIN_API_KEY --project bip --config prd_hetzner --plain)
+
+          if [ -z "$ADMIN_API_KEY" ]; then
+            echo "❌ ADMIN_API_KEY is not set in bip/prd_hetzner; cron requests would be rejected."
+            exit 1
+          fi
+
+          # Register with the runner's log scrubber before the value is used anywhere.
+          echo "::add-mask::$ADMIN_API_KEY"
+
           response=$(curl -s -w "\n%{http_code}" -X POST \
             "${{ env.PRODUCTION_URL }}/api/cron/$CRON_JOB" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $ADMIN_API_KEY" \
             --max-time $((${{ github.event.inputs.timeout || '10' }} * 60)))
           
           http_code=$(echo "$response" | tail -n1)

@@ -6,8 +6,17 @@ import { logger } from "~/lib/logger";
 import { services } from "~/server/services";
 import { getServerClient } from "~/server/supabase";
 
+const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+
 const updateUserSchema = z.object({
-  username: z.string().min(3).max(50).optional(),
+  // "@" is refused even on an unchanged resubmit: a username renders publicly, and an
+  // email-shaped one published the address (a DB CHECK enforces the same rule).
+  username: z
+    .string()
+    .min(3)
+    .max(50)
+    .refine((value) => !value.includes("@"), "Usernames cannot contain @")
+    .optional(),
   // Toggles arrive as "true"/"false" strings; persistence is flag-gated below.
   showCalibratedRatings: z.enum(["true", "false"]).optional(),
   showRatingComparisonDebug: z.enum(["true", "false"]).optional(),
@@ -86,7 +95,25 @@ export async function action({ request }: ActionFunctionArgs) {
       showSetlistTimes?: boolean;
       ratingDecimalPlaces?: number;
     } = {};
-    if (validatedData.username) update.username = validatedData.username;
+    if (validatedData.username && validatedData.username !== localUser.username) {
+      // Same alphabet signup produces (UserService.sanitizeUsername). Without it, a rename
+      // could pick spaces, Unicode lookalikes, or an email address, which renders publicly.
+      // Checked only on change: 139 existing names predate the rule, and the profile form
+      // resubmits the current name with every save.
+      if (!USERNAME_PATTERN.test(validatedData.username)) {
+        return new Response(
+          JSON.stringify({ error: "Usernames may contain only letters, numbers, dots, dashes and underscores" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (await services.users.isUsernameTaken(validatedData.username, localUser.id)) {
+        return new Response(JSON.stringify({ error: "That username is taken" }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      update.username = validatedData.username;
+    }
     const flags = await getFeatureFlags({ user: { id: localUser.id, username: localUser.username } });
     if (flags.toggleVisible && validatedData.showCalibratedRatings !== undefined) {
       update.showCalibratedRatings = validatedData.showCalibratedRatings === "true";

@@ -1,4 +1,4 @@
-import { CacheKeys, type Setlist, yearListingPath, yearScope } from "@bip/domain";
+import { CacheKeys, type Setlist, START_YEAR, yearListingPath, yearScope } from "@bip/domain";
 import type { DehydratedState } from "@tanstack/react-query";
 import { ArrowUp, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -103,7 +103,14 @@ export function headers({ loaderHeaders }: HeadersArgs): Headers {
 export const loader = publicLoader(async ({ request, params, context }) => {
   const url = new URL(request.url);
   const year = params.year || new Date().getFullYear();
-  const yearInt = Number.parseInt(year as string, 10);
+  const parsedYear = Number.parseInt(year as string, 10);
+
+  // The year becomes both a cache key and a served-url registry scope, so an unvalidated
+  // value lets a crawler mint unbounded Redis keys.
+  if (!Number.isFinite(parsedYear) || parsedYear < START_YEAR || parsedYear > new Date().getFullYear() + 1) {
+    throw new Response("Not Found", { status: 404 });
+  }
+  const yearInt = parsedYear;
   const searchQuery = url.searchParams.get("q") || undefined;
 
   let setlists: Setlist[] = [];
