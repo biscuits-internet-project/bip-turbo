@@ -1,0 +1,3 @@
+# Nightly bip Postgres backup. Installed at /etc/cron.d/bip-postgres-backup.
+# 03:45 UTC: after dipstick (03:30), before the Sunday 04:00 apt/prune job.
+45 3 * * * root /usr/local/bin/bip-postgres-backup.sh >> /var/log/bip-postgres-backup.log 2>&1
