@@ -8,8 +8,8 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
 
 ## Pre-flight
 
-- [ ] Last night's backup succeeded: `ssh root@5.161.124.129 tail -3 /var/log/bip-postgres-backup.log` ends with no `ERROR`, and the Honeybadger check-in is green.
-- [ ] Run the restore drill as root within the past day: `PASS: row counts match`.
+- [ ] Last night's backup succeeded: `h tail -3 backups/bip-postgres-backup.log` ends with no `ERROR`, and the Honeybadger check-in is green.
+- [ ] Run the restore drill within the past day: `h bin/bip-postgres-restore-drill.sh` prints `PASS: row counts match`.
 - [ ] Commit `config/error_pages/503.html` on `main` and deploy, so the maintenance page is on the host.
 - [ ] Pick a quiet hour that isn't the top of the hour (the ratings cron runs at :00).
 
@@ -84,7 +84,7 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
      ```
    - Honeybadger shows no new errors.
 
-9. **Back up right away** (root): `ssh root@5.161.124.129 /usr/local/bin/bip-postgres-backup.sh`. Expected: exit 0.
+9. **Back up right away:** `h bin/bip-postgres-backup.sh`. Expected: exit 0.
 
 10. **Memory:** run `h 'free -m; docker stats --no-stream'`. If `available` is under 500 MB, plan a resize to the next Hetzner size up.
 

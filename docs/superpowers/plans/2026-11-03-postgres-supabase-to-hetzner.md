@@ -17,7 +17,7 @@
 - Dumps contain personal data. Keep them in `../data/` on the laptop or `/var/backups/bip-postgres/` on the host, never in the repo. Delete ad-hoc copies when the step is done.
 - Postgres client version for every dump and restore is 18: use `pgvector/pgvector:pg18` in Docker, never the laptop's `pg_dump`.
 - Port 5432 is published only on `127.0.0.1`.
-- The deploy user has no sudo. Steps marked **(root)** are run by the user.
+- The deploy user has no sudo and root SSH is not available. Ruling 2026-11-03: everything, backups included, runs as deploy (docker group), with a token limited to the bucket in deploy's rclone config.
 - Times in reports are US Eastern.
 - PR 1 holds Tasks 2–6, including 5b. PR 2 holds Task 8's repo changes. Link PRs as `[#N](url)`. The user merges.
 

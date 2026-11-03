@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # Nightly dump of the bip Postgres database, kept on the host and copied off it.
-# Installed at /usr/local/bin/bip-postgres-backup.sh, run by root from
-# /etc/cron.d/bip-postgres-backup. Modeled on dipstick-backup.sh on the same host.
+# Installed at ~/bin/bip-postgres-backup.sh for the deploy user (docker group, no
+# root needed) and run from its crontab. Modeled on dipstick-backup.sh on the same host.
 #
 # pg_dump runs inside the bip-web-postgres container, so the client always matches
 # the server version and no password is needed (the image trusts its local socket).
@@ -28,7 +28,7 @@ set -uo pipefail
 
 CONTAINER=bip-web-postgres
 DB_NAME=${DB_NAME:-bip}
-DEST=${DEST:-/var/backups/bip-postgres}
+DEST=${DEST:-$HOME/backups/bip-postgres}
 REMOTE=${REMOTE:-r2:bip-postgres-backups}
 KEEP_DAYS=14
 KEEP_DAYS_REMOTE=90
@@ -36,7 +36,7 @@ KEEP_DAYS_REMOTE=90
 MIN_TABLES=30
 # Today's dump is 18 MB. Well under that means the tables are there but the rows are not.
 MIN_BYTES=$((5 * 1024 * 1024))
-ENV_FILE=${ENV_FILE:-/etc/bip-postgres-backup.env}
+ENV_FILE=${ENV_FILE:-$HOME/.config/bip-postgres-backup.env}
 
 HONEYBADGER_CHECKIN_URL=""
 # shellcheck source=/dev/null

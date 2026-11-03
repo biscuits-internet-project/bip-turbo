@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Prove the newest R2 backup restores. Run as root on the host, quarterly and
+# Prove the newest R2 backup restores. Run as deploy on the host, quarterly and
 # before any risky database change:
-#   /usr/local/bin/bip-postgres-restore-drill.sh
+#   ~/bin/bip-postgres-restore-drill.sh
 #
 # Pulls the newest bip-*.dump from R2 (not the local copy: the R2 one is what we
 # would have after losing the server), restores it into a throwaway container,
@@ -18,7 +18,7 @@ REMOTE=r2:bip-postgres-backups
 LIVE=bip-web-postgres
 DRILL=bip-restore-drill
 IMAGE=pgvector/pgvector:pg18
-COUNTS_SQL=/usr/local/share/bip-postgres/table-counts.sql
+COUNTS_SQL=${COUNTS_SQL:-$HOME/.local/share/bip-postgres/table-counts.sql}
 
 say() { echo "$(date -u +'%Y-%m-%dT%H:%M:%SZ') $*"; }
 

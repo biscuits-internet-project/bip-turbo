@@ -47,7 +47,7 @@ Hetzner VPS (5.161.124.129)
 ├── bip-web            Kamal app
 ├── bip-web-redis      Kamal accessory (existing)
 ├── bip-web-postgres   Kamal accessory: pgvector/pgvector:pg18
-└── root cron          /usr/local/bin/bip-postgres-backup.sh, nightly
+└── deploy crontab     ~/bin/bip-postgres-backup.sh, nightly
 ```
 
 - **Image:** `pgvector/pgvector:pg18`, the official Postgres image with pgvector added. `pg_trgm` and `unaccent` ship with Postgres.
@@ -77,10 +77,10 @@ Set `DATABASE_URL` back to `SUPABASE_DATABASE_URL` and boot the app. Writes made
 
 ## Backups
 
-A root cron script on the host, modeled on `dipstick-backup.sh`:
+A cron script in the `deploy` user's crontab (docker group, no root needed), modeled on `dipstick-backup.sh`. R2 access uses a token limited to the `bip-postgres-backups` bucket:
 
-- Nightly at 03:45 UTC: `docker exec bip-web-postgres pg_dump -Fc` of the whole `bip` database into `/var/backups/bip-postgres/`.
-- Verify before keeping: `pg_restore --list` must read the file and list at least 30 `TABLE DATA` entries.
+- Nightly at 03:45 UTC: `docker exec bip-web-postgres pg_dump -Fc` of the whole `bip` database into `~deploy/backups/bip-postgres/`. Each dump is checked with `pg_restore --list` (at least 30 `TABLE DATA` entries), a 5 MB size floor, and a full read-back.
+- Nothing is kept or pruned until all three checks pass.
 - Keep 14 days on the host, prune only after a good dump.
 - Copy to `r2:bip-postgres-backups`, confirm the remote size matches, keep 90 days there.
 - On full success, ping a Honeybadger check-in. A missed check-in emails the user. Exit 2 means the local copy is good but R2 failed.
