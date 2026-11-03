@@ -92,11 +92,17 @@ db-start:
 # Take a fresh data-only dump of prod (read-only on prod). The schema comes from
 # our migrations, so only public-schema data is dumped, minus migration history
 # and the deploy-time recompute queue (transient, meaningless locally).
+# Prod Postgres is reachable only on the server's Docker network, so pg_dump runs
+# inside its container over SSH. The dump lands in a temp file first, so a dropped
+# connection can't replace the last good dump with half of one.
+PROD_SSH ?= ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129
+
 db-dump-prod:
 	@mkdir -p $(dir $(PROD_DATA_PATH))
-	pg_dump "$$(doppler secrets get DATABASE_URL --project bip --config prd_hetzner --plain)" \
+	$(PROD_SSH) 'docker exec bip-web-postgres pg_dump -U bip -d bip \
 		-Fc --data-only -n public --exclude-table-data=_prisma_migrations \
-		--exclude-table-data=stats_recompute_requests -f $(PROD_DATA_PATH)
+		--exclude-table-data=stats_recompute_requests' > $(PROD_DATA_PATH).tmp
+	@mv $(PROD_DATA_PATH).tmp $(PROD_DATA_PATH)
 	@echo "Wrote $(PROD_DATA_PATH). Restore it with: make db-restore"
 
 # Reset the local DB to the current migrations, then load the prod data dump.

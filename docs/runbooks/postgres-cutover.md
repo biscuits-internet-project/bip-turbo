@@ -108,5 +108,4 @@ gh workflow enable deploy.yml
 
 ## Afterwards
 
-- Change `make db-dump-prod` to dump over SSH. After step 6, `DATABASE_URL` names a host only the Docker network can resolve.
 - At +30 days with no rollback: add the weekly Supabase `auth` dump to the backup script, drop the app tables from Supabase `public`, downgrade Supabase to the free plan, then delete `SUPABASE_DATABASE_URL` from Doppler.
