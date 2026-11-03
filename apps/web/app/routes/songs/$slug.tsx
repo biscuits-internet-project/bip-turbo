@@ -22,6 +22,7 @@ import { searchPerformance, usePerformancePageFilters } from "~/hooks/use-perfor
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { useTrackUserRatings } from "~/hooks/use-track-user-ratings";
 import { publicLoader } from "~/lib/base-loaders";
+import { notFound } from "~/lib/errors";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { pickGapTier } from "~/lib/gap-tier";
 import { showUserDataQueryKey, trackUserRatingsQueryKey } from "~/lib/query-keys";
@@ -35,9 +36,10 @@ type LoaderData = SongPageView & { dehydratedState: DehydratedState };
 
 export const loader = publicLoader(async ({ params, context }: LoaderFunctionArgs): Promise<LoaderData> => {
   const slug = params.slug;
-  if (!slug) throw new Response("Not Found", { status: 404 });
+  if (!slug) throw notFound();
 
   const view = await services.songPageComposer.build(slug);
+  if (!view) throw notFound();
 
   const trackIds = view.performances.map((p) => p.trackId);
   const showIds = [...new Set(view.performances.map((p) => p.show.id))];
