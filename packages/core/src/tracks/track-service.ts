@@ -191,6 +191,26 @@ export class TrackService {
     return track;
   }
 
+  /**
+   * The song of the track immediately after this one in the same show and set,
+   * or null when it is the last track. Deleting a track gives its follower a new
+   * predecessor, so the follower's song needs its segue recurrence recomputed;
+   * callers read this before the delete.
+   */
+  async findFollowingTrackSongId(trackId: string): Promise<string | null> {
+    const track = await this.db.track.findUnique({
+      where: { id: trackId },
+      select: { showId: true, set: true, position: true },
+    });
+    if (!track) return null;
+
+    const following = await this.db.track.findFirst({
+      where: { showId: track.showId, set: track.set, position: track.position + 1 },
+      select: { songId: true },
+    });
+    return following?.songId ?? null;
+  }
+
   async findBySlug(slug: string): Promise<Track | null> {
     const result = await this.db.track.findUnique({
       where: { slug },
@@ -360,16 +380,33 @@ export class TrackService {
     });
   }
 
+  /**
+   * Deletes a track and closes the hole it leaves in its set's positions.
+   * Segue and neighbor lookups find a track's predecessor as `position - 1`,
+   * so positions must stay contiguous (1..n per show and set); renumbering the
+   * later tracks in the same transaction keeps those joins correct.
+   */
   async delete(id: string): Promise<void> {
-    // Get track info before deletion for cache invalidation
+    // Get track info before deletion for renumbering and cache invalidation
     const track = await this.db.track.findUnique({
       where: { id },
-      select: { showId: true },
+      select: { showId: true, set: true, position: true },
     });
 
-    await this.db.track.delete({
+    const deleteOperation = this.db.track.delete({
       where: { id },
     });
+    if (track) {
+      await this.db.$transaction([
+        deleteOperation,
+        this.db.track.updateMany({
+          where: { showId: track.showId, set: track.set, position: { gt: track.position } },
+          data: { position: { decrement: 1 } },
+        }),
+      ]);
+    } else {
+      await deleteOperation;
+    }
 
     // Invalidate show caches
     if (track?.showId) {
