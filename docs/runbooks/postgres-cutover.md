@@ -108,4 +108,5 @@ gh workflow enable deploy.yml
 
 ## Afterwards
 
-- At +30 days with no rollback: add the weekly Supabase `auth` dump to the backup script, drop the app tables from Supabase `public`, downgrade Supabase to the free plan, then delete `SUPABASE_DATABASE_URL` from Doppler.
+- Before downgrading Supabase to the free plan, install the weekly `auth` dump (`ops/postgres/supabase-auth-backup.sh`).
+- At +30 days with no rollback: drop the app tables from Supabase `public`, then delete `SUPABASE_DATABASE_URL` from Doppler.
