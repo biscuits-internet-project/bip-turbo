@@ -74,7 +74,7 @@ ssh root@5.161.124.129 /usr/local/bin/bip-postgres-restore-drill.sh
 
 ## Upgrades
 
-- **Minor (18.x):** `pg18` tracks the newest 18.x. Run `mise exec ruby -- kamal accessory reboot postgres` at a quiet hour. The database is down for about 10 seconds, and the data is untouched.
+- **Minor (18.x):** `pg18` tracks the newest 18.x. Run `mise exec ruby -- kamal accessory reboot postgres` at a quiet hour. Reboot pulls the image first, so it picks up the new 18.x. The database is down for about 10 seconds, and the data is untouched. If the new image also bumped pgvector, run `docker exec bip-web-postgres psql -U bip -d bip -c 'ALTER EXTENSION vector UPDATE'`.
 - **Major (19):** dump, boot `pgvector/pgvector:pg19` on a new volume, restore, switch `DATABASE_URL` and boot the app. These are the same steps as the cutover in `docs/runbooks/postgres-cutover.md`.
 - **Host OS:** the Sunday 04:00 UTC root cron runs `apt upgrade` and `docker system prune -f`. Neither touches the Postgres container or its named volume.
 

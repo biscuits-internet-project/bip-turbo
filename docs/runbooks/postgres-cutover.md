@@ -15,6 +15,11 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
 
 ## Cutover
 
+0. **Pause auto-deploys.** A merge to `main` during the window would boot a new container against Supabase.
+   ```bash
+   gh workflow disable deploy.yml
+   ```
+
 1. **Reset the target.** This **drops** the dry-run copy and recreates it empty with the extensions.
    ```bash
    h 'docker exec -i bip-web-postgres psql -U bip -d postgres -v ON_ERROR_STOP=1' < ops/postgres/prepare-database.sql
@@ -23,8 +28,10 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
 2. **Maintenance on.**
    ```bash
    mise exec ruby -- kamal app maintenance --message "Started at $(TZ=America/New_York date '+%-I:%M %p %Z')."
-   curl -s -o /dev/null -w '%{http_code}\n' https://discobiscuits.net/   # 503
-   curl -s https://discobiscuits.net/ | grep -c "new home"                 # 1
+   curl -s -o /dev/null -w '%{http_code}\n' "https://discobiscuits.net/?mx=$RANDOM"   # 503
+   curl -s "https://discobiscuits.net/?mx=$RANDOM" | grep -c "new home"                # 1
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://discobiscuits.net/api/cron/recompute-ratings   # 503
+   sleep 30   # let requests already in flight finish (proxy response_timeout is 30s)
    ```
 
 3. **Dump Supabase** with a PG 18 client:
@@ -49,10 +56,13 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
    ```
    If anything differs: `mise exec ruby -- kamal app live`, stop, and investigate. Supabase is still live and nothing has switched.
 
-6. **Switch Doppler.** Keep the Supabase URL for rollback and build the new one. `secrets set` echoes values, so its output goes to `/dev/null`.
+6. **Switch Doppler.** Keep the Supabase URL for rollback and build the new one. `secrets set` echoes values, so its output goes to `/dev/null`. The rollback copy is written only if `DATABASE_URL` still points at Supabase, so re-running this step after a failed boot can't overwrite it with the Hetzner URL. The password is URL-safe (checked 2026-11-03), so it needs no encoding.
    ```bash
    doppler run -p bip -c prd_hetzner --only-secrets DATABASE_URL,POSTGRES_PASSWORD -- sh -c '
-     doppler secrets set -p bip -c prd_hetzner SUPABASE_DATABASE_URL="$DATABASE_URL" > /dev/null &&
+     case "$DATABASE_URL" in
+       *supabase*) doppler secrets set -p bip -c prd_hetzner SUPABASE_DATABASE_URL="$DATABASE_URL" > /dev/null ;;
+       *) echo "DATABASE_URL already switched; keeping the existing SUPABASE_DATABASE_URL" ;;
+     esac &&
      doppler secrets set -p bip -c prd_hetzner DATABASE_URL="postgresql://bip:${POSTGRES_PASSWORD}@bip-web-postgres:5432/bip" > /dev/null'
    doppler secrets get DATABASE_URL -p bip -c prd_hetzner --plain | sed -E 's#//[^@]*@#//<creds>@#'   # ...@bip-web-postgres:5432/bip
    ```
@@ -61,6 +71,7 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
    ```bash
    mise exec ruby -- kamal app boot      # log shows "No pending migrations to apply"
    mise exec ruby -- kamal app live
+   gh workflow enable deploy.yml
    ```
 
 8. **Smoke test:**
@@ -69,7 +80,7 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
    - search from the header;
    - rate a show, then confirm the new row landed on Hetzner:
      ```bash
-     h "docker exec bip-web-postgres psql -U bip -d bip -Atc 'SELECT max(updated_at) FROM ratings'"
+     h "docker exec bip-web-postgres psql -U bip -d bip -Atc 'SELECT max(updated_at) FROM ratings'"   # UTC, no zone
      ```
    - Honeybadger shows no new errors.
 
@@ -82,12 +93,18 @@ h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
 ## Rollback
 
 ```bash
-doppler run -p bip -c prd_hetzner --only-secrets SUPABASE_DATABASE_URL -- sh -c \
-  'doppler secrets set -p bip -c prd_hetzner DATABASE_URL="$SUPABASE_DATABASE_URL" > /dev/null'
+mise exec ruby -- kamal app maintenance --message "Rolling back."
+doppler run -p bip -c prd_hetzner --only-secrets SUPABASE_DATABASE_URL -- sh -c '
+  case "$SUPABASE_DATABASE_URL" in
+    *supabase*) doppler secrets set -p bip -c prd_hetzner DATABASE_URL="$SUPABASE_DATABASE_URL" > /dev/null && echo switched ;;
+    *) echo "SUPABASE_DATABASE_URL does not point at Supabase; restore it from Doppler version history first" ;;
+  esac'
 mise exec ruby -- kamal app boot
+mise exec ruby -- kamal app live
+gh workflow enable deploy.yml
 ```
 
-Writes made on Hetzner after step 7 are not on Supabase. Within the first hour that usually means a few ratings, which is acceptable. Later than that, take a data-only dump from Hetzner and restore it into Supabase before switching.
+**Writes made on Hetzner after step 7 are dropped.** Supabase still holds the data as it was at step 3. In the first hour that usually means a few ratings and attendances, which is acceptable. Later than that, don't use this block as written: keep maintenance on and work out a merge first. A plain data-only dump from Hetzner can't be restored over Supabase, because every existing row's primary key would collide.
 
 ## Afterwards
 

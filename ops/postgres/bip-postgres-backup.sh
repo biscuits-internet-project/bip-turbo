@@ -7,10 +7,14 @@
 # pg_dump runs inside the bip-web-postgres container, so the client always matches
 # the server version and no password is needed (the image trusts its local socket).
 #
-# Every dump is read back with pg_restore --list before anything is rotated away.
-# A dump that pg_dump reports as fine but that holds almost nothing (the wrong
-# database, a fresh empty one after a botched restore) is rejected by counting its
-# TABLE DATA entries, so a bad night never replaces a good one.
+# Every dump is checked three ways before anything is rotated away, so a bad night
+# never replaces a good one:
+#   - pg_restore --list counts TABLE DATA entries, rejecting the wrong database or
+#     a fresh one with no tables;
+#   - a size floor rejects a database whose tables exist but are empty;
+#   - a full pg_restore to /dev/null reads every data block. --list alone reads
+#     only the table of contents, which pg_dump writes before any data, so a dump
+#     cut off halfway (disk full, killed process) passes it.
 #
 # The local copy protects against a bad migration or an accidental delete. The R2
 # copy protects against losing the server, which the local one cannot, so the
@@ -24,13 +28,15 @@ set -uo pipefail
 
 CONTAINER=bip-web-postgres
 DB_NAME=${DB_NAME:-bip}
-DEST=/var/backups/bip-postgres
-REMOTE=r2:bip-postgres-backups
+DEST=${DEST:-/var/backups/bip-postgres}
+REMOTE=${REMOTE:-r2:bip-postgres-backups}
 KEEP_DAYS=14
 KEEP_DAYS_REMOTE=90
 # public has 30+ tables today; a dump listing fewer is not the database we protect.
 MIN_TABLES=30
-ENV_FILE=/etc/bip-postgres-backup.env
+# Today's dump is 18 MB. Well under that means the tables are there but the rows are not.
+MIN_BYTES=$((5 * 1024 * 1024))
+ENV_FILE=${ENV_FILE:-/etc/bip-postgres-backup.env}
 
 HONEYBADGER_CHECKIN_URL=""
 # shellcheck source=/dev/null
@@ -63,6 +69,18 @@ if ! [ "$tables" -ge "$MIN_TABLES" ] 2>/dev/null; then
 fi
 
 local_size=$(stat -c %s "$snap")
+if [ "$local_size" -lt "$MIN_BYTES" ]; then
+  say "ERROR: dump is $local_size bytes (want >= $MIN_BYTES); refusing to keep it"
+  rm -f "$snap"
+  exit 1
+fi
+
+if ! docker exec -i "$CONTAINER" pg_restore -f /dev/null < "$snap" 2>/dev/null; then
+  say "ERROR: dump does not read back in full (truncated or corrupt); refusing to keep it"
+  rm -f "$snap"
+  exit 1
+fi
+
 say "ok: $snap ($(du -h "$snap" | cut -f1), $tables tables)"
 
 # Only prune once a good dump is on disk.
@@ -88,7 +106,7 @@ fi
 
 if [ "$remote_ok" = 1 ]; then
   # Same rule as locally: only prune after a good one has landed.
-  rclone delete "$REMOTE" --min-age "${KEEP_DAYS_REMOTE}d" 2>/dev/null
+  rclone delete "$REMOTE" --include '*.dump' --min-age "${KEEP_DAYS_REMOTE}d" 2>/dev/null
   say "remote: $(rclone ls "$REMOTE" 2>/dev/null | wc -l) dump(s)"
 fi
 
