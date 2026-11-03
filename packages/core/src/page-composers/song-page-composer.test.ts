@@ -1106,6 +1106,21 @@ describe("getFilterMatchingShowDates", () => {
   });
 });
 
+describe("SongPageComposer.build", () => {
+  // An unknown slug (a typo, or an old link to a song whose title edit
+  // re-slugged it) resolves to null so the route can answer 404, and no
+  // per-song queries run.
+  test("returns null without querying when no song has the slug", async () => {
+    const mockDb = { $queryRaw: vi.fn() };
+    const songService = { findBySlug: vi.fn().mockResolvedValue(null) };
+    const composer = new SongPageComposer(mockDb as never, songService as never);
+
+    expect(await composer.build("zzz-not-a-song")).toBeNull();
+    expect(songService.findBySlug).toHaveBeenCalledWith("zzz-not-a-song");
+    expect(mockDb.$queryRaw).not.toHaveBeenCalled();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // CacheKeys — on-this-day all-timers key
 // ---------------------------------------------------------------------------

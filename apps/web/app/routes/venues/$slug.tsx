@@ -11,6 +11,7 @@ import { PageHeader } from "~/components/ui/page-header";
 import { StatBox } from "~/components/ui/stat-box";
 import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { publicLoader } from "~/lib/base-loaders";
+import { notFound } from "~/lib/errors";
 import { showUserDataQueryKey } from "~/lib/query-keys";
 import { createPrefetchClient, dehydrateAndClear } from "~/lib/query-prefetch";
 import { getVenueMeta, getVenueStructuredData } from "~/lib/seo";
@@ -35,10 +36,10 @@ interface LoaderData {
 
 export const loader = publicLoader(async ({ params, context }): Promise<LoaderData> => {
   const slug = params.slug;
-  if (!slug) throw new Error("Slug is required");
+  if (!slug) throw notFound();
 
   const venue = await services.venues.findBySlug(slug);
-  if (!venue) throw new Error("Venue not found");
+  if (!venue) throw notFound();
 
   // Fetch setlists for this venue
   const setlists = await services.setlists.findMany({

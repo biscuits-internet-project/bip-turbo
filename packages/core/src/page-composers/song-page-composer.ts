@@ -132,10 +132,11 @@ export class SongPageComposer {
     private statsService?: StatsService,
   ) {}
 
-  async build(songSlug: string): Promise<SongPageView> {
+  /** Returns null when no song has the slug, so the route can answer 404. */
+  async build(songSlug: string): Promise<SongPageView | null> {
     const song = await this.songService.findBySlug(songSlug);
 
-    if (!song) throw new Error("Song not found");
+    if (!song) return null;
 
     // Computed off the cached stats-show-dates array; cheap enough that
     // recomputing below against `actualLastPlayedDate` is fine.
