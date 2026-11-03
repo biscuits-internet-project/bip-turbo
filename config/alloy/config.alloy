@@ -134,6 +134,15 @@ loki.process "requests" {
   stage.labels {
     values = { method = "", status = "" }
   }
+  // kamal-proxy logs every request as JSON (status, duration in ns, path), which
+  // the dashboard reads. Blank the visitor IPs before they leave the host.
+  stage.match {
+    selector = "{container=\"kamal-proxy\"}"
+    stage.replace {
+      expression = "\"(?:client_addr|remote_addr)\":\"([^\"]*)\""
+      replace    = ""
+    }
+  }
   forward_to = [loki.write.cloud.receiver]
 }
 

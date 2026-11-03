@@ -145,3 +145,6 @@ accessories:
     cmd: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     options:
       memory: 384m
+      # Metrics carry the container hostname as `instance`; a fixed one keeps a
+      # single series per metric across restarts.
+      hostname: bip-alloy
