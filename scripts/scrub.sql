@@ -36,22 +36,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE PROCEDURE scrub_public_audit(old_email TEXT, new_email TEXT, fn TEXT, ln TEXT)
-AS $$
-BEGIN
-    UPDATE public.audits
-    SET audited_changes = COALESCE(audited_changes, '{}'::jsonb) ||
-                          jsonb_build_object(
-                              'first_name', fn,
-                              'last_name', ln,
-                              'email', new_email,
-                              'username', new_email
-                          )
-    WHERE auditable_type = 'User'
-    AND audited_changes ->> 'email' = old_email;
-END;
-$$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE PROCEDURE scrub_auth_audit_actor(old_email TEXT, new_email TEXT)
 AS $$
 BEGIN
@@ -88,10 +72,6 @@ SELECT (SELECT COUNT(*)
         FROM public.users
         WHERE email NOT LIKE '%@bip-localhost-test.com') +
        (SELECT count(*)
-        FROM public.audits, jsonb_each_text(audited_changes)
-        WHERE value like '%@%.com'
-        AND value NOT LIKE '%@bip-localhost-test.com') +
-       (SELECT count(*)
         FROM auth.audit_log_entries, json_each_text(payload -> 'traits')
         WHERE value LIKE '%@%.com'
         AND value NOT LIKE '%@bip-localhost-test.com') +
@@ -122,7 +102,6 @@ BEGIN
 
         CALL scrub_auth_user(email_record.original_email, new_test_email, random_first_name, random_last_name);
         CALL scrub_public_user(email_record.original_email, new_test_email, random_first_name, random_last_name);
-        CALL scrub_public_audit(email_record.original_email, new_test_email, random_first_name, random_last_name);
         CALL scrub_auth_audit_actor(email_record.original_email, new_test_email);
         CALL scrub_auth_audit_traits(email_record.original_email, new_test_email);
     END LOOP;
@@ -138,7 +117,6 @@ BEGIN
         FROM scrub_test_identity('test-au-only');
 
         CALL scrub_auth_user(email_record.original_email, new_test_email, random_first_name, random_last_name);
-        CALL scrub_public_audit(email_record.original_email, new_test_email, random_first_name, random_last_name);
         CALL scrub_auth_audit_actor(email_record.original_email, new_test_email);
         CALL scrub_auth_audit_traits(email_record.original_email, new_test_email);
     END LOOP;
@@ -154,25 +132,11 @@ BEGIN
         FROM scrub_test_identity('test-pu-only');
 
         CALL scrub_public_user(email_record.original_email, new_test_email, random_first_name, random_last_name);
-        CALL scrub_public_audit(email_record.original_email, new_test_email, random_first_name, random_last_name);
         CALL scrub_auth_audit_actor(email_record.original_email, new_test_email);
         CALL scrub_auth_audit_traits(email_record.original_email, new_test_email);
     END LOOP;
 
-    -- Case 4: Orphaned audited_changes.email public.audits
-    FOR email_record IN
-        SELECT DISTINCT pa.audited_changes ->> 'email' as original_email
-        FROM public.audits pa
-        WHERE pa.audited_changes ->> 'email' NOT LIKE '%@bip-localhost-test.com'
-    LOOP
-        SELECT *
-        INTO new_test_email, random_first_name, random_last_name
-        FROM scrub_test_identity('test-public-audit');
-
-        CALL scrub_public_audit(email_record.original_email, new_test_email, random_first_name, random_last_name);
-    END LOOP;
-
-    -- Case 5: Orphaned payload.actor_username auth.audit_log_entries
+    -- Case 4: Orphaned payload.actor_username auth.audit_log_entries
     FOR email_record IN
         SELECT DISTINCT aa.payload ->> 'actor_username' as original_email
         FROM auth.audit_log_entries aa
@@ -186,7 +150,7 @@ BEGIN
         CALL scrub_auth_audit_actor(email_record.original_email, new_test_email);
     END LOOP;
 
-    -- Case 6: Orphaned payload.traits.user_email auth.audit_log_entries
+    -- Case 5: Orphaned payload.traits.user_email auth.audit_log_entries
     FOR email_record IN
         SELECT DISTINCT aa.payload -> 'traits' ->> 'user_email' as original_email
         FROM auth.audit_log_entries aa
@@ -210,10 +174,6 @@ SELECT (SELECT COUNT(*)
         FROM public.users
         WHERE email NOT LIKE '%@bip-localhost-test.com') +
        (SELECT count(*)
-        FROM public.audits, jsonb_each_text(audited_changes)
-        WHERE value like '%@%.com'
-        AND value NOT LIKE '%@bip-localhost-test.com') +
-       (SELECT count(*)
         FROM auth.audit_log_entries, json_each_text(payload -> 'traits')
         WHERE value LIKE '%@%.com'
         AND value NOT LIKE '%@bip-localhost-test.com') +
@@ -228,6 +188,5 @@ AS after_non_test_email_count;
 DROP FUNCTION scrub_test_identity(TEXT);
 DROP PROCEDURE scrub_auth_user(TEXT, TEXT, TEXT, TEXT);
 DROP PROCEDURE scrub_public_user(TEXT, TEXT, TEXT, TEXT);
-DROP PROCEDURE scrub_public_audit(TEXT, TEXT, TEXT, TEXT);
 DROP PROCEDURE scrub_auth_audit_actor(TEXT, TEXT);
 DROP PROCEDURE scrub_auth_audit_traits(TEXT, TEXT);

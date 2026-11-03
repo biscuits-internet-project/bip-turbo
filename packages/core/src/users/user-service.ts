@@ -175,19 +175,6 @@ export class UserService {
     return result ? mapUserToDomainEntity(result) : null;
   }
 
-  async findByIdWithRoles(id: string) {
-    return this.db.user.findUnique({
-      where: { id },
-      include: {
-        userRoles: {
-          include: {
-            role: true,
-          },
-        },
-      },
-    });
-  }
-
   async findMany(options?: QueryOptions<User>): Promise<User[]> {
     const where = options?.filters ? buildWhereClause(options.filters) : {};
     const orderBy = options?.sort ? buildOrderByClause(options.sort) : [{ createdAt: "desc" }];
