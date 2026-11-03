@@ -19,11 +19,13 @@ The R2 key is a token limited to the `bip-postgres-backups` bucket (Object Read 
 ```bash
 h() { ssh -i ~/.ssh/hetzner_deploy deploy@5.161.124.129 "$@"; }
 doppler run -p bip -c prd_hetzner --only-secrets R2_BACKUP_ACCESS_KEY_ID,R2_BACKUP_SECRET_ACCESS_KEY,R2_ACCOUNT_ID -- sh -c '
-  printf "[r2]\ntype = s3\nprovider = Cloudflare\naccess_key_id = %s\nsecret_access_key = %s\nendpoint = https://%s.r2.cloudflarestorage.com\nno_check_bucket = true\n" \
+  printf "[r2]\ntype = s3\nprovider = Cloudflare\naccess_key_id = %s\nsecret_access_key = %s\nendpoint = https://%s.r2.cloudflarestorage.com\nno_check_bucket = true\nno_head = true\n" \
     "$R2_BACKUP_ACCESS_KEY_ID" "$R2_BACKUP_SECRET_ACCESS_KEY" "$R2_ACCOUNT_ID"' \
   | h 'umask 077; mkdir -p ~/.config/rclone && cat > ~/.config/rclone/rclone.conf'
 h 'rclone lsf r2:bip-postgres-backups && echo reachable'
 ```
+
+`no_head = true` is required. Ubuntu's rclone (1.60) re-checks each upload with `HEAD ?versionId=…`, which R2 answers with `501 Not Implemented`, so every upload fails its first attempt. The backup script verifies uploads with its own size check either way.
 
 Install the scripts and the cron entry. `crontab` replaces deploy's whole crontab, which is fine because it had none before this:
 
