@@ -50,7 +50,7 @@ bun prisma:studio         # Open Prisma Studio
 
 ## Schema and data changes go through migrations ONLY
 
-Never mutate schema or data outside a migration (local or prod) — see the root `CLAUDE.md`. `db-query`/`db-execute` are read-only inspection tools. Schema edits: change `schema.prisma`, then migrate. If `migrate dev` wants to reset the dev DB on drift, hand-author the `migration.sql` and apply with `bun run prisma:migrate:deploy`. Seed/backfill data ships as idempotent `INSERT ... ON CONFLICT DO NOTHING` inside a migration, never a runtime script.
+Never mutate schema or data outside a migration (local or prod) — see the root `CLAUDE.md`. `db-query`/`db-execute` are read-only inspection tools. Schema edits: change `schema.prisma`, then `make migrate`; on drift, see "Use `make migrate`" below. Seed/backfill data ships as idempotent `INSERT ... ON CONFLICT DO NOTHING` inside a migration, never a runtime script.
 
 ## A BEFORE trigger reads its own row from `NEW`, never with a re-SELECT
 
