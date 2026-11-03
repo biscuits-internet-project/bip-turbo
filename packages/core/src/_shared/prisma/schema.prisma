@@ -7,34 +7,6 @@ datasource db {
   provider = "postgresql"
 }
 
-model ActiveStorageAttachment {
-  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String            @db.VarChar
-  recordType String            @map("record_type") @db.VarChar
-  recordId   String            @map("record_id") @db.Uuid
-  blobId     String            @map("blob_id") @db.Uuid
-  createdAt  DateTime          @map("created_at") @db.Timestamp(6)
-  blob       ActiveStorageBlob @relation(fields: [blobId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_active_storage_attachments_active_storage_blobs_blob_id")
-
-  @@unique([recordType, recordId, name, blobId], map: "active_storage_attachments_record_name_blob_unique")
-  @@index([blobId])
-  @@map("active_storage_attachments")
-}
-
-model ActiveStorageBlob {
-  id          String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key         String                    @unique(map: "active_storage_blobs_key_unique") @db.VarChar
-  filename    String                    @db.VarChar
-  contentType String?                   @map("content_type") @db.VarChar
-  metadata    String?
-  byteSize    BigInt                    @map("byte_size")
-  checksum    String                    @db.VarChar
-  createdAt   DateTime                  @map("created_at") @db.Timestamp(6)
-  attachments ActiveStorageAttachment[]
-
-  @@map("active_storage_blobs")
-}
-
 model Annotation {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   trackId   String   @map("track_id") @db.Uuid
@@ -45,15 +17,6 @@ model Annotation {
 
   @@index([trackId])
   @@map("annotations")
-}
-
-model ArInternalMetadata {
-  key       String   @id @db.VarChar
-  value     String?  @db.VarChar
-  createdAt DateTime @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
-
-  @@map("ar_internal_metadata")
 }
 
 model Attendance {
@@ -69,31 +32,6 @@ model Attendance {
   @@index([showId])
   @@index([userId])
   @@map("attendances")
-}
-
-model Audit {
-  id             BigInt    @id @default(autoincrement())
-  auditableId    Int?      @map("auditable_id")
-  auditableType  String?   @map("auditable_type") @db.VarChar
-  associatedId   Int?      @map("associated_id")
-  associatedType String?   @map("associated_type") @db.VarChar
-  userId         String?   @map("user_id") @db.Uuid
-  userType       String?   @map("user_type") @db.VarChar
-  username       String?   @db.VarChar
-  action         String?   @db.VarChar
-  auditedChanges Json?     @map("audited_changes")
-  version        Int?      @default(0)
-  comment        String?   @db.VarChar
-  remoteAddress  String?   @map("remote_address") @db.VarChar
-  requestUuid    String?   @map("request_uuid") @db.VarChar
-  createdAt      DateTime? @map("created_at") @db.Timestamp(6)
-
-  @@index([associatedType, associatedId], map: "audits_associated_type_id_idx")
-  @@index([auditableType, auditableId, version], map: "audits_auditable_type_id_version_idx")
-  @@index([createdAt])
-  @@index([requestUuid])
-  @@index([userId, userType], map: "audits_user_id_type_idx")
-  @@map("audits")
 }
 
 model Author {
@@ -175,15 +113,6 @@ model Comment {
   @@map("comments")
 }
 
-model Faq {
-  id       Int     @id
-  question String?
-  answer   String?
-  section  Int?
-
-  @@map("faq")
-}
-
 model Favorite {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
@@ -196,35 +125,6 @@ model Favorite {
   @@index([showId])
   @@index([userId])
   @@map("favorites")
-}
-
-model FriendlyIdSlug {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug          String    @db.VarChar
-  sluggableType String    @map("sluggable_type") @db.VarChar
-  sluggableId   String    @map("sluggable_id") @db.Uuid
-  scope         String?   @db.VarChar
-  createdAt     DateTime? @map("created_at") @db.Timestamp(6)
-
-  @@unique([slug, sluggableType, scope], map: "friendly_id_slugs_slug_type_scope_unique")
-  @@index([slug, sluggableType], map: "friendly_id_slugs_slug_type_idx")
-  @@index([sluggableType, sluggableId], map: "friendly_id_slugs_type_id_idx")
-  @@map("friendly_id_slugs")
-}
-
-model Like {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  likeableId   String   @map("likeable_id") @db.Uuid
-  likeableType String   @map("likeable_type") @db.VarChar
-  userId       String   @map("user_id") @db.Uuid
-  createdAt    DateTime @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime @map("updated_at") @db.Timestamp(6)
-  user         User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_likes_users_user_id")
-
-  @@unique([userId, likeableType, likeableId], map: "likes_user_id_likeable_type_id_unique")
-  @@index([likeableType, likeableId], map: "likes_likeable_type_id_idx")
-  @@index([userId])
-  @@map("likes")
 }
 
 model MediaContent {
@@ -269,34 +169,20 @@ model Rating {
 }
 
 model Review {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  content    String
-  status     String   @default("draft") @db.VarChar
-  userId     String   @map("user_id") @db.Uuid
-  createdAt  DateTime @map("created_at") @db.Timestamp(6)
-  updatedAt  DateTime @map("updated_at") @db.Timestamp(6)
-  showId     String?  @map("show_id") @db.Uuid
-  user       User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_users_user_id")
-  show       Show?    @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_shows_show_id")
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content   String
+  status    String   @default("draft") @db.VarChar
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @map("updated_at") @db.Timestamp(6)
+  showId    String?  @map("show_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_users_user_id")
+  show      Show?    @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_shows_show_id")
 
   @@unique([showId, userId])
   @@index([showId])
   @@index([userId])
   @@map("reviews")
-}
-
-model Role {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String?    @db.VarChar
-  resourceId   String?    @map("resource_id") @db.Uuid
-  resourceType String?    @map("resource_type") @db.VarChar
-  createdAt    DateTime   @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime   @map("updated_at") @db.Timestamp(6)
-  userRoles    UserRole[]
-
-  @@index([name])
-  @@index([name, resourceType, resourceId], map: "roles_name_resource_type_id_idx")
-  @@map("roles")
 }
 
 model ShowPhoto {
@@ -328,42 +214,42 @@ model ShowYoutube {
 }
 
 model Show {
-  id                String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug              String?                  @unique(map: "shows_slug_unique") @db.VarChar
-  date              String                   @db.VarChar
-  venueId           String?                  @map("venue_id") @db.Uuid
-  bandId            String?                  @map("band_id") @db.Uuid
-  notes             String?
-  createdAt         DateTime                 @map("created_at") @db.Timestamp(6)
-  updatedAt         DateTime                 @map("updated_at") @db.Timestamp(6)
-  likesCount        Int                      @default(0) @map("likes_count")
-  relistenUrl       String?                  @map("relisten_url") @db.VarChar
-  averageRating     Float?                   @default(0) @map("average_rating")
-  ratingsCount      Int                      @default(0) @map("ratings_count")
-  weightedRating       Float?                @map("weighted_rating")
-  weightedRatingsCount Int                   @default(0) @map("weighted_ratings_count")
-  showPhotosCount   Int                      @default(0) @map("show_photos_count")
-  showYoutubesCount Int                      @default(0) @map("show_youtubes_count")
-  reviewsCount      Int                      @default(0) @map("reviews_count")
-  countForStats     Boolean                  @default(true) @map("count_for_stats")
-  dayOrder          Int?                     @map("day_order")
-  duration          Int?
-  durationCheckedAt DateTime?                @map("duration_checked_at") @db.Timestamp(6)
-  attendances       Attendance[]
-  favorites         Favorite[]
-  reviews           Review[]
-  showPhotos        ShowPhoto[]
-  showYoutubes      ShowYoutube[]
-  band              Band?                    @relation(fields: [bandId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_bands_band_id")
-  venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_venues_venue_id")
-  tracks            Track[]
-  previousPerformanceTracks Track[]            @relation("TrackPreviousPerformance")
+  id                        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                      String?                @unique(map: "shows_slug_unique") @db.VarChar
+  date                      String                 @db.VarChar
+  venueId                   String?                @map("venue_id") @db.Uuid
+  bandId                    String?                @map("band_id") @db.Uuid
+  notes                     String?
+  createdAt                 DateTime               @map("created_at") @db.Timestamp(6)
+  updatedAt                 DateTime               @map("updated_at") @db.Timestamp(6)
+  likesCount                Int                    @default(0) @map("likes_count")
+  relistenUrl               String?                @map("relisten_url") @db.VarChar
+  averageRating             Float?                 @default(0) @map("average_rating")
+  ratingsCount              Int                    @default(0) @map("ratings_count")
+  weightedRating            Float?                 @map("weighted_rating")
+  weightedRatingsCount      Int                    @default(0) @map("weighted_ratings_count")
+  showPhotosCount           Int                    @default(0) @map("show_photos_count")
+  showYoutubesCount         Int                    @default(0) @map("show_youtubes_count")
+  reviewsCount              Int                    @default(0) @map("reviews_count")
+  countForStats             Boolean                @default(true) @map("count_for_stats")
+  dayOrder                  Int?                   @map("day_order")
+  duration                  Int?
+  durationCheckedAt         DateTime?              @map("duration_checked_at") @db.Timestamp(6)
+  attendances               Attendance[]
+  favorites                 Favorite[]
+  reviews                   Review[]
+  showPhotos                ShowPhoto[]
+  showYoutubes              ShowYoutube[]
+  band                      Band?                  @relation(fields: [bandId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_bands_band_id")
+  venue                     Venue?                 @relation(fields: [venueId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_shows_venues_venue_id")
+  tracks                    Track[]
+  previousPerformanceTracks Track[]                @relation("TrackPreviousPerformance")
   flagRecurrencePrevious    TrackFlagAssignment[]  @relation("TrackFlagPreviousShow")
   segueRecurrencePrevious   TrackSegueRecurrence[] @relation("TrackSeguePreviousShow")
-  segueRuns         SegueRun[]
-  files             ShowToFile[]
-  rockOperaPerformances RockOperaPerformance[]
-  showMusicians         ShowMusician[]
+  segueRuns                 SegueRun[]
+  files                     ShowToFile[]
+  rockOperaPerformances     RockOperaPerformance[]
+  showMusicians             ShowMusician[]
 
   @@index([likesCount])
   @@index([date])
@@ -563,75 +449,39 @@ model Song {
   @@map("songs")
 }
 
-model Tagging {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tagId        String?   @map("tag_id") @db.Uuid
-  taggableType String?   @map("taggable_type") @db.VarChar
-  taggableId   String?   @map("taggable_id") @db.Uuid
-  taggerType   String?   @map("tagger_type") @db.VarChar
-  taggerId     String?   @map("tagger_id") @db.Uuid
-  context      String?   @db.VarChar
-  createdAt    DateTime? @map("created_at") @db.Timestamp(6)
-  tag          Tag?      @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_taggings_tags_tag_id")
-
-  @@unique([tagId, taggableId, taggableType, context, taggerId, taggerType], map: "taggings_tag_taggable_context_unique")
-  @@index([context])
-  @@index([tagId])
-  @@index([taggableId, taggableType, context], map: "taggings_taggable_context_idx")
-  @@index([taggableId])
-  @@index([taggableId, taggableType, taggerId, context], map: "taggings_taggable_tagger_context_idx")
-  @@index([taggableType, taggableId], map: "taggings_taggable_type_id_idx")
-  @@index([taggableType])
-  @@index([taggerId])
-  @@index([taggerId, taggerType], map: "taggings_tagger_id_type_idx")
-  @@index([taggerType, taggerId], map: "taggings_tagger_type_id_idx")
-  @@map("taggings")
-}
-
-model Tag {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String?   @unique(map: "tags_name_unique") @db.VarChar
-  createdAt     DateTime  @map("created_at") @db.Timestamp(6)
-  updatedAt     DateTime  @map("updated_at") @db.Timestamp(6)
-  taggingsCount Int?      @default(0) @map("taggings_count")
-  taggings      Tagging[]
-
-  @@map("tags")
-}
-
 model Track {
-  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  showId          String                   @map("show_id") @db.Uuid
-  songId          String                   @map("song_id") @db.Uuid
-  set             String                   @db.VarChar
-  position        Int
-  segue           String?                  @db.VarChar
-  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamp(6)
-  likesCount      Int                      @default(0) @map("likes_count")
-  slug            String?                  @unique(map: "tracks_slug_unique") @db.VarChar
-  note            String?                  @db.VarChar
-  allTimer        Boolean?                 @default(false) @map("all_timer")
-  previousTrackId String?                  @map("previous_track_id") @db.Uuid
-  nextTrackId     String?                  @map("next_track_id") @db.Uuid
-  averageRating   Float?                   @default(0) @map("average_rating")
-  ratingsCount    Int                      @default(0) @map("ratings_count")
-  discriminatingRating       Float?        @map("discriminating_rating")
-  discriminatingRatingsCount Int           @default(0) @map("discriminating_ratings_count")
-  gap                       Int?
-  previousPerformanceShowId String?         @map("previous_performance_show_id") @db.Uuid
-  duration        Int?
-  durationSource  String?                  @map("duration_source") @db.VarChar
-  annotations     Annotation[]
-  show            Show                     @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_shows_show_id")
-  song            Song                     @relation(fields: [songId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_songs_song_id")
-  previousPerformanceShow   Show?           @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
-  durationSourceRef         DurationSource? @relation(fields: [durationSource], references: [name], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_duration_source")
-  trackMusicians            TrackMusician[]
-  trackFlags                TrackFlagAssignment[]
-  segueRecurrences          TrackSegueRecurrence[]
-  completionAsEarlier       TrackCompletion?  @relation("CompletionEarlier")
-  completionsAsLater        TrackCompletion[] @relation("CompletionLater")
+  id                         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  showId                     String                 @map("show_id") @db.Uuid
+  songId                     String                 @map("song_id") @db.Uuid
+  set                        String                 @db.VarChar
+  position                   Int
+  segue                      String?                @db.VarChar
+  createdAt                  DateTime               @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt                  DateTime               @updatedAt @map("updated_at") @db.Timestamp(6)
+  likesCount                 Int                    @default(0) @map("likes_count")
+  slug                       String?                @unique(map: "tracks_slug_unique") @db.VarChar
+  note                       String?                @db.VarChar
+  allTimer                   Boolean?               @default(false) @map("all_timer")
+  previousTrackId            String?                @map("previous_track_id") @db.Uuid
+  nextTrackId                String?                @map("next_track_id") @db.Uuid
+  averageRating              Float?                 @default(0) @map("average_rating")
+  ratingsCount               Int                    @default(0) @map("ratings_count")
+  discriminatingRating       Float?                 @map("discriminating_rating")
+  discriminatingRatingsCount Int                    @default(0) @map("discriminating_ratings_count")
+  gap                        Int?
+  previousPerformanceShowId  String?                @map("previous_performance_show_id") @db.Uuid
+  duration                   Int?
+  durationSource             String?                @map("duration_source") @db.VarChar
+  annotations                Annotation[]
+  show                       Show                   @relation(fields: [showId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_shows_show_id")
+  song                       Song                   @relation(fields: [songId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_songs_song_id")
+  previousPerformanceShow    Show?                  @relation("TrackPreviousPerformance", fields: [previousPerformanceShowId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_previous_performance_show_id")
+  durationSourceRef          DurationSource?        @relation(fields: [durationSource], references: [name], onDelete: NoAction, onUpdate: NoAction, map: "fk_tracks_duration_source")
+  trackMusicians             TrackMusician[]
+  trackFlags                 TrackFlagAssignment[]
+  segueRecurrences           TrackSegueRecurrence[]
+  completionAsEarlier        TrackCompletion?       @relation("CompletionEarlier")
+  completionsAsLater         TrackCompletion[]      @relation("CompletionLater")
 
   @@index([likesCount])
   @@index([nextTrackId])
@@ -748,55 +598,42 @@ model TrackCompletion {
 }
 
 model User {
-  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  firstName           String?      @map("first_name") @db.VarChar
-  lastName            String?      @map("last_name") @db.VarChar
-  createdAt           DateTime     @map("created_at") @db.Timestamp(6)
-  updatedAt           DateTime     @map("updated_at") @db.Timestamp(6)
-  email               String       @unique(map: "users_email_unique") @db.VarChar
-  resetPasswordToken  String?      @unique(map: "users_reset_password_token_unique") @map("reset_password_token") @db.VarChar
-  resetPasswordSentAt DateTime?    @map("reset_password_sent_at") @db.Timestamp(6)
-  confirmationToken   String?      @unique(map: "users_confirmation_token_unique") @map("confirmation_token") @db.VarChar
-  confirmedAt         DateTime?    @map("confirmed_at") @db.Timestamp(6)
-  confirmationSentAt  DateTime?    @map("confirmation_sent_at") @db.Timestamp(6)
-  passwordDigest      String       @map("password_digest") @db.VarChar
-  username            String?      @unique(map: "users_username_unique") @db.VarChar
-  avatarFileId        String?      @map("avatar_file_id") @db.Uuid
-  avatarFileUrl       String?      @map("avatar_file_url") @db.VarChar
-  showCalibratedRatings     Boolean? @map("show_adjusted_rating")
-  showRatingComparisonDebug Boolean? @map("show_rating_compare")
-  trackCalibratedRatings     Boolean? @map("track_calibrated_rating")
-  trackRatingComparisonDebug Boolean? @map("track_rating_compare")
-  colorCodeRatings          Boolean? @map("color_code_ratings")
-  showSetlistTimes          Boolean? @map("show_setlist_times")
-  ratingDecimalPlaces       Int?     @map("rating_decimal_places")
-  avatarFile          File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  attendances         Attendance[]
-  blogPosts           BlogPost[]
-  comments            Comment[]
-  favorites           Favorite[]
-  likes               Like[]
-  ratings             Rating[]
-  raterStats          RaterStats[]
-  reviews             Review[]
-  showPhotos          ShowPhoto[]
-  files               File[]
-  userRoles           UserRole[]
-  showFiles           ShowToFile[] @relation("ShowFileUploader")
+  id                         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstName                  String?      @map("first_name") @db.VarChar
+  lastName                   String?      @map("last_name") @db.VarChar
+  createdAt                  DateTime     @map("created_at") @db.Timestamp(6)
+  updatedAt                  DateTime     @map("updated_at") @db.Timestamp(6)
+  email                      String       @unique(map: "users_email_unique") @db.VarChar
+  resetPasswordToken         String?      @unique(map: "users_reset_password_token_unique") @map("reset_password_token") @db.VarChar
+  resetPasswordSentAt        DateTime?    @map("reset_password_sent_at") @db.Timestamp(6)
+  confirmationToken          String?      @unique(map: "users_confirmation_token_unique") @map("confirmation_token") @db.VarChar
+  confirmedAt                DateTime?    @map("confirmed_at") @db.Timestamp(6)
+  confirmationSentAt         DateTime?    @map("confirmation_sent_at") @db.Timestamp(6)
+  passwordDigest             String       @map("password_digest") @db.VarChar
+  username                   String?      @unique(map: "users_username_unique") @db.VarChar
+  avatarFileId               String?      @map("avatar_file_id") @db.Uuid
+  avatarFileUrl              String?      @map("avatar_file_url") @db.VarChar
+  showCalibratedRatings      Boolean?     @map("show_adjusted_rating")
+  showRatingComparisonDebug  Boolean?     @map("show_rating_compare")
+  trackCalibratedRatings     Boolean?     @map("track_calibrated_rating")
+  trackRatingComparisonDebug Boolean?     @map("track_rating_compare")
+  colorCodeRatings           Boolean?     @map("color_code_ratings")
+  showSetlistTimes           Boolean?     @map("show_setlist_times")
+  ratingDecimalPlaces        Int?         @map("rating_decimal_places")
+  avatarFile                 File?        @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  attendances                Attendance[]
+  blogPosts                  BlogPost[]
+  comments                   Comment[]
+  favorites                  Favorite[]
+  ratings                    Rating[]
+  raterStats                 RaterStats[]
+  reviews                    Review[]
+  showPhotos                 ShowPhoto[]
+  files                      File[]
+  showFiles                  ShowToFile[] @relation("ShowFileUploader")
 
   @@index([avatarFileId])
   @@map("users")
-}
-
-model UserRole {
-  userId String @map("user_id") @db.Uuid
-  roleId String @map("role_id") @db.Uuid
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@id([userId, roleId])
-  @@index([userId, roleId])
-  @@map("users_roles")
 }
 
 model Venue {
@@ -823,14 +660,6 @@ model Venue {
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "venues_search_text_trgm_idx")
   @@index([searchVector], type: Gin, map: "venues_search_vector_idx")
   @@map("venues")
-}
-
-model Youtube {
-  date DateTime? @db.Date
-  url  String?
-
-  @@map("youtubes")
-  @@ignore
 }
 
 /// Signal table bridging SQL data migrations to the TypeScript stats recompute.
@@ -917,32 +746,6 @@ model SearchHistory {
   @@map("search_histories")
 }
 
-model MemoryMetric {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label          String?  @db.VarChar
-  heapUsed       Int      @map("heap_used") // MB
-  heapTotal      Int      @map("heap_total") // MB
-  external       Int // MB
-  rss            Int // MB
-  requestMethod  String?  @map("request_method") @db.VarChar
-  requestUrl     String?  @map("request_url") @db.VarChar
-  // V8 heap statistics for deeper analysis
-  heapUsedBytes  BigInt?  @map("heap_used_bytes")
-  heapTotalBytes BigInt?  @map("heap_total_bytes")
-  // Track memory delta from previous measurement
-  memoryDelta    Int?     @map("memory_delta") // MB difference
-  // Track GC stats if available
-  gcCount        Int?     @map("gc_count")
-  gcDuration     Int?     @map("gc_duration") // ms
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-
-  @@index([createdAt])
-  @@index([label])
-  @@index([requestUrl])
-  @@index([memoryDelta])
-  @@map("memory_metrics")
-}
-
 /// Per-user rating behavior, computed (not entered) for the calibrated-rating
 /// system. One row per scope: a `GLOBAL` row over all of a user's ratings plus
 /// one row per drummer era. Only the fields the entropy-centered + bad-faith
@@ -951,15 +754,15 @@ model MemoryMetric {
 /// (per-era bomber/fluffer flag). Derived aggregate (like Show.average_rating),
 /// maintained by RaterWeightService; never feeds the canonical displayed average.
 model RaterStats {
-  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String       @map("user_id") @db.Uuid
-  era              RaterEra
-  kind             RateableKind
-  ratingsCount     Int          @default(0) @map("ratings_count")
-  entropy          Float        @default(0)
-  mean             Float        @default(0)
-  isExcluded       Boolean      @default(false) @map("is_excluded")
-  computedAt       DateTime     @default(now()) @map("computed_at") @db.Timestamp(6)
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  era          RaterEra
+  kind         RateableKind
+  ratingsCount Int          @default(0) @map("ratings_count")
+  entropy      Float        @default(0)
+  mean         Float        @default(0)
+  isExcluded   Boolean      @default(false) @map("is_excluded")
+  computedAt   DateTime     @default(now()) @map("computed_at") @db.Timestamp(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_rater_stats_users_user_id")
 
