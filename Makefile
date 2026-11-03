@@ -2,7 +2,7 @@
 DB_NAME ?= bip_development
 DB_USER ?= postgres
 DB_PASSWORD ?= password
-PROD_DATA_PATH ?= ../data/bip.tar
+PROD_DATA_PATH ?= ../data/bip.dump
 BACKUP_DIR ?= backups
 
 install:
@@ -89,15 +89,42 @@ migrate-baseline:
 db-start:
 	supabase start
 
+# Take a fresh data-only dump of prod (read-only on prod). The schema comes from
+# our migrations, so only public-schema data is dumped, minus migration history
+# and the deploy-time recompute queue (transient, meaningless locally).
+db-dump-prod:
+	@mkdir -p $(dir $(PROD_DATA_PATH))
+	pg_dump "$$(doppler secrets get DATABASE_URL --project bip --config prd_hetzner --plain)" \
+		-Fc --data-only -n public --exclude-table-data=_prisma_migrations \
+		--exclude-table-data=stats_recompute_requests -f $(PROD_DATA_PATH)
+	@echo "Wrote $(PROD_DATA_PATH). Restore it with: make db-restore"
+
+# Reset the local DB to the current migrations, then load the prod data dump.
+# Restores as supabase_admin with triggers disabled because users and files
+# reference each other. Migrations seed some reference tables (musicians,
+# instruments, ...) with ids that differ from prod's, so every table is emptied
+# before the load and the dump's rows win. A newer local pg_restore warns about
+# transaction_timeout against an older server; that warning is harmless and ignored.
 db-restore:
-	cd packages/core && bun prisma:reset
-	@echo "Restoring production data from $(PROD_DATA_PATH)..."
 	@if [ ! -f $(PROD_DATA_PATH) ]; then \
-		echo "Error: Production data file not found at $(PROD_DATA_PATH)"; \
+		echo "Error: Production data file not found at $(PROD_DATA_PATH). Run 'make db-dump-prod' first."; \
 		exit 1; \
 	fi
-	pg_restore --no-owner --no-acl --data-only -d "$$(doppler secrets get DATABASE_URL --plain)" $(PROD_DATA_PATH) || true
-	@echo "Production data restored successfully."
+	@DB_URL=$$(doppler secrets get DATABASE_URL --plain); \
+	if ! echo "$$DB_URL" | grep -q "localhost\|127.0.0.1"; then \
+		echo "ERROR: db-restore only runs against a local database"; exit 1; \
+	fi
+	cd packages/core && bun prisma:reset
+	@echo "Restoring production data from $(PROD_DATA_PATH)..."
+	@ADMIN_URL=$$(doppler secrets get DATABASE_URL --plain | sed 's|postgresql://postgres:|postgresql://supabase_admin:|'); \
+	psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "DO \$$\$$ DECLARE t text; BEGIN \
+		SELECT string_agg(format('%I', tablename), ', ') INTO t FROM pg_tables \
+		WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'; \
+		IF t IS NOT NULL THEN EXECUTE 'TRUNCATE ' || t || ' CASCADE'; END IF; END \$$\$$;" && \
+	{ pg_restore --no-owner --no-acl --data-only --disable-triggers -d "$$ADMIN_URL" $(PROD_DATA_PATH) 2>&1 \
+		| grep -v transaction_timeout | grep -A2 "pg_restore: error" && \
+		{ echo "ERROR: restore had errors (above)"; exit 1; } || true; } && \
+	echo "Production data restored successfully."
 
 recompute-pending:
 	cd packages/core && doppler run -- bun run scripts/recompute-pending.ts

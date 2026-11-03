@@ -115,7 +115,7 @@ model SongAuthor {
   authorId  String   @map("author_id") @db.Uuid
   position  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   song   Song   @relation(fields: [songId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_song_authors_song_id")
   author Author @relation(fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_song_authors_author_id")
@@ -558,6 +558,8 @@ model Song {
 
   @@index([longestGapsData], type: Gin)
   @@index([yearlyPlayData], type: Gin)
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "songs_search_text_trgm_idx")
+  @@index([searchVector], type: Gin, map: "songs_search_vector_idx")
   @@map("songs")
 }
 
@@ -818,6 +820,8 @@ model Venue {
   shows        Show[]
 
   @@index([slug])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "venues_search_text_trgm_idx")
+  @@index([searchVector], type: Gin, map: "venues_search_vector_idx")
   @@map("venues")
 }
 

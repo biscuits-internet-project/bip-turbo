@@ -4652,6 +4652,9 @@ async function syncMissingShows(): Promise<void> {
   } finally {
     await db.$disconnect();
     if (redis) await redis.disconnect();
+    // A non-zero exit lets a caller (cron, CI, a shell `&&`) tell a run that hit
+    // errors from a clean one; the summary alone is only readable by a human.
+    if (stats.errors > 0) process.exitCode = 1;
   }
 }
 
