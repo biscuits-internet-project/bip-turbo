@@ -652,7 +652,7 @@
       },
       "targets": [
         {
-          "expr": "topk(20, sum by (query) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range])))",
+          "expr": "topk(20, sum by (queryid) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range]))) * on (queryid) group_left(query) max by (queryid, query) (pg_stat_statements_query_id)",
           "queryType": "instant",
           "instant": true,
           "format": "table",
@@ -664,7 +664,7 @@
           }
         },
         {
-          "expr": "topk(20, sum by (query) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range])) / sum by (query) (increase(pg_stat_statements_calls_total{datname=\"bip\"}[$__range])))",
+          "expr": "(sum by (queryid) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range])) / sum by (queryid) (increase(pg_stat_statements_calls_total{datname=\"bip\"}[$__range]))) * on (queryid) group_left(query) max by (queryid, query) (pg_stat_statements_query_id)",
           "queryType": "instant",
           "instant": true,
           "format": "table",
@@ -693,7 +693,8 @@
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "queryid": true
             },
             "renameByName": {
               "Value #A": "total",
