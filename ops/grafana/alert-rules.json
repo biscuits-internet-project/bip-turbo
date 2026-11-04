@@ -112,7 +112,7 @@
     "noDataState": "Alerting",
     "execErrState": "Error",
     "for": "0s",
-    "isPaused": true,
+    "isPaused": false,
     "annotations": {
       "summary": "No verified nightly Postgres backup upload in 26 hours.",
       "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
