@@ -85,6 +85,45 @@ describe("ArchiveRecordingsCard", () => {
     expect(screen.getByTestId("ArchiveMusicPlayer")).toHaveAttribute("data-identifier", "db2004-12-31.sbd.flac16");
   });
 
+  // A long recording list previews only a few rows. The primary is moved to the
+  // front so the "(in player below)" row can never be the one that is hidden.
+  test("lists the primary first and hides extra recordings until 'Show N more' is clicked", async () => {
+    const recording = (suffix: string, source: string) => ({
+      identifier: `db2004-12-31.${suffix}`,
+      title: `Basis for a Day (${suffix})`,
+      source,
+      url: `https://archive.org/details/db2004-12-31.${suffix}`,
+    });
+    const { user } = await setup(
+      <ArchiveRecordingsCard
+        items={[
+          recording("aud1.flac16", "AUD > DAT"),
+          recording("aud2.flac16", "AUD > Cassette"),
+          recording("aud3.flac16", "AUD > Minidisc"),
+          recording("aud4.flac16", "AUD > CDR"),
+          recording("sbd.flac16", "SBD > DAT"),
+        ]}
+      />,
+    );
+
+    const listedIdentifiers = () => screen.getAllByRole("link").map((link) => link.textContent);
+    expect(listedIdentifiers()).toEqual([
+      "db2004-12-31.sbd.flac16(in player below)",
+      "db2004-12-31.aud1.flac16",
+      "db2004-12-31.aud2.flac16",
+    ]);
+    expect(screen.queryByRole("link", { name: "db2004-12-31.aud4.flac16" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show 2 more" }));
+    expect(listedIdentifiers()).toEqual([
+      "db2004-12-31.sbd.flac16(in player below)",
+      "db2004-12-31.aud1.flac16",
+      "db2004-12-31.aud2.flac16",
+      "db2004-12-31.aud3.flac16",
+      "db2004-12-31.aud4.flac16",
+    ]);
+  });
+
   // The added-on date is formatted into a friendly "Mon D, YYYY" string so
   // users can spot recent remasters without decoding ISO timestamps.
   test("renders a formatted added-on line when addedDate is present", async () => {
