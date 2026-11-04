@@ -1,0 +1,158 @@
+// Grafana Alloy on the Hetzner host: ships metrics and logs to the bip Grafana
+// Cloud stack (playfulfennec1443). Runs as the Kamal accessory `alloy`.
+// Secrets come from the container's environment (see config/deploy.yml).
+
+// --- Grafana Cloud endpoints ---------------------------------------------------
+
+prometheus.remote_write "cloud" {
+  endpoint {
+    url = "https://prometheus-prod-66-prod-us-east-3.grafana.net/api/prom/push"
+    basic_auth {
+      username = "3734102"
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+  external_labels = { host = "hetzner-bip" }
+}
+
+loki.write "cloud" {
+  endpoint {
+    url = "https://logs-prod-042.grafana.net/loki/api/v1/push"
+    basic_auth {
+      username = "1862719"
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+  external_labels = { host = "hetzner-bip" }
+}
+
+// --- Host: CPU, memory, disk, load ------------------------------------------
+
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+  // Docker's overlay and bind mounts would each show up as a filesystem.
+  filesystem {
+    mount_points_exclude = "^/(dev|proc|run|sys|var/lib/docker/.+|host/root/var/lib/docker/.+)($|/)"
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+  scrape_interval = "30s"
+  job_name        = "host"
+}
+
+// --- Containers: memory and CPU per container --------------------------------
+
+prometheus.exporter.cadvisor "containers" {
+  docker_only      = true
+  storage_duration = "2m"
+}
+
+prometheus.scrape "containers" {
+  targets         = prometheus.exporter.cadvisor.containers.targets
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+  scrape_interval = "30s"
+  job_name        = "containers"
+}
+
+// --- Postgres -----------------------------------------------------------------
+
+prometheus.exporter.postgres "bip" {
+  data_source_names  = [string.format("postgresql://bip:%s@bip-web-postgres:5432/bip?sslmode=disable", sys.env("POSTGRES_PASSWORD"))]
+  enabled_collectors = ["database", "locks", "stat_database", "stat_user_tables", "statio_user_tables", "stat_bgwriter", "stat_checkpointer", "long_running_transactions", "stat_statements"]
+
+  stat_statements {
+    include_query = true
+    limit         = 50
+    query_length  = 300
+  }
+}
+
+prometheus.scrape "postgres" {
+  targets         = prometheus.exporter.postgres.bip.targets
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+  scrape_interval = "60s"
+  job_name        = "postgres"
+}
+
+// --- Redis --------------------------------------------------------------------
+
+prometheus.exporter.redis "bip" {
+  redis_addr = "bip-web-redis:6379"
+}
+
+prometheus.scrape "redis" {
+  targets         = prometheus.exporter.redis.bip.targets
+  forward_to      = [prometheus.remote_write.cloud.receiver]
+  scrape_interval = "60s"
+  job_name        = "redis"
+}
+
+// --- Container logs (request timings, errors) --------------------------------
+
+discovery.docker "all" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.all.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  // Kamal labels every container with its service (bip-web, coaching-tree, ...).
+  rule {
+    source_labels = ["__meta_docker_container_label_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_role"]
+    target_label  = "role"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.all.targets
+  relabel_rules = discovery.relabel.containers.rules
+  forward_to    = [loki.process.requests.receiver]
+}
+
+// The app logs one line per request: `GET /path 200 - - 51.731 ms`.
+// Pull method and status out as labels (low cardinality); the path and
+// duration stay in the line for LogQL to parse at query time.
+loki.process "requests" {
+  stage.regex {
+    expression = "^(?P<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \\S+ (?P<status>\\d{3}) "
+  }
+  stage.labels {
+    values = { method = "", status = "" }
+  }
+  // kamal-proxy logs every request as JSON (status, duration in ns, path), which
+  // the dashboard reads. Blank the visitor IPs before they leave the host.
+  stage.match {
+    selector = "{container=\"kamal-proxy\"}"
+    stage.replace {
+      expression = "\"(?:client_addr|remote_addr)\":\"([^\"]*)\""
+      replace    = ""
+    }
+  }
+  forward_to = [loki.write.cloud.receiver]
+}
+
+// --- Backup logs ----------------------------------------------------------------
+
+local.file_match "backups" {
+  path_targets = [{ "__path__" = "/host/backups/*.log", job = "backups" }]
+}
+
+loki.source.file "backups" {
+  targets    = local.file_match.backups.targets
+  forward_to = [loki.write.cloud.receiver]
+}

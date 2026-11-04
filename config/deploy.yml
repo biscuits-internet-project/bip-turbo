@@ -112,7 +112,39 @@ accessories:
       - bip-web-postgres-data:/var/lib/postgresql
     # Same reasoning as the web cap: on this shared 3.7GB host, a runaway
     # postgres should be OOM-killed and restarted, not freeze the box.
-    cmd: postgres -c shared_buffers=256MB -c max_connections=50
+    # pg_stat_statements records per-query timings for the Grafana dashboard.
+    cmd: postgres -c shared_buffers=256MB -c max_connections=50 -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=top
     options:
       shm-size: 256m
       memory: 768m
+
+  alloy:
+    # Grafana Alloy ships host, container, Postgres and Redis metrics plus
+    # container and backup logs to Grafana Cloud. Config: config/alloy/config.alloy.
+    # The token can only write metrics and logs (no read, no admin).
+    image: grafana/alloy:v1.21.3
+    host: 5.161.124.129
+    env:
+      secret:
+        - GRAFANA_CLOUD_TOKEN
+        - POSTGRES_PASSWORD
+    files:
+      - config/alloy/config.alloy:/etc/alloy/config.alloy
+    volumes:
+      # Docker socket: container discovery and logs. Read-only host mounts:
+      # host metrics (/proc, /sys, /), per-container stats, backup logs.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+      - /home/deploy/backups:/host/backups:ro
+      - bip-web-alloy-data:/var/lib/alloy/data
+    cmd: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    options:
+      memory: 384m
+      # Metrics carry the container hostname as `instance`; a fixed one keeps a
+      # single series per metric across restarts.
+      hostname: bip-alloy

@@ -1,0 +1,486 @@
+[
+  {
+    "uid": "bip-backup-error",
+    "title": "Backup failed",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-logs",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"backups\"} |= \"ERROR\" [1h]))",
+          "instant": true,
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [0]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": false,
+    "annotations": {
+      "summary": "A backup logged ERROR in the last hour. Check ~/backups/*.log on the server.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-backup-nightly-missing",
+    "title": "Nightly Postgres backup missing",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-logs",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"backups\", filename=\"/host/backups/bip-postgres-backup.log\"} |= \"uploaded:\" [26h]))",
+          "instant": true,
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [1]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "Alerting",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": true,
+    "annotations": {
+      "summary": "No verified nightly Postgres backup upload in 26 hours.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-backup-auth-missing",
+    "title": "Weekly Supabase auth backup missing",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-logs",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"backups\", filename=\"/host/backups/supabase-auth-backup.log\"} |= \"uploaded:\" [8d]))",
+          "instant": true,
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [1]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "Alerting",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": true,
+    "annotations": {
+      "summary": "No verified Supabase auth backup upload in 8 days.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-low-memory",
+    "title": "Server memory low",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(node_memory_MemAvailable_bytes)",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [500000000.0]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "10m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "Under 500 MB of memory available for 10 minutes. Consider the next Hetzner size up.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-disk-low",
+    "title": "Server disk low",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(node_filesystem_avail_bytes{mountpoint=\"/\"})",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [10000000000.0]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "15m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "Under 10 GB free on the server's disk.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-site-5xx",
+    "title": "Site returning errors",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-logs",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | status >= 500 [10m]))",
+          "instant": true,
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [9]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": false,
+    "annotations": {
+      "summary": "10 or more 5xx responses from discobiscuits.net in 10 minutes.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-postgres-down",
+    "title": "Postgres down",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(pg_up)",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [1]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "2m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "The bip Postgres container is not answering.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-monitoring-stopped",
+    "title": "Monitoring agent stopped",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "count(up{job=\"integrations/unix\"} == 1)",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [1]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "Alerting",
+    "execErrState": "Error",
+    "for": "10m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "No data from the Alloy agent on the server for 10 minutes.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  }
+]
