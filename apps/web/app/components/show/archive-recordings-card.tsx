@@ -2,6 +2,7 @@ import { type ArchiveDotOrgRecording, pickPrimaryArchiveRecording } from "@bip/d
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import ArchiveMusicPlayer from "~/components/player";
+import { ShowMoreList } from "~/components/ui/show-more-list";
 import { cn, formatDateLong } from "~/lib/utils";
 import { ExternalSourceCard } from "./external-source-card";
 
@@ -19,12 +20,27 @@ function formatAddedOn(addedDate: string | undefined): string | null {
 }
 
 /**
- * Lists every archive.org recording for a show date and embeds the
- * ArchiveMusicPlayer for the ranked primary. The list + player share one card
- * (rather than being two separate cards) so users immediately see that "Other
- * recordings" are alternate tapes for the same show as the one playing. The
- * primary pick is derived from the recordings themselves so callers only
- * need to pass the raw list.
+ * Moves the primary recording to the front, leaving the rest in their
+ * original order, so the collapsed list preview always includes the tape the
+ * player below is loaded with.
+ */
+function primaryFirst(
+  items: ArchiveDotOrgRecording[],
+  primary: ArchiveDotOrgRecording | null,
+): ArchiveDotOrgRecording[] {
+  if (!primary) return items;
+  return [primary, ...items.filter((recording) => recording.identifier !== primary.identifier)];
+}
+
+/**
+ * Lists the archive.org recordings for a show date (a few at first, the rest
+ * behind a "Show N more" toggle, since a date can have a dozen tapes) and
+ * embeds the ArchiveMusicPlayer for the ranked primary. The list + player
+ * share one card (rather than being two separate cards) so users immediately
+ * see that "Other recordings" are alternate tapes for the same show as the
+ * one playing. The primary pick is derived from the recordings themselves so
+ * callers only need to pass the raw list, and it is listed first so it is
+ * never hidden.
  */
 export function ArchiveRecordingsCard({ items }: ArchiveRecordingsCardProps) {
   if (items.length === 0) return null;
@@ -32,12 +48,15 @@ export function ArchiveRecordingsCard({ items }: ArchiveRecordingsCardProps) {
   return (
     <ExternalSourceCard faviconDomain="archive.org" title="Archive.org">
       <div className="space-y-3">
-        <ul className="space-y-2 pl-6">
-          {items.map((recording) => {
+        <ShowMoreList
+          className="space-y-2 pl-6"
+          items={primaryFirst(items, primary)}
+          getKey={(recording) => recording.identifier}
+          renderItem={(recording) => {
             const isPrimary = primary?.identifier === recording.identifier;
             const addedOn = formatAddedOn(recording.addedDate);
             return (
-              <li key={recording.identifier}>
+              <>
                 <a
                   href={recording.url}
                   target="_blank"
@@ -51,10 +70,10 @@ export function ArchiveRecordingsCard({ items }: ArchiveRecordingsCardProps) {
                 </a>
                 {recording.source && <p className="text-xs text-content-text-tertiary truncate">{recording.source}</p>}
                 {addedOn && <p className="text-xs text-content-text-tertiary">added {addedOn}</p>}
-              </li>
+              </>
             );
-          })}
-        </ul>
+          }}
+        />
         {primary && <CollapsiblePlayer identifier={primary.identifier} />}
       </div>
     </ExternalSourceCard>
