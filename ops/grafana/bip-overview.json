@@ -1,9 +1,7 @@
 {
   "uid": "bip-overview",
   "title": "bip: overview",
-  "tags": [
-    "bip"
-  ],
+  "tags": ["bip"],
   "timezone": "America/New_York",
   "refresh": "1m",
   "time": {
@@ -181,9 +179,7 @@
         {
           "id": "reduce",
           "options": {
-            "reducers": [
-              "lastNotNull"
-            ]
+            "reducers": ["lastNotNull"]
           }
         },
         {

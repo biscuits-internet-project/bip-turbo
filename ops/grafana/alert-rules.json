@@ -41,9 +41,7 @@
             {
               "evaluator": {
                 "type": "gt",
-                "params": [
-                  0
-                ]
+                "params": [0]
               }
             }
           ]
@@ -104,9 +102,7 @@
             {
               "evaluator": {
                 "type": "lt",
-                "params": [
-                  1
-                ]
+                "params": [1]
               }
             }
           ]
@@ -167,9 +163,7 @@
             {
               "evaluator": {
                 "type": "lt",
-                "params": [
-                  1
-                ]
+                "params": [1]
               }
             }
           ]
@@ -229,9 +223,7 @@
             {
               "evaluator": {
                 "type": "lt",
-                "params": [
-                  500000000.0
-                ]
+                "params": [500000000.0]
               }
             }
           ]
@@ -291,9 +283,7 @@
             {
               "evaluator": {
                 "type": "lt",
-                "params": [
-                  10000000000.0
-                ]
+                "params": [10000000000.0]
               }
             }
           ]
@@ -354,9 +344,7 @@
             {
               "evaluator": {
                 "type": "gt",
-                "params": [
-                  9
-                ]
+                "params": [9]
               }
             }
           ]
@@ -416,9 +404,7 @@
             {
               "evaluator": {
                 "type": "lt",
-                "params": [
-                  1
-                ]
+                "params": [1]
               }
             }
           ]
@@ -478,9 +464,7 @@
             {
               "evaluator": {
                 "type": "lt",
-                "params": [
-                  1
-                ]
+                "params": [1]
               }
             }
           ]
