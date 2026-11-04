@@ -1898,6 +1898,167 @@ describe("buildSetlistReconciliation", () => {
     expect(recon.structurallyChanged).toBe(false);
     expect(recon.cosmeticallyChanged).toBe(true);
   });
+
+  // Prod deleted the opener of S1 and renumbered the later tracks down by one.
+  // Every surviving track keeps its prod id, so the reconciler must find each
+  // one by id and patch its position. Deleting and reinserting them would drop
+  // their local Track ratings, which the incremental rating sync never
+  // re-pulls. Only the track prod actually removed is deleted.
+  test("matches tracks by id when prod renumbers positions, patching position instead of rebuilding", () => {
+    const localTrack = (id: string, position: number, songId: string): LocalTrackForReconcile => ({
+      id,
+      set: "S1",
+      position,
+      songId,
+      segue: null,
+      note: null,
+      allTimer: false,
+      duration: null,
+      durationSource: null,
+      annotations: [],
+    });
+    const remoteTrack = (id: string, position: number, songSlug: string) => ({
+      id,
+      position,
+      songTitle: songSlug,
+      songSlug,
+      segue: null,
+      allTimer: false,
+      note: null,
+      annotations: [],
+    });
+    const local = [
+      localTrack("track-basis", 1, "song-basis-uuid"),
+      localTrack("track-crystal", 2, "song-crystal-uuid"),
+      localTrack("track-reactor", 3, "song-reactor-uuid"),
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show-x",
+      showDate: "2026-02-06",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [remoteTrack("track-crystal", 1, "crystal-ball"), remoteTrack("track-reactor", 2, "reactor")],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toInsert).toEqual([]);
+    expect(recon.toDelete).toEqual([{ trackId: "track-basis", annotationIds: [] }]);
+    expect(recon.toUpdate).toEqual([
+      {
+        trackId: "track-crystal",
+        patch: { position: 1 },
+        annotationDiff: { toCreateDescs: [], toDeleteIds: [] },
+      },
+      {
+        trackId: "track-reactor",
+        patch: { position: 2 },
+        annotationDiff: { toCreateDescs: [], toDeleteIds: [] },
+      },
+    ]);
+    expect(recon.structurallyChanged).toBe(true);
+  });
+
+  // tracks has no unique on (show_id, set, position), so a local show can hold
+  // two rows in one slot where prod has one. One row pairs with prod's track;
+  // the other is surplus and is deleted so the local setlist mirrors prod. No
+  // synced rating can be lost: prod ratings reference prod ids, and neither
+  // local row carries one.
+  test("deletes a surplus local track that shares a slot with the matched one", () => {
+    const localTrack = (id: string): LocalTrackForReconcile => ({
+      id,
+      set: "S1",
+      position: 1,
+      songId: "song-basis-uuid",
+      segue: null,
+      note: null,
+      allTimer: false,
+      duration: null,
+      durationSource: null,
+      annotations: [{ id: `${id}-annotation`, desc: "explosive intro" }],
+    });
+    const local = [localTrack("legacy-first"), localTrack("legacy-second")];
+    const remote: McpSetlist = {
+      showSlug: "show-x",
+      showDate: "2026-02-06",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S1",
+          tracks: [
+            {
+              position: 1,
+              songTitle: "Basis for a Day",
+              songSlug: "basis-for-a-day",
+              segue: null,
+              allTimer: false,
+              note: null,
+              annotations: ["explosive intro"],
+            },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toInsert).toEqual([]);
+    expect(recon.toUpdate).toEqual([]);
+    expect(recon.toDelete).toEqual([{ trackId: "legacy-first", annotationIds: ["legacy-first-annotation"] }]);
+    expect(recon.structurallyChanged).toBe(true);
+  });
+
+  // A track prod moved into another set (S1 closer becomes the S2 opener)
+  // keeps its id, so it is patched in place with both set and position.
+  test("patches set and position when prod moves a track to another set", () => {
+    const local: LocalTrackForReconcile[] = [
+      {
+        id: "track-helicopters",
+        set: "S1",
+        position: 2,
+        songId: "song-helicopters-uuid",
+        segue: null,
+        note: null,
+        allTimer: false,
+        duration: null,
+        durationSource: null,
+        annotations: [],
+      },
+    ];
+    const remote: McpSetlist = {
+      showSlug: "show-x",
+      showDate: "2026-02-06",
+      venue: { name: "v", city: "c", state: "s" },
+      sets: [
+        {
+          label: "S2",
+          tracks: [
+            {
+              id: "track-helicopters",
+              position: 1,
+              songTitle: "Helicopters",
+              songSlug: "helicopters",
+              segue: null,
+              allTimer: false,
+              note: null,
+              annotations: [],
+            },
+          ],
+        },
+      ],
+    };
+    const recon = buildSetlistReconciliation(local, remote, songMap);
+    expect(recon.toInsert).toEqual([]);
+    expect(recon.toDelete).toEqual([]);
+    expect(recon.toUpdate).toEqual([
+      {
+        trackId: "track-helicopters",
+        patch: { set: "S2", position: 1 },
+        annotationDiff: { toCreateDescs: [], toDeleteIds: [] },
+      },
+    ]);
+    expect(recon.structurallyChanged).toBe(true);
+  });
 });
 
 // diffTrackAnnotations replaces the local Annotation set for one track with
