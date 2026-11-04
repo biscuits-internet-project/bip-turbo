@@ -916,6 +916,8 @@ export interface LocalTrackForReconcile {
 }
 
 export interface TrackPatch {
+  set?: string;
+  position?: number;
   songId?: string;
   segue?: string | null;
   note?: string | null;
@@ -956,8 +958,8 @@ export interface SetlistReconciliation {
   toUpdate: TrackUpdateOp[];
   toDelete: TrackDeleteOp[];
   /**
-   * True when an insert, delete, or songId change happened — i.e. the show's
-   * setlist shape moved. Drives cache invalidation, SegueRun regen, and
+   * True when an insert, delete, or set / position / songId change happened,
+   * i.e. the show's setlist shape moved. Drives cache invalidation, SegueRun regen, and
    * stats-rebuild window expansion. Pure segue/note/allTimer/annotation drift
    * doesn't count as structural.
    */
@@ -970,13 +972,20 @@ export interface SetlistReconciliation {
 
 /**
  * Diff a show's local tracks against the remote setlist and emit per-track
- * insert/update/delete ops. The match key is (set, position) because position
- * is unique only within a set — a show with three sets will reuse position 1
- * three times, so any position-only key collapses across sets.
+ * insert/update/delete ops.
  *
- * Same-key match: patch songId / segue / note / allTimer if drifted, and
- * compute the annotation delta. Remote-only key: insert a new track + its
- * annotations. Local-only key: delete the track and its annotations.
+ * Matching runs in two passes. First by Track.id when prod supplies one: a
+ * prod-side renumber (an admin deletes a track and the later ones shift down)
+ * moves a track to a new (set, position) without changing its id, so the row
+ * is patched in place and keeps its local ratings. Remote tracks with no id
+ * match then fall back to (set, position) against the local tracks the first
+ * pass left unclaimed. The key is the composite tuple because position is
+ * unique only within a set: a three-set show reuses position 1 three times.
+ *
+ * Matched pair: patch set / position / songId / segue / note / allTimer /
+ * duration if drifted, and compute the annotation delta. Unmatched remote:
+ * insert a new track + its annotations. Unclaimed local: delete the track and
+ * its annotations.
  *
  * `undefined` on remote.note / remote.allTimer / remote.annotations still means
  * "no opinion" (pre-deploy MCP) so admin-set values aren't clobbered.
@@ -988,13 +997,30 @@ export function buildSetlistReconciliation(
 ): SetlistReconciliation {
   const keyOf = (set: string, position: number): string => `${set}|${position}`;
 
-  const remoteByKey = new Map<string, { set: string; track: McpSetlistTrack }>();
-  for (const set of remote.sets) {
-    for (const track of set.tracks) {
-      remoteByKey.set(keyOf(set.label, track.position), { set: set.label, track });
+  const remoteTracks = remote.sets.flatMap((set) => set.tracks.map((track) => ({ set: set.label, track })));
+  const localById = new Map(local.map((t) => [t.id, t]));
+  const claimedLocalIds = new Set<string>();
+  const pairs: Array<{ set: string; track: McpSetlistTrack; localTrack: LocalTrackForReconcile | undefined }> = [];
+
+  const unmatchedById: typeof remoteTracks = [];
+  for (const remoteTrack of remoteTracks) {
+    const localTrack = remoteTrack.track.id ? localById.get(remoteTrack.track.id) : undefined;
+    if (localTrack) {
+      claimedLocalIds.add(localTrack.id);
+      pairs.push({ ...remoteTrack, localTrack });
+    } else {
+      unmatchedById.push(remoteTrack);
     }
   }
-  const localByKey = new Map(local.map((t) => [keyOf(t.set, t.position), t]));
+  const unclaimedLocalByKey = new Map(
+    local.filter((t) => !claimedLocalIds.has(t.id)).map((t) => [keyOf(t.set, t.position), t]),
+  );
+  for (const remoteTrack of unmatchedById) {
+    const candidate = unclaimedLocalByKey.get(keyOf(remoteTrack.set, remoteTrack.track.position));
+    const localTrack = candidate && !claimedLocalIds.has(candidate.id) ? candidate : undefined;
+    if (localTrack) claimedLocalIds.add(localTrack.id);
+    pairs.push({ ...remoteTrack, localTrack });
+  }
 
   const toInsert: TrackInsertOp[] = [];
   const toUpdate: TrackUpdateOp[] = [];
@@ -1003,8 +1029,7 @@ export function buildSetlistReconciliation(
   let structurallyChanged = false;
   let cosmeticallyChanged = false;
 
-  for (const [key, { set, track }] of remoteByKey) {
-    const localTrack = localByKey.get(key);
+  for (const { set, track, localTrack } of pairs) {
     if (!localTrack) {
       const songId = songSlugToId.get(track.songSlug);
       if (!songId) {
@@ -1026,12 +1051,13 @@ export function buildSetlistReconciliation(
       structurallyChanged = true;
       continue;
     }
-    // Track-id mismatch: a previous sync inserted this track with a fresh
-    // local UUID (the buggy default before id preservation landed). Prod
-    // ratings reference prod's track id, so they FK-skip against the local
-    // mismatched id. Treat as structural: delete the local row (cascading
-    // annotations + Track-type ratings) and reinsert with prod's id so
-    // subsequent rating sync FK-resolves.
+    // Track-id mismatch at the same (set, position), with prod's id absent
+    // locally: a previous sync inserted this track with a fresh local UUID
+    // (the buggy default before id preservation landed). Prod ratings
+    // reference prod's track id, so they FK-skip against the local mismatched
+    // id. Treat as structural: delete the local row (cascading annotations +
+    // Track-type ratings) and reinsert with prod's id so subsequent rating
+    // sync FK-resolves.
     if (track.id && localTrack.id !== track.id) {
       const songId = songSlugToId.get(track.songSlug);
       if (!songId) {
@@ -1058,6 +1084,14 @@ export function buildSetlistReconciliation(
       continue;
     }
     const patch: TrackPatch = {};
+    if (localTrack.set !== set) {
+      patch.set = set;
+      structurallyChanged = true;
+    }
+    if (localTrack.position !== track.position) {
+      patch.position = track.position;
+      structurallyChanged = true;
+    }
     const remoteSongId = songSlugToId.get(track.songSlug);
     if (remoteSongId === undefined) {
       // We have a local track at this slot but can't resolve the prod songId.
@@ -1107,8 +1141,8 @@ export function buildSetlistReconciliation(
     }
   }
 
-  for (const [key, localTrack] of localByKey) {
-    if (remoteByKey.has(key)) continue;
+  for (const localTrack of local) {
+    if (claimedLocalIds.has(localTrack.id)) continue;
     toDelete.push({
       trackId: localTrack.id,
       annotationIds: localTrack.annotations.map((a) => a.id),
@@ -3729,10 +3763,10 @@ async function syncMissingShows(): Promise<void> {
     // Step 8: reconcile every in-scope show's setlist against prod. One DB
     // query pulls the local track + annotation graph for every show; the pure
     // buildSetlistReconciliation helper diffs against the remote setlist
-    // matched on (set, position) and emits insert / update / delete ops. The
-    // SegueRun regen + stats-rebuild-window expansion fire only for shows
-    // whose setlist shape actually moved (insert / delete / songId change),
-    // not for cosmetic-only diffs.
+    // matched by track id, then (set, position), and emits insert / update /
+    // delete ops. The SegueRun regen + stats-rebuild-window expansion fire
+    // only for shows whose setlist shape actually moved (insert / delete /
+    // set, position, or songId change), not for cosmetic-only diffs.
     const showIdsToReconcile = Array.from(existingBySlug.values())
       .filter((s) => !String(s.id).startsWith("dry-run-show-"))
       .map((s) => s.id);
@@ -3826,11 +3860,11 @@ async function syncMissingShows(): Promise<void> {
 
       try {
         await db.$transaction(async (tx) => {
-          // Deletes run before inserts so an id-mismatch reconcile (delete
-          // old (set, position) row then insert with same key under prod's
-          // id) doesn't transiently violate the (showId, set, position)
-          // unique. The buggy default before id preservation gave the same
-          // slot two different ids — this loop converges them.
+          // Deletes run first so an id-mismatch reconcile (delete the old
+          // row, insert under prod's id at the same (set, position)) never
+          // leaves two rows in one slot. tracks has no unique on (show_id,
+          // set, position), only an index, so position patches applied in
+          // any order can't collide either.
           for (const del of recon.toDelete) {
             if (del.annotationIds.length > 0) {
               await tx.annotation.deleteMany({ where: { id: { in: del.annotationIds } } });
