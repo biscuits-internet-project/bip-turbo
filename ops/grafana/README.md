@@ -9,6 +9,8 @@ Stack: https://playfulfennec1443.grafana.net (personal account). The `alloy` Kam
     | curl -s -H "Authorization: Bearer $GRAFANA_CLI_TOKEN" -H "Content-Type: application/json" -d @- https://playfulfennec1443.grafana.net/api/dashboards/db'
   ```
 
+- `alert-rules.json`: the alert rules (folder `bip`, group `bip`, every 1 minute), sent by email through the `bip-email` contact point. The two "backup missing" rules start paused until each backup has logged its first run.
+
 Tokens in Doppler `bip/prd_hetzner`:
 - `GRAFANA_CLOUD_TOKEN`: on the server, write-only (metrics, logs).
 - `GRAFANA_CLI_TOKEN`: service account (Editor) for dashboards and alerts. Never on the server.
