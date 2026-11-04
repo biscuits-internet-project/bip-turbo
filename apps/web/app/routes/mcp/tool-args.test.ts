@@ -8,6 +8,7 @@ class InvalidSearchQueryError extends Error {}
 vi.mock("@bip/core", () => ({ InvalidSearchQueryError }));
 vi.mock("~/lib/logger", () => ({ logger: { error: logError, info: vi.fn(), warn: vi.fn() } }));
 vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
+vi.mock("~/server/admin-api-key", () => ({ isAuthorizedAdminRequest: vi.fn().mockReturnValue(false) }));
 vi.mock("~/server/services", () => ({
   services: { songs: { findBySlug }, venues: { findBySlug }, shows: { findBySlug }, postgresSearch: { searchSongs } },
 }));
@@ -88,5 +89,16 @@ describe("MCP rate limit", () => {
     await expect(callTool("get_song", { slug: "basis-for-a-day" })).rejects.toMatchObject({ status: 429 });
     expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "mcp");
     expect(findBySlug).not.toHaveBeenCalled();
+  });
+
+  test("exempts the admin key, so the setlist sync is never limited", async () => {
+    const { enforceRateLimit } = await import("~/server/rate-limit");
+    const { isAuthorizedAdminRequest } = await import("~/server/admin-api-key");
+    vi.clearAllMocks();
+    vi.mocked(isAuthorizedAdminRequest).mockReturnValueOnce(true);
+
+    await callTool("get_song", { slug: "basis-for-a-day" });
+
+    expect(enforceRateLimit).not.toHaveBeenCalled();
   });
 });

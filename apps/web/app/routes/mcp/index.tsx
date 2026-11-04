@@ -2,6 +2,7 @@ import { InvalidSearchQueryError } from "@bip/core";
 import type { Instrument, TrackMusicianDelta } from "@bip/domain";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
+import { isAuthorizedAdminRequest } from "~/server/admin-api-key";
 import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 
@@ -873,7 +874,8 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
-  await enforceRateLimit(request, "mcp");
+  // Ops callers (the setlist sync) carry the admin key and are exempt.
+  if (!isAuthorizedAdminRequest(request)) await enforceRateLimit(request, "mcp");
 
   let body: JsonRpcRequest;
   try {
