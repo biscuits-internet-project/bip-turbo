@@ -3,6 +3,7 @@ import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "rea
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
+import { enforceRateLimit } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 import { services } from "~/server/services";
 
@@ -60,6 +61,8 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
         context.currentUser = user as TContext["currentUser"];
       }
 
+      await limitApiRequest(args.request, user);
+
       const result = await fn({ ...args, context });
 
       logRequestCompleted(args.request, startTime);
@@ -70,6 +73,15 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
       throw error;
     }
   };
+}
+
+/**
+ * Every `/api/*` route shares one per-caller budget. Admins are exempt: their
+ * bulk edits (reordering a setlist, a lineup pass) legitimately burst past it.
+ */
+async function limitApiRequest(request: Request, user: User | null) {
+  if (user?.isAdmin || !new URL(request.url).pathname.startsWith("/api/")) return;
+  await enforceRateLimit(request, "api", user?.id);
 }
 
 /**
@@ -122,6 +134,8 @@ export function createAction<T, TContext extends PublicContext = PublicContext>(
       if (user) {
         context.currentUser = user as TContext["currentUser"];
       }
+
+      await limitApiRequest(args.request, user);
 
       const result = await fn({ ...args, context });
 

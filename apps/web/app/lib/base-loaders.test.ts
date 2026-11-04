@@ -5,10 +5,13 @@ import { describe, expect, test, vi } from "vitest";
 // Supabase/Prisma into the test bundle.
 vi.mock("~/server/request-user", () => ({ getRequestUser: vi.fn().mockResolvedValue(null) }));
 vi.mock("~/server/services", () => ({ services: {} }));
+vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
+import { enforceRateLimit } from "~/server/rate-limit";
+import { getRequestUser } from "~/server/request-user";
 
 /** Run a wrapped loader and return whatever it produced or threw. */
 async function run(url: string, inner = vi.fn().mockResolvedValue("rendered")) {
@@ -111,5 +114,41 @@ describe("publicLoader success logging", () => {
     const [line] = vi.mocked(logger.info).mock.calls[0];
     expect(line).toContain("GET /auth/callback |");
     expect(line).not.toContain("secret");
+  });
+});
+
+describe("publicLoader API rate limit", () => {
+  test("counts an /api request against the caller's budget", async () => {
+    vi.mocked(enforceRateLimit).mockClear();
+    await run("/api/ratings");
+
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined);
+  });
+
+  test("stops an over-limit /api request before the loader runs", async () => {
+    vi.mocked(enforceRateLimit).mockRejectedValueOnce(new Response(null, { status: 429 }));
+    const { thrown, inner } = await run("/api/ratings");
+
+    expect(thrown?.status).toBe(429);
+    expect(inner).not.toHaveBeenCalled();
+  });
+
+  test("leaves page loaders alone", async () => {
+    vi.mocked(enforceRateLimit).mockClear();
+    await run("/shows/stats");
+
+    expect(enforceRateLimit).not.toHaveBeenCalled();
+  });
+
+  test("exempts admins", async () => {
+    vi.mocked(enforceRateLimit).mockClear();
+    vi.mocked(getRequestUser).mockResolvedValueOnce({
+      id: "admin-1",
+      email: "a@example.com",
+      app_metadata: { isAdmin: true },
+    } as never);
+    await run("/api/shows/reorder");
+
+    expect(enforceRateLimit).not.toHaveBeenCalled();
   });
 });

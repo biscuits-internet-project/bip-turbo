@@ -2,6 +2,7 @@ import { InvalidSearchQueryError } from "@bip/core";
 import type { Instrument, TrackMusicianDelta } from "@bip/domain";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
+import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 
 // MCP JSON-RPC Protocol Handler
@@ -871,6 +872,8 @@ export async function action({ request }: ActionFunctionArgs) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  await enforceRateLimit(request, "mcp");
 
   let body: JsonRpcRequest;
   try {

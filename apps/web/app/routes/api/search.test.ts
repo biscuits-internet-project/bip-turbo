@@ -8,6 +8,7 @@ vi.mock("@bip/core", () => ({ InvalidSearchQueryError, MAX_SEARCH_QUERY_LENGTH: 
 
 vi.mock("~/lib/base-loaders", () => ({ publicLoader: (fn: unknown) => fn }));
 vi.mock("~/lib/logger", () => ({ logger: { error, info: vi.fn(), warn: vi.fn() } }));
+vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 vi.mock("~/server/services", () => ({ services: { postgresSearch: { search } } }));
 
 const { action } = await import("./search");
@@ -19,7 +20,7 @@ async function post(body: unknown): Promise<Response> {
     body: JSON.stringify(body),
   });
   try {
-    return (await action({ request } as never)) as Response;
+    return (await action({ request, context: {} } as never)) as Response;
   } catch (thrown) {
     if (thrown instanceof Response) return thrown;
     throw thrown;
@@ -71,5 +72,22 @@ describe("POST /api/search validation", () => {
 
   test("a non-string query is a 400", async () => {
     expect((await post({ query: 42 })).status).toBe(400);
+  });
+});
+
+describe("search rate limit", () => {
+  test("uses the stricter search budget, keyed by the logged-in user", async () => {
+    const { enforceRateLimit } = await import("~/server/rate-limit");
+    const request = new Request("http://localhost/api/search", {
+      method: "POST",
+      body: JSON.stringify({ query: "basis" }),
+    });
+    try {
+      await action({ request, context: { currentUser: { id: "u1" } } } as never);
+    } catch {
+      // The search itself is unmocked here; only the limiter call matters.
+    }
+
+    expect(enforceRateLimit).toHaveBeenCalledWith(request, "search", "u1");
   });
 });
