@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { BlockList, isIP } from "node:net";
 import { logger } from "~/lib/logger";
+import { RATE_LIMIT_DEFAULTS } from "~/lib/rate-limit-defaults";
 import { services } from "~/server/services";
 
 /**
@@ -24,9 +25,9 @@ export function isFilteredListingRequest(url: URL): boolean {
  * `filteredListing` bounds the catalog renders described above.
  */
 export const RATE_LIMITS = {
-  api: { limit: 300, windowSeconds: 60 },
+  api: { limit: RATE_LIMIT_DEFAULTS.api, windowSeconds: 60 },
   search: { limit: 30, windowSeconds: 60 },
-  mcp: { limit: 60, windowSeconds: 60 },
+  mcp: { limit: RATE_LIMIT_DEFAULTS.mcp, windowSeconds: 60 },
   filteredListing: { limit: 20, windowSeconds: 60 },
   // Shared by every caller. A crawler spread across a residential proxy network
   // sends a request or two per IP, so no per-caller budget sees it; this one caps

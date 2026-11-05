@@ -2,7 +2,7 @@ import { InvalidSearchQueryError } from "@bip/core";
 import type { Instrument, TrackMusicianDelta } from "@bip/domain";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
-import { apiCallerIdentity, authenticateApiCaller, rateLimitOverride } from "~/server/api-caller";
+import { apiCallerIdentity, authenticateApiCaller, raisedLimit } from "~/server/api-caller";
 import { protectedResourceMetadataUrl } from "~/server/oauth-protected-resource";
 import { enforceCallerRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
@@ -897,7 +897,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!caller) return unauthorized();
   // Ops callers (the setlist sync) carry the admin key and are exempt.
   if (caller.kind !== "admin") {
-    await enforceCallerRateLimit(request, "mcp", apiCallerIdentity(caller), rateLimitOverride(caller, "mcp"));
+    await enforceCallerRateLimit(request, "mcp", apiCallerIdentity(caller), raisedLimit(caller, "mcp"));
   }
 
   let body: JsonRpcRequest;

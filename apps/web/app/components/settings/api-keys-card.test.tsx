@@ -8,12 +8,14 @@ vi.mock("~/components/contact/contact-dialog", () => ({
 
 import { ApiKeysCard } from "./api-keys-card";
 
+const DEFAULT_LIMITS = { mcpLimitPerMinute: null, apiLimitPerMinute: null };
 const EXISTING = {
   id: "k1",
   name: "old script",
   prefix: "bip_abcd1234",
   createdAt: "2026-11-01T12:00:00Z",
   lastUsedAt: null,
+  ...DEFAULT_LIMITS,
 };
 
 const fetchMock = vi.fn();

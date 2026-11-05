@@ -12,7 +12,7 @@ const KEY_CALLER = { kind: "apiKey", keyId: "k1", userId: "u1" };
 vi.mock("~/server/api-caller", () => ({
   authenticateApiCaller: vi.fn(async () => KEY_CALLER),
   apiCallerIdentity: () => "key:k1",
-  rateLimitOverride: () => undefined,
+  raisedLimit: () => undefined,
 }));
 vi.mock("~/server/oauth-protected-resource", () => ({
   protectedResourceMetadataUrl: () => "https://discobiscuits.net/.well-known/oauth-protected-resource/mcp",

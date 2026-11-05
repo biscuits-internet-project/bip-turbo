@@ -1,5 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
-import { API_KEY_PREFIX, type ApiKey, type ApiKeyOwner, MAX_ACTIVE_API_KEYS } from "@bip/domain";
+import {
+  type AdminApiKey,
+  API_KEY_PREFIX,
+  type ApiKey,
+  type ApiKeyLimits,
+  type ApiKeyOwner,
+  MAX_ACTIVE_API_KEYS,
+} from "@bip/domain";
 import type { DbApiKey, DbClient } from "../_shared/database/models";
 
 /** How stale `last_used_at` may get before a request refreshes it, so busy keys don't write on every call. */
@@ -20,7 +27,15 @@ function hashKey(key: string): string {
 }
 
 function toApiKey(row: DbApiKey): ApiKey {
-  return { id: row.id, name: row.name, prefix: row.prefix, createdAt: row.createdAt, lastUsedAt: row.lastUsedAt };
+  return {
+    id: row.id,
+    name: row.name,
+    prefix: row.prefix,
+    createdAt: row.createdAt,
+    lastUsedAt: row.lastUsedAt,
+    mcpLimitPerMinute: row.mcpLimitPerMinute,
+    apiLimitPerMinute: row.apiLimitPerMinute,
+  };
 }
 
 export class ApiKeyService {
@@ -50,6 +65,22 @@ export class ApiKeyService {
     return rows.map(toApiKey);
   }
 
+  /** Every active key with its owner's username, most recently used first, for the admin page. */
+  async listAllActive(): Promise<AdminApiKey[]> {
+    const rows = await this.db.apiKey.findMany({
+      where: { revokedAt: null },
+      include: { user: { select: { username: true } } },
+      orderBy: [{ lastUsedAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
+    });
+    return rows.map((row) => ({ ...toApiKey(row), ownerUsername: row.user.username }));
+  }
+
+  /** Sets a key's raised limits (null restores the default). Returns false when there is no such active key. */
+  async setLimits(id: string, limits: ApiKeyLimits): Promise<boolean> {
+    const { count } = await this.db.apiKey.updateMany({ where: { id, revokedAt: null }, data: limits });
+    return count > 0;
+  }
+
   /** Revokes one of the user's own keys. Returns false when there was no such active key. */
   async revoke(userId: string, id: string): Promise<boolean> {
     const { count } = await this.db.apiKey.updateMany({
@@ -70,6 +101,11 @@ export class ApiKeyService {
     if (!row.lastUsedAt || now.getTime() - row.lastUsedAt.getTime() > LAST_USED_RESOLUTION_MS) {
       await this.db.apiKey.update({ where: { id: row.id }, data: { lastUsedAt: now } });
     }
-    return { keyId: row.id, userId: row.userId };
+    return {
+      keyId: row.id,
+      userId: row.userId,
+      mcpLimitPerMinute: row.mcpLimitPerMinute,
+      apiLimitPerMinute: row.apiLimitPerMinute,
+    };
   }
 }

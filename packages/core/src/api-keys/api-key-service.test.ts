@@ -11,6 +11,8 @@ type Row = {
   createdAt: Date;
   lastUsedAt: Date | null;
   revokedAt: Date | null;
+  mcpLimitPerMinute: number | null;
+  apiLimitPerMinute: number | null;
 };
 
 /** Just enough of `db.apiKey` for the service, backed by an array. */
@@ -27,6 +29,8 @@ function fakeDb() {
         createdAt: new Date(Date.now() + rows.length),
         lastUsedAt: null,
         revokedAt: null,
+        mcpLimitPerMinute: null,
+        apiLimitPerMinute: null,
       };
       rows.push(row);
       return row;
@@ -63,7 +67,12 @@ describe("ApiKeyService", () => {
     const service = new ApiKeyService(db);
     const { apiKey, secret } = await service.create("u1", "my script");
 
-    expect(await service.authenticate(secret)).toEqual({ keyId: apiKey.id, userId: "u1" });
+    expect(await service.authenticate(secret)).toEqual({
+      keyId: apiKey.id,
+      userId: "u1",
+      mcpLimitPerMinute: null,
+      apiLimitPerMinute: null,
+    });
   });
 
   test("records when a key was last used", async () => {
@@ -112,5 +121,23 @@ describe("ApiKeyService", () => {
     for (let i = 0; i < MAX_ACTIVE_API_KEYS; i++) await service.create("u1", `key ${i}`);
 
     await expect(service.create("u1", "one too many")).rejects.toBeInstanceOf(ApiKeyLimitError);
+  });
+
+  test("carries a raised limit an admin set on the key", async () => {
+    const { db } = fakeDb();
+    const service = new ApiKeyService(db);
+    const { apiKey, secret } = await service.create("u1", "importer");
+
+    expect(await service.setLimits(apiKey.id, { mcpLimitPerMinute: 600, apiLimitPerMinute: null })).toBe(true);
+    expect(await service.authenticate(secret)).toMatchObject({ mcpLimitPerMinute: 600, apiLimitPerMinute: null });
+  });
+
+  test("won't set limits on a revoked key", async () => {
+    const { db } = fakeDb();
+    const service = new ApiKeyService(db);
+    const { apiKey } = await service.create("u1", "importer");
+    await service.revoke("u1", apiKey.id);
+
+    expect(await service.setLimits(apiKey.id, { mcpLimitPerMinute: 600, apiLimitPerMinute: null })).toBe(false);
   });
 });

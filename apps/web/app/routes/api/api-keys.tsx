@@ -12,7 +12,7 @@ function jsonError(status: number, error: string) {
 // Managing keys takes a browser session: a key that could mint more keys would let one
 // leaked key outlive its own revocation.
 export const action = protectedAction(async ({ request, context }) => {
-  if (context.currentUser.apiKeyId) return jsonError(403, "Manage API keys from your settings page");
+  if (context.currentUser.apiKey) return jsonError(403, "Manage API keys from your settings page");
 
   // Keys belong to the local users row, whose id can differ from the Supabase auth id
   // (accounts carried over from the old site), so resolve it by email like other routes.

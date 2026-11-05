@@ -1,7 +1,5 @@
-import { API_KEY_PREFIX } from "@bip/domain";
+import { API_KEY_PREFIX, type ApiKeyOwner } from "@bip/domain";
 import { createClient } from "@supabase/supabase-js";
-import { z } from "zod";
-import { logger } from "~/lib/logger";
 import { isAuthorizedAdminRequest } from "~/server/admin-api-key";
 import { env } from "~/server/env";
 import { services } from "~/server/services";
@@ -15,7 +13,7 @@ import { services } from "~/server/services";
  */
 export type ApiCaller =
   | { kind: "admin" }
-  | { kind: "apiKey"; userId: string; keyId: string }
+  | ({ kind: "apiKey" } & ApiKeyOwner)
   | { kind: "oauth"; userId: string; clientId: string | null };
 
 function bearerToken(request: Request): string | null {
@@ -60,47 +58,11 @@ export function apiCallerIdentity(caller: Exclude<ApiCaller, { kind: "admin" }>)
   return caller.kind === "apiKey" ? `key:${caller.keyId}` : `user:${caller.userId}`;
 }
 
-const overridesSchema = z.record(
-  z.string(),
-  z.object({ api: z.number().int().positive(), mcp: z.number().int().positive() }).partial(),
-);
-type Overrides = z.infer<typeof overridesSchema>;
-
-let overrides: Overrides | null = null;
-
 /**
- * Raised limits agreed with a user or an organization, from `RATE_LIMIT_OVERRIDES`:
- * JSON keyed by API key id, OAuth client id (one per app or org), or user id, e.g.
- * `{"<id>": {"mcp": 600, "api": 3000}}`. Kept in Doppler rather than the database
- * or the repo, so ids stay out of a public repo and no migration is needed to
- * grant one. Changes apply on the next deploy or app restart.
+ * A raised limit an admin granted the caller's key, if any. Signed-in OAuth apps
+ * always get the default; anyone who needs more uses an API key and asks.
  */
-function rateLimitOverrides(): Overrides {
-  if (overrides) return overrides;
-  try {
-    overrides = env.RATE_LIMIT_OVERRIDES ? overridesSchema.parse(JSON.parse(env.RATE_LIMIT_OVERRIDES)) : {};
-  } catch (error) {
-    logger.error("RATE_LIMIT_OVERRIDES is not valid; using default limits", { error });
-    overrides = {};
-  }
-  return overrides;
-}
-
-/** The caller's raised limit for a bucket, if one was granted. Most specific id wins. */
-export function rateLimitOverride(
-  caller: Exclude<ApiCaller, { kind: "admin" }>,
-  bucket: "api" | "mcp",
-): number | undefined {
-  const table = rateLimitOverrides();
-  const ids = caller.kind === "apiKey" ? [caller.keyId, caller.userId] : [caller.clientId, caller.userId];
-  for (const id of ids) {
-    const limit = id ? table[id]?.[bucket] : undefined;
-    if (limit) return limit;
-  }
-  return undefined;
-}
-
-/** For tests: forget the parsed overrides so a changed env is read again. */
-export function resetRateLimitOverrides() {
-  overrides = null;
+export function raisedLimit(caller: Exclude<ApiCaller, { kind: "admin" }>, bucket: "api" | "mcp"): number | undefined {
+  if (caller.kind !== "apiKey") return undefined;
+  return (bucket === "mcp" ? caller.mcpLimitPerMinute : caller.apiLimitPerMinute) ?? undefined;
 }

@@ -649,6 +649,9 @@ model ApiKey {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamp(6)
   revokedAt  DateTime? @map("revoked_at") @db.Timestamp(6)
+  /// Raised per-minute limits an admin granted this key; null means the default.
+  mcpLimitPerMinute Int? @map("mcp_limit_per_minute")
+  apiLimitPerMinute Int? @map("api_limit_per_minute")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_api_keys_users_user_id")
 
   @@index([userId], map: "idx_api_keys_user_id")

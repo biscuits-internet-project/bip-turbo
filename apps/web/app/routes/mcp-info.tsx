@@ -6,6 +6,7 @@ import { ContactDialog } from "~/components/contact/contact-dialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { RATE_LIMIT_DEFAULTS } from "~/lib/rate-limit-defaults";
 
 export const meta: MetaFunction = () => {
   return [
@@ -149,13 +150,14 @@ export default function McpInfo() {
             language="bash"
           />
           <p>
-            Each account or key gets 60 requests a minute. Need more for a project?{" "}
+            Each signed-in app or key gets {RATE_LIMIT_DEFAULTS.mcp} requests a minute. Need more for a project? Use an
+            API key and{" "}
             <ContactDialog>
               <button type="button" className="text-brand-secondary hover:underline">
-                Get in touch
+                get in touch
               </button>
-            </ContactDialog>
-            .
+            </ContactDialog>{" "}
+            and we'll raise its limit.
           </p>
         </CardContent>
       </Card>

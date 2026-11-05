@@ -59,7 +59,7 @@ describe("/api/api-keys", () => {
   });
 
   test("refuses requests made with an API key, so a key can't mint or revoke keys", async () => {
-    const res = await call("POST", { name: "x" }, { id: "u1", email: "fan@example.com", apiKeyId: "k1" });
+    const res = await call("POST", { name: "x" }, { id: "u1", email: "fan@example.com", apiKey: { keyId: "k1" } });
 
     expect(res.status).toBe(403);
     expect(create).not.toHaveBeenCalled();

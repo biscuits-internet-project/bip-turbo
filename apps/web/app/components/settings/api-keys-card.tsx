@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formInputClass } from "~/lib/form-styles";
+import { RATE_LIMIT_DEFAULTS } from "~/lib/rate-limit-defaults";
 
 /** Dates arrive from the loader as strings. */
 type ListedKey = Omit<ApiKey, "createdAt" | "lastUsedAt"> & {
@@ -85,13 +86,14 @@ export function ApiKeysCard({ initialKeys }: { initialKeys: ListedKey[] }) {
             can't do admin actions.
           </p>
           <p>
-            Each key gets 60 MCP requests and 300 API requests a minute. Need more?{" "}
+            Each key gets {RATE_LIMIT_DEFAULTS.mcp} MCP requests and {RATE_LIMIT_DEFAULTS.api} API requests a minute.
+            Need more?{" "}
             <ContactDialog>
               <button type="button" className="underline hover:text-content-text-primary">
                 Get in touch
               </button>
-            </ContactDialog>
-            .
+            </ContactDialog>{" "}
+            and we'll raise your key's limit.
           </p>
         </div>
 

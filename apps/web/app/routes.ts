@@ -168,6 +168,7 @@ export default [
   // Admin routes
   ...prefix("admin", [
     index("routes/admin/index.tsx"),
+    route("api-keys", "routes/admin/api-keys.tsx"),
     ...prefix("authors", [
       index("routes/admin/authors/index.tsx"),
       route("new", "routes/admin/authors/new.tsx"),

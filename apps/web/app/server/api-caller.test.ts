@@ -11,9 +11,7 @@ vi.mock("~/server/env", () => ({ env }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ auth: { getClaims } }) }));
 
-const { apiCallerIdentity, authenticateApiCaller, rateLimitOverride, resetRateLimitOverrides } = await import(
-  "~/server/api-caller"
-);
+const { apiCallerIdentity, authenticateApiCaller, raisedLimit } = await import("~/server/api-caller");
 
 function request(token?: string) {
   return new Request("https://discobiscuits.net/mcp", {
@@ -25,8 +23,6 @@ function request(token?: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   isAuthorizedAdminRequest.mockReturnValue(false);
-  env.RATE_LIMIT_OVERRIDES = undefined;
-  resetRateLimitOverrides();
 });
 
 describe("authenticateApiCaller", () => {
@@ -40,9 +36,10 @@ describe("authenticateApiCaller", () => {
   });
 
   test("resolves a personal API key to its owner", async () => {
-    authenticate.mockResolvedValue({ keyId: "k1", userId: "u1" });
+    const owner = { keyId: "k1", userId: "u1", mcpLimitPerMinute: null, apiLimitPerMinute: null };
+    authenticate.mockResolvedValue(owner);
 
-    expect(await authenticateApiCaller(request("bip_abc"))).toEqual({ kind: "apiKey", keyId: "k1", userId: "u1" });
+    expect(await authenticateApiCaller(request("bip_abc"))).toEqual({ kind: "apiKey", ...owner });
     expect(getClaims).not.toHaveBeenCalled();
   });
 
@@ -73,8 +70,14 @@ describe("authenticateApiCaller", () => {
   });
 });
 
-describe("rate limit identity and overrides", () => {
-  const keyCaller = { kind: "apiKey" as const, keyId: "k1", userId: "u1" };
+describe("rate limit identity and raised limits", () => {
+  const keyCaller = {
+    kind: "apiKey" as const,
+    keyId: "k1",
+    userId: "u1",
+    mcpLimitPerMinute: null,
+    apiLimitPerMinute: null,
+  };
   const oauthCaller = { kind: "oauth" as const, userId: "u1", clientId: "client-9" };
 
   test("budgets per key for API keys and per user for OAuth apps", () => {
@@ -82,20 +85,14 @@ describe("rate limit identity and overrides", () => {
     expect(apiCallerIdentity(oauthCaller)).toBe("user:u1");
   });
 
-  test("has no override by default", () => {
-    expect(rateLimitOverride(keyCaller, "mcp")).toBeUndefined();
+  test("uses the limit an admin set on the key, per bucket", () => {
+    const raised = { ...keyCaller, mcpLimitPerMinute: 600 };
+
+    expect(raisedLimit(raised, "mcp")).toBe(600);
+    expect(raisedLimit(raised, "api")).toBeUndefined();
   });
 
-  test("uses the most specific id that has a raised limit", () => {
-    env.RATE_LIMIT_OVERRIDES = JSON.stringify({ u1: { mcp: 120 }, k1: { mcp: 600 }, "client-9": { api: 5000 } });
-
-    expect(rateLimitOverride(keyCaller, "mcp")).toBe(600);
-    expect(rateLimitOverride(oauthCaller, "mcp")).toBe(120);
-    expect(rateLimitOverride(oauthCaller, "api")).toBe(5000);
-  });
-
-  test("falls back to the defaults when the setting is malformed", () => {
-    env.RATE_LIMIT_OVERRIDES = "{not json";
-    expect(rateLimitOverride(keyCaller, "mcp")).toBeUndefined();
+  test("gives OAuth apps the default", () => {
+    expect(raisedLimit(oauthCaller, "mcp")).toBeUndefined();
   });
 });

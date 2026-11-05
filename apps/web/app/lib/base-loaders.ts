@@ -1,9 +1,10 @@
+import type { ApiKeyOwner } from "@bip/domain";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
-import { apiCallerIdentity, authenticateApiCaller, hasApiKey, rateLimitOverride } from "~/server/api-caller";
+import { apiCallerIdentity, authenticateApiCaller, hasApiKey, raisedLimit } from "~/server/api-caller";
 import {
   enforceCallerRateLimit,
   enforceRateLimit,
@@ -19,7 +20,7 @@ interface User {
   email: string;
   isAdmin: boolean;
   /** Set when the request authenticated with one of the user's personal API keys. */
-  apiKeyId?: string;
+  apiKey?: ApiKeyOwner;
 }
 
 export interface PublicContext {
@@ -98,18 +99,18 @@ async function limitAnonymousRequest(request: Request) {
 
 async function limitSignedInRequest(request: Request, user: User | null) {
   if (!hasCredential(request) || user?.isAdmin) return;
-  if (user?.apiKeyId) await limitApiKeyRequest(request, user, user.apiKeyId);
+  if (user?.apiKey) await limitApiKeyRequest(request, user, user.apiKey);
   else await limitRequest(request, user);
 }
 
-/** Scripts using a personal key get a budget per key, which can be raised for that key or its owner. */
-async function limitApiKeyRequest(request: Request, user: User, keyId: string) {
+/** Scripts using a personal key get a budget per key, which an admin can raise on the key. */
+async function limitApiKeyRequest(request: Request, user: User, key: ApiKeyOwner) {
   const { pathname } = new URL(request.url);
-  const caller = { kind: "apiKey" as const, userId: user.id, keyId };
+  const caller = { kind: "apiKey" as const, ...key };
   if (pathname === "/api/search") {
     await enforceCallerRateLimit(request, "search", apiCallerIdentity(caller));
   } else if (pathname.startsWith("/api/")) {
-    await enforceCallerRateLimit(request, "api", apiCallerIdentity(caller), rateLimitOverride(caller, "api"));
+    await enforceCallerRateLimit(request, "api", apiCallerIdentity(caller), raisedLimit(caller, "api"));
   } else {
     await limitRequest(request, user);
   }
@@ -284,7 +285,8 @@ async function getApiKeyUser(request: Request, options: { requireAdmin?: boolean
   const owner = caller?.kind === "apiKey" ? await services.users.find(caller.userId) : null;
   if (!caller || caller.kind !== "apiKey" || !owner) throw jsonError(401, "Invalid or revoked API key");
   if (options.requireAdmin) throw jsonError(403, "API keys can't be used for admin actions");
-  return { id: owner.id, email: owner.email, isAdmin: false, apiKeyId: caller.keyId };
+  const { kind: _kind, ...apiKey } = caller;
+  return { id: owner.id, email: owner.email, isAdmin: false, apiKey };
 }
 
 async function ensureLocalUserRecord(authUser: SupabaseUser) {

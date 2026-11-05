@@ -10,7 +10,7 @@ vi.mock("~/server/api-caller", () => ({
   hasApiKey: (request: Request) => request.headers.get("Authorization")?.startsWith("Bearer bip_") ?? false,
   authenticateApiCaller,
   apiCallerIdentity: (caller: { keyId: string }) => `key:${caller.keyId}`,
-  rateLimitOverride: () => 900,
+  raisedLimit: (caller: { apiLimitPerMinute: number | null }) => caller.apiLimitPerMinute ?? undefined,
 }));
 vi.mock("~/server/rate-limit", async (importOriginal) => ({
   isFilteredListingRequest: (await importOriginal<typeof import("~/server/rate-limit")>()).isFilteredListingRequest,
@@ -196,7 +196,13 @@ describe("personal API keys", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    authenticateApiCaller.mockResolvedValue({ kind: "apiKey", keyId: "k1", userId: "u1" });
+    authenticateApiCaller.mockResolvedValue({
+      kind: "apiKey",
+      keyId: "k1",
+      userId: "u1",
+      mcpLimitPerMinute: null,
+      apiLimitPerMinute: 900,
+    });
     findUser.mockResolvedValue({ id: "u1", email: "fan@example.com" });
   });
 
@@ -208,12 +214,12 @@ describe("personal API keys", () => {
       id: "u1",
       email: "fan@example.com",
       isAdmin: false,
-      apiKeyId: "k1",
+      apiKey: { keyId: "k1", userId: "u1", mcpLimitPerMinute: null, apiLimitPerMinute: 900 },
     });
     expect(getRequestUser).not.toHaveBeenCalled();
   });
 
-  test("are counted per key, with any raised limit", async () => {
+  test("are counted per key, with the limit set on the key", async () => {
     await run("/api/attendances", undefined, KEY);
 
     expect(enforceCallerRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "key:k1", 900);
