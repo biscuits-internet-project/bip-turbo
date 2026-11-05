@@ -8,6 +8,7 @@ export * from "./_shared/redis";
 export * from "./_shared/sanitize";
 export * from "./_shared/services";
 export * from "./annotations/annotation-service";
+export * from "./api-keys/api-key-service";
 export * from "./attendances/attendance-service";
 export * from "./blog-posts/blog-post-service";
 // Views

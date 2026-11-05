@@ -1,3 +1,4 @@
+import { API_KEY_PREFIX } from "@bip/domain";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { serialize } from "cookie";
@@ -17,8 +18,10 @@ export const getServerClient = (request: Request) => {
   const headers = new Headers();
 
   // Check for Bearer token (OAuth/MCP clients)
+  // A personal API key (`bip_…`) is ours, not a Supabase token: never send it to Supabase.
   const authHeader = request.headers.get("Authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const presented = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const bearerToken = presented && !presented.startsWith(API_KEY_PREFIX) ? presented : null;
 
   const supabase = createServerClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
     cookies: {

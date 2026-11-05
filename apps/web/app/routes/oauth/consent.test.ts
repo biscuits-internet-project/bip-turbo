@@ -9,7 +9,7 @@ vi.mock("~/server/supabase", () => ({
   }),
 }));
 
-import { loader } from "./consent";
+import { clientName, loader } from "./consent";
 
 describe("oauth consent loader", () => {
   // Login reads `next` and discards anything that isn't a same-origin path, so the
@@ -22,5 +22,17 @@ describe("oauth consent loader", () => {
     const location = new URL(response.headers.get("Location") ?? "", "https://discobiscuits.net");
     expect(location.pathname).toBe("/auth/login");
     expect(getSafeRedirectUrl(location.searchParams.get("next"))).toBe("/oauth/consent?authorization_id=abc123");
+  });
+});
+
+describe("clientName", () => {
+  test("reads the typed `name`, or the `client_name` some Auth versions send", () => {
+    expect(clientName({ name: "Claude" })).toBe("Claude");
+    expect(clientName({ client_name: "Codex" })).toBe("Codex");
+  });
+
+  test("is undefined when the app registered no name, so the screen falls back to 'An application'", () => {
+    expect(clientName({ name: "", client_name: "" })).toBeUndefined();
+    expect(clientName(undefined)).toBeUndefined();
   });
 });

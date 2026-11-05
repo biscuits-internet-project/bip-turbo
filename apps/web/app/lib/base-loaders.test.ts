@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 // Server-only modules, stubbed so the wrapper can be exercised without pulling
 // Supabase/Prisma into the test bundle.
 vi.mock("~/server/request-user", () => ({ getRequestUser: vi.fn().mockResolvedValue(null) }));
-vi.mock("~/server/services", () => ({ services: {} }));
+const { findUser, authenticateApiCaller } = vi.hoisted(() => ({ findUser: vi.fn(), authenticateApiCaller: vi.fn() }));
+vi.mock("~/server/services", () => ({ services: { users: { find: findUser } } }));
+vi.mock("~/server/api-caller", () => ({
+  hasApiKey: (request: Request) => request.headers.get("Authorization")?.startsWith("Bearer bip_") ?? false,
+  authenticateApiCaller,
+  raisedLimit: (caller: { apiLimitPerMinute: number | null }) => caller.apiLimitPerMinute ?? undefined,
+}));
 vi.mock("~/server/rate-limit", async (importOriginal) => ({
   isFilteredListingRequest: (await importOriginal<typeof import("~/server/rate-limit")>()).isFilteredListingRequest,
   enforceRateLimit: vi.fn(),
@@ -12,7 +18,7 @@ vi.mock("~/server/rate-limit", async (importOriginal) => ({
 }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
-import { publicLoader } from "~/lib/base-loaders";
+import { adminLoader, publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
 import { enforceRateLimit, enforceSiteWideRateLimit } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
@@ -136,7 +142,7 @@ describe("publicLoader rate limits", () => {
     const { thrown, inner } = await run("/api/ratings");
 
     expect(thrown?.status).toBe(429);
-    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined);
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined, undefined);
     expect(getRequestUser).not.toHaveBeenCalled();
     expect(inner).not.toHaveBeenCalled();
   });
@@ -145,7 +151,7 @@ describe("publicLoader rate limits", () => {
     vi.mocked(getRequestUser).mockResolvedValueOnce({ id: "u1", email: "u@example.com", app_metadata: {} } as never);
     await run("/api/ratings", undefined, SIGNED_IN);
 
-    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1");
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1", undefined);
   });
 
   test("gives search its own budget instead of the API's", async () => {
@@ -195,5 +201,59 @@ describe("publicLoader rate limits", () => {
     await run("/api/shows/reorder", undefined, SIGNED_IN);
 
     expect(enforceRateLimit).not.toHaveBeenCalled();
+  });
+});
+
+describe("personal API keys", () => {
+  const KEY = { Authorization: "Bearer bip_secret" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authenticateApiCaller.mockResolvedValue({
+      kind: "apiKey",
+      keyId: "k1",
+      userId: "u1",
+      mcpLimitPerMinute: null,
+      apiLimitPerMinute: 900,
+    });
+    findUser.mockResolvedValue({ id: "u1", email: "fan@example.com" });
+  });
+
+  test("act as the key's owner, never as an admin", async () => {
+    const inner = vi.fn().mockResolvedValue("ok");
+    await run("/api/attendances", inner, KEY);
+
+    expect(inner.mock.calls[0][0].context.currentUser).toEqual({
+      id: "u1",
+      email: "fan@example.com",
+      isAdmin: false,
+      apiKey: { keyId: "k1", userId: "u1", mcpLimitPerMinute: null, apiLimitPerMinute: 900 },
+    });
+    expect(getRequestUser).not.toHaveBeenCalled();
+  });
+
+  test("count against their owner's budget, with the limit set on the key", async () => {
+    await run("/api/attendances", undefined, KEY);
+
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1", 900);
+  });
+
+  test("get a 401 when unknown or revoked", async () => {
+    authenticateApiCaller.mockResolvedValue(null);
+    const { thrown, inner } = await run("/api/attendances", undefined, KEY);
+
+    expect(thrown?.status).toBe(401);
+    expect(inner).not.toHaveBeenCalled();
+  });
+
+  test("can't reach admin routes", async () => {
+    const loader = adminLoader(vi.fn());
+    const thrown = await (loader as (args: LoaderFunctionArgs) => Promise<unknown>)({
+      request: new Request("https://discobiscuits.net/api/admin/cache", { headers: KEY }),
+      params: {},
+      context: {},
+    } as unknown as LoaderFunctionArgs).catch((error: Response) => error);
+
+    expect((thrown as Response).status).toBe(403);
   });
 });

@@ -1,8 +1,10 @@
+import type { ApiKeyOwner } from "@bip/domain";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "react-router-dom";
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
+import { authenticateApiCaller, hasApiKey, raisedLimit } from "~/server/api-caller";
 import { enforceRateLimit, enforceSiteWideRateLimit, isFilteredListingRequest } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 import { hasCredential } from "~/server/response-headers";
@@ -12,6 +14,8 @@ interface User {
   id: string;
   email: string;
   isAdmin: boolean;
+  /** Set when the request authenticated with one of the user's personal API keys. */
+  apiKey?: ApiKeyOwner;
 }
 
 export interface PublicContext {
@@ -89,18 +93,24 @@ async function limitAnonymousRequest(request: Request) {
 }
 
 async function limitSignedInRequest(request: Request, user: User | null) {
-  if (hasCredential(request) && !user?.isAdmin) await limitRequest(request, user);
+  if (!hasCredential(request) || user?.isAdmin) return;
+  await limitRequest(request, user);
 }
 
-/** Every `/api/*` route shares one budget (search has its own); filtered catalog listings have theirs. */
+/**
+ * Every `/api/*` route shares one budget (search has its own); filtered catalog
+ * listings have theirs. A user's API keys share that user's budget, so creating
+ * more keys doesn't buy more requests; an admin can raise it on the key.
+ */
 async function limitRequest(request: Request, user: User | null) {
   const url = new URL(request.url);
   // React Router matches paths case-insensitively, so `/API/SEARCH` is search too.
   const path = url.pathname.toLowerCase().replace(/\/+$/, "");
+  const raised = user?.apiKey ? raisedLimit({ kind: "apiKey", ...user.apiKey }, "api") : undefined;
   if (path === "/api/search") {
     await enforceRateLimit(request, "search", user?.id);
   } else if (path.startsWith("/api/")) {
-    await enforceRateLimit(request, "api", user?.id);
+    await enforceRateLimit(request, "api", user?.id, raised);
   } else if (isFilteredListingRequest(url)) {
     await enforceRateLimit(request, "filteredListing", user?.id);
     // Signed-in visitors skip the shared cap, so a crawl that exhausts it can't lock
@@ -199,16 +209,15 @@ async function getUser(
   request: Request,
   options: { requireAuth: boolean; requireAdmin?: boolean },
 ): Promise<User | null> {
+  if (hasApiKey(request)) return getApiKeyUser(request, options);
+
   const user = await getRequestUser(request);
 
   if (options?.requireAuth) {
     if (!user) {
       const isJsonRequest = request.headers.get("Accept")?.includes("application/json");
       if (isJsonRequest) {
-        throw new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw jsonError(401, "Unauthorized");
       }
       throw redirect("/auth/login");
     }
@@ -222,10 +231,7 @@ async function getUser(
     if (options?.requireAdmin && !isAdmin) {
       const isJsonRequest = request.headers.get("Accept")?.includes("application/json");
       if (isJsonRequest) {
-        throw new Response(JSON.stringify({ error: "Forbidden: Admin access required" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw jsonError(403, "Forbidden: Admin access required");
       }
       throw redirect("/");
     }
@@ -247,6 +253,24 @@ async function getUser(
   }
 
   return null;
+}
+
+function jsonError(status: number, error: string): Response {
+  return new Response(JSON.stringify({ error }), { status, headers: { "Content-Type": "application/json" } });
+}
+
+/**
+ * A personal API key acts as its owner, but never with admin rights: a key pasted
+ * into a script is far easier to leak than a browser session, so admin routes
+ * stay session-only.
+ */
+async function getApiKeyUser(request: Request, options: { requireAdmin?: boolean }): Promise<User> {
+  const caller = await authenticateApiCaller(request);
+  const owner = caller?.kind === "apiKey" ? await services.users.find(caller.userId) : null;
+  if (!caller || caller.kind !== "apiKey" || !owner) throw jsonError(401, "Invalid or revoked API key");
+  if (options.requireAdmin) throw jsonError(403, "API keys can't be used for admin actions");
+  const { kind: _kind, ...apiKey } = caller;
+  return { id: owner.id, email: owner.email, isAdmin: false, apiKey };
 }
 
 async function ensureLocalUserRecord(authUser: SupabaseUser) {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { BlockList, isIP } from "node:net";
 import { logger } from "~/lib/logger";
+import { RATE_LIMIT_DEFAULTS } from "~/lib/rate-limit-defaults";
 import { services } from "~/server/services";
 
 /**
@@ -33,9 +34,9 @@ export function isFilteredListingRequest(url: URL): boolean {
  * `filteredListing` bounds the catalog renders described above.
  */
 export const RATE_LIMITS = {
-  api: { limit: 300, windowSeconds: 60 },
+  api: { limit: RATE_LIMIT_DEFAULTS.api, windowSeconds: 60 },
   search: { limit: 30, windowSeconds: 60 },
-  mcp: { limit: 60, windowSeconds: 60 },
+  mcp: { limit: RATE_LIMIT_DEFAULTS.mcp, windowSeconds: 60 },
   filteredListing: { limit: 20, windowSeconds: 60 },
   // Shared by every caller. A crawler spread across a residential proxy network
   // sends a request or two per IP, so no per-caller budget sees it; this one caps
@@ -135,14 +136,32 @@ export function rateLimitIdentity(request: Request, userId?: string): string {
     .slice(0, 16)}`;
 }
 
-/** Throws a 429 when the caller is over the bucket's limit. */
-export function enforceRateLimit(request: Request, bucket: RateLimitBucket, userId?: string): Promise<void> {
-  return enforce(request, bucket, rateLimitIdentity(request, userId));
+/** Throws a 429 when the caller is over the bucket's limit (or a limit an admin raised for them). */
+export function enforceRateLimit(
+  request: Request,
+  bucket: RateLimitBucket,
+  userId?: string,
+  raisedLimit?: number,
+): Promise<void> {
+  return enforce(request, bucket, rateLimitIdentity(request, userId), raisedLimit);
 }
 
 /** Throws a 429 when every caller together is over the bucket's limit. */
 export function enforceSiteWideRateLimit(request: Request, bucket: RateLimitBucket): Promise<void> {
   return enforce(request, bucket, "all");
+}
+
+/**
+ * Throws a 429 for an authenticated non-browser caller (an API key or OAuth app)
+ * over its budget, which may be raised above the bucket's default.
+ */
+export function enforceCallerRateLimit(
+  request: Request,
+  bucket: RateLimitBucket,
+  identity: string,
+  raisedLimit?: number,
+): Promise<void> {
+  return enforce(request, bucket, identity, raisedLimit);
 }
 
 /**
@@ -208,8 +227,14 @@ function tooManyRequests(window: number, windowSeconds: number): Response {
   });
 }
 
-async function enforce(request: Request, bucket: RateLimitBucket, identity: string): Promise<void> {
-  const { limit, windowSeconds } = RATE_LIMITS[bucket];
+async function enforce(
+  request: Request,
+  bucket: RateLimitBucket,
+  identity: string,
+  raisedLimit?: number,
+): Promise<void> {
+  const { windowSeconds } = RATE_LIMITS[bucket];
+  const limit = raisedLimit ?? RATE_LIMITS[bucket].limit;
   const { key, window } = counterKey(bucket, identity);
 
   const count = await counterRead(() => services.redis.incrWithExpiry(key, windowSeconds), bucket);

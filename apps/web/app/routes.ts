@@ -119,6 +119,7 @@ export default [
 
   ...prefix("api", [
     route("auth/sync", "routes/api/auth/sync.tsx"),
+    route("api-keys", "routes/api/api-keys.tsx"),
     route("reviews", "routes/api/reviews.tsx"),
     route("ratings", "routes/api/ratings.tsx"),
     route("tracks/:trackId", "routes/api/tracks/$trackId.tsx"),
@@ -167,6 +168,7 @@ export default [
   // Admin routes
   ...prefix("admin", [
     index("routes/admin/index.tsx"),
+    route("api-keys", "routes/admin/api-keys.tsx"),
     ...prefix("authors", [
       index("routes/admin/authors/index.tsx"),
       route("new", "routes/admin/authors/new.tsx"),
@@ -185,6 +187,17 @@ export default [
 
   // MCP JSON-RPC endpoint (all tools exposed via JSON-RPC protocol)
   route("mcp", "routes/mcp/index.tsx"),
+  // The same server, always requiring sign-in; see mcpResourcePath.
+  route("mcp/signin", "routes/mcp/index.tsx", { id: "mcp-signin" }),
+  route(".well-known/oauth-protected-resource", "routes/well-known/oauth-protected-resource.tsx", {
+    id: "oauth-protected-resource",
+  }),
+  route(".well-known/oauth-protected-resource/mcp", "routes/well-known/oauth-protected-resource.tsx", {
+    id: "oauth-protected-resource-mcp",
+  }),
+  route(".well-known/oauth-protected-resource/mcp/signin", "routes/well-known/oauth-protected-resource.tsx", {
+    id: "oauth-protected-resource-mcp-signin",
+  }),
 
   // Health check route
   route("healthcheck", "routes/healthcheck.tsx"),

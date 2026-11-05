@@ -38,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   return {
     authorizationId,
-    client: authDetails.client,
+    client: { ...authDetails.client, name: clientName(authDetails.client) },
     scopes: authDetails.scope?.split(" ") || [],
     user: { email: user.email },
   };
@@ -147,6 +147,17 @@ export default function OAuthConsent() {
       </div>
     </div>
   );
+}
+
+/**
+ * supabase-js types the client's display name as `name`, but some Supabase Auth
+ * versions send the registered `client_name` instead, which left the screen saying
+ * "An application" for every app. Accept either.
+ */
+export function clientName(client: unknown): string | undefined {
+  const fields = (client ?? {}) as { name?: unknown; client_name?: unknown };
+  const name = typeof fields.name === "string" && fields.name ? fields.name : fields.client_name;
+  return typeof name === "string" && name ? name : undefined;
 }
 
 function scopeDescription(scope: string): string {

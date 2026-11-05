@@ -7,6 +7,7 @@
 // Import the actual types from the generated Prisma client
 import type {
   Annotation as PrismaAnnotation,
+  ApiKey as PrismaApiKey,
   Attendance as PrismaAttendance,
   Author as PrismaAuthor,
   BlogPost as PrismaBlogPost,
@@ -30,6 +31,7 @@ export type DbAnnotation = PrismaAnnotation;
 export type DbBlogPost = PrismaBlogPost;
 export type DbClient = PrismaClient;
 export type DbReview = PrismaReview;
+export type DbApiKey = PrismaApiKey;
 export type DbSearchHistory = PrismaSearchHistory;
 export type DbSong = PrismaSong;
 export type DbAuthor = PrismaAuthor;

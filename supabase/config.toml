@@ -139,6 +139,13 @@ password_requirements = ""
 # provider = "hcaptcha"
 # secret = ""
 
+# Supabase Auth as the OAuth 2.1 server MCP clients sign in through. Mirrors
+# production: the consent screen is app/routes/oauth/consent.tsx.
+[auth.oauth_server]
+enabled = true
+authorization_url_path = "/oauth/consent"
+allow_dynamic_registration = true
+
 [auth.email]
 # Allow/disallow new user signups via email to your project.
 enable_signup = true

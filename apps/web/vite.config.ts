@@ -36,8 +36,10 @@ export default defineConfig({
     {
       name: "handle-well-known",
       configureServer(server) {
-        server.middlewares.use("/.well-known", (_req, res, _next) => {
-          // Silently return 404 for .well-known requests
+        server.middlewares.use("/.well-known", (req, res, next) => {
+          // The app serves OAuth discovery for MCP clients; let that through.
+          if (req.url?.startsWith("/oauth-protected-resource")) return next();
+          // Silently return 404 for other .well-known probes (e.g. Chrome DevTools)
           res.statusCode = 404;
           res.end();
         });
