@@ -63,6 +63,8 @@ env:
     - CLOUDFLARE_CACHE_PURGE_TOKEN
     - DATABASE_URL
     - ADMIN_API_KEY
+    # Raised rate limits for specific API keys, OAuth apps or users (JSON; "{}" for none).
+    - RATE_LIMIT_OVERRIDES
   clear:
     APP_ENV: production
     PORT: "8080"

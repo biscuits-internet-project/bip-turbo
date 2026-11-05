@@ -3,7 +3,13 @@ import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "rea
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
-import { enforceRateLimit, enforceSiteWideRateLimit, isFilteredListingRequest } from "~/server/rate-limit";
+import { apiCallerIdentity, authenticateApiCaller, hasApiKey, rateLimitOverride } from "~/server/api-caller";
+import {
+  enforceCallerRateLimit,
+  enforceRateLimit,
+  enforceSiteWideRateLimit,
+  isFilteredListingRequest,
+} from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 import { hasCredential } from "~/server/response-headers";
 import { services } from "~/server/services";
@@ -12,6 +18,8 @@ interface User {
   id: string;
   email: string;
   isAdmin: boolean;
+  /** Set when the request authenticated with one of the user's personal API keys. */
+  apiKeyId?: string;
 }
 
 export interface PublicContext {
@@ -89,7 +97,22 @@ async function limitAnonymousRequest(request: Request) {
 }
 
 async function limitSignedInRequest(request: Request, user: User | null) {
-  if (hasCredential(request) && !user?.isAdmin) await limitRequest(request, user);
+  if (!hasCredential(request) || user?.isAdmin) return;
+  if (user?.apiKeyId) await limitApiKeyRequest(request, user, user.apiKeyId);
+  else await limitRequest(request, user);
+}
+
+/** Scripts using a personal key get a budget per key, which can be raised for that key or its owner. */
+async function limitApiKeyRequest(request: Request, user: User, keyId: string) {
+  const { pathname } = new URL(request.url);
+  const caller = { kind: "apiKey" as const, userId: user.id, keyId };
+  if (pathname === "/api/search") {
+    await enforceCallerRateLimit(request, "search", apiCallerIdentity(caller));
+  } else if (pathname.startsWith("/api/")) {
+    await enforceCallerRateLimit(request, "api", apiCallerIdentity(caller), rateLimitOverride(caller, "api"));
+  } else {
+    await limitRequest(request, user);
+  }
 }
 
 /** Every `/api/*` route shares one budget (search has its own); filtered catalog listings have theirs. */
@@ -195,6 +218,8 @@ async function getUser(
   request: Request,
   options: { requireAuth: boolean; requireAdmin?: boolean },
 ): Promise<User | null> {
+  if (hasApiKey(request)) return getApiKeyUser(request, options);
+
   const user = await getRequestUser(request);
 
   if (options?.requireAuth) {
@@ -243,6 +268,23 @@ async function getUser(
   }
 
   return null;
+}
+
+function jsonError(status: number, error: string): Response {
+  return new Response(JSON.stringify({ error }), { status, headers: { "Content-Type": "application/json" } });
+}
+
+/**
+ * A personal API key acts as its owner, but never with admin rights: a key pasted
+ * into a script is far easier to leak than a browser session, so admin routes
+ * stay session-only.
+ */
+async function getApiKeyUser(request: Request, options: { requireAdmin?: boolean }): Promise<User> {
+  const caller = await authenticateApiCaller(request);
+  const owner = caller?.kind === "apiKey" ? await services.users.find(caller.userId) : null;
+  if (!caller || caller.kind !== "apiKey" || !owner) throw jsonError(401, "Invalid or revoked API key");
+  if (options.requireAdmin) throw jsonError(403, "API keys can't be used for admin actions");
+  return { id: owner.id, email: owner.email, isAdmin: false, apiKeyId: caller.keyId };
 }
 
 async function ensureLocalUserRecord(authUser: SupabaseUser) {

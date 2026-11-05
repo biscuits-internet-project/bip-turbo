@@ -5,6 +5,7 @@ export * from "./drummer-era";
 export * from "./duration";
 export * from "./math";
 export * from "./models/annotation";
+export * from "./models/api-key";
 export * from "./models/attendance";
 export * from "./models/author";
 export * from "./models/band";

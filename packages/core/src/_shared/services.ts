@@ -1,5 +1,6 @@
 import type { Logger } from "@bip/domain";
 import { AnnotationService } from "../annotations/annotation-service";
+import { ApiKeyService } from "../api-keys/api-key-service";
 import { AttendanceService } from "../attendances/attendance-service";
 import { AuthorService } from "../authors/author-service";
 import { BlogPostService } from "../blog-posts/blog-post-service";
@@ -62,6 +63,7 @@ export interface Services {
   files: FileService;
   postgresSearch: PostgresSearchService;
   searchHistory: SearchHistoryService;
+  apiKeys: ApiKeyService;
   redis: RedisService;
   cache: CacheService;
   cacheInvalidation: CacheInvalidationService;
@@ -139,6 +141,7 @@ export function createServices(container: ServiceContainer): Services {
     }),
     postgresSearch: postgresSearchService,
     searchHistory: searchHistoryService,
+    apiKeys: new ApiKeyService(container.db),
     redis: container.redis,
     cache: container.cache,
     cacheInvalidation: container.cacheInvalidation,

@@ -1,6 +1,8 @@
 import { Check, Code2, Copy, ExternalLink, Sparkles, Terminal, Zap } from "lucide-react";
 import { useState } from "react";
 import type { MetaFunction } from "react-router";
+import { Link } from "react-router";
+import { ContactDialog } from "~/components/contact/contact-dialog";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -114,6 +116,47 @@ export default function McpInfo() {
             <code className="flex-1 text-brand-secondary font-mono">{MCP_URL}</code>
             <CopyButton text={MCP_URL} />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Signing in */}
+      <Card variant="panel" className="mb-8">
+        <CardHeader className="space-y-1">
+          <CardTitle>Signing in</CardTitle>
+          <CardDescription>The server needs a discobiscuits.net account</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-content-text-secondary">
+          <p>
+            The first time your AI client connects, it opens a browser window. Log in and click{" "}
+            <strong>Authorize</strong>, and the client takes it from there. Don't have an account?{" "}
+            <Link to="/auth/register" className="text-brand-secondary hover:underline">
+              Sign up
+            </Link>
+            .
+          </p>
+          <p>
+            Calling it from a script instead? Create an API key in your{" "}
+            <Link to="/profile/edit" className="text-brand-secondary hover:underline">
+              settings
+            </Link>{" "}
+            and send it as a bearer token:
+          </p>
+          <CodeBlock
+            code={`curl ${MCP_URL} \\
+  -H "Authorization: Bearer $DISCOBISCUITS_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}
+            language="bash"
+          />
+          <p>
+            Each account or key gets 60 requests a minute. Need more for a project?{" "}
+            <ContactDialog>
+              <button type="button" className="text-brand-secondary hover:underline">
+                Get in touch
+              </button>
+            </ContactDialog>
+            .
+          </p>
         </CardContent>
       </Card>
 

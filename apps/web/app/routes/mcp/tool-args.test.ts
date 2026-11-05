@@ -7,21 +7,33 @@ const logError = vi.fn();
 class InvalidSearchQueryError extends Error {}
 vi.mock("@bip/core", () => ({ InvalidSearchQueryError }));
 vi.mock("~/lib/logger", () => ({ logger: { error: logError, info: vi.fn(), warn: vi.fn() } }));
-vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
-vi.mock("~/server/admin-api-key", () => ({ isAuthorizedAdminRequest: vi.fn().mockReturnValue(false) }));
+vi.mock("~/server/rate-limit", () => ({ enforceCallerRateLimit: vi.fn() }));
+const KEY_CALLER = { kind: "apiKey", keyId: "k1", userId: "u1" };
+vi.mock("~/server/api-caller", () => ({
+  authenticateApiCaller: vi.fn(async () => KEY_CALLER),
+  apiCallerIdentity: () => "key:k1",
+  rateLimitOverride: () => undefined,
+}));
+vi.mock("~/server/oauth-protected-resource", () => ({
+  protectedResourceMetadataUrl: () => "https://discobiscuits.net/.well-known/oauth-protected-resource/mcp",
+}));
 vi.mock("~/server/services", () => ({
   services: { songs: { findBySlug }, venues: { findBySlug }, shows: { findBySlug }, postgresSearch: { searchSongs } },
 }));
 
 const { action } = await import("./index");
 
-async function callTool(name: string, args: unknown) {
+function postTool(name: string, args: unknown) {
   const request = new Request("http://localhost/mcp", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
   });
-  const res = (await action({ request } as never)) as Response;
+  return action({ request } as never) as Promise<Response>;
+}
+
+async function callTool(name: string, args: unknown) {
+  const res = await postTool(name, args);
   const body = await res.json();
   return body.result as { isError?: boolean; content: Array<{ text: string }> };
 }
@@ -78,27 +90,49 @@ describe("MCP tool arguments are checked against the declared schema", () => {
   });
 });
 
-describe("MCP rate limit", () => {
-  test("rejects an over-limit caller before running the tool", async () => {
-    const { enforceRateLimit } = await import("~/server/rate-limit");
+describe("MCP sign-in and rate limit", () => {
+  test("turns away a caller with no credential, pointing it at the sign-in metadata", async () => {
+    const { authenticateApiCaller } = await import("~/server/api-caller");
     vi.clearAllMocks();
-    vi.mocked(enforceRateLimit).mockImplementationOnce(() => {
+    vi.mocked(authenticateApiCaller).mockResolvedValueOnce(null);
+
+    const res = await postTool("get_song", { slug: "basis-for-a-day" });
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("WWW-Authenticate")).toBe(
+      'Bearer resource_metadata="https://discobiscuits.net/.well-known/oauth-protected-resource/mcp"',
+    );
+    expect(findBySlug).not.toHaveBeenCalled();
+  });
+
+  test("counts a signed-in caller against its own budget", async () => {
+    const { enforceCallerRateLimit } = await import("~/server/rate-limit");
+    vi.clearAllMocks();
+
+    await callTool("get_song", { slug: "basis-for-a-day" });
+
+    expect(enforceCallerRateLimit).toHaveBeenCalledWith(expect.any(Request), "mcp", "key:k1", undefined);
+  });
+
+  test("rejects an over-limit caller before running the tool", async () => {
+    const { enforceCallerRateLimit } = await import("~/server/rate-limit");
+    vi.clearAllMocks();
+    vi.mocked(enforceCallerRateLimit).mockImplementationOnce(() => {
       throw new Response(null, { status: 429 });
     });
 
     await expect(callTool("get_song", { slug: "basis-for-a-day" })).rejects.toMatchObject({ status: 429 });
-    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "mcp");
     expect(findBySlug).not.toHaveBeenCalled();
   });
 
   test("exempts the admin key, so the setlist sync is never limited", async () => {
-    const { enforceRateLimit } = await import("~/server/rate-limit");
-    const { isAuthorizedAdminRequest } = await import("~/server/admin-api-key");
+    const { enforceCallerRateLimit } = await import("~/server/rate-limit");
+    const { authenticateApiCaller } = await import("~/server/api-caller");
     vi.clearAllMocks();
-    vi.mocked(isAuthorizedAdminRequest).mockReturnValueOnce(true);
+    vi.mocked(authenticateApiCaller).mockResolvedValueOnce({ kind: "admin" });
 
     await callTool("get_song", { slug: "basis-for-a-day" });
 
-    expect(enforceRateLimit).not.toHaveBeenCalled();
+    expect(enforceCallerRateLimit).not.toHaveBeenCalled();
   });
 });

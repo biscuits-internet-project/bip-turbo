@@ -631,9 +631,28 @@ model User {
   showPhotos                 ShowPhoto[]
   files                      File[]
   showFiles                  ShowToFile[] @relation("ShowFileUploader")
+  apiKeys                    ApiKey[]
 
   @@index([avatarFileId])
   @@map("users")
+}
+
+/// A personal API key. Only the SHA-256 of the key is stored; the key itself is
+/// shown to its owner once, at creation.
+model ApiKey {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  name       String    @db.VarChar(100)
+  /// The key's first characters, so its owner can tell keys apart.
+  prefix     String    @db.VarChar(16)
+  keyHash    String    @unique(map: "api_keys_key_hash_unique") @map("key_hash") @db.VarChar(64)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamp(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamp(6)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_api_keys_users_user_id")
+
+  @@index([userId], map: "idx_api_keys_user_id")
+  @@map("api_keys")
 }
 
 model Venue {

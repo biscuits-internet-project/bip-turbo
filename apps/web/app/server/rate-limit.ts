@@ -107,9 +107,28 @@ export function enforceSiteWideRateLimit(request: Request, bucket: RateLimitBuck
   return enforce(request, bucket, "all");
 }
 
+/**
+ * Throws a 429 for an authenticated non-browser caller (an API key or OAuth app)
+ * over its budget, which may be raised above the bucket's default.
+ */
+export function enforceCallerRateLimit(
+  request: Request,
+  bucket: RateLimitBucket,
+  identity: string,
+  raisedLimit?: number,
+): Promise<void> {
+  return enforce(request, bucket, identity, raisedLimit);
+}
+
 /** Redis being down fails open: an outage of the counter should not take the site down with it. */
-async function enforce(request: Request, bucket: RateLimitBucket, identity: string): Promise<void> {
-  const { limit, windowSeconds } = RATE_LIMITS[bucket];
+async function enforce(
+  request: Request,
+  bucket: RateLimitBucket,
+  identity: string,
+  raisedLimit?: number,
+): Promise<void> {
+  const { windowSeconds } = RATE_LIMITS[bucket];
+  const limit = raisedLimit ?? RATE_LIMITS[bucket].limit;
   const window = Math.floor(Date.now() / 1000 / windowSeconds);
   const key = `ratelimit:${bucket}:${identity}:${window}`;
 

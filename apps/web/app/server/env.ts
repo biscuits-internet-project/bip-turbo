@@ -21,6 +21,10 @@ export const envSchema = z.object({
   // missing value can't crash boot in dev or CI — the check site fails closed instead,
   // rejecting every request when it is unset rather than taking the app down.
   ADMIN_API_KEY: z.string().optional(),
+  // Raised rate limits granted to specific API keys, OAuth apps or users; see
+  // `rateLimitOverride` in api-caller.ts for the format. Optional: absent means
+  // everyone gets the defaults.
+  RATE_LIMIT_OVERRIDES: z.string().optional(),
   // Salts the published fingerprint of a shared email-alias namespace, so two
   // duplicate-account groups under different subdomains stay distinguishable without
   // either subdomain ever leaving the database. Optional on purpose: absent, the

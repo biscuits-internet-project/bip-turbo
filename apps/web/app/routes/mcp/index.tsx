@@ -2,8 +2,9 @@ import { InvalidSearchQueryError } from "@bip/core";
 import type { Instrument, TrackMusicianDelta } from "@bip/domain";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { logger } from "~/lib/logger";
-import { isAuthorizedAdminRequest } from "~/server/admin-api-key";
-import { enforceRateLimit } from "~/server/rate-limit";
+import { apiCallerIdentity, authenticateApiCaller, rateLimitOverride } from "~/server/api-caller";
+import { protectedResourceMetadataUrl } from "~/server/oauth-protected-resource";
+import { enforceCallerRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 
 // MCP JSON-RPC Protocol Handler
@@ -847,6 +848,21 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   }
 }
 
+function unauthorized(): Response {
+  return new Response(
+    JSON.stringify({
+      error: "Sign in to use the Disco Biscuits MCP server. See https://discobiscuits.net/mcp-info for setup.",
+    }),
+    {
+      status: 401,
+      headers: {
+        "Content-Type": "application/json",
+        "WWW-Authenticate": `Bearer resource_metadata="${protectedResourceMetadataUrl()}"`,
+      },
+    },
+  );
+}
+
 function jsonRpcError(id: string | number, code: number, message: string): JsonRpcResponse {
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
@@ -874,8 +890,15 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  // Every call needs a credential: an OAuth token (MCP apps get one by signing in
+  // through /oauth/consent), a personal API key, or the ops admin key. The 401
+  // tells an MCP app where to start that sign-in.
+  const caller = await authenticateApiCaller(request);
+  if (!caller) return unauthorized();
   // Ops callers (the setlist sync) carry the admin key and are exempt.
-  if (!isAuthorizedAdminRequest(request)) await enforceRateLimit(request, "mcp");
+  if (caller.kind !== "admin") {
+    await enforceCallerRateLimit(request, "mcp", apiCallerIdentity(caller), rateLimitOverride(caller, "mcp"));
+  }
 
   let body: JsonRpcRequest;
   try {
