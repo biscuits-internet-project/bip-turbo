@@ -167,4 +167,25 @@ describe("anonymous MCP access while sign-in rolls out", () => {
     expect(res.headers.get("WWW-Authenticate")).toContain("/.well-known/oauth-protected-resource/mcp/signin");
     mcpEnv.MCP_ALLOW_ANONYMOUS = undefined;
   });
+
+  // Falling back to anonymous here would hide a mistyped or revoked key: the call still
+  // succeeds, just without the key's identity or raised limit.
+  test("a credential that doesn't check out gets a 401 instead of anonymous access", async () => {
+    const { authenticateApiCaller } = await import("~/server/api-caller");
+    vi.clearAllMocks();
+    mcpEnv.MCP_ALLOW_ANONYMOUS = "true";
+    vi.mocked(authenticateApiCaller).mockResolvedValueOnce(null);
+    const request = new Request("https://discobiscuits.net/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer bip_revoked" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+
+    const res = (await action({ request } as never)) as Response;
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("WWW-Authenticate")).toContain("oauth-protected-resource/mcp");
+    expect((await res.json()).error).toContain("Invalid or expired");
+    mcpEnv.MCP_ALLOW_ANONYMOUS = undefined;
+  });
 });

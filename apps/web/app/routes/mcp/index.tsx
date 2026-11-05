@@ -853,10 +853,11 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
   }
 }
 
-function unauthorized(resourcePath: McpResourcePath): Response {
+function unauthorized(resourcePath: McpResourcePath, presentedCredential: boolean): Response {
+  const problem = presentedCredential ? "Invalid or expired API key or token." : "Sign in to use the server.";
   return new Response(
     JSON.stringify({
-      error: "Sign in to use the Disco Biscuits MCP server. See https://discobiscuits.net/mcp-info for setup.",
+      error: `${problem} See https://discobiscuits.net/mcp-info for setup of the Disco Biscuits MCP server.`,
     }),
     {
       status: 401,
@@ -898,11 +899,16 @@ export async function action({ request }: ActionFunctionArgs) {
   // Callers bring a credential: an OAuth token (MCP apps get one by signing in
   // through /oauth/consent), a personal API key, or the ops admin key. The 401
   // tells an MCP app where to start that sign-in. Until anonymous access is
-  // switched off, `/mcp` still serves callers without one, limited by IP.
+  // switched off, `/mcp` still serves callers without one, limited by IP. A credential
+  // that doesn't check out is always refused: falling back to anonymous would hide a
+  // mistyped or revoked key, and an app needs the 401 to refresh an expired token.
   const resourcePath = mcpResourcePath(new URL(request.url).pathname);
   const caller = await authenticateApiCaller(request);
   if (!caller) {
-    if (!anonymousMcpAllowed(resourcePath)) return unauthorized(resourcePath);
+    const presentedCredential = request.headers.has("Authorization");
+    if (presentedCredential || !anonymousMcpAllowed(resourcePath)) {
+      return unauthorized(resourcePath, presentedCredential);
+    }
     await enforceRateLimit(request, "mcp");
   } else if (caller.kind !== "admin") {
     // Ops callers (the setlist sync) carry the admin key and are exempt.

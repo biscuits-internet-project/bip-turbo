@@ -20,6 +20,24 @@ export const meta: MetaFunction = () => {
 
 const MCP_URL = "https://discobiscuits.net/mcp";
 
+const OTHER_CLIENTS = [
+  {
+    name: "VS Code",
+    href: "https://code.visualstudio.com/docs/agents/reference/mcp-configuration",
+    note: 'use "servers" as the top-level key, with "type": "http"',
+  },
+  {
+    name: "Zed",
+    href: "https://zed.dev/docs/ai/mcp",
+    note: 'goes under "context_servers"; prompts you to sign in when there\'s no Authorization header',
+  },
+  {
+    name: "Cline",
+    href: "https://docs.cline.bot/mcp/configuring-mcp-servers",
+    note: 'set "type": "streamableHttp"',
+  },
+];
+
 function CopyButton({ text, className }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -124,24 +142,28 @@ export default function McpInfo() {
       <Card variant="panel" className="mb-8">
         <CardHeader className="space-y-1">
           <CardTitle>Signing in</CardTitle>
-          <CardDescription>The server needs a discobiscuits.net account</CardDescription>
+          <CardDescription>Use your discobiscuits.net account, through your AI app or with an API key</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-content-text-secondary">
           <p>
-            The first time your AI client connects, it opens a browser window. Log in and click{" "}
-            <strong>Authorize</strong>, and the client takes it from there. Don't have an account?{" "}
+            <strong>In an AI app:</strong> when the app asks you to sign in, it opens a browser window. Log in and click{" "}
+            <strong>Authorize</strong>, and the app takes it from there. You don't need an API key for this. Don't have
+            an account?{" "}
             <Link to="/auth/register" className="text-brand-secondary hover:underline">
               Sign up
             </Link>
             .
           </p>
           <p>
-            Calling it from a script instead? Create an API key under Settings on{" "}
+            <strong>With an API key:</strong> for scripts, services, and apps you'd rather not sign in through a
+            browser. Create a key under Settings on{" "}
             <Link to="/profile" className="text-brand-secondary hover:underline">
               your profile
-            </Link>{" "}
-            and send it as a bearer token:
+            </Link>
+            . It acts as you, so keep it out of anything you share or commit. Each client's setup below shows where it
+            goes.
           </p>
+          <p>From a script:</p>
           <CodeBlock
             code={`curl ${MCP_URL} \\
   -H "Authorization: Bearer $DISCOBISCUITS_API_KEY" \\
@@ -180,53 +202,61 @@ export default function McpInfo() {
             <TabsContent value="claude-code" className="space-y-4">
               <div className="prose prose-invert max-w-none space-y-4">
                 <h3 className="text-lg font-semibold text-content-text-primary">Claude Code (CLI)</h3>
-                <p className="text-content-text-secondary">Add the MCP server using the Claude Code CLI:</p>
-                <CodeBlock code={`claude mcp add discobiscuits --transport http ${MCP_URL}`} language="bash" />
-                <p className="text-content-text-secondary mt-4">
-                  Or add it to your <code className="text-brand-secondary">~/.claude.json</code> configuration:
+                <p className="text-content-text-secondary">
+                  Add the server. Include <code className="text-brand-secondary">--scope user</code> to use it in every
+                  project:
                 </p>
+                <CodeBlock code={`claude mcp add --transport http discobiscuits ${MCP_URL}`} language="bash" />
+                <p className="text-content-text-secondary">
+                  If it shows as needing authentication, run <code className="text-brand-secondary">/mcp</code> in
+                  Claude Code and choose <strong>discobiscuits</strong> to sign in.
+                </p>
+                <p className="text-content-text-secondary mt-4">To use an API key instead:</p>
                 <CodeBlock
-                  code={`{
-  "mcpServers": {
-    "discobiscuits": {
-      "type": "http",
-      "url": "${MCP_URL}"
-    }
-  }
-}`}
+                  code={`claude mcp add --transport http discobiscuits ${MCP_URL} \\
+  --header "Authorization: Bearer $DISCOBISCUITS_API_KEY"`}
+                  language="bash"
                 />
               </div>
             </TabsContent>
 
             <TabsContent value="claude-desktop" className="space-y-4">
               <div className="prose prose-invert max-w-none space-y-4">
-                <h3 className="text-lg font-semibold text-content-text-primary">Claude Desktop App</h3>
-                <p className="text-content-text-secondary">Edit your Claude Desktop configuration file:</p>
-                <ul className="text-content-text-secondary list-disc ml-6 space-y-2 my-4">
+                <h3 className="text-lg font-semibold text-content-text-primary">Claude Desktop and claude.ai</h3>
+                <p className="text-content-text-secondary">Add it as a custom connector:</p>
+                <ol className="text-content-text-secondary list-decimal ml-6 space-y-2 my-4">
                   <li>
-                    <strong>macOS:</strong>{" "}
-                    <code className="text-brand-secondary text-sm">
-                      ~/Library/Application Support/Claude/claude_desktop_config.json
-                    </code>
+                    Go to <strong>Customize &gt; Connectors</strong>.
                   </li>
                   <li>
-                    <strong>Windows:</strong>{" "}
-                    <code className="text-brand-secondary text-sm">%APPDATA%\Claude\claude_desktop_config.json</code>
+                    Click <strong>+ Add</strong>, then <strong>Add custom connector</strong>.
                   </li>
-                </ul>
-                <p className="text-content-text-secondary">Add the following configuration:</p>
-                <CodeBlock
-                  code={`{
-  "mcpServers": {
-    "discobiscuits": {
-      "type": "http",
-      "url": "${MCP_URL}"
-    }
-  }
-}`}
-                />
-                <p className="text-content-text-secondary mt-4">
-                  Then restart Claude Desktop to enable the MCP server.
+                  <li>
+                    Name it <strong>discobiscuits</strong>, enter{" "}
+                    <code className="text-brand-secondary">{MCP_URL}</code>, and continue.
+                  </li>
+                  <li>
+                    Choose how to sign in under <strong>Authentication</strong>, then click <strong>Add</strong>.
+                  </li>
+                </ol>
+                <p className="text-content-text-secondary">
+                  To use an API key instead, choose <strong>No sign in</strong> and add a{" "}
+                  <code className="text-brand-secondary">Authorization: Bearer YOUR_API_KEY</code> entry under{" "}
+                  <strong>Request headers</strong>.
+                </p>
+                <p className="text-content-text-secondary">
+                  On a Team or Enterprise plan, an owner adds the connector in{" "}
+                  <strong>Organization settings &gt; Connectors</strong>, and members click <strong>Connect</strong>{" "}
+                  under <strong>Customize &gt; Connectors</strong>. Free plans are limited to one custom connector. See{" "}
+                  <a
+                    href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-secondary hover:underline"
+                  >
+                    Anthropic's guide
+                  </a>
+                  .
                 </p>
               </div>
             </TabsContent>
@@ -235,31 +265,32 @@ export default function McpInfo() {
               <div className="prose prose-invert max-w-none space-y-4">
                 <h3 className="text-lg font-semibold text-content-text-primary">Cursor</h3>
                 <p className="text-content-text-secondary">
-                  Open Cursor Settings and navigate to <strong>Features &gt; MCP Servers</strong>.
-                </p>
-                <p className="text-content-text-secondary">
-                  Click <strong>Add Server</strong> and enter:
-                </p>
-                <ul className="text-content-text-secondary list-disc ml-6 space-y-2 my-4">
-                  <li>
-                    <strong>Name:</strong> discobiscuits
-                  </li>
-                  <li>
-                    <strong>Type:</strong> HTTP
-                  </li>
-                  <li>
-                    <strong>URL:</strong> <code className="text-brand-secondary">{MCP_URL}</code>
-                  </li>
-                </ul>
-                <p className="text-content-text-secondary">
-                  Alternatively, add to your <code className="text-brand-secondary">.cursor/mcp.json</code>:
+                  Add this to <code className="text-brand-secondary">~/.cursor/mcp.json</code> to use it everywhere, or{" "}
+                  <code className="text-brand-secondary">.cursor/mcp.json</code> for one project:
                 </p>
                 <CodeBlock
                   code={`{
   "mcpServers": {
     "discobiscuits": {
-      "type": "http",
       "url": "${MCP_URL}"
+    }
+  }
+}`}
+                />
+                <p className="text-content-text-secondary">
+                  You can turn the server on or off from <strong>Customize</strong> in the sidebar.
+                </p>
+                <p className="text-content-text-secondary mt-4">
+                  To use an API key instead, add a header that reads it from your environment:
+                </p>
+                <CodeBlock
+                  code={`{
+  "mcpServers": {
+    "discobiscuits": {
+      "url": "${MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer \${env:DISCOBISCUITS_API_KEY}"
+      }
     }
   }
 }`}
@@ -270,69 +301,29 @@ export default function McpInfo() {
             <TabsContent value="other" className="space-y-4">
               <div className="prose prose-invert max-w-none space-y-4">
                 <h3 className="text-lg font-semibold text-content-text-primary">Other MCP Clients</h3>
-                <p className="text-content-text-secondary">The following clients also support MCP:</p>
-                <ul className="space-y-3 text-content-text-secondary ml-4 my-4">
-                  <li className="flex items-start gap-2">
-                    <ExternalLink className="h-4 w-4 mt-1 text-brand-secondary flex-shrink-0" />
-                    <div>
-                      <a
-                        href="https://www.windsurf.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-secondary hover:underline font-medium"
-                      >
-                        Windsurf
-                      </a>
-                      <span> - AI-powered IDE with MCP support</span>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ExternalLink className="h-4 w-4 mt-1 text-brand-secondary flex-shrink-0" />
-                    <div>
-                      <a
-                        href="https://zed.dev"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-secondary hover:underline font-medium"
-                      >
-                        Zed
-                      </a>
-                      <span> - High-performance code editor</span>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ExternalLink className="h-4 w-4 mt-1 text-brand-secondary flex-shrink-0" />
-                    <div>
-                      <a
-                        href="https://github.com/cline/cline"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-secondary hover:underline font-medium"
-                      >
-                        Cline
-                      </a>
-                      <span> - VS Code extension for AI coding</span>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ExternalLink className="h-4 w-4 mt-1 text-brand-secondary flex-shrink-0" />
-                    <div>
-                      <a
-                        href="https://code.visualstudio.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-secondary hover:underline font-medium"
-                      >
-                        VS Code + GitHub Copilot
-                      </a>
-                      <span> - MCP support in agent mode</span>
-                    </div>
-                  </li>
-                </ul>
-                <p className="text-content-text-secondary mt-4">
-                  Most clients use a similar JSON configuration format. Refer to your client's documentation for
-                  specific setup instructions.
+                <p className="text-content-text-secondary">
+                  Add <code className="text-brand-secondary">{MCP_URL}</code> as a remote HTTP server. To use an API
+                  key, send it as an <code className="text-brand-secondary">Authorization: Bearer</code> header. The
+                  format differs by client, so check its docs:
                 </p>
+                <ul className="space-y-3 text-content-text-secondary ml-4 my-4">
+                  {OTHER_CLIENTS.map((client) => (
+                    <li key={client.name} className="flex items-start gap-2">
+                      <ExternalLink className="h-4 w-4 mt-1 text-brand-secondary flex-shrink-0" />
+                      <div>
+                        <a
+                          href={client.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-brand-secondary hover:underline font-medium"
+                        >
+                          {client.name}
+                        </a>
+                        <span> - {client.note}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </TabsContent>
           </Tabs>
