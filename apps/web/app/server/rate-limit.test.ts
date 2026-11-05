@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const incrWithExpiry = vi.fn();
-vi.mock("~/server/services", () => ({ services: { redis: { incrWithExpiry } } }));
+const redisGet = vi.fn();
+vi.mock("~/server/services", () => ({ services: { redis: { incrWithExpiry, get: redisGet } } }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 const {
   clientIp,
   enforceRateLimit,
   enforceSiteWideRateLimit,
+  hasTooManyFailedSignIns,
   isFilteredListingRequest,
+  rateLimitAddress,
   rateLimitIdentity,
   RATE_LIMITS,
+  recordFailedSignIn,
 } = await import("~/server/rate-limit");
 
 function request(headers: Record<string, string> = {}) {
@@ -28,6 +32,7 @@ async function thrownBy(promise: Promise<unknown>): Promise<Response | null> {
 
 beforeEach(() => {
   incrWithExpiry.mockReset();
+  redisGet.mockReset();
 });
 
 describe("enforceRateLimit", () => {
@@ -75,6 +80,16 @@ describe("enforceRateLimit", () => {
     }
 
     expect(logger.info).toHaveBeenCalledTimes(1);
+  });
+
+  test("lets the request through when Redis doesn't answer in time", async () => {
+    vi.useFakeTimers();
+    incrWithExpiry.mockReturnValue(new Promise(() => {}));
+    const pending = thrownBy(enforceRateLimit(request(), "api"));
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(await pending).toBeNull();
+    vi.useRealTimers();
   });
 
   test("lets the request through when Redis is unavailable", async () => {
@@ -130,5 +145,54 @@ describe("isFilteredListingRequest", () => {
   test("ignores other pages with query strings", () => {
     expect(check("/shows/2005-12-30-the-electric-factory-philadelphia-pa?x=1")).toBe(false);
     expect(check("/songs?sort=plays")).toBe(false);
+  });
+});
+
+describe("filtered listings, as the router sees them", () => {
+  const check = (path: string) => isFilteredListingRequest(new URL(`https://discobiscuits.net${path}`));
+
+  test("counts other spellings of the same page: case and a trailing slash", () => {
+    expect(check("/SHOWS/STATS?nugs=yes")).toBe(true);
+    expect(check("/shows/stats/?nugs=yes")).toBe(true);
+    expect(check("/Shows/Year/2005/?youtube=true")).toBe(true);
+  });
+
+  test("counts any param that busts the cache, junk included, but not a tracking-only link", () => {
+    expect(check("/shows/year/2005?zzz=1")).toBe(true);
+    expect(check("/shows/year/2005?q=tractorbeam")).toBe(true);
+    expect(check("/shows/year/2005?utm_source=newsletter&utm_medium=email")).toBe(false);
+    expect(check("/shows/stats?fbclid=abc")).toBe(false);
+    expect(check("/shows/stats?utm_source=x&nugs=yes")).toBe(true);
+  });
+});
+
+describe("rateLimitAddress", () => {
+  test("counts an IPv6 caller by its /64, so rotating within it doesn't help", () => {
+    expect(rateLimitAddress("2001:db8:1:2::1")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitAddress("2001:db8:1:2:ffff:ffff:ffff:ffff")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitAddress("2001:db8::1")).toBe("2001:db8:0:0::/64");
+  });
+
+  test("leaves IPv4 alone, including IPv4 written as IPv6", () => {
+    expect(rateLimitAddress("198.51.100.9")).toBe("198.51.100.9");
+    expect(rateLimitAddress("::ffff:198.51.100.9")).toBe("198.51.100.9");
+  });
+});
+
+describe("failed sign-ins", () => {
+  test("are counted per IP, and past the limit the IP's credentials go unchecked", async () => {
+    incrWithExpiry.mockResolvedValue(1);
+    await recordFailedSignIn(request({ "x-forwarded-for": "198.51.100.9" }));
+    expect(incrWithExpiry.mock.calls[0][0]).toMatch(/^ratelimit:failedSignIn:ip:/);
+
+    redisGet.mockResolvedValue(RATE_LIMITS.failedSignIn.limit - 1);
+    expect(await hasTooManyFailedSignIns(request({ "x-forwarded-for": "198.51.100.9" }))).toBe(false);
+    redisGet.mockResolvedValue(RATE_LIMITS.failedSignIn.limit);
+    expect(await hasTooManyFailedSignIns(request({ "x-forwarded-for": "198.51.100.9" }))).toBe(true);
+  });
+
+  test("don't block anyone when Redis is unavailable", async () => {
+    redisGet.mockRejectedValue(new Error("ECONNREFUSED"));
+    expect(await hasTooManyFailedSignIns(request())).toBe(false);
   });
 });

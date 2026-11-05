@@ -4,13 +4,8 @@ import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "rea
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
-import { apiCallerIdentity, authenticateApiCaller, hasApiKey, raisedLimit } from "~/server/api-caller";
-import {
-  enforceCallerRateLimit,
-  enforceRateLimit,
-  enforceSiteWideRateLimit,
-  isFilteredListingRequest,
-} from "~/server/rate-limit";
+import { authenticateApiCaller, hasApiKey, raisedLimit } from "~/server/api-caller";
+import { enforceRateLimit, enforceSiteWideRateLimit, isFilteredListingRequest } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 import { hasCredential } from "~/server/response-headers";
 import { services } from "~/server/services";
@@ -99,33 +94,28 @@ async function limitAnonymousRequest(request: Request) {
 
 async function limitSignedInRequest(request: Request, user: User | null) {
   if (!hasCredential(request) || user?.isAdmin) return;
-  if (user?.apiKey) await limitApiKeyRequest(request, user, user.apiKey);
-  else await limitRequest(request, user);
+  await limitRequest(request, user);
 }
 
-/** Scripts using a personal key get a budget per key, which an admin can raise on the key. */
-async function limitApiKeyRequest(request: Request, user: User, key: ApiKeyOwner) {
-  const { pathname } = new URL(request.url);
-  const caller = { kind: "apiKey" as const, ...key };
-  if (pathname === "/api/search") {
-    await enforceCallerRateLimit(request, "search", apiCallerIdentity(caller));
-  } else if (pathname.startsWith("/api/")) {
-    await enforceCallerRateLimit(request, "api", apiCallerIdentity(caller), raisedLimit(caller, "api"));
-  } else {
-    await limitRequest(request, user);
-  }
-}
-
-/** Every `/api/*` route shares one budget (search has its own); filtered catalog listings have theirs. */
+/**
+ * Every `/api/*` route shares one budget (search has its own); filtered catalog
+ * listings have theirs. A user's API keys share that user's budget, so creating
+ * more keys doesn't buy more requests; an admin can raise it on the key.
+ */
 async function limitRequest(request: Request, user: User | null) {
   const url = new URL(request.url);
-  if (url.pathname === "/api/search") {
+  // React Router matches paths case-insensitively, so `/API/SEARCH` is search too.
+  const path = url.pathname.toLowerCase().replace(/\/+$/, "");
+  const raised = user?.apiKey ? raisedLimit({ kind: "apiKey", ...user.apiKey }, "api") : undefined;
+  if (path === "/api/search") {
     await enforceRateLimit(request, "search", user?.id);
-  } else if (url.pathname.startsWith("/api/")) {
-    await enforceRateLimit(request, "api", user?.id);
+  } else if (path.startsWith("/api/")) {
+    await enforceRateLimit(request, "api", user?.id, raised);
   } else if (isFilteredListingRequest(url)) {
     await enforceRateLimit(request, "filteredListing", user?.id);
-    await enforceSiteWideRateLimit(request, "filteredListingSiteWide");
+    // Signed-in visitors skip the shared cap, so a crawl that exhausts it can't lock
+    // fans out of filtered pages; anyone faking a credential is caught by failedSignIn.
+    if (!user) await enforceSiteWideRateLimit(request, "filteredListingSiteWide");
   }
 }
 
@@ -227,10 +217,7 @@ async function getUser(
     if (!user) {
       const isJsonRequest = request.headers.get("Accept")?.includes("application/json");
       if (isJsonRequest) {
-        throw new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw jsonError(401, "Unauthorized");
       }
       throw redirect("/auth/login");
     }
@@ -244,10 +231,7 @@ async function getUser(
     if (options?.requireAdmin && !isAdmin) {
       const isJsonRequest = request.headers.get("Accept")?.includes("application/json");
       if (isJsonRequest) {
-        throw new Response(JSON.stringify({ error: "Forbidden: Admin access required" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw jsonError(403, "Forbidden: Admin access required");
       }
       throw redirect("/");
     }

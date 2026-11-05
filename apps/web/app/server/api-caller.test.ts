@@ -10,6 +10,9 @@ vi.mock("~/server/admin-api-key", () => ({ isAuthorizedAdminRequest }));
 vi.mock("~/server/env", () => ({ env }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ auth: { getClaims } }) }));
+const hasTooManyFailedSignIns = vi.fn().mockResolvedValue(false);
+const recordFailedSignIn = vi.fn();
+vi.mock("~/server/rate-limit", () => ({ hasTooManyFailedSignIns, recordFailedSignIn }));
 
 const { apiCallerIdentity, authenticateApiCaller, raisedLimit } = await import("~/server/api-caller");
 
@@ -23,6 +26,7 @@ function request(token?: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   isAuthorizedAdminRequest.mockReturnValue(false);
+  hasTooManyFailedSignIns.mockResolvedValue(false);
 });
 
 describe("authenticateApiCaller", () => {
@@ -43,9 +47,18 @@ describe("authenticateApiCaller", () => {
     expect(getClaims).not.toHaveBeenCalled();
   });
 
-  test("rejects an unknown or revoked API key", async () => {
+  test("rejects an unknown or revoked API key, and counts the failure against the IP", async () => {
     authenticate.mockResolvedValue(null);
     expect(await authenticateApiCaller(request("bip_revoked"))).toBeNull();
+    expect(recordFailedSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  test("stops looking up credentials from an IP that keeps sending bad ones", async () => {
+    hasTooManyFailedSignIns.mockResolvedValue(true);
+
+    expect(await authenticateApiCaller(request("bip_guess"))).toBeNull();
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(getClaims).not.toHaveBeenCalled();
   });
 
   test("accepts a verified OAuth access token and keeps its client id", async () => {
@@ -80,8 +93,9 @@ describe("rate limit identity and raised limits", () => {
   };
   const oauthCaller = { kind: "oauth" as const, userId: "u1", clientId: "client-9" };
 
-  test("budgets per key for API keys and per user for OAuth apps", () => {
-    expect(apiCallerIdentity(keyCaller)).toBe("key:k1");
+  test("budgets per user, so a user's keys share one budget", () => {
+    expect(apiCallerIdentity(keyCaller)).toBe("user:u1");
+    expect(apiCallerIdentity({ ...keyCaller, keyId: "k2" })).toBe("user:u1");
     expect(apiCallerIdentity(oauthCaller)).toBe("user:u1");
   });
 

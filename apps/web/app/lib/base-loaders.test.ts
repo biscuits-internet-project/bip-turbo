@@ -9,20 +9,18 @@ vi.mock("~/server/services", () => ({ services: { users: { find: findUser } } })
 vi.mock("~/server/api-caller", () => ({
   hasApiKey: (request: Request) => request.headers.get("Authorization")?.startsWith("Bearer bip_") ?? false,
   authenticateApiCaller,
-  apiCallerIdentity: (caller: { keyId: string }) => `key:${caller.keyId}`,
   raisedLimit: (caller: { apiLimitPerMinute: number | null }) => caller.apiLimitPerMinute ?? undefined,
 }));
 vi.mock("~/server/rate-limit", async (importOriginal) => ({
   isFilteredListingRequest: (await importOriginal<typeof import("~/server/rate-limit")>()).isFilteredListingRequest,
   enforceRateLimit: vi.fn(),
   enforceSiteWideRateLimit: vi.fn(),
-  enforceCallerRateLimit: vi.fn(),
 }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import { adminLoader, publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
-import { enforceCallerRateLimit, enforceRateLimit, enforceSiteWideRateLimit } from "~/server/rate-limit";
+import { enforceRateLimit, enforceSiteWideRateLimit } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 
 /** Run a wrapped loader and return whatever it produced or threw. */
@@ -144,7 +142,7 @@ describe("publicLoader rate limits", () => {
     const { thrown, inner } = await run("/api/ratings");
 
     expect(thrown?.status).toBe(429);
-    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined);
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined, undefined);
     expect(getRequestUser).not.toHaveBeenCalled();
     expect(inner).not.toHaveBeenCalled();
   });
@@ -153,7 +151,7 @@ describe("publicLoader rate limits", () => {
     vi.mocked(getRequestUser).mockResolvedValueOnce({ id: "u1", email: "u@example.com", app_metadata: {} } as never);
     await run("/api/ratings", undefined, SIGNED_IN);
 
-    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1");
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1", undefined);
   });
 
   test("gives search its own budget instead of the API's", async () => {
@@ -169,6 +167,21 @@ describe("publicLoader rate limits", () => {
 
     expect(enforceRateLimit).not.toHaveBeenCalled();
     expect(enforceSiteWideRateLimit).not.toHaveBeenCalled();
+  });
+
+  test("keeps signed-in visitors out of the site-wide filtered-listing cap", async () => {
+    vi.mocked(getRequestUser).mockResolvedValueOnce({ id: "u1", email: "u@example.com", app_metadata: {} } as never);
+    await run("/shows/year/2005?nugs=yes", undefined, SIGNED_IN);
+
+    expect(buckets()).toEqual(["filteredListing"]);
+    expect(enforceSiteWideRateLimit).not.toHaveBeenCalled();
+  });
+
+  test("routes other spellings of an API path to the same budget", async () => {
+    await run("/API/Search/");
+    await run("/Api/ratings");
+
+    expect(buckets()).toEqual(["search", "api"]);
   });
 
   test("counts filtered catalog listings per caller and site-wide", async () => {
@@ -219,11 +232,10 @@ describe("personal API keys", () => {
     expect(getRequestUser).not.toHaveBeenCalled();
   });
 
-  test("are counted per key, with the limit set on the key", async () => {
+  test("count against their owner's budget, with the limit set on the key", async () => {
     await run("/api/attendances", undefined, KEY);
 
-    expect(enforceCallerRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "key:k1", 900);
-    expect(enforceRateLimit).not.toHaveBeenCalled();
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1", 900);
   });
 
   test("get a 401 when unknown or revoked", async () => {

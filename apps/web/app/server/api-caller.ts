@@ -2,6 +2,7 @@ import { API_KEY_PREFIX, type ApiKeyOwner } from "@bip/domain";
 import { createClient } from "@supabase/supabase-js";
 import { isAuthorizedAdminRequest } from "~/server/admin-api-key";
 import { env } from "~/server/env";
+import { hasTooManyFailedSignIns, recordFailedSignIn } from "~/server/rate-limit";
 import { services } from "~/server/services";
 
 /**
@@ -34,13 +35,25 @@ function tokenVerifier() {
   return verifier;
 }
 
-/** Resolves the request's bearer credential, or null when it has none or it doesn't check out. */
+/**
+ * Resolves the request's bearer credential, or null when it has none or it doesn't
+ * check out. An IP that keeps presenting bad ones stops being looked up at all (it
+ * just gets null), so a flood of guessed keys or forged tokens can't make every
+ * request cost a database or Supabase round trip.
+ */
 export async function authenticateApiCaller(request: Request): Promise<ApiCaller | null> {
   if (isAuthorizedAdminRequest(request)) return { kind: "admin" };
 
   const token = bearerToken(request);
   if (!token) return null;
+  if (await hasTooManyFailedSignIns(request)) return null;
 
+  const caller = await verifyBearerToken(token);
+  if (!caller) await recordFailedSignIn(request);
+  return caller;
+}
+
+async function verifyBearerToken(token: string): Promise<ApiCaller | null> {
   if (token.startsWith(API_KEY_PREFIX)) {
     const owner = await services.apiKeys.authenticate(token);
     return owner ? { kind: "apiKey", ...owner } : null;
@@ -53,9 +66,12 @@ export async function authenticateApiCaller(request: Request): Promise<ApiCaller
   return { kind: "oauth", userId: data.claims.sub, clientId };
 }
 
-/** Rate-limit identity: one budget per key, and one per user for OAuth apps. */
+/**
+ * Rate-limit identity: one budget per user, shared by all their keys and apps, so
+ * creating more keys doesn't buy more requests.
+ */
 export function apiCallerIdentity(caller: Exclude<ApiCaller, { kind: "admin" }>): string {
-  return caller.kind === "apiKey" ? `key:${caller.keyId}` : `user:${caller.userId}`;
+  return `user:${caller.userId}`;
 }
 
 /**

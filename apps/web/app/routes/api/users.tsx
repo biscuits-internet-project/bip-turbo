@@ -3,6 +3,7 @@ import type { ActionFunctionArgs } from "react-router-dom";
 import { z } from "zod";
 import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/lib/logger";
+import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 import { getServerClient } from "~/server/supabase";
 
@@ -29,6 +30,9 @@ const updateUserSchema = z.object({
 });
 
 export async function action({ request }: ActionFunctionArgs) {
+  // Not wrapped in base-loaders, so it applies the shared /api budget itself (by IP).
+  await enforceRateLimit(request, "api");
+
   try {
     // Get current session user
     const { supabase } = getServerClient(request);
