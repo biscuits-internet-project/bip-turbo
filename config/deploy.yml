@@ -65,6 +65,9 @@ env:
     - ADMIN_API_KEY
   clear:
     APP_ENV: production
+    # Keeps /mcp open without sign-in while MCP sign-in rolls out. Test sign-in at
+    # /mcp/signin, then set this to "false" (or delete it) and deploy.
+    MCP_ALLOW_ANONYMOUS: "true"
     PORT: "8080"
     # Container-name DNS on the kamal Docker network; accessory IPs change on
     # restart, so never point this at a raw container IP.

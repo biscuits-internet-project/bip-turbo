@@ -21,6 +21,9 @@ export const envSchema = z.object({
   // missing value can't crash boot in dev or CI — the check site fails closed instead,
   // rejecting every request when it is unset rather than taking the app down.
   ADMIN_API_KEY: z.string().optional(),
+  // "true" keeps /mcp open to callers without a credential (rate-limited by IP)
+  // while MCP sign-in rolls out. Unset or "false" requires sign-in.
+  MCP_ALLOW_ANONYMOUS: z.enum(["true", "false"]).optional(),
   // Salts the published fingerprint of a shared email-alias namespace, so two
   // duplicate-account groups under different subdomains stay distinguishable without
   // either subdomain ever leaving the database. Optional on purpose: absent, the

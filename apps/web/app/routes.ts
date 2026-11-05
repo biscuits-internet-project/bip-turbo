@@ -187,11 +187,16 @@ export default [
 
   // MCP JSON-RPC endpoint (all tools exposed via JSON-RPC protocol)
   route("mcp", "routes/mcp/index.tsx"),
+  // The same server, always requiring sign-in; see mcpResourcePath.
+  route("mcp/signin", "routes/mcp/index.tsx", { id: "mcp-signin" }),
   route(".well-known/oauth-protected-resource", "routes/well-known/oauth-protected-resource.tsx", {
     id: "oauth-protected-resource",
   }),
   route(".well-known/oauth-protected-resource/mcp", "routes/well-known/oauth-protected-resource.tsx", {
     id: "oauth-protected-resource-mcp",
+  }),
+  route(".well-known/oauth-protected-resource/mcp/signin", "routes/well-known/oauth-protected-resource.tsx", {
+    id: "oauth-protected-resource-mcp-signin",
   }),
 
   // Health check route

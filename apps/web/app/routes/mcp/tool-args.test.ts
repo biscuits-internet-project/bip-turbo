@@ -7,24 +7,27 @@ const logError = vi.fn();
 class InvalidSearchQueryError extends Error {}
 vi.mock("@bip/core", () => ({ InvalidSearchQueryError }));
 vi.mock("~/lib/logger", () => ({ logger: { error: logError, info: vi.fn(), warn: vi.fn() } }));
-vi.mock("~/server/rate-limit", () => ({ enforceCallerRateLimit: vi.fn() }));
+vi.mock("~/server/rate-limit", () => ({ enforceCallerRateLimit: vi.fn(), enforceRateLimit: vi.fn() }));
 const KEY_CALLER = { kind: "apiKey", keyId: "k1", userId: "u1" };
 vi.mock("~/server/api-caller", () => ({
   authenticateApiCaller: vi.fn(async () => KEY_CALLER),
   apiCallerIdentity: () => "key:k1",
   raisedLimit: () => undefined,
 }));
-vi.mock("~/server/oauth-protected-resource", () => ({
-  protectedResourceMetadataUrl: () => "https://discobiscuits.net/.well-known/oauth-protected-resource/mcp",
+const mcpEnv = vi.hoisted(() => ({
+  BASE_URL: "https://discobiscuits.net",
+  SUPABASE_URL: "https://ref.supabase.co",
+  MCP_ALLOW_ANONYMOUS: undefined as string | undefined,
 }));
+vi.mock("~/server/env", () => ({ env: mcpEnv }));
 vi.mock("~/server/services", () => ({
   services: { songs: { findBySlug }, venues: { findBySlug }, shows: { findBySlug }, postgresSearch: { searchSongs } },
 }));
 
 const { action } = await import("./index");
 
-function postTool(name: string, args: unknown) {
-  const request = new Request("http://localhost/mcp", {
+function postTool(name: string, args: unknown, path = "/mcp") {
+  const request = new Request(`https://discobiscuits.net${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
@@ -134,5 +137,34 @@ describe("MCP sign-in and rate limit", () => {
     await callTool("get_song", { slug: "basis-for-a-day" });
 
     expect(enforceCallerRateLimit).not.toHaveBeenCalled();
+  });
+});
+
+describe("anonymous MCP access while sign-in rolls out", () => {
+  test("is served at /mcp when switched on, limited by IP", async () => {
+    const { authenticateApiCaller } = await import("~/server/api-caller");
+    const { enforceRateLimit } = await import("~/server/rate-limit");
+    vi.clearAllMocks();
+    mcpEnv.MCP_ALLOW_ANONYMOUS = "true";
+    vi.mocked(authenticateApiCaller).mockResolvedValueOnce(null);
+
+    const res = await postTool("get_song", { slug: "basis-for-a-day" });
+
+    expect(res.status).toBe(200);
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "mcp");
+    mcpEnv.MCP_ALLOW_ANONYMOUS = undefined;
+  });
+
+  test("still asks for sign-in at /mcp/signin, pointing at that path's metadata", async () => {
+    const { authenticateApiCaller } = await import("~/server/api-caller");
+    vi.clearAllMocks();
+    mcpEnv.MCP_ALLOW_ANONYMOUS = "true";
+    vi.mocked(authenticateApiCaller).mockResolvedValueOnce(null);
+
+    const res = await postTool("get_song", { slug: "basis-for-a-day" }, "/mcp/signin");
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get("WWW-Authenticate")).toContain("/.well-known/oauth-protected-resource/mcp/signin");
+    mcpEnv.MCP_ALLOW_ANONYMOUS = undefined;
   });
 });
