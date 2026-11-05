@@ -1,0 +1,18 @@
+{
+  "description": "bip rate limiting rules",
+  "rules": [
+    {
+      "ref": "bip-rate-limit-pages-per-ip",
+      "description": "Block one IP sending over 50 page requests in 10 seconds (scanners). API and MCP keep their per-key limits in the app.",
+      "action": "block",
+      "enabled": true,
+      "expression": "not starts_with(http.request.uri.path, \"/assets/\") and not starts_with(http.request.uri.path, \"/api/\") and not starts_with(http.request.uri.path, \"/mcp\") and not cf.client.bot",
+      "ratelimit": {
+        "characteristics": ["cf.colo.id", "ip.src"],
+        "period": 10,
+        "requests_per_period": 50,
+        "mitigation_timeout": 10
+      }
+    }
+  ]
+}
