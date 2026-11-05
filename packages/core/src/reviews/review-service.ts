@@ -1,4 +1,5 @@
 import type { Logger, Review, ReviewMinimal, UserMinimal } from "@bip/domain";
+import type { CacheInvalidationService } from "../_shared/cache/cache-invalidation-service";
 import type { DbClient, DbReview, DbUser } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
@@ -51,6 +52,7 @@ export class ReviewService {
   constructor(
     protected readonly db: DbClient,
     protected readonly logger: Logger,
+    private readonly cacheInvalidation?: CacheInvalidationService,
   ) {}
 
   async findById(id: string): Promise<Review | null> {
@@ -167,6 +169,7 @@ export class ReviewService {
         user: true,
       },
     });
+    await this.invalidateShowPage(result.showId);
     return mapReviewToMinimal(result, result.user);
   }
 
@@ -178,18 +181,27 @@ export class ReviewService {
         user: true,
       },
     });
+    await this.invalidateShowPage(result.showId);
     return mapReviewToMinimal(result, result.user);
   }
 
   async delete(id: string): Promise<boolean> {
     try {
-      await this.db.review.delete({
+      const deleted = await this.db.review.delete({
         where: { id },
       });
+      await this.invalidateShowPage(deleted.showId);
       return true;
     } catch (_error) {
       return false;
     }
+  }
+
+  /** Reviews render on the show page, which signed-out visitors get from Cloudflare. */
+  private async invalidateShowPage(showId: string | null): Promise<void> {
+    if (!this.cacheInvalidation || !showId) return;
+    const show = await this.db.show.findUnique({ where: { id: showId }, select: { slug: true } });
+    if (show?.slug) await this.cacheInvalidation.invalidateShow(show.slug);
   }
 
   /**

@@ -11,6 +11,17 @@ function makeCache() {
   };
 }
 
+function makeWithEdge() {
+  const cache = makeCache();
+  const cloudflareCache = {
+    purgePaths: vi.fn().mockResolvedValue(undefined),
+    purgeYearListings: vi.fn().mockResolvedValue(undefined),
+    purgeShowsStats: vi.fn().mockResolvedValue(undefined),
+  };
+  const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
+  return { service, cache, cloudflareCache };
+}
+
 describe("CacheInvalidationService.invalidateAttendanceCaches", () => {
   // Toggling attendance changes which shows appear in /songs filtered-by-user
   // results AND which setlists appear on the user-profile Shows Attended tab.
@@ -61,14 +72,77 @@ describe("CacheInvalidationService.invalidatePerformanceListings", () => {
 
 describe("CacheInvalidationService.invalidateShow", () => {
   test("clears Redis and purges the show's page from Cloudflare", async () => {
-    const cache = { del: vi.fn().mockResolvedValue(undefined) };
-    const cloudflareCache = { purgeShow: vi.fn().mockResolvedValue(undefined) };
-    const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
+    const { service, cache, cloudflareCache } = makeWithEdge();
 
     await service.invalidateShow("2024-04-06-red-rocks");
 
     expect(cache.del).toHaveBeenCalledWith(CacheKeys.show.data("2024-04-06-red-rocks"));
-    expect(cloudflareCache.purgeShow).toHaveBeenCalledWith("2024-04-06-red-rocks");
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/shows/2024-04-06-red-rocks"]);
+  });
+
+  // A visitor who misses at the edge between the two steps would otherwise re-cache
+  // the old setlist from Redis for another hour.
+  test("clears Redis before purging the edge", async () => {
+    const { service, cache, cloudflareCache } = makeWithEdge();
+
+    await service.invalidateShow("2024-04-06-red-rocks");
+
+    expect(cache.del.mock.invocationCallOrder[0]).toBeLessThan(cloudflareCache.purgePaths.mock.invocationCallOrder[0]);
+  });
+});
+
+describe("CacheInvalidationService edits to a single page", () => {
+  test("a song rename clears the song index and both of its pages", async () => {
+    const { service, cache, cloudflareCache } = makeWithEdge();
+
+    await service.invalidateSong("old-name", "new-name");
+
+    expect(cache.del).toHaveBeenCalledWith(CacheKeys.songs.index());
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/songs"]);
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/songs/old-name", "/songs/new-name"]);
+  });
+
+  test("new play counts purge only that song's page", async () => {
+    const { service, cache, cloudflareCache } = makeWithEdge();
+
+    await service.invalidateSongPage("jam");
+
+    expect(cache.del).not.toHaveBeenCalled();
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/songs/jam"]);
+  });
+
+  test("a venue edit purges the list and its page", async () => {
+    const { service, cloudflareCache } = makeWithEdge();
+
+    await service.invalidateVenue("red-rocks");
+
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/venues", "/venues/red-rocks"]);
+  });
+
+  test("a musician edit clears Redis, the list and its page", async () => {
+    const { service, cache, cloudflareCache } = makeWithEdge();
+
+    await service.invalidateMusician("aron-magner");
+
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.musicians.allPages());
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/musicians", "/musicians/aron-magner"]);
+  });
+
+  test("an author edit clears the song caches and its page", async () => {
+    const { service, cache, cloudflareCache } = makeWithEdge();
+
+    await service.invalidateAuthor("trey-parker");
+
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.authors.allPages());
+    expect(cloudflareCache.purgePaths).toHaveBeenCalledWith(["/authors/trey-parker"]);
+  });
+
+  test("still clears Redis when Cloudflare isn't configured", async () => {
+    const cache = makeCache();
+
+    await new CacheInvalidationService(cache as never, logger).invalidateMusician("aron-magner");
+
+    expect(cache.delPattern).toHaveBeenCalledWith(CacheKeys.musicians.allPages());
   });
 });
 

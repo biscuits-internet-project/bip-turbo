@@ -6,6 +6,7 @@ import type {
   MusicianAppearances,
   MusicianWithStats,
 } from "@bip/domain";
+import type { CacheInvalidationService } from "../_shared/cache/cache-invalidation-service";
 import type { DbClient, DbInstrument, DbMusician } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -216,6 +217,7 @@ export class MusicianService {
   constructor(
     protected readonly db: DbClient,
     protected readonly logger: Logger,
+    private readonly cacheInvalidation?: CacheInvalidationService,
   ) {}
 
   async findById(id: string): Promise<Musician | null> {
@@ -488,6 +490,7 @@ export class MusicianService {
       where: { id: current.id },
       data: updateData,
     });
+    await this.cacheInvalidation?.invalidateMusician(slug, result.slug);
     return mapMusicianToDomainEntity(result);
   }
 
@@ -510,7 +513,8 @@ export class MusicianService {
     }
 
     try {
-      await this.db.musician.delete({ where: { id } });
+      const deleted = await this.db.musician.delete({ where: { id } });
+      await this.cacheInvalidation?.invalidateMusician(deleted.slug);
       return true;
     } catch (_error) {
       return false;

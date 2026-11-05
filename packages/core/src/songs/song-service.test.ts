@@ -383,3 +383,33 @@ describe("SongService.updateSongStatistics — gap denormalization", () => {
     });
   });
 });
+
+describe("SongService edge cache invalidation", () => {
+  function makeInvalidation() {
+    return {
+      invalidateSong: vi.fn().mockResolvedValue(undefined),
+      invalidateSongPage: vi.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  test("a rename invalidates the old and new pages", async () => {
+    const db = { song: { update: vi.fn().mockResolvedValue({ slug: "new-name", songAuthors: [] }) } };
+    const invalidation = makeInvalidation();
+
+    await new SongService(db as never, logger, invalidation as never).update("old-name", { title: "New Name" });
+
+    expect(invalidation.invalidateSong).toHaveBeenCalledWith("old-name", "new-name");
+  });
+
+  test("a song with no plays left still purges its page", async () => {
+    const db = {
+      track: { findMany: vi.fn().mockResolvedValue([]) },
+      song: { update: vi.fn().mockResolvedValue({}), findUnique: vi.fn().mockResolvedValue({ slug: "jam" }) },
+    };
+    const invalidation = makeInvalidation();
+
+    await new SongService(db as never, logger, invalidation as never).updateSongStatistics("song-1");
+
+    expect(invalidation.invalidateSongPage).toHaveBeenCalledWith("jam");
+  });
+});

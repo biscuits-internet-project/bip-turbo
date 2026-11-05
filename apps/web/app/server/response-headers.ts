@@ -47,23 +47,35 @@ export function preventSharedCachingForCredentialedRequests(request: Request, he
   headers.set("Cache-Control", "private, no-store");
 }
 
-/** Live data at a glance: the home page, tour dates and anything listing recent plays. */
-const FRESH_PAGES = [/^\/$/, /^\/songs\/(recent|this-year)$/, /^\/shows\/tour-dates$/, /^\/blog(\/|$)/];
-
 /** Public pages that render the same for every signed-out visitor. */
 const SHARED_PAGES = [
-  ...FRESH_PAGES,
-  /^\/(songs|shows|venues|musicians|authors|resources)(\/|$)/,
+  /^\/$/,
+  /^\/(songs|shows|venues|musicians|authors|resources|blog)(\/|$)/,
   /^\/(about|terms|privacy|community|mcp-info|calibrated-rating-algorithm)$/,
 ];
 
-const FRESH_PAGE_CACHE_CONTROL = "public, max-age=0, s-maxage=300";
-const SHARED_PAGE_CACHE_CONTROL = "public, max-age=0, s-maxage=3600";
+/**
+ * The pages an edit purges by name (see CacheInvalidationService), plus those only a
+ * deploy can change. Every other shared page self-heals on the short TTL. Cloudflare's
+ * cache key includes the query string and purge-by-URL matches it exactly, so these
+ * only count in their exact spelling: a `?x=1` or trailing slash is an entry no purge
+ * can reach.
+ */
+const PURGEABLE_PAGES = [
+  /^\/shows\/\d{4}-\d{2}-\d{2}-[^/]+$/,
+  /^\/(songs|venues|musicians)$/,
+  /^\/songs\/(?!all-timers$|jam-charts$|histories$|recent$|this-year$)[^/]+$/,
+  /^\/(venues|musicians|authors)\/[^/]+$/,
+  /^\/(about|terms|privacy|community|mcp-info|calibrated-rating-algorithm)$/,
+];
+
+const PURGEABLE_PAGE_CACHE_CONTROL = "public, max-age=0, s-maxage=3600";
+const SELF_HEALING_PAGE_CACHE_CONTROL = "public, max-age=0, s-maxage=300";
 
 /** `/shows/foo.data` and `/_root.data` are the single-fetch twins of `/shows/foo` and `/`. */
-function documentPath(url: URL): string {
-  const path = url.pathname.replace(/\.data$/, "").replace(/\/+$/, "");
-  return path === "" || path === "/_root" ? "/" : path;
+function documentPath(pathname: string): string {
+  if (pathname === "/_root.data") return "/";
+  return pathname.replace(/\.data$/, "");
 }
 
 /**
@@ -79,8 +91,10 @@ function documentPath(url: URL): string {
 export function allowSharedCachingOfPublicPages(request: Request, status: number, headers: Headers): void {
   if (status !== 200 || !["GET", "HEAD"].includes(request.method)) return;
   if (hasCredential(request) || headers.has("Cache-Control")) return;
-  const path = documentPath(new URL(request.url));
-  if (!SHARED_PAGES.some((page) => page.test(path))) return;
-  const fresh = FRESH_PAGES.some((page) => page.test(path));
-  headers.set("Cache-Control", fresh ? FRESH_PAGE_CACHE_CONTROL : SHARED_PAGE_CACHE_CONTROL);
+  const url = new URL(request.url);
+  const path = documentPath(url.pathname);
+  const bare = path.replace(/(.)\/+$/, "$1");
+  if (!SHARED_PAGES.some((page) => page.test(bare))) return;
+  const purgeable = !url.search && PURGEABLE_PAGES.some((page) => page.test(path));
+  headers.set("Cache-Control", purgeable ? PURGEABLE_PAGE_CACHE_CONTROL : SELF_HEALING_PAGE_CACHE_CONTROL);
 }

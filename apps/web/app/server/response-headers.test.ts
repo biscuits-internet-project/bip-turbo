@@ -69,21 +69,39 @@ describe("shared caching of public pages", () => {
   const HOUR = "public, max-age=0, s-maxage=3600";
   const FIVE_MINUTES = "public, max-age=0, s-maxage=300";
 
+  // An edit purges these by exact URL, so they can hold a long TTL.
   test.each([
+    "/songs",
     "/songs/jam",
-    "/songs/jam/stats",
-    "/shows/2024-04-06-red-rocks",
+    "/venues",
     "/venues/red-rocks",
+    "/musicians/aron-magner",
+    "/authors/trey-parker",
+    "/shows/2024-04-06-red-rocks",
     "/about",
   ])("%s stays at the edge for an hour", (path) => expect(policyFor(path)).toBe(HOUR));
 
+  // Nothing purges these by name, so they self-heal quickly.
   test.each([
     "/",
     "/songs/recent",
+    "/songs/all-timers",
+    "/songs/jam/stats",
     "/shows/tour-dates",
+    "/shows/top-rated",
     "/blog",
     "/blog/a-post",
+    "/resources/perfume",
   ])("%s stays at the edge for five minutes", (path) => expect(policyFor(path)).toBe(FIVE_MINUTES));
+
+  // The cache key includes the query string and purge-by-URL matches exactly, so a
+  // long TTL here would be an entry no edit could ever evict.
+  test.each([
+    "/songs/jam?x=1",
+    "/shows/2024-04-06-red-rocks?view=gap-chart",
+    "/songs/jam/",
+    "/songs/jam.data?_routes=root",
+  ])("%s can't be purged, so it gets the short TTL", (path) => expect(policyFor(path)).toBe(FIVE_MINUTES));
 
   // A client-side navigation reads the `.data` twin, never the document.
   test("single-fetch twins get the same policy as their page", () => {

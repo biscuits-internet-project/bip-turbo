@@ -1,4 +1,5 @@
 import { type Logger, narrowSongKind, type Song, type SongAuthor, type SongKind, type TrendingSong } from "@bip/domain";
+import type { CacheInvalidationService } from "../_shared/cache/cache-invalidation-service";
 import type { DbClient, DbSong } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -102,6 +103,7 @@ export class SongService {
   constructor(
     protected readonly db: DbClient,
     protected readonly logger: Logger,
+    private readonly cacheInvalidation?: CacheInvalidationService,
   ) {}
 
   async findById(id: string): Promise<Song | null> {
@@ -348,6 +350,8 @@ export class SongService {
       include: songAuthorsInclude,
     });
 
+    await this.cacheInvalidation?.invalidateSong(result.slug);
+
     return mapSongToDomainEntity(result);
   }
 
@@ -368,13 +372,17 @@ export class SongService {
       include: songAuthorsInclude,
     });
 
+    await this.cacheInvalidation?.invalidateSong(slug, result.slug);
+
     return mapSongToDomainEntity(result);
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.song.delete({
+    const deleted = await this.db.song.delete({
       where: { id },
     });
+
+    await this.cacheInvalidation?.invalidateSong(deleted.slug);
   }
 
   /**
@@ -416,6 +424,7 @@ export class SongService {
           mostCommonYear: null,
         },
       });
+      await this.purgeSongPage(songId);
       return;
     }
 
@@ -471,5 +480,12 @@ export class SongService {
         },
       }),
     ]);
+    await this.purgeSongPage(songId);
+  }
+
+  private async purgeSongPage(songId: string): Promise<void> {
+    if (!this.cacheInvalidation) return;
+    const song = await this.db.song.findUnique({ where: { id: songId }, select: { slug: true } });
+    if (song) await this.cacheInvalidation.invalidateSongPage(song.slug);
   }
 }

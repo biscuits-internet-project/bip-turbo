@@ -37,11 +37,11 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("CloudflareCacheService.purgeShow", () => {
+describe("CloudflareCacheService.purgePaths", () => {
   test("purges both the document and the .data URL", async () => {
     const fetchMock = stubFetch();
 
-    await makeService().purgeShow("2024-04-06-red-rocks");
+    await makeService().purgePaths(["/shows/2024-04-06-red-rocks"]);
 
     expect(purgedFileBatches(fetchMock)).toEqual([
       [

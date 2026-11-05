@@ -1,4 +1,5 @@
 import type { Logger, Venue } from "@bip/domain";
+import type { CacheInvalidationService } from "../_shared/cache/cache-invalidation-service";
 import type { DbClient, DbVenue } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { QueryOptions } from "../_shared/database/types";
@@ -40,6 +41,7 @@ export class VenueService {
   constructor(
     protected readonly db: DbClient,
     protected readonly logger: Logger,
+    private readonly cacheInvalidation?: CacheInvalidationService,
   ) {}
 
   private async generateVenueSlug(
@@ -299,6 +301,7 @@ export class VenueService {
       where: { id: current.id },
       data: updateData,
     });
+    await this.cacheInvalidation?.invalidateVenue(slug, result.slug);
     return mapVenueToDomainEntity(result);
   }
 
@@ -319,9 +322,10 @@ export class VenueService {
     }
 
     try {
-      await this.db.venue.delete({
+      const deleted = await this.db.venue.delete({
         where: { id },
       });
+      await this.cacheInvalidation?.invalidateVenue(deleted.slug);
       return true;
     } catch (_error) {
       return false;
