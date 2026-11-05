@@ -10,6 +10,7 @@ import { formatSetLabel } from "~/components/setlist/set-label";
 import { SetlistDisplaySettings } from "~/components/setlist/setlist-display-settings";
 import { SetlistList } from "~/components/setlist/setlist-list";
 import type { ShowExternalSources } from "~/components/setlist/show-external-badges";
+import { ApiKeysCard } from "~/components/settings/api-keys-card";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { LinkButton } from "~/components/ui/link-button";
@@ -152,6 +153,9 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
   const trackRatingBuckets =
     activeTab === "track-ratings" ? await services.ratings.getTrackRatingDistribution(user.id) : [];
 
+  // Only the owner ever receives their keys: this page is public.
+  const apiKeys = isOwnProfile && activeTab === "settings" ? await services.apiKeys.listActive(user.id) : [];
+
   const totalRatings = tabCounts.showRatingsCount + tabCounts.trackRatingsCount;
 
   // Total attended pages comes straight from the count — no full-list fetch
@@ -241,6 +245,7 @@ async function loadUserProfile({ params, request, context }: LoaderFunctionArgs 
     trackRatingsSort,
     ratingsDirection,
     activeTab,
+    apiKeys,
     attendanceCount,
     reviewCount: tabCounts.reviewCount,
     showRatingsCount: tabCounts.showRatingsCount,
@@ -301,6 +306,7 @@ export default function UserProfile() {
     trackRatingsSort,
     ratingsDirection,
     activeTab,
+    apiKeys,
     attendanceCount,
     reviewCount,
     showRatingsCount,
@@ -505,6 +511,7 @@ export default function UserProfile() {
               ratingDecimalPlaces={user.ratingDecimalPlaces}
             />
             <SetlistDisplaySettings showSetlistTimes={user.showSetlistTimes} />
+            <ApiKeysCard initialKeys={apiKeys} />
           </TabsContent>
         )}
 

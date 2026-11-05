@@ -1,10 +1,9 @@
-import type { ApiKey, User } from "@bip/domain";
+import type { User } from "@bip/domain";
 import { ArrowLeft, Upload, User as UserIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { MetaFunction } from "react-router-dom";
 import { Link, useLoaderData, useNavigation, useRevalidator } from "react-router-dom";
 import { toast } from "sonner";
-import { ApiKeysCard } from "~/components/settings/api-keys-card";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ImageUpload } from "~/components/ui/image-upload";
@@ -21,19 +20,19 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export const loader = protectedLoader(async ({ context }): Promise<{ user: User; apiKeys: ApiKey[] }> => {
+export const loader = protectedLoader(async ({ context }): Promise<{ user: User }> => {
   const user = await services.users.findByEmail(context.currentUser.email);
 
   if (!user) {
     throw new Response("User not found", { status: 404 });
   }
 
-  return { user, apiKeys: await services.apiKeys.listActive(user.id) };
+  return { user };
 });
 
 export default function ProfileEdit() {
-  const data = useLoaderData() as { user: User; apiKeys: ApiKey[] };
-  const { user, apiKeys } = data;
+  const data = useLoaderData() as { user: User };
+  const { user } = data;
   const { supabase } = useSession();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
@@ -263,8 +262,6 @@ export default function ProfileEdit() {
           </form>
         </CardContent>
       </Card>
-
-      <ApiKeysCard initialKeys={apiKeys} />
     </div>
   );
 }
