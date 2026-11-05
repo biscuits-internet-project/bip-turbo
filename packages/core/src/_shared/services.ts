@@ -78,7 +78,7 @@ export function createServices(container: ServiceContainer): Services {
   const postgresSearchService = new PostgresSearchService(container.db, container.logger, searchHistoryService);
 
   // Create core services
-  const songService = new SongService(container.db, container.logger);
+  const songService = new SongService(container.db, container.logger, container.cacheInvalidation);
   // StatsService is constructed first so ShowService can hand it the
   // post-mutation rebuild dependency.
   const statsService = new StatsService(container.db, container.cache);
@@ -104,10 +104,10 @@ export function createServices(container: ServiceContainer): Services {
 
   return {
     annotations: new AnnotationService(container.db, container.logger, container.cacheInvalidation),
-    authors: new AuthorService(container.db, container.logger),
+    authors: new AuthorService(container.db, container.logger, container.cacheInvalidation),
     blogPosts: new BlogPostService(container.db, container.redis, container.logger),
     instruments: new InstrumentService(container.db, container.logger),
-    musicians: new MusicianService(container.db, container.logger),
+    musicians: new MusicianService(container.db, container.logger, container.cacheInvalidation),
     shows: new ShowService(container.db, container.logger, container.cacheInvalidation, statsService),
     songs: songService,
     stats: statsService,
@@ -120,10 +120,10 @@ export function createServices(container: ServiceContainer): Services {
       container.logger,
     ),
     setlists: new SetlistService(container.db, rockOperaService),
-    venues: new VenueService(container.db, container.logger),
+    venues: new VenueService(container.db, container.logger, container.cacheInvalidation),
     users: new UserService(container.db, container.logger),
     personalSongHistory: new PersonalSongHistoryService(container.db, container.cache),
-    reviews: new ReviewService(container.db, container.logger),
+    reviews: new ReviewService(container.db, container.logger, container.cacheInvalidation),
     rockOperas: rockOperaService,
     ratings: new RatingService(container.db, raterWeightService, aliasRulesetService),
     raterWeights: raterWeightService,

@@ -1,4 +1,5 @@
 import type { Author, Logger } from "@bip/domain";
+import type { CacheInvalidationService } from "../_shared/cache/cache-invalidation-service";
 import type { DbAuthor, DbClient } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -27,6 +28,7 @@ export class AuthorService {
   constructor(
     protected readonly db: DbClient,
     protected readonly logger: Logger,
+    private readonly cacheInvalidation?: CacheInvalidationService,
   ) {}
 
   private async generateAuthorSlug(name: string, excludeId?: string): Promise<string> {
@@ -208,6 +210,7 @@ export class AuthorService {
       where: { id: current.id },
       data: updateData,
     });
+    await this.cacheInvalidation?.invalidateAuthor(slug, result.slug);
     return mapAuthorToDomainEntity(result);
   }
 
@@ -225,9 +228,10 @@ export class AuthorService {
     }
 
     try {
-      await this.db.author.delete({
+      const deleted = await this.db.author.delete({
         where: { id },
       });
+      await this.cacheInvalidation?.invalidateAuthor(deleted.slug);
       return true;
     } catch (_error) {
       return false;

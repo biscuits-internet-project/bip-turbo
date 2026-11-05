@@ -95,9 +95,13 @@ export class CloudflareCacheService {
     await this.purgeUrls(this.toAbsoluteUrls(paths));
   }
 
-  /** Purge one show's page, so an edit is live for signed-out visitors right away. */
-  async purgeShow(slug: string): Promise<void> {
-    await this.purgeUrls(this.toAbsoluteUrls([`/shows/${slug}`]));
+  /**
+   * Purge pages by exact path, each with its single-fetch twin. Only reaches URLs with
+   * no query string, which is why `allowSharedCachingOfPublicPages` gives everything
+   * else a short TTL.
+   */
+  async purgePaths(paths: string[]): Promise<void> {
+    await this.purgeUrls(this.toAbsoluteUrls(paths));
   }
 
   /**

@@ -33,7 +33,37 @@ export class CacheInvalidationService {
   async invalidateShow(slug: string): Promise<void> {
     this.logger.info(`Invalidating show cache for slug: ${slug}`);
 
-    await Promise.all([this.cache.del(CacheKeys.show.data(slug)), this.cloudflareCache?.purgeShow(slug)]);
+    // Redis first: a visitor who misses at the edge mid-purge must not re-cache the old setlist.
+    await this.cache.del(CacheKeys.show.data(slug));
+    await this.cloudflareCache?.purgePaths([`/shows/${slug}`]);
+  }
+
+  /** After a song edit. Pass the old and new slug when a rename moves its page. */
+  async invalidateSong(...slugs: string[]): Promise<void> {
+    await this.invalidateSongCaches();
+    await this.cloudflareCache?.purgePaths(slugs.map((slug) => `/songs/${slug}`));
+  }
+
+  /** After a song's play counts and gaps change, which only touches its own page. */
+  async invalidateSongPage(slug: string): Promise<void> {
+    await this.cloudflareCache?.purgePaths([`/songs/${slug}`]);
+  }
+
+  /** After a venue edit. Pass the old and new slug when a rename moves its page. */
+  async invalidateVenue(...slugs: string[]): Promise<void> {
+    await this.cloudflareCache?.purgePaths(["/venues", ...slugs.map((slug) => `/venues/${slug}`)]);
+  }
+
+  /** After a musician edit. Pass the old and new slug when a rename moves its page. */
+  async invalidateMusician(...slugs: string[]): Promise<void> {
+    await this.cache.delPattern(CacheKeys.musicians.allPages());
+    await this.cloudflareCache?.purgePaths(["/musicians", ...slugs.map((slug) => `/musicians/${slug}`)]);
+  }
+
+  /** After an author edit. Song and musician pages list authors, so their Redis caches go too. */
+  async invalidateAuthor(...slugs: string[]): Promise<void> {
+    await this.invalidateSongCaches();
+    await this.cloudflareCache?.purgePaths(slugs.map((slug) => `/authors/${slug}`));
   }
 
   /**
@@ -49,7 +79,7 @@ export class CacheInvalidationService {
 
     this.logger.info(`Invalidating show cache for ID: ${showId}, slug: ${slug}`);
 
-    await this.cache.del(CacheKeys.show.data(slug));
+    await this.invalidateShow(slug);
   }
 
   /**
@@ -132,6 +162,8 @@ export class CacheInvalidationService {
       this.cache.delPattern(CacheKeys.musicians.allPages()),
       this.cache.delPattern(CacheKeys.authors.allPages()),
     ]);
+    // After Redis, so a miss at the edge can't re-cache the old index.
+    await this.cloudflareCache?.purgePaths(["/songs"]);
   }
 
   /**
