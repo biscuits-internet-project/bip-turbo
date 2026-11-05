@@ -10,18 +10,13 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formInputClass } from "~/lib/form-styles";
 import { RATE_LIMIT_DEFAULTS } from "~/lib/rate-limit-defaults";
+import { formatDateMedium } from "~/lib/utils";
 
 /** Dates arrive from the loader as strings. */
 type ListedKey = Omit<ApiKey, "createdAt" | "lastUsedAt"> & {
   createdAt: string | Date;
   lastUsedAt: string | Date | null;
 };
-
-function formatDay(value: string | Date | null): string {
-  return value
-    ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-    : "never";
-}
 
 async function callKeysApi(method: "POST" | "DELETE", body: object) {
   const response = await fetch("/api/api-keys", {
@@ -127,8 +122,8 @@ export function ApiKeysCard({ initialKeys }: { initialKeys: ListedKey[] }) {
                 <div className="min-w-0">
                   <p className="truncate font-medium text-content-text-primary">{key.name}</p>
                   <p className="text-xs text-content-text-tertiary">
-                    <code>{key.prefix}…</code> · created {formatDay(key.createdAt)} · last used{" "}
-                    {formatDay(key.lastUsedAt)}
+                    <code>{key.prefix}…</code> · created {formatDateMedium(key.createdAt)} · last used{" "}
+                    {key.lastUsedAt ? formatDateMedium(key.lastUsedAt) : "never"}
                   </p>
                 </div>
                 <Button

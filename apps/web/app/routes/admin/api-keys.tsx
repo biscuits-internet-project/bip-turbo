@@ -9,6 +9,7 @@ import { useSerializedLoaderData } from "~/hooks/use-serialized-loader-data";
 import { adminAction, adminLoader } from "~/lib/base-loaders";
 import { formInputClass } from "~/lib/form-styles";
 import { RATE_LIMIT_DEFAULTS } from "~/lib/rate-limit-defaults";
+import { formatDateMedium } from "~/lib/utils";
 import { services } from "~/server/services";
 
 interface LoaderData {
@@ -39,12 +40,6 @@ export const action = adminAction(async ({ request }) => {
   return { saved: id };
 });
 
-function formatDay(value: string | Date | null): string {
-  return value
-    ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-    : "never";
-}
-
 function KeyLimitsRow({ apiKey }: { apiKey: AdminApiKey }) {
   const fetcher = useFetcher<{ error?: string; saved?: string }>();
   const saving = fetcher.state !== "idle";
@@ -55,7 +50,7 @@ function KeyLimitsRow({ apiKey }: { apiKey: AdminApiKey }) {
         <p className="font-medium text-content-text-primary">{apiKey.name}</p>
         <p className="text-xs text-content-text-tertiary">
           {apiKey.ownerUsername ?? "unknown user"} · <code>{apiKey.prefix}…</code> · last used{" "}
-          {formatDay(apiKey.lastUsedAt)}
+          {apiKey.lastUsedAt ? formatDateMedium(apiKey.lastUsedAt) : "never"}
         </p>
         {fetcher.data?.error && <p className="text-xs text-red-400">{fetcher.data.error}</p>}
         {fetcher.data?.saved && !saving && <p className="text-xs text-green-400">Saved</p>}
