@@ -50,6 +50,7 @@ const baseLoaderData = {
   attendedPagination: { page: 1, pageSize: 100, totalPages: 1, total: 1 },
   ratingsPagination: { page: 1, pageSize: 100, totalPages: 1, total: 0 },
   activeTab: "shows" as const,
+  apiKeys: [],
   showRatings: [],
   trackRatings: [],
   attendanceCount: 1,
@@ -179,6 +180,26 @@ describe("UserProfile", () => {
 
   // Regression guard: the settings cards must not leak above the tab strip on
   // the default (Shows) landing — they belong to the Settings tab only.
+  test("Settings tab lists your API keys from the loader", () => {
+    vi.mocked(useSerializedLoaderData).mockReturnValue({
+      ...baseLoaderData,
+      activeTab: "settings",
+      apiKeys: [
+        {
+          id: "k1",
+          name: "setlist-script",
+          prefix: "bip_abc",
+          createdAt: "2026-11-01T00:00:00Z",
+          lastUsedAt: null,
+        },
+      ],
+    });
+    renderProfile();
+
+    expect(screen.getByText("API keys")).toBeInTheDocument();
+    expect(screen.getByText("setlist-script")).toBeInTheDocument();
+  });
+
   test("does not render the settings cards above the tab strip", () => {
     renderProfile();
 

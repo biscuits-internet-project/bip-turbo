@@ -68,7 +68,7 @@ export default [
   ...prefix("oauth", [route("consent", "routes/oauth/consent.tsx")]),
 
   // Profile routes
-  ...prefix("profile", [route("edit", "routes/profile/edit.tsx")]),
+  ...prefix("profile", [index("routes/profile/index.tsx"), route("edit", "routes/profile/edit.tsx")]),
 
   // User profile routes
   ...prefix("users", [route(":username", "routes/users/$username.tsx")]),

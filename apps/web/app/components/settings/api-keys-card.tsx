@@ -76,7 +76,8 @@ export function ApiKeysCard({ initialKeys }: { initialKeys: ListedKey[] }) {
       <CardContent className="space-y-6">
         <div className="space-y-2 text-sm text-content-text-secondary">
           <p>
-            Use a key to call the <Link to="/mcp-info">MCP server</Link> or the API from a script. Send it as{" "}
+            Most AI apps sign in on their own, so you don't need a key for them. Use a key to call the{" "}
+            <Link to="/mcp-info">MCP server</Link> or the API from a script. Send it as{" "}
             <code className="text-content-text-primary">Authorization: Bearer &lt;key&gt;</code>. A key acts as you, but
             can't do admin actions.
           </p>

@@ -136,9 +136,9 @@ export default function McpInfo() {
             .
           </p>
           <p>
-            Calling it from a script instead? Create an API key in your{" "}
-            <Link to="/profile/edit" className="text-brand-secondary hover:underline">
-              settings
+            Calling it from a script instead? Create an API key under Settings on{" "}
+            <Link to="/profile" className="text-brand-secondary hover:underline">
+              your profile
             </Link>{" "}
             and send it as a bearer token:
           </p>
