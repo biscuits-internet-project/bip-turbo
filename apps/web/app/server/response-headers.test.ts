@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { hasCredential, preventSharedCachingForCredentialedRequests } from "./response-headers";
+import {
+  allowSharedCachingOfPublicPages,
+  hasCredential,
+  preventSharedCachingForCredentialedRequests,
+} from "./response-headers";
 
 const PUBLIC_EDGE = "public, max-age=300, s-maxage=86400, stale-while-revalidate=3600";
 
@@ -38,5 +42,82 @@ describe("shared-cache guard for signed-in renders", () => {
   test("an already-private policy is left alone", () => {
     const signedIn = req({ Cookie: "sb-abcd-auth-token=x" });
     expect(cacheControlFor(signedIn, "private, no-cache")).toBe("private, no-cache");
+  });
+});
+
+describe("shared caching of public pages", () => {
+  function policyFor(
+    path: string,
+    {
+      status = 200,
+      method = "GET",
+      requestHeaders = {},
+      initial = {},
+    }: {
+      status?: number;
+      method?: string;
+      requestHeaders?: Record<string, string>;
+      initial?: Record<string, string>;
+    } = {},
+  ) {
+    const headers = new Headers(initial);
+    const request = new Request(`https://discobiscuits.net${path}`, { method, headers: requestHeaders });
+    allowSharedCachingOfPublicPages(request, status, headers);
+    return headers.get("Cache-Control");
+  }
+
+  const HOUR = "public, max-age=0, s-maxage=3600";
+  const FIVE_MINUTES = "public, max-age=0, s-maxage=300";
+
+  test.each([
+    "/songs/jam",
+    "/songs/jam/stats",
+    "/shows/2024-04-06-red-rocks",
+    "/venues/red-rocks",
+    "/about",
+  ])("%s stays at the edge for an hour", (path) => expect(policyFor(path)).toBe(HOUR));
+
+  test.each([
+    "/",
+    "/songs/recent",
+    "/shows/tour-dates",
+    "/blog",
+    "/blog/a-post",
+  ])("%s stays at the edge for five minutes", (path) => expect(policyFor(path)).toBe(FIVE_MINUTES));
+
+  // A client-side navigation reads the `.data` twin, never the document.
+  test("single-fetch twins get the same policy as their page", () => {
+    expect(policyFor("/songs/jam.data")).toBe(HOUR);
+    expect(policyFor("/_root.data")).toBe(FIVE_MINUTES);
+    expect(policyFor("/songs/recent.data")).toBe(FIVE_MINUTES);
+  });
+
+  test.each([
+    "/auth/login",
+    "/oauth/consent",
+    "/profile",
+    "/users/someone",
+    "/admin",
+    "/on-this-day/11-05",
+    "/mcp",
+  ])("%s is never marked cacheable", (path) => expect(policyFor(path)).toBeNull());
+
+  test("a signed-in request is never marked cacheable", () => {
+    expect(policyFor("/songs/jam", { requestHeaders: { Cookie: "sb-abcd-auth-token=x" } })).toBeNull();
+    expect(policyFor("/songs/jam", { requestHeaders: { Authorization: "Bearer jwt" } })).toBeNull();
+  });
+
+  // A protected page redirects a signed-out visitor; that redirect, a not-found and an
+  // error must not outlive what caused them.
+  test.each([301, 302, 404, 429, 500])("a %i is never marked cacheable", (status) => {
+    expect(policyFor("/songs/new", { status })).toBeNull();
+  });
+
+  test("a form post is never marked cacheable", () => {
+    expect(policyFor("/songs/jam", { method: "POST" })).toBeNull();
+  });
+
+  test("a route's own policy wins", () => {
+    expect(policyFor("/shows/stats", { initial: { "Cache-Control": PUBLIC_EDGE } })).toBe(PUBLIC_EDGE);
   });
 });

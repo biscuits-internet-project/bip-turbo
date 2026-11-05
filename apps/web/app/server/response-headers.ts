@@ -46,3 +46,41 @@ export function preventSharedCachingForCredentialedRequests(request: Request, he
   if (cacheControl && !/\bpublic\b|s-maxage/i.test(cacheControl)) return;
   headers.set("Cache-Control", "private, no-store");
 }
+
+/** Live data at a glance: the home page, tour dates and anything listing recent plays. */
+const FRESH_PAGES = [/^\/$/, /^\/songs\/(recent|this-year)$/, /^\/shows\/tour-dates$/, /^\/blog(\/|$)/];
+
+/** Public pages that render the same for every signed-out visitor. */
+const SHARED_PAGES = [
+  ...FRESH_PAGES,
+  /^\/(songs|shows|venues|musicians|authors|resources)(\/|$)/,
+  /^\/(about|terms|privacy|community|mcp-info|calibrated-rating-algorithm)$/,
+];
+
+const FRESH_PAGE_CACHE_CONTROL = "public, max-age=0, s-maxage=300";
+const SHARED_PAGE_CACHE_CONTROL = "public, max-age=0, s-maxage=3600";
+
+/** `/shows/foo.data` and `/_root.data` are the single-fetch twins of `/shows/foo` and `/`. */
+function documentPath(url: URL): string {
+  const path = url.pathname.replace(/\.data$/, "").replace(/\/+$/, "");
+  return path === "" || path === "/_root" ? "/" : path;
+}
+
+/**
+ * Let Cloudflare hold signed-out renders of public pages, so a crawl doesn't reach the
+ * app for a page it has already rendered. Browsers always revalidate (`max-age=0`), so
+ * someone who signs in never sees their own browser's signed-out copy.
+ *
+ * Only a 200 qualifies: a redirect or a not-found must not outlive what caused it. A
+ * route that sets its own Cache-Control keeps it. Pages not listed here send no header,
+ * which the Cloudflare cache rule (`ops/cloudflare/cache-rules.json`) treats as "don't
+ * cache". That rule also skips the cache for any request with a session cookie.
+ */
+export function allowSharedCachingOfPublicPages(request: Request, status: number, headers: Headers): void {
+  if (status !== 200 || !["GET", "HEAD"].includes(request.method)) return;
+  if (hasCredential(request) || headers.has("Cache-Control")) return;
+  const path = documentPath(new URL(request.url));
+  if (!SHARED_PAGES.some((page) => page.test(path))) return;
+  const fresh = FRESH_PAGES.some((page) => page.test(path));
+  headers.set("Cache-Control", fresh ? FRESH_PAGE_CACHE_CONTROL : SHARED_PAGE_CACHE_CONTROL);
+}

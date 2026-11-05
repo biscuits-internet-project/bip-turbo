@@ -33,7 +33,7 @@ export class CacheInvalidationService {
   async invalidateShow(slug: string): Promise<void> {
     this.logger.info(`Invalidating show cache for slug: ${slug}`);
 
-    await this.cache.del(CacheKeys.show.data(slug));
+    await Promise.all([this.cache.del(CacheKeys.show.data(slug)), this.cloudflareCache?.purgeShow(slug)]);
   }
 
   /**
