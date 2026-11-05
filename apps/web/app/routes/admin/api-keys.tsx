@@ -62,8 +62,8 @@ function KeyLimitsRow({ apiKey }: { apiKey: AdminApiKey }) {
       </div>
       <fetcher.Form method="post" className="flex items-end gap-2">
         <input type="hidden" name="id" value={apiKey.id} />
-        <label className="space-y-1 text-xs text-content-text-tertiary">
-          <span>MCP / min</span>
+        <div className="space-y-1 text-xs text-content-text-tertiary">
+          <span aria-hidden="true">MCP / min</span>
           <Input
             name="mcpLimitPerMinute"
             type="number"
@@ -73,9 +73,9 @@ function KeyLimitsRow({ apiKey }: { apiKey: AdminApiKey }) {
             aria-label={`MCP limit for ${apiKey.name}`}
             className={`${formInputClass} w-28`}
           />
-        </label>
-        <label className="space-y-1 text-xs text-content-text-tertiary">
-          <span>API / min</span>
+        </div>
+        <div className="space-y-1 text-xs text-content-text-tertiary">
+          <span aria-hidden="true">API / min</span>
           <Input
             name="apiLimitPerMinute"
             type="number"
@@ -85,7 +85,7 @@ function KeyLimitsRow({ apiKey }: { apiKey: AdminApiKey }) {
             aria-label={`API limit for ${apiKey.name}`}
             className={`${formInputClass} w-28`}
           />
-        </label>
+        </div>
         <Button type="submit" variant="outline" disabled={saving}>
           {saving ? "Saving…" : "Save"}
         </Button>
