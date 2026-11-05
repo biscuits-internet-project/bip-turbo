@@ -3,7 +3,7 @@ import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "rea
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
-import { enforceRateLimit } from "~/server/rate-limit";
+import { enforceRateLimit, isFilteredListingRequest } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 import { services } from "~/server/services";
 
@@ -61,7 +61,7 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
         context.currentUser = user as TContext["currentUser"];
       }
 
-      await limitApiRequest(args.request, user);
+      await limitRequest(args.request, user);
 
       const result = await fn({ ...args, context });
 
@@ -76,12 +76,15 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
 }
 
 /**
- * Every `/api/*` route shares one per-caller budget. Admins are exempt: their
- * bulk edits (reordering a setlist, a lineup pass) legitimately burst past it.
+ * Every `/api/*` route shares one per-caller budget, and filtered catalog
+ * listings have their own. Admins are exempt: their bulk edits (reordering a
+ * setlist, a lineup pass) legitimately burst past it.
  */
-async function limitApiRequest(request: Request, user: User | null) {
-  if (user?.isAdmin || !new URL(request.url).pathname.startsWith("/api/")) return;
-  await enforceRateLimit(request, "api", user?.id);
+async function limitRequest(request: Request, user: User | null) {
+  if (user?.isAdmin) return;
+  const url = new URL(request.url);
+  if (url.pathname.startsWith("/api/")) await enforceRateLimit(request, "api", user?.id);
+  else if (isFilteredListingRequest(url)) await enforceRateLimit(request, "filteredListing", user?.id);
 }
 
 /**
@@ -135,7 +138,7 @@ export function createAction<T, TContext extends PublicContext = PublicContext>(
         context.currentUser = user as TContext["currentUser"];
       }
 
-      await limitApiRequest(args.request, user);
+      await limitRequest(args.request, user);
 
       const result = await fn({ ...args, context });
 

@@ -5,7 +5,10 @@ import { describe, expect, test, vi } from "vitest";
 // Supabase/Prisma into the test bundle.
 vi.mock("~/server/request-user", () => ({ getRequestUser: vi.fn().mockResolvedValue(null) }));
 vi.mock("~/server/services", () => ({ services: {} }));
-vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
+vi.mock("~/server/rate-limit", async (importOriginal) => ({
+  isFilteredListingRequest: (await importOriginal<typeof import("~/server/rate-limit")>()).isFilteredListingRequest,
+  enforceRateLimit: vi.fn(),
+}));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import { publicLoader } from "~/lib/base-loaders";
@@ -117,7 +120,7 @@ describe("publicLoader success logging", () => {
   });
 });
 
-describe("publicLoader API rate limit", () => {
+describe("publicLoader rate limits", () => {
   test("counts an /api request against the caller's budget", async () => {
     vi.mocked(enforceRateLimit).mockClear();
     await run("/api/ratings");
@@ -133,11 +136,24 @@ describe("publicLoader API rate limit", () => {
     expect(inner).not.toHaveBeenCalled();
   });
 
-  test("leaves page loaders alone", async () => {
+  test("leaves ordinary page loads alone", async () => {
     vi.mocked(enforceRateLimit).mockClear();
     await run("/shows/stats");
+    await run("/shows/year/2001");
+    await run("/songs?sort=plays");
 
     expect(enforceRateLimit).not.toHaveBeenCalled();
+  });
+
+  test("counts filtered catalog listings against their own budget", async () => {
+    vi.mocked(enforceRateLimit).mockClear();
+    await run("/shows/year/2005?nugs=yes&youtube=true");
+    await run("/shows/stats?archive=no");
+
+    expect(vi.mocked(enforceRateLimit).mock.calls.map((call) => call[1])).toEqual([
+      "filteredListing",
+      "filteredListing",
+    ]);
   });
 
   test("exempts admins", async () => {
