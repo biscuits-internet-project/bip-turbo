@@ -1,8 +1,7 @@
 import { InvalidSearchQueryError, MAX_SEARCH_QUERY_LENGTH } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router";
-import { type PublicContext, publicLoader } from "~/lib/base-loaders";
+import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
-import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 
 interface SearchRequest {
@@ -27,12 +26,10 @@ interface SearchResponse {
 }
 
 // POST /api/search - Perform vector search
-export const action = publicLoader(async ({ request, context }: ActionFunctionArgs & { context: PublicContext }) => {
+export const action = publicLoader(async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
     throw new Response("Method not allowed", { status: 405 });
   }
-
-  await enforceRateLimit(request, "search", context.currentUser?.id);
 
   const startTime = Date.now();
 

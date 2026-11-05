@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Server-only modules, stubbed so the wrapper can be exercised without pulling
 // Supabase/Prisma into the test bundle.
@@ -8,22 +8,23 @@ vi.mock("~/server/services", () => ({ services: {} }));
 vi.mock("~/server/rate-limit", async (importOriginal) => ({
   isFilteredListingRequest: (await importOriginal<typeof import("~/server/rate-limit")>()).isFilteredListingRequest,
   enforceRateLimit: vi.fn(),
+  enforceSiteWideRateLimit: vi.fn(),
 }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
 import { publicLoader } from "~/lib/base-loaders";
 import { logger } from "~/lib/logger";
-import { enforceRateLimit } from "~/server/rate-limit";
+import { enforceRateLimit, enforceSiteWideRateLimit } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
 
 /** Run a wrapped loader and return whatever it produced or threw. */
-async function run(url: string, inner = vi.fn().mockResolvedValue("rendered")) {
+async function run(url: string, inner = vi.fn().mockResolvedValue("rendered"), headers: HeadersInit = {}) {
   const loader = publicLoader(inner);
   try {
     return {
       thrown: null,
       result: await (loader as (args: LoaderFunctionArgs) => Promise<unknown>)({
-        request: new Request(`https://discobiscuits.net${url}`),
+        request: new Request(`https://discobiscuits.net${url}`, { headers }),
         params: {},
         context: {},
       } as unknown as LoaderFunctionArgs),
@@ -121,49 +122,62 @@ describe("publicLoader success logging", () => {
 });
 
 describe("publicLoader rate limits", () => {
-  test("counts an /api request against the caller's budget", async () => {
-    vi.mocked(enforceRateLimit).mockClear();
-    await run("/api/ratings");
+  const SIGNED_IN = { Authorization: "Bearer token" };
+  const buckets = () => vi.mocked(enforceRateLimit).mock.calls.map((call) => call[1]);
 
-    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined);
+  beforeEach(() => {
+    vi.mocked(enforceRateLimit).mockClear();
+    vi.mocked(enforceSiteWideRateLimit).mockClear();
+    vi.mocked(getRequestUser).mockClear();
   });
 
-  test("stops an over-limit /api request before the loader runs", async () => {
+  test("counts an anonymous /api request by IP before the auth lookup", async () => {
     vi.mocked(enforceRateLimit).mockRejectedValueOnce(new Response(null, { status: 429 }));
     const { thrown, inner } = await run("/api/ratings");
 
     expect(thrown?.status).toBe(429);
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", undefined);
+    expect(getRequestUser).not.toHaveBeenCalled();
     expect(inner).not.toHaveBeenCalled();
   });
 
+  test("counts a signed-in /api request by user id", async () => {
+    vi.mocked(getRequestUser).mockResolvedValueOnce({ id: "u1", email: "u@example.com", app_metadata: {} } as never);
+    await run("/api/ratings", undefined, SIGNED_IN);
+
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api", "u1");
+  });
+
+  test("gives search its own budget instead of the API's", async () => {
+    await run("/api/search");
+
+    expect(buckets()).toEqual(["search"]);
+  });
+
   test("leaves ordinary page loads alone", async () => {
-    vi.mocked(enforceRateLimit).mockClear();
     await run("/shows/stats");
     await run("/shows/year/2001");
     await run("/songs?sort=plays");
 
     expect(enforceRateLimit).not.toHaveBeenCalled();
+    expect(enforceSiteWideRateLimit).not.toHaveBeenCalled();
   });
 
-  test("counts filtered catalog listings against their own budget", async () => {
-    vi.mocked(enforceRateLimit).mockClear();
+  test("counts filtered catalog listings per caller and site-wide", async () => {
     await run("/shows/year/2005?nugs=yes&youtube=true");
     await run("/shows/stats?archive=no");
 
-    expect(vi.mocked(enforceRateLimit).mock.calls.map((call) => call[1])).toEqual([
-      "filteredListing",
-      "filteredListing",
-    ]);
+    expect(buckets()).toEqual(["filteredListing", "filteredListing"]);
+    expect(enforceSiteWideRateLimit).toHaveBeenCalledTimes(2);
   });
 
   test("exempts admins", async () => {
-    vi.mocked(enforceRateLimit).mockClear();
     vi.mocked(getRequestUser).mockResolvedValueOnce({
       id: "admin-1",
       email: "a@example.com",
       app_metadata: { isAdmin: true },
     } as never);
-    await run("/api/shows/reorder");
+    await run("/api/shows/reorder", undefined, SIGNED_IN);
 
     expect(enforceRateLimit).not.toHaveBeenCalled();
   });

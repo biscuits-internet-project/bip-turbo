@@ -4,9 +4,14 @@ const incrWithExpiry = vi.fn();
 vi.mock("~/server/services", () => ({ services: { redis: { incrWithExpiry } } }));
 vi.mock("~/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
-const { enforceRateLimit, isFilteredListingRequest, rateLimitIdentity, RATE_LIMITS } = await import(
-  "~/server/rate-limit"
-);
+const {
+  clientIp,
+  enforceRateLimit,
+  enforceSiteWideRateLimit,
+  isFilteredListingRequest,
+  rateLimitIdentity,
+  RATE_LIMITS,
+} = await import("~/server/rate-limit");
 
 function request(headers: Record<string, string> = {}) {
   return new Request("https://discobiscuits.net/api/ratings", { headers });
@@ -51,28 +56,64 @@ describe("enforceRateLimit", () => {
     expect(ttl).toBe(RATE_LIMITS.search.windowSeconds);
   });
 
+  test("counts the site-wide budget under one shared key", async () => {
+    incrWithExpiry.mockResolvedValue(1);
+    await enforceSiteWideRateLimit(request({ "x-forwarded-for": "198.51.100.9" }), "filteredListingSiteWide");
+    await enforceSiteWideRateLimit(request({ "x-forwarded-for": "198.51.100.10" }), "filteredListingSiteWide");
+
+    const [first, second] = incrWithExpiry.mock.calls.map((call) => call[0]);
+    expect(first).toMatch(/^ratelimit:filteredListingSiteWide:all:\d+$/);
+    expect(second).toBe(first);
+  });
+
+  test("logs a caller's first rejection in a window, not every one", async () => {
+    const { logger } = await import("~/lib/logger");
+    vi.mocked(logger.info).mockClear();
+    for (const count of [61, 62, 63]) {
+      incrWithExpiry.mockResolvedValueOnce(count);
+      await thrownBy(enforceRateLimit(request(), "mcp"));
+    }
+
+    expect(logger.info).toHaveBeenCalledTimes(1);
+  });
+
   test("lets the request through when Redis is unavailable", async () => {
     incrWithExpiry.mockRejectedValue(new Error("ECONNREFUSED"));
     expect(await thrownBy(enforceRateLimit(request(), "api"))).toBeNull();
   });
 });
 
+describe("clientIp", () => {
+  const CF_EDGE = "172.70.1.1";
+
+  test("uses Cloudflare's client header when the request came from a Cloudflare edge", () => {
+    expect(clientIp(request({ "x-forwarded-for": CF_EDGE, "cf-connecting-ip": "203.0.113.7" }))).toBe("203.0.113.7");
+  });
+
+  test("ignores a client header sent by anyone who isn't Cloudflare", () => {
+    expect(clientIp(request({ "x-forwarded-for": "198.51.100.9", "cf-connecting-ip": "203.0.113.7" }))).toBe(
+      "198.51.100.9",
+    );
+  });
+
+  test("recognizes Cloudflare's IPv6 edges", () => {
+    expect(clientIp(request({ "x-forwarded-for": "2606:4700::1", "cf-connecting-ip": "203.0.113.7" }))).toBe(
+      "203.0.113.7",
+    );
+  });
+});
+
 describe("rateLimitIdentity", () => {
   test("keys a logged-in caller by user id, whatever their IP", () => {
-    expect(rateLimitIdentity(request({ "cf-connecting-ip": "1.1.1.1" }), "u1")).toBe("user:u1");
+    expect(rateLimitIdentity(request({ "x-forwarded-for": "198.51.100.9" }), "u1")).toBe("user:u1");
   });
 
-  test("keys anonymous callers by Cloudflare's client IP, not the edge in X-Forwarded-For", () => {
-    const a = rateLimitIdentity(request({ "cf-connecting-ip": "1.1.1.1", "x-forwarded-for": "9.9.9.9" }));
-    const b = rateLimitIdentity(request({ "cf-connecting-ip": "1.1.1.1", "x-forwarded-for": "8.8.8.8" }));
-    const c = rateLimitIdentity(request({ "cf-connecting-ip": "2.2.2.2", "x-forwarded-for": "9.9.9.9" }));
+  test("keys anonymous callers by IP, without storing the raw address", () => {
+    const a = rateLimitIdentity(request({ "x-forwarded-for": "198.51.100.9" }));
+    const b = rateLimitIdentity(request({ "x-forwarded-for": "198.51.100.10" }));
 
-    expect(a).toBe(b);
-    expect(a).not.toBe(c);
-  });
-
-  test("never stores the raw IP", () => {
-    expect(rateLimitIdentity(request({ "cf-connecting-ip": "1.1.1.1" }))).not.toContain("1.1.1.1");
+    expect(a).not.toBe(b);
+    expect(a).not.toContain("198.51.100.9");
   });
 });
 

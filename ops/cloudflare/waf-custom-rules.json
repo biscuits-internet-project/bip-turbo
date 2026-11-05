@@ -1,0 +1,12 @@
+{
+  "description": "bip custom WAF rules",
+  "rules": [
+    {
+      "ref": "bip-challenge-filtered-listings",
+      "description": "Challenge filtered show listings (crawlers walking filter combinations)",
+      "action": "managed_challenge",
+      "enabled": true,
+      "expression": "(starts_with(http.request.uri.path, \"/shows/year/\") or http.request.uri.path eq \"/shows/stats\") and http.request.uri.query ne \"\" and not ends_with(http.request.uri.path, \".data\") and not cf.client.bot"
+    }
+  ]
+}
