@@ -44,7 +44,10 @@ export const RATE_LIMITS = {
   // Credentials from one IP that didn't check out. Past this, the IP's credentials
   // aren't looked up at all (its requests are treated as signed out), so a flood of
   // junk tokens can't make every request cost a Supabase or database round trip.
-  failedSignIn: { limit: 30, windowSeconds: 60 },
+  // Generous on purpose: hundreds of fans can share one carrier IP at a venue, and a
+  // few stale cookies among them must not sign everyone else out. A real flood runs
+  // to thousands a minute.
+  failedSignIn: { limit: 200, windowSeconds: 60 },
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;
