@@ -1,5 +1,6 @@
 import { type ActionFunctionArgs, data } from "react-router";
 import { logger } from "~/server/logger";
+import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 import { getServerClient, getServiceRoleClient } from "~/server/supabase";
 
@@ -12,6 +13,9 @@ import { getServerClient, getServiceRoleClient } from "~/server/supabase";
  * This is a critical safeguard to prevent Supabase/PostgreSQL user sync issues.
  */
 export async function action({ request }: ActionFunctionArgs) {
+  // Not wrapped in base-loaders, so it applies the shared /api budget itself (by IP).
+  await enforceRateLimit(request, "api");
+
   if (request.method !== "POST") {
     return data({ error: "Method not allowed" }, { status: 405 });
   }

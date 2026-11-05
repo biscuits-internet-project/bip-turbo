@@ -4,11 +4,17 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const supabaseGetUser = vi.fn();
 
 vi.mock("~/server/supabase", () => ({
-  getServerClient: () => ({
-    supabase: { auth: { getUser: supabaseGetUser } },
+  getServerClient: (request: Request) => ({
+    supabase: { auth: { getUser: () => supabaseGetUser(request) } },
     headers: new Headers(),
   }),
 }));
+
+const { hasTooManyFailedSignIns, recordFailedSignIn } = vi.hoisted(() => ({
+  hasTooManyFailedSignIns: vi.fn().mockResolvedValue(false),
+  recordFailedSignIn: vi.fn(),
+}));
+vi.mock("~/server/rate-limit", () => ({ hasTooManyFailedSignIns, recordFailedSignIn }));
 
 import { getRequestUser } from "./request-user";
 
@@ -19,6 +25,7 @@ function makeRequest(cookie = "sb-auth=fake-token"): Request {
 describe("getRequestUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hasTooManyFailedSignIns.mockResolvedValue(false);
   });
 
   // Sibling loaders within one HTTP request receive separate Request
@@ -88,9 +95,10 @@ describe("getRequestUser", () => {
 
   // A bearer request and a cookie-less anonymous request must not share a slot either.
   test("does not dedupe a bearer request with an anonymous one", async () => {
-    supabaseGetUser
-      .mockResolvedValueOnce({ data: { user: { id: "u1" } as User }, error: null })
-      .mockResolvedValueOnce({ data: { user: null }, error: null });
+    supabaseGetUser.mockImplementation(async (request: Request) => ({
+      data: { user: request.headers.get("Authorization") ? ({ id: "u1" } as User) : null },
+      error: null,
+    }));
 
     const withBearer = new Request("http://localhost/", { headers: { Authorization: "Bearer token-1" } });
     const anonymous = new Request("http://localhost/", { headers: {} });
@@ -113,5 +121,31 @@ describe("getRequestUser", () => {
     await Promise.all([getRequestUser(reqA), getRequestUser(reqB)]);
 
     expect(supabaseGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  describe("credentials that don't check out", () => {
+    const SESSION = "sb-lgczyfvrisdlknvfuemk-auth-token=junk";
+
+    test("are counted against the caller's IP", async () => {
+      supabaseGetUser.mockResolvedValue({ data: { user: null } });
+      await getRequestUser(makeRequest(SESSION));
+
+      expect(recordFailedSignIn).toHaveBeenCalledTimes(1);
+    });
+
+    test("once an IP has sent too many, its requests are treated as signed out without a lookup", async () => {
+      hasTooManyFailedSignIns.mockResolvedValue(true);
+
+      expect(await getRequestUser(makeRequest(SESSION))).toBeNull();
+      expect(supabaseGetUser).not.toHaveBeenCalled();
+    });
+
+    test("an ordinary cookie with no session isn't counted as a failed sign-in", async () => {
+      supabaseGetUser.mockResolvedValue({ data: { user: null } });
+      await getRequestUser(makeRequest("theme=dark"));
+
+      expect(recordFailedSignIn).not.toHaveBeenCalled();
+      expect(hasTooManyFailedSignIns).not.toHaveBeenCalled();
+    });
   });
 });

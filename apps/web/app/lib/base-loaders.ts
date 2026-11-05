@@ -3,7 +3,9 @@ import type { ActionFunctionArgs, LoaderFunction, LoaderFunctionArgs } from "rea
 import { redirect } from "react-router-dom";
 import { normalizeEscapedAmpersands } from "~/lib/escaped-ampersand";
 import { logger } from "~/lib/logger";
+import { enforceRateLimit, enforceSiteWideRateLimit, isFilteredListingRequest } from "~/server/rate-limit";
 import { getRequestUser } from "~/server/request-user";
+import { hasCredential } from "~/server/response-headers";
 import { services } from "~/server/services";
 
 interface User {
@@ -51,6 +53,8 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
     if (repaired) throw redirect(repaired, 301);
 
     try {
+      await limitAnonymousRequest(args.request);
+
       const user = await getUser(args.request, {
         requireAuth: options?.requireAuth ?? false,
         requireAdmin: options?.requireAdmin ?? false,
@@ -59,6 +63,8 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
       if (user) {
         context.currentUser = user as TContext["currentUser"];
       }
+
+      await limitSignedInRequest(args.request, user);
 
       const result = await fn({ ...args, context });
 
@@ -70,6 +76,37 @@ export function createLoader<T, TContext extends PublicContext = PublicContext>(
       throw error;
     }
   };
+}
+
+/**
+ * Requests carrying no credential are counted by IP before the Supabase lookup,
+ * so a flood never reaches auth (and a protected route's 401 path is counted
+ * too). Signed-in callers are counted after it, by user id. Admins are exempt:
+ * their bulk edits (reordering a setlist, a lineup pass) legitimately burst.
+ */
+async function limitAnonymousRequest(request: Request) {
+  if (!hasCredential(request)) await limitRequest(request, null);
+}
+
+async function limitSignedInRequest(request: Request, user: User | null) {
+  if (hasCredential(request) && !user?.isAdmin) await limitRequest(request, user);
+}
+
+/** Every `/api/*` route shares one budget (search has its own); filtered catalog listings have theirs. */
+async function limitRequest(request: Request, user: User | null) {
+  const url = new URL(request.url);
+  // React Router matches paths case-insensitively, so `/API/SEARCH` is search too.
+  const path = url.pathname.toLowerCase().replace(/\/+$/, "");
+  if (path === "/api/search") {
+    await enforceRateLimit(request, "search", user?.id);
+  } else if (path.startsWith("/api/")) {
+    await enforceRateLimit(request, "api", user?.id);
+  } else if (isFilteredListingRequest(url)) {
+    await enforceRateLimit(request, "filteredListing", user?.id);
+    // Signed-in visitors skip the shared cap, so a crawl that exhausts it can't lock
+    // fans out of filtered pages; anyone faking a credential is caught by failedSignIn.
+    if (!user) await enforceSiteWideRateLimit(request, "filteredListingSiteWide");
+  }
 }
 
 /**
@@ -114,6 +151,8 @@ export function createAction<T, TContext extends PublicContext = PublicContext>(
     const startTime = performance.now();
 
     try {
+      await limitAnonymousRequest(args.request);
+
       const user = await getUser(args.request, {
         requireAuth: options?.requireAuth ?? false,
         requireAdmin: options?.requireAdmin ?? false,
@@ -122,6 +161,8 @@ export function createAction<T, TContext extends PublicContext = PublicContext>(
       if (user) {
         context.currentUser = user as TContext["currentUser"];
       }
+
+      await limitSignedInRequest(args.request, user);
 
       const result = await fn({ ...args, context });
 

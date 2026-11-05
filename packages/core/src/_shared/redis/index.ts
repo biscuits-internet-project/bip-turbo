@@ -118,6 +118,16 @@ export class RedisService {
     await this.client.expire(key, seconds);
   }
 
+  /**
+   * Increments a counter and returns its new value. The first increment starts the
+   * key's TTL, so the counter resets `ttlSeconds` after it was created (a fixed window).
+   */
+  async incrWithExpiry(key: string, ttlSeconds: number): Promise<number> {
+    await this.connect();
+    const [count] = await this.client.multi().incr(key).expire(key, ttlSeconds, "NX").exec();
+    return Number(count);
+  }
+
   getClient(): RedisClientType {
     if (!globalIsConnected) {
       throw new Error("Redis client not connected. Call connect() first");

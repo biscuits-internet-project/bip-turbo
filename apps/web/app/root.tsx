@@ -2,6 +2,7 @@ import type { Route } from ".react-router/types/app/+types/root";
 import { type FeatureFlags, getFeatureFlags } from "@bip/core";
 import { type DehydratedState, HydrationBoundary } from "@tanstack/react-query";
 import { useMemo } from "react";
+import type { HeadersArgs } from "react-router";
 import {
   isRouteErrorResponse,
   Links,
@@ -162,11 +163,29 @@ export default function App() {
   return <Outlet />;
 }
 
+/**
+ * A loader error renders at this boundary, and React Router sends only the
+ * boundary route's headers with the document. Without this, a rate-limited page
+ * load would lose its `Retry-After` and `Cache-Control: no-store`.
+ */
+export function headers({ errorHeaders }: HeadersArgs): Headers {
+  return errorHeaders ?? new Headers();
+}
+
 export function ErrorBoundary() {
   const error = useRouteError();
 
   if (isRouteErrorResponse(error) && error.status === 404) {
     return <NotFound />;
+  }
+
+  if (isRouteErrorResponse(error) && error.status === 429) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-4 p-4">
+        <h1>Too many requests</h1>
+        <p>Give it a minute and try again.</p>
+      </div>
+    );
   }
 
   // Handle 500 errors

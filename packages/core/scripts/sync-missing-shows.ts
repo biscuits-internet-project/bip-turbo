@@ -1548,6 +1548,9 @@ async function apiCall<T>(toolName: string, args: Record<string, unknown>): Prom
 }
 
 async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Promise<T> {
+  // The admin key exempts the sync from MCP's per-caller rate limit, which a full
+  // sync (hundreds of calls a minute) would otherwise exhaust in its first minute.
+  const apiKey = syncApiKey();
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MCP_MAX_ATTEMPTS; attempt++) {
     const controller = new AbortController();
@@ -1555,8 +1558,9 @@ async function mcpCall<T>(toolName: string, args: Record<string, unknown>): Prom
     try {
       const response = await fetch(MCP_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        redirect: "follow",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        // Same rule as syncCall: never follow a redirect with the admin key attached.
+        redirect: "error",
         signal: controller.signal,
         body: JSON.stringify({
           jsonrpc: "2.0",

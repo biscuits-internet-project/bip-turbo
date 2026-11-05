@@ -7,6 +7,8 @@ const logError = vi.fn();
 class InvalidSearchQueryError extends Error {}
 vi.mock("@bip/core", () => ({ InvalidSearchQueryError }));
 vi.mock("~/lib/logger", () => ({ logger: { error: logError, info: vi.fn(), warn: vi.fn() } }));
+vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
+vi.mock("~/server/admin-api-key", () => ({ isAuthorizedAdminRequest: vi.fn().mockReturnValue(false) }));
 vi.mock("~/server/services", () => ({
   services: { songs: { findBySlug }, venues: { findBySlug }, shows: { findBySlug }, postgresSearch: { searchSongs } },
 }));
@@ -73,5 +75,30 @@ describe("MCP tool arguments are checked against the declared schema", () => {
 
     expect(result.content[0].text).toBe("Error: Internal error");
     expect(logError).toHaveBeenCalled();
+  });
+});
+
+describe("MCP rate limit", () => {
+  test("rejects an over-limit caller before running the tool", async () => {
+    const { enforceRateLimit } = await import("~/server/rate-limit");
+    vi.clearAllMocks();
+    vi.mocked(enforceRateLimit).mockImplementationOnce(() => {
+      throw new Response(null, { status: 429 });
+    });
+
+    await expect(callTool("get_song", { slug: "basis-for-a-day" })).rejects.toMatchObject({ status: 429 });
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "mcp");
+    expect(findBySlug).not.toHaveBeenCalled();
+  });
+
+  test("exempts the admin key, so the setlist sync is never limited", async () => {
+    const { enforceRateLimit } = await import("~/server/rate-limit");
+    const { isAuthorizedAdminRequest } = await import("~/server/admin-api-key");
+    vi.clearAllMocks();
+    vi.mocked(isAuthorizedAdminRequest).mockReturnValueOnce(true);
+
+    await callTool("get_song", { slug: "basis-for-a-day" });
+
+    expect(enforceRateLimit).not.toHaveBeenCalled();
   });
 });
