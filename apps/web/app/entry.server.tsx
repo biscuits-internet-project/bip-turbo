@@ -9,7 +9,11 @@ import honeybadger from "~/lib/honeybadger";
 import { createLogger, logger } from "~/server/logger";
 import { startMemoryLogging } from "~/server/memory-log";
 import { recordRequest } from "~/server/request-counts";
-import { preventSharedCachingForCredentialedRequests, setSecurityHeaders } from "~/server/response-headers";
+import {
+  allowSharedCachingOfPublicPages,
+  preventSharedCachingForCredentialedRequests,
+  setSecurityHeaders,
+} from "~/server/response-headers";
 
 export const streamTimeout = 5_000;
 
@@ -26,6 +30,7 @@ export function handleDataRequest(response: Response, { request }: { request: Re
   // Copy rather than mutate: a redirect Response's headers are immutable and would throw.
   const headers = new Headers(response.headers);
   setSecurityHeaders(headers);
+  allowSharedCachingOfPublicPages(request, response.status, headers);
   preventSharedCachingForCredentialedRequests(request, headers);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
@@ -79,6 +84,7 @@ export default function handleRequest(
 
         responseHeaders.set("Content-Type", "text/html");
         setSecurityHeaders(responseHeaders);
+        allowSharedCachingOfPublicPages(request, responseStatusCode, responseHeaders);
         preventSharedCachingForCredentialedRequests(request, responseHeaders);
 
         resolve(

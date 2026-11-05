@@ -59,6 +59,19 @@ describe("CacheInvalidationService.invalidatePerformanceListings", () => {
   });
 });
 
+describe("CacheInvalidationService.invalidateShow", () => {
+  test("clears Redis and purges the show's page from Cloudflare", async () => {
+    const cache = { del: vi.fn().mockResolvedValue(undefined) };
+    const cloudflareCache = { purgeShow: vi.fn().mockResolvedValue(undefined) };
+    const service = new CacheInvalidationService(cache as never, logger, cloudflareCache as never);
+
+    await service.invalidateShow("2024-04-06-red-rocks");
+
+    expect(cache.del).toHaveBeenCalledWith(CacheKeys.show.data("2024-04-06-red-rocks"));
+    expect(cloudflareCache.purgeShow).toHaveBeenCalledWith("2024-04-06-red-rocks");
+  });
+});
+
 describe("CacheInvalidationService.invalidateShowListings", () => {
   // Admin edits to show metadata (date, venue, etc.) bubble through here.
   // Per-user attended-setlists caches embed that metadata, so they must be

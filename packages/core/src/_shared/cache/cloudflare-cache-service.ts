@@ -95,6 +95,11 @@ export class CloudflareCacheService {
     await this.purgeUrls(this.toAbsoluteUrls(paths));
   }
 
+  /** Purge one show's page, so an edit is live for signed-out visitors right away. */
+  async purgeShow(slug: string): Promise<void> {
+    await this.purgeUrls(this.toAbsoluteUrls([`/shows/${slug}`]));
+  }
+
   /**
    * The bare path plus every recorded variant, deduped. The bare path goes
    * first and unconditionally: it is the URL everyone lands on, and it stays

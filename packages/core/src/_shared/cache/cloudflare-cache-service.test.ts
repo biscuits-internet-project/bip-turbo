@@ -37,6 +37,21 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("CloudflareCacheService.purgeShow", () => {
+  test("purges both the document and the .data URL", async () => {
+    const fetchMock = stubFetch();
+
+    await makeService().purgeShow("2024-04-06-red-rocks");
+
+    expect(purgedFileBatches(fetchMock)).toEqual([
+      [
+        "https://discobiscuits.net/shows/2024-04-06-red-rocks",
+        "https://discobiscuits.net/shows/2024-04-06-red-rocks.data",
+      ],
+    ]);
+  });
+});
+
 describe("CloudflareCacheService.purgeYearListings", () => {
   // The zone is not Enterprise, so purge-by-tag is unavailable and the API
   // silently no-ops. Purge-by-URL works on every plan but matches the exact
