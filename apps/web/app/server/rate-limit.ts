@@ -13,8 +13,17 @@ import { services } from "~/server/services";
  */
 const FILTERED_LISTING_PATHS = [/^\/shows\/year\/[^/]+$/, /^\/shows\/stats$/];
 
+/** Params that only track where a visitor came from; a link carrying just these isn't a filter. */
+const TRACKING_PARAM = /^(utm_[a-z]+|fbclid|gclid)$/i;
+
 export function isFilteredListingRequest(url: URL): boolean {
-  return url.search !== "" && FILTERED_LISTING_PATHS.some((pattern) => pattern.test(url.pathname));
+  // React Router matches paths case-insensitively and ignores a trailing slash, so
+  // `/SHOWS/STATS/` renders the same catalog and must be counted the same.
+  const path = url.pathname.toLowerCase().replace(/\/+$/, "");
+  if (!FILTERED_LISTING_PATHS.some((pattern) => pattern.test(path))) return false;
+  // Any other query string counts, junk included: an unknown param still misses the
+  // edge cache and renders the whole catalog.
+  return [...url.searchParams.keys()].some((key) => !TRACKING_PARAM.test(key));
 }
 
 /**
@@ -32,6 +41,10 @@ export const RATE_LIMITS = {
   // sends a request or two per IP, so no per-caller budget sees it; this one caps
   // the catalog renders it can cause in total.
   filteredListingSiteWide: { limit: 60, windowSeconds: 60 },
+  // Credentials from one IP that didn't check out. Past this, the IP's credentials
+  // aren't looked up at all (its requests are treated as signed out), so a flood of
+  // junk tokens can't make every request cost a Supabase or database round trip.
+  failedSignIn: { limit: 30, windowSeconds: 60 },
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;
@@ -88,13 +101,35 @@ export function clientIp(request: Request): string {
 }
 
 /**
+ * The address to count. An IPv6 caller is usually handed a whole /64, and could
+ * otherwise send each request from a fresh address in it, so IPv6 is counted by
+ * its /64. IPv4-mapped IPv6 (`::ffff:1.2.3.4`) is counted as the IPv4 address.
+ */
+export function rateLimitAddress(ip: string): string {
+  if (isIP(ip) !== 6) return ip;
+  const mapped = ip.match(/:ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (mapped) return mapped[1];
+  const [head, tail = ""] = ip.split("::");
+  const front = head ? head.split(":") : [];
+  const back = tail ? tail.split(":") : [];
+  const groups = [...front, ...Array(8 - front.length - back.length).fill("0"), ...back];
+  return `${groups
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group || "0", 16).toString(16))
+    .join(":")}::/64`;
+}
+
+/**
  * Logged-in callers are counted by user id, so many fans on one venue's cellular
  * NAT don't share a budget. Everyone else is counted by IP, hashed so Redis never
  * holds a raw address.
  */
 export function rateLimitIdentity(request: Request, userId?: string): string {
   if (userId) return `user:${userId}`;
-  return `ip:${createHash("sha256").update(clientIp(request)).digest("hex").slice(0, 16)}`;
+  return `ip:${createHash("sha256")
+    .update(rateLimitAddress(clientIp(request)))
+    .digest("hex")
+    .slice(0, 16)}`;
 }
 
 /** Throws a 429 when the caller is over the bucket's limit. */
@@ -107,32 +142,77 @@ export function enforceSiteWideRateLimit(request: Request, bucket: RateLimitBuck
   return enforce(request, bucket, "all");
 }
 
-/** Redis being down fails open: an outage of the counter should not take the site down with it. */
-async function enforce(request: Request, bucket: RateLimitBucket, identity: string): Promise<void> {
-  const { limit, windowSeconds } = RATE_LIMITS[bucket];
-  const window = Math.floor(Date.now() / 1000 / windowSeconds);
-  const key = `ratelimit:${bucket}:${identity}:${window}`;
+/**
+ * True once an IP has sent too many credentials that didn't check out this window.
+ * The caller then skips the lookup and treats the request as signed out, rather
+ * than refusing it: a real visitor with an expired cookie fails every lookup too,
+ * and should still see public pages. Pair with `recordFailedSignIn`.
+ */
+export async function hasTooManyFailedSignIns(request: Request): Promise<boolean> {
+  const { key } = counterKey("failedSignIn", rateLimitIdentity(request));
+  const count = await counterRead(() => services.redis.get<number>(key), "failedSignIn");
+  return count !== null && count >= RATE_LIMITS.failedSignIn.limit;
+}
 
-  let count: number;
+/** Counts a request whose cookie or bearer token didn't resolve to a user. */
+export async function recordFailedSignIn(request: Request): Promise<void> {
+  const { windowSeconds } = RATE_LIMITS.failedSignIn;
+  const { key } = counterKey("failedSignIn", rateLimitIdentity(request));
+  await counterRead(() => services.redis.incrWithExpiry(key, windowSeconds), "failedSignIn");
+}
+
+function counterKey(bucket: RateLimitBucket, identity: string) {
+  const window = Math.floor(Date.now() / 1000 / RATE_LIMITS[bucket].windowSeconds);
+  return { key: `ratelimit:${bucket}:${identity}:${window}`, window };
+}
+
+/** Past this, a counter read is abandoned and the request let through. */
+const COUNTER_TIMEOUT_MS = 250;
+
+/**
+ * Runs a Redis counter call, failing open: an error, or a reply slower than
+ * COUNTER_TIMEOUT_MS (Redis restarting, commands queued while it reconnects),
+ * gives null, so an outage of the counter can't stall or take down the site.
+ */
+async function counterRead<T>(call: () => Promise<T>, bucket: RateLimitBucket): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Redis did not answer within ${COUNTER_TIMEOUT_MS}ms`)),
+      COUNTER_TIMEOUT_MS,
+    );
+  });
   try {
-    count = await services.redis.incrWithExpiry(key, windowSeconds);
+    return await Promise.race([call(), timeout]);
   } catch (error) {
     logger.warn("Rate limit check failed; allowing request", { error, bucket });
-    return;
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
+}
 
-  if (count > limit) {
-    // Once per caller per window, so a flood past the limit doesn't become a log flood.
-    if (count === limit + 1) logger.info("Rate limited", { bucket, path: new URL(request.url).pathname });
-    const retryAfter = (window + 1) * windowSeconds - Math.floor(Date.now() / 1000);
-    throw new Response(JSON.stringify({ error: "Too many requests. Try again shortly." }), {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(Math.max(retryAfter, 1)),
-        // One caller's 429 must never be served to everyone from Cloudflare's cache.
-        "Cache-Control": "no-store",
-      },
-    });
-  }
+function tooManyRequests(window: number, windowSeconds: number): Response {
+  const retryAfter = (window + 1) * windowSeconds - Math.floor(Date.now() / 1000);
+  return new Response(JSON.stringify({ error: "Too many requests. Try again shortly." }), {
+    status: 429,
+    headers: {
+      "Content-Type": "application/json",
+      "Retry-After": String(Math.max(retryAfter, 1)),
+      // One caller's 429 must never be served to everyone from Cloudflare's cache.
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function enforce(request: Request, bucket: RateLimitBucket, identity: string): Promise<void> {
+  const { limit, windowSeconds } = RATE_LIMITS[bucket];
+  const { key, window } = counterKey(bucket, identity);
+
+  const count = await counterRead(() => services.redis.incrWithExpiry(key, windowSeconds), bucket);
+  if (count === null || count <= limit) return;
+
+  // Once per caller per window, so a flood past the limit doesn't become a log flood.
+  if (count === limit + 1) logger.info("Rate limited", { bucket, path: new URL(request.url).pathname });
+  throw tooManyRequests(window, windowSeconds);
 }

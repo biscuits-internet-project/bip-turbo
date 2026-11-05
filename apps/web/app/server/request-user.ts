@@ -1,4 +1,6 @@
 import type { User } from "@supabase/supabase-js";
+import { hasTooManyFailedSignIns, recordFailedSignIn } from "~/server/rate-limit";
+import { hasCredential } from "~/server/response-headers";
 import { getServerClient } from "~/server/supabase";
 
 /**
@@ -33,10 +35,16 @@ export function getRequestUser(request: Request): Promise<User | null> {
 
   const promise = (async () => {
     try {
+      // An IP that keeps presenting credentials that don't check out is treated as
+      // signed out without a lookup, so a flood of junk tokens can't make every
+      // request cost a Supabase round trip.
+      const credentialed = hasCredential(request);
+      if (credentialed && (await hasTooManyFailedSignIns(request))) return null;
       const { supabase } = getServerClient(request);
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      if (credentialed && !user) await recordFailedSignIn(request);
       return user ?? null;
     } finally {
       inflight.delete(key);

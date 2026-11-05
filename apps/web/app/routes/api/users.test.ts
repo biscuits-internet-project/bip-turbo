@@ -6,6 +6,7 @@ const localUser = { id: "u-1", username: "Legacy Name", email: "a@example.com" }
 
 vi.mock("@bip/core", () => ({ getFeatureFlags: vi.fn().mockResolvedValue({}) }));
 vi.mock("~/lib/honeybadger", () => ({ default: { notify: vi.fn() } }));
+vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 vi.mock("~/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("~/server/supabase", () => ({
   getServerClient: () => ({
@@ -72,5 +73,17 @@ describe("POST /api/users username changes", () => {
     const res = await submit({ username: "Legacy Name", showSetlistTimes: "true" });
     expect(res.status).toBe(200);
     expect(update).toHaveBeenCalledWith("u-1", { showSetlistTimes: true });
+  });
+});
+
+describe("POST /api/users rate limit", () => {
+  test("applies the shared /api budget, since this route isn't wrapped in base-loaders", async () => {
+    const { enforceRateLimit } = await import("~/server/rate-limit");
+    vi.mocked(enforceRateLimit).mockRejectedValueOnce(new Response(null, { status: 429 }));
+
+    await expect(
+      action({ request: new Request("http://localhost/api/users", { method: "POST" }) } as never),
+    ).rejects.toMatchObject({ status: 429 });
+    expect(enforceRateLimit).toHaveBeenCalledWith(expect.any(Request), "api");
   });
 });

@@ -163,6 +163,21 @@ describe("publicLoader rate limits", () => {
     expect(enforceSiteWideRateLimit).not.toHaveBeenCalled();
   });
 
+  test("keeps signed-in visitors out of the site-wide filtered-listing cap", async () => {
+    vi.mocked(getRequestUser).mockResolvedValueOnce({ id: "u1", email: "u@example.com", app_metadata: {} } as never);
+    await run("/shows/year/2005?nugs=yes", undefined, SIGNED_IN);
+
+    expect(buckets()).toEqual(["filteredListing"]);
+    expect(enforceSiteWideRateLimit).not.toHaveBeenCalled();
+  });
+
+  test("routes other spellings of an API path to the same budget", async () => {
+    await run("/API/Search/");
+    await run("/Api/ratings");
+
+    expect(buckets()).toEqual(["search", "api"]);
+  });
+
   test("counts filtered catalog listings per caller and site-wide", async () => {
     await run("/shows/year/2005?nugs=yes&youtube=true");
     await run("/shows/stats?archive=no");

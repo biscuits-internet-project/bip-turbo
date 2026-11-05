@@ -3,12 +3,16 @@ import type { ActionFunctionArgs } from "react-router-dom";
 import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/lib/logger";
 import { matchesImageSignature } from "~/server/image-signature";
+import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
 import { getServerClient, getServiceRoleClient } from "~/server/supabase";
 
 const AVATAR_MIME_TYPES: readonly string[] = ALLOWED_IMAGE_MIME_TYPES.filter((type) => type !== "image/svg+xml");
 
 export async function action({ request }: ActionFunctionArgs) {
+  // Not wrapped in base-loaders, so it applies the shared /api budget itself (by IP).
+  await enforceRateLimit(request, "api");
+
   try {
     const { supabase } = getServerClient(request);
     const {

@@ -95,13 +95,17 @@ async function limitSignedInRequest(request: Request, user: User | null) {
 /** Every `/api/*` route shares one budget (search has its own); filtered catalog listings have theirs. */
 async function limitRequest(request: Request, user: User | null) {
   const url = new URL(request.url);
-  if (url.pathname === "/api/search") {
+  // React Router matches paths case-insensitively, so `/API/SEARCH` is search too.
+  const path = url.pathname.toLowerCase().replace(/\/+$/, "");
+  if (path === "/api/search") {
     await enforceRateLimit(request, "search", user?.id);
-  } else if (url.pathname.startsWith("/api/")) {
+  } else if (path.startsWith("/api/")) {
     await enforceRateLimit(request, "api", user?.id);
   } else if (isFilteredListingRequest(url)) {
     await enforceRateLimit(request, "filteredListing", user?.id);
-    await enforceSiteWideRateLimit(request, "filteredListingSiteWide");
+    // Signed-in visitors skip the shared cap, so a crawl that exhausts it can't lock
+    // fans out of filtered pages; anyone faking a credential is caught by failedSignIn.
+    if (!user) await enforceSiteWideRateLimit(request, "filteredListingSiteWide");
   }
 }
 
