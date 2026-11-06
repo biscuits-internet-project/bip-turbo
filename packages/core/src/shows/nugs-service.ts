@@ -164,7 +164,7 @@ export class NugsService {
     if (cached) return cached;
 
     try {
-      const url = `https://streamapi.nugs.net/api.aspx?method=catalog.container&containerID=${containerId}&vdisp=1`;
+      const url = `https://api.nugs.net/api.aspx?method=catalog.container&containerID=${containerId}&vdisp=1`;
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch nugs container ${containerId}: ${response.status}`);

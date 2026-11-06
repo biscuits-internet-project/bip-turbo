@@ -1,4 +1,4 @@
-import type { ArchiveDotOrgRecording } from "@bip/domain";
+import type { ArchiveDotOrgRecording, Logger } from "@bip/domain";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { RedisService } from "../_shared/redis";
 import { ArchiveDotOrgService, parseArchiveLength } from "./archive-dot-org-service";
@@ -306,5 +306,21 @@ describe("ArchiveDotOrgService.fetchRecordingTracks", () => {
   test("returns [] without throwing on a non-ok response", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 404 } as unknown as Response);
     expect(await service.fetchRecordingTracks("missing")).toEqual([]);
+  });
+
+  // archive.org regularly answers bursts with 503s and drops connections. Times
+  // fall back to other sources and get rechecked later, so nothing needs fixing.
+  test("logs an archive.org outage as a warning, not an error", async () => {
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
+    const logged = new ArchiveDotOrgService(redis, logger as unknown as Logger);
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 503 } as unknown as Response);
+
+    expect(await logged.fetchRecordingTracks("busy")).toEqual([]);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "archive.org recording fetch failed",
+      expect.objectContaining({ identifier: "busy" }),
+    );
+    expect(logger.error).not.toHaveBeenCalled();
   });
 });
