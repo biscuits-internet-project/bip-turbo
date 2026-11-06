@@ -204,7 +204,7 @@ export class ArchiveDotOrgService {
       }
       return tracks;
     } catch (error) {
-      this.logger?.error("archive.org recording fetch failed", { identifier, error });
+      this.logger?.warn("archive.org recording fetch failed", { identifier, error });
       return [];
     }
   }

@@ -8,6 +8,9 @@ vi.mock("~/server/services", () => ({
   },
 }));
 
+const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }));
+vi.mock("~/lib/logger", () => ({ logger }));
+
 const { PODCAST_EPISODE_CACHE_TTL_SECONDS, getLatestPodcastEpisode } = await import("./latest-podcast-episode");
 
 // Trimmed slice of a real feeder.acast.com response (2026-07-14). The episode
@@ -116,6 +119,37 @@ describe("getLatestPodcastEpisode", () => {
     mockFetchResponse({}, false);
 
     expect(await getLatestPodcastEpisode()).toBeNull();
+  });
+
+  // An Acast hiccup only hides the card, and the next request tries again.
+  test("logs an Acast failure as a warning, not an error", async () => {
+    logger.error.mockClear();
+    logger.warn.mockClear();
+    mockFetchResponse({}, false);
+
+    await getLatestPodcastEpisode();
+
+    expect(logger.warn).toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  test("logs an unreadable Acast response as a warning, not an error", async () => {
+    logger.error.mockClear();
+    logger.warn.mockClear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("Unexpected end of JSON input");
+        },
+      })),
+    );
+
+    expect(await getLatestPodcastEpisode()).toBeNull();
+
+    expect(logger.warn).toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   test("returns null when the feed has no episodes", async () => {

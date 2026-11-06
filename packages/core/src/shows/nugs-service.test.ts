@@ -225,6 +225,21 @@ describe("NugsService.fetchContainerTracks", () => {
     ]);
   });
 
+  // streamapi.nugs.net answers many containers with a redirect to an HTML error
+  // page, while api.nugs.net returns their tracks.
+  test("requests the container from api.nugs.net", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Response: { tracks: [] } }),
+    } as unknown as Response);
+
+    await service.fetchContainerTracks(4850);
+
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      "https://api.nugs.net/api.aspx?method=catalog.container&containerID=4850",
+    );
+  });
+
   test("returns [] without throwing on a non-ok response", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 500 } as unknown as Response);
     expect(await service.fetchContainerTracks(1)).toEqual([]);

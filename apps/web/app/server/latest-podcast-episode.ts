@@ -68,7 +68,7 @@ export async function getLatestPodcastEpisode(): Promise<AcastEpisode | null> {
       ttl: PODCAST_EPISODE_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    logger.error("Error fetching latest podcast episode", { error });
+    logger.warn("Error fetching latest podcast episode", { error });
     return null;
   }
 }
@@ -76,7 +76,7 @@ export async function getLatestPodcastEpisode(): Promise<AcastEpisode | null> {
 async function fetchLatestEpisode(): Promise<AcastEpisode | null> {
   const response = await fetch(ACAST_FEED_URL, { signal: AbortSignal.timeout(ACAST_TIMEOUT_MS) });
   if (!response.ok) {
-    logger.error("Acast feed responded non-OK", { status: response.status });
+    logger.warn("Acast feed responded non-OK", { status: response.status });
     return null;
   }
 
@@ -116,7 +116,7 @@ export async function getRecentPodcastEpisodes(): Promise<AcastEpisode[]> {
       ttl: PODCAST_EPISODE_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    logger.error("Error fetching podcast episodes", { error });
+    logger.warn("Error fetching podcast episodes", { error });
     return [];
   }
 }
