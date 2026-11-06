@@ -1,4 +1,4 @@
-name: bip
+name: bip-turbo
 
 services:
   redis:
