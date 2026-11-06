@@ -1,180 +1,169 @@
 {
-  "uid": "bip-overview",
-  "title": "bip: overview",
-  "tags": ["bip"],
-  "timezone": "America/New_York",
-  "refresh": "1m",
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "schemaVersion": 39,
   "panels": [
     {
-      "type": "row",
-      "title": "Site (discobiscuits.net)",
-      "id": 1,
       "collapsed": false,
       "gridPos": {
-        "x": 0,
-        "y": 0,
+        "h": 1,
         "w": 24,
-        "h": 1
+        "x": 0,
+        "y": 0
       },
-      "panels": []
+      "id": 1,
+      "panels": [],
+      "title": "Site (discobiscuits.net)",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "title": "Requests per minute",
-      "id": 2,
       "datasource": {
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "gridPos": {
-        "x": 0,
-        "y": 1,
-        "w": 8,
-        "h": 8
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {},
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
           "expr": "sum(count_over_time({container=\"kamal-proxy\"} | json | service=\"bip-web-web\" [1m]))",
           "legendFormat": "requests",
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
-          }
+          "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {}
+      "title": "Requests per minute",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Response time (ms)",
-      "id": 3,
       "datasource": {
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "gridPos": {
-        "x": 8,
-        "y": 1,
-        "w": 8,
-        "h": 8
+      "description": "From kamal-proxy, so it includes everything the app does for a request.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "id": 3,
+      "options": {},
       "targets": [
         {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
           "expr": "quantile_over_time(0.5, {container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | unwrap duration | __error__=\"\" [5m]) by (service) / 1e6",
           "legendFormat": "p50",
-          "refId": "A",
+          "refId": "A"
+        },
+        {
           "datasource": {
             "type": "loki",
             "uid": "grafanacloud-logs"
-          }
-        },
-        {
+          },
           "expr": "quantile_over_time(0.95, {container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | unwrap duration | __error__=\"\" [5m]) by (service) / 1e6",
           "legendFormat": "p95",
-          "refId": "B",
-          "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
-          }
+          "refId": "B"
         },
         {
-          "expr": "quantile_over_time(0.99, {container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | unwrap duration | __error__=\"\" [5m]) by (service) / 1e6",
-          "legendFormat": "p99",
-          "refId": "C",
           "datasource": {
             "type": "loki",
             "uid": "grafanacloud-logs"
-          }
+          },
+          "expr": "quantile_over_time(0.99, {container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | unwrap duration | __error__=\"\" [5m]) by (service) / 1e6",
+          "legendFormat": "p99",
+          "refId": "C"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms"
-        },
-        "overrides": []
-      },
-      "options": {},
-      "description": "From kamal-proxy, so it includes everything the app does for a request."
+      "title": "Response time (ms)",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Errors (5xx) per 5 min",
-      "id": 4,
       "datasource": {
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "gridPos": {
-        "x": 16,
-        "y": 1,
-        "w": 8,
-        "h": 8
-      },
-      "targets": [
-        {
-          "expr": "sum by (status) (count_over_time({container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | status >= 500 [5m]))",
-          "legendFormat": "{{status}}",
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {
           "unit": "short"
         },
         "overrides": []
       },
-      "options": {}
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "id": 4,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
+          "expr": "sum by (status) (count_over_time({container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | status >= 500 [5m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Errors (5xx) per 5 min",
+      "type": "timeseries"
     },
     {
-      "type": "table",
-      "title": "Slowest pages (average over the time range)",
-      "id": 5,
       "datasource": {
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "gridPos": {
-        "x": 0,
-        "y": 9,
-        "w": 12,
-        "h": 10
-      },
-      "targets": [
-        {
-          "expr": "topk(20, avg by (path) (avg_over_time({container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | unwrap duration | __error__=\"\" [$__range]))) / 1e6",
-          "queryType": "instant",
-          "instant": true,
-          "legendFormat": "{{path}}",
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {
           "unit": "ms"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 5,
       "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
+          "expr": "topk(20, avg by (path) (avg_over_time({container=\"kamal-proxy\"} | json | service=\"bip-web-web\" | unwrap duration | __error__=\"\" [$__range]))) / 1e6",
+          "instant": true,
+          "legendFormat": "{{path}}",
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Slowest pages (average over the time range)",
       "transformations": [
         {
           "id": "reduce",
@@ -187,88 +176,70 @@
           "options": {
             "sort": [
               {
-                "field": "Last *",
-                "desc": true
+                "desc": true,
+                "field": "Last *"
               }
             ]
           }
         }
-      ]
+      ],
+      "type": "table"
     },
     {
-      "type": "logs",
-      "title": "App errors",
-      "id": 6,
       "datasource": {
         "type": "loki",
         "uid": "grafanacloud-logs"
       },
-      "gridPos": {
-        "x": 12,
-        "y": 9,
-        "w": 12,
-        "h": 10
-      },
-      "targets": [
-        {
-          "expr": "{service=\"bip-web\"} |= \"\\\"level\\\":\\\"error\\\"\"",
-          "refId": "A",
-          "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 6,
       "options": {
         "showTime": true,
-        "wrapLogMessage": true,
-        "sortOrder": "Descending"
-      }
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
+          "expr": "{service=\"bip-web\"} |= \"\\\"level\\\":\\\"error\\\"\"",
+          "refId": "A"
+        }
+      ],
+      "title": "App errors",
+      "type": "logs"
     },
     {
-      "type": "row",
-      "title": "Server",
-      "id": 7,
       "collapsed": false,
       "gridPos": {
-        "x": 0,
-        "y": 19,
+        "h": 1,
         "w": 24,
-        "h": 1
+        "x": 0,
+        "y": 19
       },
-      "panels": []
+      "id": 7,
+      "panels": [],
+      "title": "Server",
+      "type": "row"
     },
     {
-      "type": "stat",
-      "title": "Memory available",
-      "id": 8,
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
-      "gridPos": {
-        "x": 0,
-        "y": 20,
-        "w": 4,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "max(node_memory_MemAvailable_bytes)",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
+      "description": "Resize the server if this stays under 500 MB.",
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -278,88 +249,289 @@
               },
               {
                 "color": "orange",
-                "value": 500000000.0
+                "value": 500000000
               },
               {
                 "color": "green",
-                "value": 800000000.0
+                "value": 800000000
               }
             ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 20
+      },
+      "id": 8,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "max(node_memory_MemAvailable_bytes)",
+          "refId": "A"
+        }
+      ],
+      "title": "Memory available",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10000000000
+              },
+              {
+                "color": "green",
+                "value": 20000000000
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 20
+      },
+      "id": 9,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "max(node_filesystem_avail_bytes{mountpoint=\"/\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Disk free",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 20
+      },
+      "id": 10,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
+          "legendFormat": "cpu",
+          "refId": "A"
+        }
+      ],
+      "title": "CPU used",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 20
+      },
+      "id": 11,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "max(node_load1)",
+          "legendFormat": "1m",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "max(node_load15)",
+          "legendFormat": "15m",
+          "refId": "B"
+        }
+      ],
+      "title": "Load average",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 12,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "sum by (app) (label_replace(container_memory_working_set_bytes{name!=\"\"}, \"app\", \"$1\", \"name\", \"(.+?)(-[0-9a-f]{40})?\"))",
+          "legendFormat": "{{app}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Memory per container",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "id": 13,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "sum by (app) (label_replace(rate(container_cpu_usage_seconds_total{name!=\"\"}[5m]), \"app\", \"$1\", \"name\", \"(.+?)(-[0-9a-f]{40})?\"))",
+          "legendFormat": "{{app}}",
+          "refId": "A"
+        }
+      ],
+      "title": "CPU per container (cores)",
+      "type": "timeseries"
+    },
+    {
+      "type": "timeseries",
+      "title": "Swap used",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 8,
+        "h": 6
+      },
+      "targets": [
+        {
+          "expr": "node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes",
+          "legendFormat": "swap used",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
           }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
         },
         "overrides": []
       },
       "options": {},
-      "description": "Resize the server if this stays under 500 MB."
-    },
-    {
-      "type": "stat",
-      "title": "Disk free",
-      "id": 9,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "grafanacloud-prom"
-      },
-      "gridPos": {
-        "x": 4,
-        "y": 20,
-        "w": 4,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "max(node_filesystem_avail_bytes{mountpoint=\"/\"})",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 10000000000.0
-              },
-              {
-                "color": "green",
-                "value": 20000000000.0
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {}
+      "id": 26
     },
     {
       "type": "timeseries",
-      "title": "CPU used",
-      "id": 10,
+      "title": "Swap activity (pages/s)",
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
       "gridPos": {
         "x": 8,
-        "y": 20,
+        "y": 34,
         "w": 8,
         "h": 6
       },
       "targets": [
         {
-          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
-          "legendFormat": "cpu",
+          "expr": "rate(node_vmstat_pswpin[5m])",
+          "legendFormat": "in",
           "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        },
+        {
+          "expr": "rate(node_vmstat_pswpout[5m])",
+          "legendFormat": "out",
+          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "grafanacloud-prom"
@@ -368,72 +540,30 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit"
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "id": 27
     },
     {
       "type": "timeseries",
-      "title": "Load average",
-      "id": 11,
+      "title": "Out-of-memory kills",
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
       "gridPos": {
         "x": 16,
-        "y": 20,
+        "y": 34,
         "w": 8,
         "h": 6
       },
       "targets": [
         {
-          "expr": "max(node_load1)",
-          "legendFormat": "1m",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        },
-        {
-          "expr": "max(node_load15)",
-          "legendFormat": "15m",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "type": "timeseries",
-      "title": "Memory per container",
-      "id": 12,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "grafanacloud-prom"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 26,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "expr": "sum by (app) (label_replace(container_memory_working_set_bytes{name!=\"\"}, \"app\", \"$1\", \"name\", \"(.+?)(-[0-9a-f]{40})?\"))",
-          "legendFormat": "{{app}}",
+          "expr": "sum(increase(node_vmstat_oom_kill[5m]))",
+          "legendFormat": "kills",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -443,184 +573,264 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "short",
+          "min": 0
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "id": 28
     },
     {
-      "type": "timeseries",
-      "title": "CPU per container (cores)",
-      "id": 13,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "grafanacloud-prom"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 26,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "expr": "sum by (app) (label_replace(rate(container_cpu_usage_seconds_total{name!=\"\"}[5m]), \"app\", \"$1\", \"name\", \"(.+?)(-[0-9a-f]{40})?\"))",
-          "legendFormat": "{{app}}",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "type": "row",
-      "title": "Postgres (bip)",
-      "id": 14,
       "collapsed": false,
       "gridPos": {
-        "x": 0,
-        "y": 34,
+        "h": 1,
         "w": 24,
-        "h": 1
+        "x": 0,
+        "y": 40
       },
-      "panels": []
+      "id": 14,
+      "panels": [],
+      "title": "Postgres (bip)",
+      "type": "row"
     },
     {
-      "type": "timeseries",
-      "title": "Connections",
-      "id": 15,
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
-      "gridPos": {
-        "x": 0,
-        "y": 35,
-        "w": 6,
-        "h": 8
-      },
-      "targets": [
-        {
-          "expr": "pg_stat_database_numbackends{datname=\"bip\"}",
-          "legendFormat": "connections",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {
           "unit": "short"
         },
         "overrides": []
       },
-      "options": {}
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 41
+      },
+      "id": 15,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "pg_stat_database_numbackends{datname=\"bip\"}",
+          "legendFormat": "connections",
+          "refId": "A"
+        }
+      ],
+      "title": "Connections",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Cache hit rate",
-      "id": 16,
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
-      "gridPos": {
-        "x": 6,
-        "y": 35,
-        "w": 6,
-        "h": 8
-      },
-      "targets": [
-        {
-          "expr": "rate(pg_stat_database_blks_hit{datname=\"bip\"}[5m]) / (rate(pg_stat_database_blks_hit{datname=\"bip\"}[5m]) + rate(pg_stat_database_blks_read{datname=\"bip\"}[5m]))",
-          "legendFormat": "hit rate",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
+      "description": "Under about 99% means queries are reading from disk.",
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 41
+      },
+      "id": 16,
       "options": {},
-      "description": "Under about 99% means queries are reading from disk."
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "rate(pg_stat_database_blks_hit{datname=\"bip\"}[5m]) / (rate(pg_stat_database_blks_hit{datname=\"bip\"}[5m]) + rate(pg_stat_database_blks_read{datname=\"bip\"}[5m]))",
+          "legendFormat": "hit rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Cache hit rate",
+      "type": "timeseries"
     },
     {
-      "type": "timeseries",
-      "title": "Transactions per second",
-      "id": 17,
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
-      "gridPos": {
-        "x": 12,
-        "y": 35,
-        "w": 6,
-        "h": 8
-      },
-      "targets": [
-        {
-          "expr": "rate(pg_stat_database_xact_commit{datname=\"bip\"}[5m])",
-          "legendFormat": "commits",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        },
-        {
-          "expr": "rate(pg_stat_database_xact_rollback{datname=\"bip\"}[5m])",
-          "legendFormat": "rollbacks",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
       "fieldConfig": {
         "defaults": {
           "unit": "ops"
         },
         "overrides": []
       },
-      "options": {}
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 41
+      },
+      "id": 17,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "rate(pg_stat_database_xact_commit{datname=\"bip\"}[5m])",
+          "legendFormat": "commits",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "rate(pg_stat_database_xact_rollback{datname=\"bip\"}[5m])",
+          "legendFormat": "rollbacks",
+          "refId": "B"
+        }
+      ],
+      "title": "Transactions per second",
+      "type": "timeseries"
     },
     {
-      "type": "stat",
-      "title": "Database size",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 41
+      },
       "id": 18,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "pg_database_size_bytes{datname=\"bip\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Database size",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "description": "From pg_stat_statements. Total = time spent on the query in the range; mean = per call.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 19,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "topk(20, sum by (queryid) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range]))) * on (queryid) group_left(query) max by (queryid, query) (pg_stat_statements_query_id)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{query}}",
+          "queryType": "instant",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "(sum by (queryid) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range])) / sum by (queryid) (increase(pg_stat_statements_calls_total{datname=\"bip\"}[$__range]))) * on (queryid) group_left(query) max by (queryid, query) (pg_stat_statements_query_id)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{query}}",
+          "queryType": "instant",
+          "refId": "B"
+        }
+      ],
+      "title": "Queries by total time (over the time range)",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "queryid": true
+            },
+            "renameByName": {
+              "Value #A": "total",
+              "Value #B": "mean per call"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": true,
+                "field": "total"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "type": "timeseries",
+      "title": "Connections by state",
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
       "gridPos": {
-        "x": 18,
-        "y": 35,
-        "w": 6,
+        "x": 0,
+        "y": 59,
+        "w": 8,
         "h": 8
       },
       "targets": [
         {
-          "expr": "pg_database_size_bytes{datname=\"bip\"}",
+          "expr": "sum by (state) (pg_stat_activity_count{datname=\"bip\", state!=\"disabled\"})",
+          "legendFormat": "{{state}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -630,46 +840,64 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "short"
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "id": 29
     },
     {
-      "type": "table",
-      "title": "Queries by total time (over the time range)",
-      "id": 19,
+      "type": "timeseries",
+      "title": "Locks by mode",
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
       "gridPos": {
-        "x": 0,
-        "y": 43,
-        "w": 24,
-        "h": 10
+        "x": 8,
+        "y": 59,
+        "w": 8,
+        "h": 8
       },
       "targets": [
         {
-          "expr": "topk(20, sum by (query) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range])))",
-          "queryType": "instant",
-          "instant": true,
-          "format": "table",
-          "legendFormat": "{{query}}",
+          "expr": "sum by (mode) (pg_locks_count{datname=\"bip\"}) > 0",
+          "legendFormat": "{{mode}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "grafanacloud-prom"
           }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
         },
+        "overrides": []
+      },
+      "options": {},
+      "id": 30
+    },
+    {
+      "type": "timeseries",
+      "title": "Oldest running transaction",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 59,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
         {
-          "expr": "topk(20, sum by (query) (increase(pg_stat_statements_seconds_total{datname=\"bip\"}[$__range])) / sum by (query) (increase(pg_stat_statements_calls_total{datname=\"bip\"}[$__range])))",
-          "queryType": "instant",
-          "instant": true,
-          "format": "table",
-          "legendFormat": "{{query}}",
-          "refId": "B",
+          "expr": "pg_long_running_transactions_oldest_timestamp_seconds",
+          "legendFormat": "oldest",
+          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "grafanacloud-prom"
@@ -683,143 +911,25 @@
         "overrides": []
       },
       "options": {},
-      "description": "From pg_stat_statements. Total = time spent on the query in the range; mean = per call.",
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "renameByName": {
-              "Value #A": "total",
-              "Value #B": "mean per call"
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "sort": [
-              {
-                "field": "total",
-                "desc": true
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "Redis",
-      "id": 20,
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 53,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
+      "id": 31
     },
     {
       "type": "timeseries",
-      "title": "Memory used",
-      "id": 21,
+      "title": "Dead rows (top 10 tables)",
       "datasource": {
         "type": "prometheus",
         "uid": "grafanacloud-prom"
       },
       "gridPos": {
         "x": 0,
-        "y": 54,
+        "y": 67,
         "w": 8,
-        "h": 6
+        "h": 8
       },
       "targets": [
         {
-          "expr": "redis_memory_used_bytes",
-          "legendFormat": "used",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        },
-        {
-          "expr": "redis_memory_max_bytes",
-          "legendFormat": "max",
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "type": "timeseries",
-      "title": "Cache hit rate",
-      "id": 22,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "grafanacloud-prom"
-      },
-      "gridPos": {
-        "x": 8,
-        "y": 54,
-        "w": 8,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
-          "legendFormat": "hit rate",
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "grafanacloud-prom"
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "type": "timeseries",
-      "title": "Clients",
-      "id": 23,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "grafanacloud-prom"
-      },
-      "gridPos": {
-        "x": 16,
-        "y": 54,
-        "w": 8,
-        "h": 6
-      },
-      "targets": [
-        {
-          "expr": "redis_connected_clients",
-          "legendFormat": "clients",
+          "expr": "topk(10, pg_stat_user_tables_n_dead_tup{datname=\"bip\"})",
+          "legendFormat": "{{relname}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -833,54 +943,478 @@
         },
         "overrides": []
       },
-      "options": {}
+      "options": {},
+      "id": 32
     },
     {
-      "type": "row",
-      "title": "Backups",
-      "id": 24,
-      "collapsed": false,
-      "gridPos": {
-        "x": 0,
-        "y": 60,
-        "w": 24,
-        "h": 1
-      },
-      "panels": []
-    },
-    {
-      "type": "logs",
-      "title": "Backup logs (nightly Postgres, weekly Supabase auth)",
-      "id": 25,
+      "type": "timeseries",
+      "title": "Autovacuum runs per hour",
       "datasource": {
-        "type": "loki",
-        "uid": "grafanacloud-logs"
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 67,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(pg_stat_user_tables_autovacuum_count{datname=\"bip\"}[1h]))",
+          "legendFormat": "runs",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 33
+    },
+    {
+      "type": "timeseries",
+      "title": "Deadlocks per 5 min",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 67,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "increase(pg_stat_database_deadlocks{datname=\"bip\"}[5m])",
+          "legendFormat": "deadlocks",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 34
+    },
+    {
+      "type": "timeseries",
+      "title": "Checkpoints per hour",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
       },
       "gridPos": {
         "x": 0,
-        "y": 61,
+        "y": 75,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "increase(pg_stat_checkpointer_num_timed_total[1h])",
+          "legendFormat": "scheduled",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        },
+        {
+          "expr": "increase(pg_stat_checkpointer_num_requested_total[1h])",
+          "legendFormat": "forced",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 35
+    },
+    {
+      "type": "timeseries",
+      "title": "Temp files written",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 75,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_temp_bytes{datname=\"bip\"}[5m])",
+          "legendFormat": "temp",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 36
+    },
+    {
+      "type": "timeseries",
+      "title": "Postgres memory vs cap",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 75,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "max(container_memory_working_set_bytes{name=\"bip-web-postgres\"})",
+          "legendFormat": "used",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        },
+        {
+          "expr": "max(container_spec_memory_limit_bytes{name=\"bip-web-postgres\"})",
+          "legendFormat": "cap",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 37
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk throughput (whole server)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 83,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(node_disk_read_bytes_total{device=\"sda\"}[5m])",
+          "legendFormat": "read",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        },
+        {
+          "expr": "rate(node_disk_written_bytes_total{device=\"sda\"}[5m])",
+          "legendFormat": "write",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 38
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk busy (whole server)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 83,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "expr": "rate(node_disk_io_time_seconds_total{device=\"sda\"}[5m])",
+          "legendFormat": "busy",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 39
+    },
+    {
+      "type": "timeseries",
+      "title": "Container restarts per hour",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 91,
         "w": 24,
         "h": 8
       },
       "targets": [
         {
-          "expr": "{job=\"backups\"}",
+          "expr": "sum by (name) (changes(container_start_time_seconds{name!=\"\"}[1h])) > 0",
+          "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
-            "type": "loki",
-            "uid": "grafanacloud-logs"
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
           }
         }
       ],
       "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {},
+      "id": 40
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 99
+      },
+      "id": 20,
+      "panels": [],
+      "title": "Redis",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 100
+      },
+      "id": 21,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "redis_memory_max_bytes",
+          "legendFormat": "max",
+          "refId": "B"
+        }
+      ],
+      "title": "Memory used",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 100
+      },
+      "id": 22,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+          "legendFormat": "hit rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Cache hit rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "grafanacloud-prom"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 100
+      },
+      "id": 23,
+      "options": {},
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "grafanacloud-prom"
+          },
+          "expr": "redis_connected_clients",
+          "legendFormat": "clients",
+          "refId": "A"
+        }
+      ],
+      "title": "Clients",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 106
+      },
+      "id": 24,
+      "panels": [],
+      "title": "Backups",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "grafanacloud-logs"
+      },
+      "fieldConfig": {
         "defaults": {},
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 107
+      },
+      "id": 25,
       "options": {
         "showTime": true,
-        "wrapLogMessage": true,
-        "sortOrder": "Descending"
-      }
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "grafanacloud-logs"
+          },
+          "expr": "{job=\"backups\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Backup logs (nightly Postgres, weekly Supabase auth)",
+      "type": "logs"
     }
-  ]
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["bip"],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "America/New_York",
+  "title": "bip: overview",
+  "uid": "bip-overview"
 }

@@ -9,7 +9,11 @@ Stack: https://playfulfennec1443.grafana.net (personal account). The `alloy` Kam
     | curl -s -H "Authorization: Bearer $GRAFANA_CLI_TOKEN" -H "Content-Type: application/json" -d @- https://playfulfennec1443.grafana.net/api/dashboards/db'
   ```
 
-- `alert-rules.json`: the alert rules (folder `bip`, group `bip`, every 1 minute), sent by email through the `bip-email` contact point. The two "backup missing" rules start paused until each backup has logged its first run.
+- `alert-rules.json`: the alert rules (folder `bip`, group `bip`, every 1 minute), sent by email through the `bip-email` contact point. The weekly auth backup rule stays paused until that backup has logged its first run.
+
+- Paging (Grafana IRM, configured in Grafana, not stored here): schedule `bip on-call` → escalation chain `bip-page` → integration and contact point `bip-page`, which also emails. The notification policy sends `Site returning errors`, `Postgres down`, `Monitoring agent stopped`, `Out-of-memory kill`, `Redis down` and `Site unreachable` to `bip-page`. Everything else is email only.
+
+- Uptime (Synthetic Monitoring, configured in Grafana, not stored here): check `bip-healthcheck` requests `/healthcheck` every 2 minutes from Ohio and Oregon. It uses `/healthcheck` because Cloudflare can serve `/` from cache while the server is down.
 
 Tokens in Doppler `bip/prd_hetzner`:
 - `GRAFANA_CLOUD_TOKEN`: on the server, write-only (metrics, logs).
