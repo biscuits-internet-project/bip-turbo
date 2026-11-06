@@ -129,6 +129,10 @@ When the same statistic surfaces in more than one place (an index table and a de
 
 Related: a musician's play count uses distinct `(song_id, show_id)` pairs, matching `Song.timesPlayed`, so a musician's plays can never exceed the per-song totals shown elsewhere.
 
+## Cache expensive aggregates on public routes
+
+A query on a public route that aggregates across whole tables (`tracks`, `show_musicians`, and so on) MUST be read through Redis (`services.cache.getOrSet`), with a key that the relevant edits invalidate. Indexes can't help a query that really does read everything, and these routes get crawled. Don't compute a large result and slice it for a small list without caching it first. Precedent: `MusicianService.findAllWithStats`, which took about 490 ms per call and was the most expensive query in production because the musician picker recalculated all 138 musicians for a top-10 list. Before adding a query like this, run `EXPLAIN (ANALYZE, BUFFERS)` on a local copy of the data. After shipping, check the `Queries by total time` table on the Grafana dashboard.
+
 ## Commit and PR Messages
 
 Describe the final before→after change as the user will see it, not the development process or intermediate iterations. Be pithy. Lead with the user-visible change.
