@@ -1,3 +1,4 @@
+import { CacheKeys } from "@bip/domain";
 import { describe, expect, test, vi } from "vitest";
 import { InstrumentService, MusicianService } from "./musician-service";
 
@@ -79,6 +80,94 @@ describe("MusicianService.findTopByPlayCount", () => {
       "marc-brownstein",
       "sam-altman",
     ]);
+  });
+});
+
+describe("MusicianService.findAllWithStats caching", () => {
+  const row = {
+    id: "1",
+    name: "Aron Magner",
+    slug: "aron-magner",
+    known_from: null,
+    default_instrument_id: null,
+    default_instrument_name: "Keyboards",
+    show_count: BigInt(1899),
+    song_count: BigInt(550),
+    play_count: BigInt(20111),
+    first_show_date: "1995-04-15",
+    last_show_date: "2026-01-03",
+  };
+
+  // A real cache: the first call runs the expensive query, and later ones don't.
+  function cacheBackedService() {
+    const stored = new Map<string, unknown>();
+    const cache = {
+      getOrSet: vi.fn(async (key: string, fetcher: () => Promise<unknown>) => {
+        if (!stored.has(key)) stored.set(key, await fetcher());
+        return stored.get(key);
+      }),
+    };
+    const db = { $queryRaw: vi.fn(() => Promise.resolve([row])) };
+    return { service: new MusicianService(db as never, logger, undefined, cache as never), cache, db };
+  }
+
+  test("runs the aggregate query once across repeated calls", async () => {
+    const { service, db } = cacheBackedService();
+
+    const first = await service.findAllWithStats();
+    const second = await service.findAllWithStats();
+
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(second).toEqual(first);
+    expect(second[0].playCount).toBe(20111);
+  });
+
+  test("the picker's top list reads the same cached result", async () => {
+    const { service, db } = cacheBackedService();
+
+    await service.findAllWithStats();
+    await service.findTopByPlayCount(5);
+
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  // Mutations clear profiles with the allPages pattern. If this key stopped
+  // matching it, edits would leave the index and picker showing old stats.
+  test("uses a key that musician, show and song edits clear", async () => {
+    const { service, cache } = cacheBackedService();
+
+    await service.findAllWithStats();
+
+    const key = cache.getOrSet.mock.calls[0][0];
+    const pattern = new RegExp(`^${CacheKeys.musicians.allPages().replaceAll("*", ".*")}$`);
+    expect(key).toMatch(pattern);
+  });
+
+  test("creating a musician clears the cached list so they appear right away", async () => {
+    const invalidateMusician = vi.fn();
+    const db = {
+      musician: {
+        findUnique: vi.fn(() => Promise.resolve(null)),
+        create: vi.fn(() =>
+          Promise.resolve({
+            id: "2",
+            name: "New Player",
+            slug: "new-player",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      },
+    };
+    const service = new MusicianService(db as never, logger, { invalidateMusician } as never);
+
+    await service.create({ name: "New Player" });
+
+    expect(invalidateMusician).toHaveBeenCalledWith("new-player");
+  });
+
+  test("a musician slug can't collide with the key", () => {
+    expect(CacheKeys.musicians.withStats()).not.toBe(CacheKeys.musicians.page("_all"));
   });
 });
 

@@ -107,7 +107,7 @@ export function createServices(container: ServiceContainer): Services {
     authors: new AuthorService(container.db, container.logger, container.cacheInvalidation),
     blogPosts: new BlogPostService(container.db, container.redis, container.logger),
     instruments: new InstrumentService(container.db, container.logger),
-    musicians: new MusicianService(container.db, container.logger, container.cacheInvalidation),
+    musicians: new MusicianService(container.db, container.logger, container.cacheInvalidation, container.cache),
     shows: new ShowService(container.db, container.logger, container.cacheInvalidation, statsService),
     songs: songService,
     stats: statsService,

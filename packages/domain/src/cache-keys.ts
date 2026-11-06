@@ -126,6 +126,10 @@ export const CacheKeys = {
      *  `songCount` (distinct repertoire) and `playCount` (every play), and the
      *  appearance show set is now stats-shows-only. */
     page: (slug: string) => `musician:${slug}:data:v8`,
+    /** Every musician with their stats, for the /musicians index and the picker's
+     *  top list. Fits the `allPages` pattern on purpose, so every mutation that
+     *  clears the profiles clears this too. */
+    withStats: () => "musician:_all:data:v1",
     /** Every musician profile cache (for pattern deletion on broad mutations). */
     allPages: () => "musician:*:data:*",
   },
