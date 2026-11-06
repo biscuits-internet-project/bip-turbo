@@ -1,7 +1,6 @@
 import { getFeatureFlags } from "@bip/core";
 import type { ActionFunctionArgs } from "react-router-dom";
 import { z } from "zod";
-import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/lib/logger";
 import { enforceRateLimit } from "~/server/rate-limit";
 import { services } from "~/server/services";
@@ -81,7 +80,6 @@ export async function action({ request }: ActionFunctionArgs) {
           },
         });
       } catch (error) {
-        honeybadger.notify(error as Error);
         logger.error("Failed to initialize username in Supabase", { error });
       }
     }
@@ -162,7 +160,6 @@ export async function action({ request }: ActionFunctionArgs) {
           },
         });
       } catch (error) {
-        honeybadger.notify(error as Error);
         logger.error("Failed to sync username to Supabase", { error });
         // Don't fail the request if Supabase sync fails
       }
@@ -173,7 +170,6 @@ export async function action({ request }: ActionFunctionArgs) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    honeybadger.notify(error as Error);
     logger.error("Error updating user", { error });
     return new Response(JSON.stringify({ error: "Invalid request data" }), {
       status: 400,

@@ -3,11 +3,11 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
-import type { AppLoadContext, EntryContext } from "react-router";
+import type { AppLoadContext, EntryContext, HandleErrorFunction } from "react-router";
 import { ServerRouter } from "react-router";
-import honeybadger from "~/lib/honeybadger";
 import { createLogger, logger } from "~/server/logger";
 import { startMemoryLogging } from "~/server/memory-log";
+import { reportServerError } from "~/server/report-server-error";
 import { recordRequest } from "~/server/request-counts";
 import {
   allowSharedCachingOfPublicPages,
@@ -16,6 +16,10 @@ import {
 } from "~/server/response-headers";
 
 export const streamTimeout = 5_000;
+
+export const handleError: HandleErrorFunction = (error, { request }) => {
+  reportServerError(error, request);
+};
 
 // Dedicated info-level logger: production's default level is `warn`, which
 // would swallow the memory timeline the line exists to produce.
@@ -102,7 +106,7 @@ export default function handleRequest(
           clearTimeout(timeoutId);
           timeoutId = null;
         }
-        honeybadger.notify(error as Error);
+        // React Router catches this rejection and passes it to handleError.
         reject(error);
       },
       onError(error: unknown) {
@@ -112,7 +116,6 @@ export default function handleRequest(
         // errors encountered during initial shell rendering since they'll
         // reject and get logged in handleDocumentRequest.
         if (shellRendered) {
-          honeybadger.notify(error as Error);
           logger.error("Streaming rendering error", { error });
         }
       },
