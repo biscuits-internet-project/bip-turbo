@@ -112,7 +112,7 @@
     "noDataState": "Alerting",
     "execErrState": "Error",
     "for": "0s",
-    "isPaused": true,
+    "isPaused": false,
     "annotations": {
       "summary": "No verified nightly Postgres backup upload in 26 hours.",
       "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
@@ -478,6 +478,396 @@
     "annotations": {
       "summary": "No data from the Alloy agent on the server for 10 minutes.",
       "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-oom-kill",
+    "title": "Out-of-memory kill",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(increase(node_vmstat_oom_kill[10m]))",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [0]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": false,
+    "annotations": {
+      "summary": "A process on the server was killed for running out of memory. See 'App errors' on the dashboard for a SIGKILL from the web container, and 'Container restarts' for which one restarted.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-postgres-connections",
+    "title": "Postgres connections high",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(pg_stat_database_numbackends{datname=\"bip\"})",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [40]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "5m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "Over 40 of 50 Postgres connections in use for 5 minutes.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-postgres-long-transaction",
+    "title": "Postgres long transaction",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(pg_long_running_transactions_oldest_timestamp_seconds)",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [300]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": false,
+    "annotations": {
+      "summary": "A Postgres transaction has been running for over 5 minutes.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-postgres-memory",
+    "title": "Postgres memory high",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(container_memory_working_set_bytes{name=\"bip-web-postgres\"})",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [650000000]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "10m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "Postgres has used over 650 MB of its 768 MiB cap for 10 minutes. At the cap it gets killed and restarted.",
+      "runbook_url": "https://github.com/biscuits-internet-project/bip-turbo/blob/main/ops/postgres/README.md"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-redis-down",
+    "title": "Redis down",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "max(redis_up)",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [1]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "2m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "The bip Redis container is not answering."
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-site-unreachable",
+    "title": "Site unreachable",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-prom",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(rate(probe_all_success_sum{job=\"bip-healthcheck\"}[6m])) / sum(rate(probe_all_success_count{job=\"bip-healthcheck\"}[6m]))",
+          "instant": true
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "lt",
+                "params": [0.5]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "Alerting",
+    "execErrState": "Error",
+    "for": "2m",
+    "isPaused": false,
+    "annotations": {
+      "summary": "discobiscuits.net/healthcheck is failing from the outside (Ohio and Oregon checks). Also fires if the uptime check stops reporting."
     },
     "labels": {
       "app": "bip"
