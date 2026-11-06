@@ -71,14 +71,16 @@ export function musicianSongPlaysSql(musicianId?: string): Prisma.Sql {
  * The two play aggregates, defined once so "songs" and "plays" mean the same
  * thing wherever they surface. `play_count` counts distinct (song, show) pairs
  * — the same "a song twice in one show counts once" math as Song.timesPlayed,
- * so a musician's plays never exceed the per-song totals shown elsewhere;
+ * so a musician's plays never exceed the per-song totals shown elsewhere. The
+ * UNION in `musicianSongPlaysSql` already makes those rows unique, so COUNT(*)
+ * gives that number without a second, slow deduplication;
  * `song_count` collapses those plays to the distinct repertoire behind them.
  *
  * Splice into a SELECT over `musicianSongPlaysSql` aliased as `p`.
  */
 export const MUSICIAN_SONG_PLAY_COUNTS_SQL = Prisma.sql`
   COUNT(DISTINCT p.song_id) AS song_count,
-  COUNT(DISTINCT (p.song_id, p.show_id)) AS play_count
+  COUNT(*) AS play_count
 `;
 
 /** Raw shape of the columns `MUSICIAN_SONG_PLAY_COUNTS_SQL` projects. */

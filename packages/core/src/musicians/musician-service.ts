@@ -6,7 +6,9 @@ import type {
   MusicianAppearances,
   MusicianWithStats,
 } from "@bip/domain";
+import { CacheKeys } from "@bip/domain";
 import type { CacheInvalidationService } from "../_shared/cache/cache-invalidation-service";
+import type { CacheService } from "../_shared/cache/cache-service";
 import type { DbClient, DbInstrument, DbMusician } from "../_shared/database/models";
 import { buildOrderByClause, buildWhereClause } from "../_shared/database/query-utils";
 import type { FilterCondition, QueryOptions } from "../_shared/database/types";
@@ -56,6 +58,9 @@ function mapMusicianToDomainEntity(db: DbMusician): Musician {
     updatedAt: new Date(db.updatedAt),
   };
 }
+
+/** Edits clear this straight away; the TTL only limits staleness from direct database changes such as migrations. */
+const MUSICIAN_STATS_CACHE_TTL_SECONDS = 60 * 60;
 
 /**
  * Unlike AuthorService, both services here dedupe on create by slug and return
@@ -218,6 +223,7 @@ export class MusicianService {
     protected readonly db: DbClient,
     protected readonly logger: Logger,
     private readonly cacheInvalidation?: CacheInvalidationService,
+    private readonly cache?: CacheService,
   ) {}
 
   async findById(id: string): Promise<Musician | null> {
@@ -330,6 +336,14 @@ export class MusicianService {
    * come from the tracks those shows do have.
    */
   async findAllWithStats(): Promise<MusicianWithStats[]> {
+    if (!this.cache) return this.queryAllWithStats();
+    return this.cache.getOrSet(CacheKeys.musicians.withStats(), () => this.queryAllWithStats(), {
+      ttl: MUSICIAN_STATS_CACHE_TTL_SECONDS,
+    });
+  }
+
+  /** The aggregate behind {@link findAllWithStats}. It scans every track in every lineup, so read it through the cache. */
+  private async queryAllWithStats(): Promise<MusicianWithStats[]> {
     const rows = await this.db.$queryRaw<
       Array<
         MusicianSongPlayCountsRow & {
@@ -426,6 +440,8 @@ export class MusicianService {
         updatedAt: new Date(),
       },
     });
+    // A new musician belongs on the /musicians index and in the picker right away.
+    await this.cacheInvalidation?.invalidateMusician(result.slug);
     return mapMusicianToDomainEntity(result);
   }
 
