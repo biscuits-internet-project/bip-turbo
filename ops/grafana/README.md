@@ -11,6 +11,8 @@ Stack: https://playfulfennec1443.grafana.net (personal account). The `alloy` Kam
 
 - `alert-rules.json`: the alert rules (folder `bip`, group `bip`, every 1 minute), sent by email through the `bip-email` contact point. The weekly auth backup rule stays paused until that backup has logged its first run.
 
+- App errors: `App error burst` and `New app error` email when the app logs `level: error` lines. `New app error` looks back 7 days, so it runs in group `bip-slow` every 15 minutes. `handleError` in `entry.server.tsx` logs uncaught errors as `Uncaught server error: <type>: <message>`, so they group and alert the same way. Both the table and `New app error` group by log message and error type, not the full error text, because that text can contain IDs.
+
 - Paging (Grafana IRM, configured in Grafana, not stored here): schedule `bip on-call` → escalation chain `bip-page` → integration and contact point `bip-page`, which also emails. The notification policy sends `Site returning errors`, `Postgres down`, `Monitoring agent stopped`, `Out-of-memory kill`, `Redis down` and `Site unreachable` to `bip-page`. Everything else is email only.
 
 - Uptime (Synthetic Monitoring, configured in Grafana, not stored here): check `bip-healthcheck` requests `/healthcheck` every 2 minutes from Ohio and Oregon. It uses `/healthcheck` because Cloudflare can serve `/` from cache while the server is down.

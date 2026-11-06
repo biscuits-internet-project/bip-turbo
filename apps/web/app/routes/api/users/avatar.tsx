@@ -1,6 +1,5 @@
 import { ALLOWED_IMAGE_MIME_TYPES, type AllowedImageMimeType, MAX_IMAGE_FILE_SIZE } from "@bip/domain";
 import type { ActionFunctionArgs } from "react-router-dom";
-import honeybadger from "~/lib/honeybadger";
 import { logger } from "~/lib/logger";
 import { matchesImageSignature } from "~/server/image-signature";
 import { enforceRateLimit } from "~/server/rate-limit";
@@ -134,7 +133,6 @@ export async function action({ request }: ActionFunctionArgs) {
       },
     );
   } catch (error) {
-    honeybadger.notify(error as Error);
     logger.error("Error uploading avatar", { error });
     return new Response(
       JSON.stringify({

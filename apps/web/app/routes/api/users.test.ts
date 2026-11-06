@@ -5,7 +5,6 @@ const isUsernameTaken = vi.fn();
 const localUser = { id: "u-1", username: "Legacy Name", email: "a@example.com" };
 
 vi.mock("@bip/core", () => ({ getFeatureFlags: vi.fn().mockResolvedValue({}) }));
-vi.mock("~/lib/honeybadger", () => ({ default: { notify: vi.fn() } }));
 vi.mock("~/server/rate-limit", () => ({ enforceRateLimit: vi.fn() }));
 vi.mock("~/lib/logger", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("~/server/supabase", () => ({

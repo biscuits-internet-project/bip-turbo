@@ -872,5 +872,125 @@
     "labels": {
       "app": "bip"
     }
+  },
+  {
+    "uid": "bip-app-error-new",
+    "title": "New app error",
+    "ruleGroup": "bip-slow",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-logs",
+        "relativeTimeRange": {
+          "from": 3600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum by (message, error_type) (count_over_time({service=\"bip-web\"} |= \"\\\"level\\\":\\\"error\\\"\" | json message=\"message\", error_type=\"error.name\" [1h])) unless sum by (message, error_type) (count_over_time({service=\"bip-web\"} |= \"\\\"level\\\":\\\"error\\\"\" | json message=\"message\", error_type=\"error.name\" [7d] offset 1h))",
+          "instant": true,
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [0]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": false,
+    "annotations": {
+      "summary": "An error the app hasn't logged in the past 7 days: {{ $labels.message }} ({{ $labels.error_type }})"
+    },
+    "labels": {
+      "app": "bip"
+    }
+  },
+  {
+    "uid": "bip-app-error-burst",
+    "title": "App error burst",
+    "ruleGroup": "bip",
+    "folderUID": "bip",
+    "condition": "C",
+    "data": [
+      {
+        "refId": "A",
+        "datasourceUid": "grafanacloud-logs",
+        "relativeTimeRange": {
+          "from": 600,
+          "to": 0
+        },
+        "model": {
+          "refId": "A",
+          "expr": "sum(count_over_time({service=\"bip-web\"} |= \"\\\"level\\\":\\\"error\\\"\" | json message=\"message\" [10m]))",
+          "instant": true,
+          "queryType": "instant"
+        }
+      },
+      {
+        "refId": "B",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "B",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last"
+        }
+      },
+      {
+        "refId": "C",
+        "datasourceUid": "__expr__",
+        "model": {
+          "refId": "C",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [19]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "isPaused": false,
+    "annotations": {
+      "summary": "20 or more app errors in 10 minutes. See 'Errors by type' on the bip overview dashboard."
+    },
+    "labels": {
+      "app": "bip"
+    }
   }
 ]
