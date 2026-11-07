@@ -22,6 +22,7 @@ import { SearchProvider } from "~/components/search/search-provider";
 import { SupabaseProvider } from "~/context/supabase-provider";
 import { GlobalSearchProvider } from "~/hooks/use-global-search";
 import { PreferencesProvider } from "~/hooks/use-preferences";
+import { browserErrorReporterScript } from "~/lib/browser-error-reporter";
 import { mergeDehydratedStates } from "~/lib/query-prefetch";
 import type { SessionUser } from "~/lib/session-user";
 import { toSessionUser } from "~/lib/session-user";
@@ -127,6 +128,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="font-quicksand dark overflow-x-hidden">
       <head>
+        {/* Inline and ahead of the app's scripts, so it's listening if they fail to load. The
+            server and browser bundles can print it differently, which React can safely ignore. */}
+        <script dangerouslySetInnerHTML={{ __html: browserErrorReporterScript }} suppressHydrationWarning />
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
