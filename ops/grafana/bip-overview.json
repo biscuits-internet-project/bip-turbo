@@ -168,9 +168,7 @@
         {
           "id": "reduce",
           "options": {
-            "reducers": [
-              "lastNotNull"
-            ]
+            "reducers": ["lastNotNull"]
           }
         },
         {
@@ -1582,9 +1580,7 @@
   ],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": [
-    "bip"
-  ],
+  "tags": ["bip"],
   "time": {
     "from": "now-6h",
     "to": "now"
