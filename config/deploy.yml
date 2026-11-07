@@ -76,6 +76,12 @@ env:
 # the repo to the host on every deploy.
 error_pages_path: config/error_pages
 
+# Keeps the previous deploy's JavaScript and CSS available after a deploy. A browser
+# can still hold a page from the old build, and that page can't start if its files
+# are gone. Older builds' files are removed, so a run of quick deploys can still
+# strand a page.
+asset_path: /app/apps/web/build/client/assets:ro
+
 builder:
   arch: amd64
   local: true
