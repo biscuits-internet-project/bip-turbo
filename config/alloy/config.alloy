@@ -143,6 +143,18 @@ loki.process "requests" {
       replace    = ""
     }
   }
+  // coaching-tree's Rails and Thruster logs carry visitor IPs too.
+  stage.match {
+    selector = "{service=\"coaching-tree\"}"
+    stage.replace {
+      expression = " for ([0-9a-fA-F.:]+) at "
+      replace    = "-"
+    }
+    stage.replace {
+      expression = "\"(?:client_addr|remote_addr)\":\"([^\"]*)\""
+      replace    = ""
+    }
+  }
   forward_to = [loki.write.cloud.receiver]
 }
 
