@@ -19,14 +19,16 @@ on:
         type: string
   
   # Scheduled triggers. Each cron expression maps to one job below, so adding a
-  # schedule means adding its expression to that mapping too.
+  # schedule means adding its expression to that mapping too. Minutes are off the
+  # top of the hour because GitHub drops scheduled runs under load, and :00 is
+  # when load peaks.
   schedule:
     # Run the ratings recompute every hour (dirty-gated server-side, so it's
     # a cheap no-op when no ratings changed)
-    - cron: '0 * * * *'
-    # Look for duplicate rater accounts weekly, Mondays at 09:00 UTC. Signups are
+    - cron: '17 * * * *'
+    # Look for duplicate rater accounts weekly, Mondays at 09:23 UTC. Signups are
     # rare and the findings are read by hand, so daily would just be churn.
-    - cron: '0 9 * * 1'
+    - cron: '23 9 * * 1'
 
 env:
   PRODUCTION_URL: 'https://discobiscuits.net'
@@ -43,13 +45,13 @@ jobs:
     timeout-minutes: ${{ fromJSON(github.event.inputs.timeout || '10') }}
     
     steps:
-      # GitHub fires one run per matching cron expression, so the two schedules
-      # produce two independent runs even when they coincide (Mondays at 09:00).
+      # GitHub fires one run per matching cron expression and passes that
+      # expression as github.event.schedule, which picks the job here.
       - name: Set job from schedule
         if: github.event_name == 'schedule'
         run: |
           case "${{ github.event.schedule }}" in
-            "0 9 * * 1") job=detect-duplicate-accounts ;;
+            "23 9 * * 1") job=detect-duplicate-accounts ;;
             *)           job=recompute-ratings ;;
           esac
           echo "CRON_JOB=$job" >> $GITHUB_ENV
