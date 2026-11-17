@@ -35,6 +35,7 @@ export default async function () {
         `checked ${links.length} links, broken: ${broken.map((b) => `${b.url} (${b.error || b.status})`).join(", ") || "none"}`,
       );
     }
+    // biome-ignore lint/suspicious/noConsole: k6 sends this to the check logs
     console.log(`checked ${links.length} links: ${links.join(" ")}`);
   } finally {
     await page.close();
