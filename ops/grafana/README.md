@@ -19,6 +19,8 @@ Stack: https://playfulfennec1443.grafana.net (personal account). The `alloy` Kam
 
 - Uptime (Synthetic Monitoring, configured in Grafana, not stored here): check `bip-healthcheck` requests `/healthcheck` every 2 minutes from Ohio and Oregon. It uses `/healthcheck` because Cloudflare can serve `/` from cache while the server is down.
 
+- Broken links (Synthetic Monitoring check `broken-links`, id 9738, hourly from North Virginia): runs `broken-links.k6.js`, which loads the homepage and fetches up to 25 of its discobiscuits.net links. External links are skipped because PayPal returns 403 to every scripted request. To push an edit, base64 the file into `settings.browser.script` of the check JSON and POST it to `/api/datasources/proxy/uid/ag3foaj9mg3k0a/sm/check/update` with `GRAFANA_CLI_TOKEN`.
+
 Tokens in Doppler `bip/prd_hetzner`:
 - `GRAFANA_CLOUD_TOKEN`: on the server, write-only (metrics, logs).
 - `GRAFANA_CLI_TOKEN`: service account (Editor) for dashboards and alerts. Never on the server.
