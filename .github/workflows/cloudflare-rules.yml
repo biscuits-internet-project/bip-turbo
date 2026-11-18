@@ -1,0 +1,53 @@
+# Its own workflow, not part of ci.yml or deploy.yml: a rule-only change shouldn't run the JS
+# pipeline, and apply.py replaces whole Cloudflare rulesets, so it should run only when the
+# rule files change, never as a side effect of an unrelated app deploy.
+name: Cloudflare Rules
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/cloudflare/**'
+  push:
+    branches: [main]
+    paths:
+      - 'ops/cloudflare/**'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Overwrite rules added or edited in the Cloudflare dashboard (they are deleted or reverted)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-rules-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Cloudflare rule tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: make test-cloudflare
+
+  apply:
+    name: Apply Cloudflare rules
+    needs: test
+    # Only reviewed rules from main reach prod: never a PR, never a dispatch from another branch.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
+
+      - name: Apply rules
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          FORCE_FLAG: ${{ inputs.force && '--force' || '' }}
+          BASELINE: ${{ github.event.before }}
+        run: doppler run -p bip -c prd_hetzner -- python3 ops/cloudflare/apply.py --baseline "${BASELINE:-HEAD}" $FORCE_FLAG
