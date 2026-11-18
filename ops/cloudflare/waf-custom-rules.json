@@ -14,6 +14,13 @@
       "action": "managed_challenge",
       "enabled": true,
       "expression": "(http.user_agent contains \"Chrome/118.0.0.0\" or http.user_agent contains \"Chrome/119.0.0.0\" or http.user_agent contains \"Chrome/120.0.0.0\" or http.user_agent contains \"Chrome/121.0.0.0\" or http.user_agent contains \"Firefox/120.0\" or http.user_agent contains \"Firefox/121.0\" or http.user_agent contains \"Lightpanda\") and not starts_with(http.request.uri.path, \"/mcp\") and http.request.uri.path ne \"/healthcheck\" and not cf.client.bot"
+    },
+    {
+      "ref": "bip-challenge-proxy-ranges",
+      "description": "Challenge proxy-host IP ranges a daily scraper rotates through (list bip_proxy_ranges, from proxy-ranges.txt)",
+      "action": "managed_challenge",
+      "enabled": true,
+      "expression": "ip.src in $bip_proxy_ranges and not starts_with(http.request.uri.path, \"/mcp\") and http.request.uri.path ne \"/healthcheck\" and not cf.client.bot"
     }
   ]
 }
