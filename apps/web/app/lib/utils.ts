@@ -178,3 +178,20 @@ export function formatDateLong(date: string | Date): string {
   });
   return `${monthName} ${parts.day}, ${parts.year}`;
 }
+
+/**
+ * Weekday name ("Wednesday" / "Wed") shown after the date in the setlist card
+ * header, which picks the width by available space. UTC-anchored (via
+ * `extractDateParts`) so a show date never shifts to the neighboring weekday
+ * for viewers east or west of UTC; the locale is pinned to en-US so the name
+ * is stable across runners. Returns an empty string for unparseable input so
+ * callers can render it unconditionally.
+ */
+export function formatWeekday(date: string | Date, width: "long" | "short"): string {
+  const parts = extractDateParts(date);
+  if (!parts) return "";
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).toLocaleString("en-US", {
+    weekday: width,
+    timeZone: "UTC",
+  });
+}

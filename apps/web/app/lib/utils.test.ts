@@ -6,6 +6,7 @@ import {
   formatDateShort,
   formatDateShortMobile,
   formatMonthDay,
+  formatWeekday,
   getAnniversaryYears,
   getOrdinalSuffix,
   isValidMonthDay,
@@ -78,6 +79,25 @@ describe("formatDateLong", () => {
 
   test("returns the original string when it isn't a parseable date", () => {
     expect(formatDateLong("nope")).toBe("nope");
+  });
+});
+
+describe("formatWeekday", () => {
+  test("returns the abbreviated weekday of a YYYY-MM-DD string", () => {
+    expect(formatWeekday("2024-06-05", "short")).toBe("Wed");
+  });
+
+  test("returns the spelled-out weekday of a YYYY-MM-DD string", () => {
+    expect(formatWeekday("2024-06-05", "long")).toBe("Wednesday");
+  });
+
+  // Reads UTC fields so a Date late on the 15th UTC stays Saturday on any runner.
+  test("uses UTC fields for a Date near the day boundary", () => {
+    expect(formatWeekday(LATE_UTC_15TH, "long")).toBe("Saturday");
+  });
+
+  test("returns an empty string when the input isn't a parseable date", () => {
+    expect(formatWeekday("nope", "short")).toBe("");
   });
 });
 
