@@ -14,7 +14,7 @@ import { useAttendanceMutation } from "~/hooks/use-show-user-data";
 import { formatVenueLocation } from "~/lib/format-venue";
 import { ROW_CHIP_HOVER } from "~/lib/interaction-styles";
 import { deriveShowLineupNotes } from "~/lib/lineup-notes";
-import { cn } from "~/lib/utils";
+import { cn, formatWeekday } from "~/lib/utils";
 import { AnniversaryBadge } from "./anniversary-badge";
 import { RockOperaAnnotations } from "./rock-opera-annotations";
 import { SetlistFlow } from "./setlist-flow";
@@ -285,7 +285,9 @@ function SetlistCardComponent({
             : undefined
         }
         className={cn(
-          "relative z-10 px-3 md:px-6 border-b",
+          // Named container so the date's weekday spells out only when the
+          // header is wide enough for it.
+          "@container/setlisthead relative z-10 px-3 md:px-6 border-b",
           collapsible ? "py-1 md:py-1 cursor-pointer" : "py-3 md:py-5",
           notForStats && "opacity-60 text-content-text-tertiary",
         )}
@@ -295,27 +297,37 @@ function SetlistCardComponent({
             <div className="flex items-center gap-2 text-lg md:text-2xl font-medium">
               <Link
                 to={setlist.show.slug ? `/shows/${setlist.show.slug}` : `/shows`}
-                // Reserve a column wide enough for the longest date this renders
-                // (`12/30/2025` — the header has no @container/datecell, so it's
-                // always the full M/D/YYYY), so the attendance button beside it
-                // lands on the same vertical line in every row instead of sliding
-                // with the date's length.
+                // Reserve a column as wide as a typical date plus the longest
+                // weekday (`11/15/2006 Wednesday`, or `11/15/2006 Wed` in a narrow
+                // header; there is no @container/datecell here, so the date is
+                // always the full M/D/YYYY), so the attendance button lands on
+                // the same vertical line in every row. A Wednesday fills the
+                // column, leaving only the row's gap before the button; dates
+                // with wider digits push it out by a few px.
                 //
                 // `ch` rather than a px/rem value: this text renders in the
                 // system font stack, so its metrics differ per platform, and it
-                // scales text-lg → text-2xl at the md breakpoint. A fixed length
-                // would need re-measuring on every OS and duplicating per
-                // breakpoint; `ch` is defined against the font actually in use,
-                // so one value covers both. 9ch clears the widest date with a few
-                // px to spare at both sizes.
+                // scales text-lg → text-2xl at the md breakpoint. `ch` is defined
+                // against the font actually in use, so one value covers both
+                // sizes. `min-w`, not `w`, so a wider date pushes the row out
+                // rather than overflowing.
                 //
-                // `min-w`, not `w`: an unexpectedly wide date pushes the row out
-                // rather than overflowing. And not a container query — ShowDate
-                // documents that `container-type: inline-size` collapses it and
-                // breaks the date character-by-character.
-                className="text-brand-primary hover:text-brand-secondary transition-colors shrink-0 min-w-[9ch]"
+                // The weekday's container query lives on the full-width header,
+                // not here: ShowDate documents that `container-type: inline-size`
+                // on a shrink-to-fit element collapses it and breaks the date
+                // character-by-character.
+                className={cn(
+                  "text-brand-primary hover:text-brand-secondary transition-colors shrink-0",
+                  "min-w-[11.5ch] @min-[34rem]/setlisthead:min-w-[16.5ch]",
+                )}
               >
                 <ShowDate date={setlist.show.date} />
+                <span className="ml-1.5 font-normal text-content-text-secondary">
+                  <span className="hidden @min-[34rem]/setlisthead:inline">
+                    {formatWeekday(setlist.show.date, "long")}
+                  </span>
+                  <span className="@min-[34rem]/setlisthead:hidden">{formatWeekday(setlist.show.date, "short")}</span>
+                </span>
               </Link>
               {user && attendanceButton}
               <AnniversaryBadge showDate={setlist.show.date} />

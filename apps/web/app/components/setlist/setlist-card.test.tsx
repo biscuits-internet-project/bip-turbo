@@ -154,6 +154,16 @@ describe("SetlistCard", () => {
     expect(screen.getByText("4/14/2021")).toBeInTheDocument();
   });
 
+  // 4/14/2021 was a Wednesday. Both forms are in the DOM and a container
+  // query on the header shows one, so jsdom (no layout) sees both.
+  test("renders the spelled-out and abbreviated weekday after the date", async () => {
+    await setupWithRouter(
+      <SetlistCard setlist={makeSetlist()} userAttendance={null} userRating={null} showRating={null} />,
+    );
+    expect(screen.getByText("Wednesday")).toBeInTheDocument();
+    expect(screen.getByText("Wed")).toBeInTheDocument();
+  });
+
   // Renders venue information
   test("renders venue name and location", async () => {
     await setupWithRouter(
