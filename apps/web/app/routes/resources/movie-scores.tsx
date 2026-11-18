@@ -12,7 +12,7 @@ export function meta() {
     { title: "Live Movie Scores" },
     {
       name: "description",
-      content: "Akira, Tron, and every other time the band played a set synched to a movie.",
+      content: "Akira, Tron, Beetlejuice, and every other time the band played a set synched to a movie.",
     },
     {
       property: "og:image",
@@ -93,6 +93,29 @@ const MovieScores: React.FC = () => {
           onto a scrim that hung in front of them, covering the entire stage area, top to bottom, left to right. The
           result was that you were primarily watching the movie, while seeing hints of movement and shadows from the
           band behind.
+        </p>
+      </MovieCard>
+
+      <MovieCard
+        title={
+          <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+            <span className="text-2xl font-bold text-content-text-primary">Beetlejuice</span>
+            <span className="text-lg text-content-text-tertiary">
+              <Link
+                to="/shows/2026-10-31-the-palladium-worcester-ma"
+                className="text-brand-primary hover:text-brand-secondary hover:underline"
+              >
+                October 31, 2026 at The Palladium - Worcester, MA
+              </Link>
+            </span>
+          </div>
+        }
+      >
+        <p>
+          For Halloween 2026, the Disco Biscuits' entire first set was an improvised score to Tim Burton's Beetlejuice.
+          This included samples and jams to the Harry Belafonte songs featured in the movie: ‘Jump In The Line (Shake
+          Senora)’ and ‘Day-O (The Banana Boat Song)’. It also included samples of ‘Beetlejuice (Main Theme)’ by Danny
+          Elfman.
         </p>
       </MovieCard>
 
