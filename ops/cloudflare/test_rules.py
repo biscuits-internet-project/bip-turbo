@@ -6,18 +6,12 @@ only stops *storing* signed-in renders; it cannot stop Cloudflare from *serving*
 already-cached one, so every cache-enabling rule must skip requests carrying the auth cookie.
 """
 
-import json
-import pathlib
 import unittest
 
-DIRECTORY = pathlib.Path(__file__).parent
+from cloudflare_api import DIRECTORY, load_repo_rules
+
 RULE_FILES = sorted(DIRECTORY.glob("*-rules.json"))
 AUTH_COOKIE_CLAUSE = 'not http.cookie contains "-auth-token"'
-
-
-def load_rules(path):
-    """The rules a checked-in ruleset file holds."""
-    return json.loads(path.read_text())["rules"]
 
 
 class RuleRefsTest(unittest.TestCase):
@@ -28,7 +22,7 @@ class RuleRefsTest(unittest.TestCase):
         name it; a duplicated ref names two rules at once."""
         self.assertTrue(RULE_FILES)
         for path in RULE_FILES:
-            refs = [rule.get("ref") for rule in load_rules(path)]
+            refs = [rule.get("ref") for rule in load_repo_rules(path.name)]
             with self.subTest(file=path.name):
                 self.assertNotIn(None, refs)
                 self.assertEqual(len(refs), len(set(refs)))
@@ -41,7 +35,7 @@ class CacheRulesTest(unittest.TestCase):
         """Fails for a rule that would hand a signed-in visitor the cached signed-out page."""
         caching_rules = [
             rule
-            for rule in load_rules(DIRECTORY / "cache-rules.json")
+            for rule in load_repo_rules("cache-rules.json")
             if rule["action"] == "set_cache_settings" and rule["action_parameters"].get("cache") is True
         ]
         self.assertTrue(caching_rules)
