@@ -201,7 +201,7 @@ jobs:
 
       # Read-only look at the live Cloudflare rulesets: inspect_live.py only sends GETs and
       # prints statuses, error codes, refs, field names and counts, never values, because
-      # run logs on this public repo are world-readable. Both values are masked before use.
+      # run logs on this public repo are world-readable. Both secrets are masked before use.
       - name: Inspect live Cloudflare rules (read-only)
         if: inputs.action == 'inspect-cloudflare'
         env:

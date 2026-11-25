@@ -48,8 +48,6 @@ class FakeZone:
         self.methods.append(request.get_method())
         path = request.full_url[len(inspect_live.API) + 1 :]
         self.paths.append(path)
-        if path == "user/tokens/verify":
-            return FakeResponse({"result": {"status": "active"}})
         if path.endswith("/entrypoint"):
             phase = path.split("/")[-2]
             if phase == self.failing_phase:
@@ -136,7 +134,6 @@ class MainTest(unittest.TestCase):
         self.assertIn("id (live only)", output)
         self.assertIn("  extra-live-rule: not in repo", output)
         self.assertIn("description present: yes", output)
-        self.assertIn("token status: active", output)
         self.assertIn("tiered cache: HTTP 200", output)
         self.assertIn("versions: HTTP 200, 2 kept", output)
 
@@ -145,7 +142,6 @@ class MainTest(unittest.TestCase):
         zone = FakeZone()
         run_main(zone)
         self.assertEqual(set(zone.methods), {"GET"})
-        self.assertIn("user/tokens/verify", zone.paths)
         for phase in inspect_live.RULESETS:
             self.assertIn(f"zones/{ZONE_MARKER}/rulesets/phases/{phase}/entrypoint", zone.paths)
             self.assertIn(f"zones/{ZONE_MARKER}/rulesets/ruleset-{phase}/versions", zone.paths)

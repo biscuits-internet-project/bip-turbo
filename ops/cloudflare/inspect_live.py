@@ -2,7 +2,7 @@
 
 Why it exists: before anything writes to the zone, we want to learn the shape of
 the live rulesets (which fields Cloudflare adds, which rules differ), what the
-API token is permitted to do, and whether Cloudflare keeps ruleset versions.
+API token can read, and whether Cloudflare keeps ruleset versions.
 
 It only issues GET requests. It prints only HTTP statuses, Cloudflare error
 codes, rule refs, field names, counts and the tiered-cache on/off value, because
@@ -126,14 +126,9 @@ def report_phase(token, zone, phase, filename):
 
 
 def main():
-    """Entry point: token check, each phase, then the tiered-cache setting."""
+    """Entry point: each phase, then the tiered-cache setting."""
     token = os.environ["CLOUDFLARE_SECURITY_TOKEN"]
     zone = os.environ["CLOUDFLARE_ZONE_ID"]
-
-    status, body = get(token, "user/tokens/verify")
-    print(f"token verify: HTTP {status}")
-    if status == 200:
-        print(f"token status: {body['result']['status']}")
 
     for phase, filename in RULESETS.items():
         report_phase(token, zone, phase, filename)
