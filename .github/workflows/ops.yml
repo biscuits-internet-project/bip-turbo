@@ -15,6 +15,7 @@ on:
           - restart-redis
           - prune-docker
           - stop-builder
+          - inspect-cloudflare
 
 concurrency:
   group: deploy-web-app
@@ -197,6 +198,25 @@ jobs:
           echo ""
           echo "=== Totals ==="
           awk '{ n++; b += $1 } END { printf "%d keys, %.1f MB\n", n, b/1048576 }' census.txt
+
+      # Read-only look at the live Cloudflare rulesets: inspect_live.py only sends GETs and
+      # prints statuses, error codes, refs, field names and counts, never values, because
+      # run logs on this public repo are world-readable. Both secrets are masked before use.
+      - name: Inspect live Cloudflare rules (read-only)
+        if: inputs.action == 'inspect-cloudflare'
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          CLOUDFLARE_SECURITY_TOKEN=$(doppler secrets get CLOUDFLARE_SECURITY_TOKEN --project bip --config prd_hetzner --plain)
+          CLOUDFLARE_ZONE_ID=$(doppler secrets get CLOUDFLARE_ZONE_ID --project bip --config prd_hetzner --plain)
+          if [ -z "$CLOUDFLARE_SECURITY_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
+            echo "CLOUDFLARE_SECURITY_TOKEN or CLOUDFLARE_ZONE_ID is not readable from bip/prd_hetzner"
+            exit 1
+          fi
+          echo "::add-mask::$CLOUDFLARE_SECURITY_TOKEN"
+          echo "::add-mask::$CLOUDFLARE_ZONE_ID"
+          export CLOUDFLARE_SECURITY_TOKEN CLOUDFLARE_ZONE_ID
+          python3 ops/cloudflare/inspect_live.py
 
       - name: Reboot redis accessory
         if: inputs.action == 'restart-redis'

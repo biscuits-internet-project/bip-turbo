@@ -1,0 +1,19 @@
+# Checks the Cloudflare rule files on PRs that change them. It never touches the live
+# zone and holds no secrets, so it is safe to run on any PR.
+name: Cloudflare Rules
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/cloudflare/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Cloudflare rule tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: make test-cloudflare

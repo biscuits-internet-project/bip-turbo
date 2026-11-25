@@ -23,6 +23,10 @@ lint:
 test:
 	bun run test
 
+# Checks on the Cloudflare rule files (stdlib only, no network, no secrets).
+test-cloudflare:
+	python3 -m unittest discover -s ops/cloudflare -t ops/cloudflare
+
 # Guard the heaviest routes against per-request memory regressions before
 # shipping. Needs a current build plus the local Postgres/Redis. See the header
 # of scripts/memory-check.sh for what the numbers do and don't mean.
