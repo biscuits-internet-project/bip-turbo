@@ -22,7 +22,11 @@ export function setSecurityHeaders(headers: Headers): void {
   }
 }
 
-/** Supabase's session cookie (`sb-<ref>-auth-token`, possibly chunked as `.0`, `.1`, ...). */
+/**
+ * Supabase's session cookie (`sb-<ref>-auth-token`, possibly chunked as `.0`, `.1`, ...).
+ * The Cloudflare cache rules in `ops/cloudflare/cache-rules.json` skip the edge cache on the
+ * same `-auth-token` marker; change both together.
+ */
 const SUPABASE_AUTH_COOKIE = /(?:^|;\s*)sb-[^=;]*-auth-token(?:\.\d+)?=/;
 
 export function hasCredential(request: Request): boolean {

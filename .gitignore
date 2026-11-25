@@ -21,3 +21,6 @@ backups/
 rater-investigation/
 # Prod-to-local sync cursors, per developer database (packages/core/scripts/sync-cursors.ts)
 .sync-cursors.json
+
+# Python bytecode from the ops/cloudflare tests
+__pycache__/
