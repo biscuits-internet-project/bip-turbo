@@ -1,0 +1,60 @@
+# Sets one live Cloudflare rule's expression to the one in ops/cloudflare/*-rules.json,
+# leaving every other rule alone (see update_rule.py for the checks it makes).
+#
+# Both jobs run only from main, since each one holds the token. The dry-run job only
+# reads and prints the old and new expression. The apply job then waits for a reviewer
+# to approve the cloudflare-write environment, repeats the checks, sends the update and
+# reads the rule back.
+name: Cloudflare Rule Update
+on:
+  workflow_dispatch:
+    inputs:
+      rule_ref:
+        description: "ref of the rule to update, as in ops/cloudflare/*-rules.json"
+        required: true
+        type: string
+
+concurrency:
+  group: cloudflare-rule-update
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  dry-run:
+    name: Dry run (read-only)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Require a reviewer on the cloudflare-write environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ops/cloudflare/require-reviewer.sh
+      - uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
+      - name: Compare the live rule with the repo
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          RULE_REF: ${{ inputs.rule_ref }}
+        run: ops/cloudflare/with-secrets.sh python3 ops/cloudflare/update_rule.py --ref "$RULE_REF"
+
+  apply:
+    name: Apply (needs approval)
+    needs: dry-run
+    if: github.ref == 'refs/heads/main'
+    environment: cloudflare-write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Require a reviewer on the cloudflare-write environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ops/cloudflare/require-reviewer.sh
+      - uses: dopplerhq/cli-action@014df23b1329b615816a38eb5f473bb9000700b1 # v3
+      - name: Update the live rule and read it back
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          RULE_REF: ${{ inputs.rule_ref }}
+        run: ops/cloudflare/with-secrets.sh python3 ops/cloudflare/update_rule.py --ref "$RULE_REF" --apply

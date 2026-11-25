@@ -206,17 +206,7 @@ jobs:
         if: inputs.action == 'inspect-cloudflare'
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-        run: |
-          CLOUDFLARE_SECURITY_TOKEN=$(doppler secrets get CLOUDFLARE_SECURITY_TOKEN --project bip --config prd_hetzner --plain)
-          CLOUDFLARE_ZONE_ID=$(doppler secrets get CLOUDFLARE_ZONE_ID --project bip --config prd_hetzner --plain)
-          if [ -z "$CLOUDFLARE_SECURITY_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
-            echo "CLOUDFLARE_SECURITY_TOKEN or CLOUDFLARE_ZONE_ID is not readable from bip/prd_hetzner"
-            exit 1
-          fi
-          echo "::add-mask::$CLOUDFLARE_SECURITY_TOKEN"
-          echo "::add-mask::$CLOUDFLARE_ZONE_ID"
-          export CLOUDFLARE_SECURITY_TOKEN CLOUDFLARE_ZONE_ID
-          python3 ops/cloudflare/inspect_live.py
+        run: ops/cloudflare/with-secrets.sh python3 ops/cloudflare/inspect_live.py
 
       - name: Reboot redis accessory
         if: inputs.action == 'restart-redis'
