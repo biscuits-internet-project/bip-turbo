@@ -5,14 +5,18 @@ exist only in the live zone. This updates a single rule, found by its ref, and o
 when the live rule already matches the repo in every field but the expression. Any
 other difference means the rule was changed outside the repo, so it refuses.
 
-Without --apply it only reads, and prints the old and new expression and the ruleset
-version to roll back to. With --apply it repeats those checks, sends one PATCH for that
-rule, and reads the ruleset back to confirm the rule now matches the repo and that the
-rule order and every other rule are as they were.
+In dry-run mode it only reads, and prints the old and new expression, the ruleset
+version to roll back to, and an approval code. In apply mode it needs that code: running
+the apply with the code you read is the approval. The code pins both the live ruleset
+version and the new expression, so the apply refuses if Cloudflare or the repo changed
+since the dry run. It then repeats the checks, sends one PATCH for that rule, and reads
+the ruleset back to confirm the rule now matches the repo and that the rule order and
+every other rule are as they were.
 
 It prints a rule's expression only for refs the repo defines, whose content is public
-here already. It never prints the token, the zone, ruleset or rule ids, descriptions,
-or any other live rule, because run logs on this public repo are world-readable.
+here already, and names other live rules only by ref. It never prints the token, the
+zone, ruleset or rule ids, or descriptions, because run logs on this public repo are
+world-readable.
 
 Rollback: revert the rule in the repo and run this again, or restore the printed
 ruleset version from Cloudflare's version history.
@@ -23,6 +27,7 @@ and 1 when it refuses or fails.
 """
 
 import argparse
+import hashlib
 import os
 
 from cloudflare_api import (
@@ -34,6 +39,16 @@ from cloudflare_api import (
     send,
     without_server_fields,
 )
+
+
+def approval_code(ruleset_version, new_expression):
+    """The code a dry run prints and an apply must repeat.
+
+    It joins the live ruleset version with a short hash of the new expression, so one
+    code ties the approval to both what Cloudflare had and what the repo will write.
+    """
+    digest = hashlib.sha256(new_expression.encode()).hexdigest()[:8]
+    return f"{ruleset_version}-{digest}"
 
 
 def find_repo_rule(ref):
@@ -84,8 +99,14 @@ def main(arguments=None):
     """Checks the live rule against the repo, then updates its expression when asked to."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ref", required=True, help="ref of the rule, as in ops/cloudflare/*-rules.json")
-    parser.add_argument("--apply", action="store_true", help="send the update; without it, only read")
+    parser.add_argument("--mode", choices=("dry-run", "apply"), default="dry-run", help="apply sends the update")
+    parser.add_argument("--approval-code", help="for apply: the code the dry run printed")
     options = parser.parse_args(arguments)
+    # Codes are copied from a run log into a form, which can bring stray whitespace along.
+    reviewed_code = (options.approval_code or "").strip()
+    if options.mode == "apply" and not reviewed_code:
+        print("refusing: apply needs --approval-code, the code the dry run printed")
+        return 1
 
     found = find_repo_rule(options.ref)
     if found is None:
@@ -100,7 +121,7 @@ def main(arguments=None):
     if compared is None:
         return 1
     ruleset, live_rule, paths = compared
-    print(f"ruleset version before: {ruleset['version']}")
+    print(f"ruleset version: {ruleset['version']}")
     if not paths:
         print("live rule matches repo: nothing to do")
         return 0
@@ -109,9 +130,14 @@ def main(arguments=None):
         return 1
     print(f"old expression: {live_rule['expression']}")
     print(f"new expression: {repo_rule['expression']}")
-    if not options.apply:
-        print("dry run: nothing changed")
+    code = approval_code(ruleset["version"], repo_rule["expression"])
+    if options.mode == "dry-run":
+        print(f"dry run: nothing changed; to apply, run again with mode apply and approval_code {code}")
         return 0
+    if code != reviewed_code:
+        # The current code is not printed: an apply has to follow a dry run that shows what it writes.
+        print("refusing: Cloudflare or the repo's rule changed since the dry run; run the dry run again")
+        return 1
 
     updated = without_server_fields(live_rule)
     updated["expression"] = repo_rule["expression"]

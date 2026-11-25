@@ -27,6 +27,9 @@ YEAR_RULE = cloudflare_api.load_repo_rules(cloudflare_api.RULESETS[CACHE_PHASE])
 YEAR_REF = YEAR_RULE["ref"]
 ENTRYPOINT = f"zones/{ZONE_MARKER}/rulesets/phases/{CACHE_PHASE}/entrypoint"
 RULE_PATH = f"zones/{ZONE_MARKER}/rulesets/{RULESET_ID}/rules/{RULE_ID}"
+# The code a dry run prints for the fake zone's ruleset version and the repo's year expression.
+APPROVAL_CODE = update_rule.approval_code("7", YEAR_RULE["expression"])
+APPLY = ("--mode", "apply", "--approval-code", APPROVAL_CODE)
 
 
 def live_year_rule(**changes):
@@ -100,7 +103,7 @@ class GuardTest(unittest.TestCase):
     def test_ref_not_in_repo_is_refused_without_any_request(self):
         """Only rules the repo defines can be updated, so a live-only rule can never be touched or printed."""
         zone = FakeZone([private_rule()])
-        code, output = run(zone, "--ref", "private-live-rule", "--apply")
+        code, output = run(zone, "--ref", "private-live-rule", *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("not in the repo", output)
         self.assertEqual(zone.requests, [])
@@ -108,7 +111,7 @@ class GuardTest(unittest.TestCase):
     def test_matching_live_rule_needs_nothing(self):
         """A live rule that differs only in the fields Cloudflare adds is already up to date."""
         zone = FakeZone([live_year_rule()])
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 0)
         self.assertIn("nothing to do", output)
         self.assertEqual(zone.patches(), [])
@@ -117,7 +120,7 @@ class GuardTest(unittest.TestCase):
         """Any live difference other than the expression means someone changed the rule elsewhere; stop and name the fields."""
         changed = live_year_rule(expression=OLD_EXPRESSION, enabled=False)
         zone = FakeZone([changed])
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("refusing", output)
         self.assertIn("enabled", output)
@@ -126,7 +129,7 @@ class GuardTest(unittest.TestCase):
     def test_missing_live_rule_is_refused(self):
         """A repo rule with no live counterpart is not created by this script."""
         zone = FakeZone([private_rule()])
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("found 0 live rules", output)
         self.assertEqual(zone.patches(), [])
@@ -134,7 +137,7 @@ class GuardTest(unittest.TestCase):
     def test_duplicate_live_ref_is_refused(self):
         """Two live rules with one ref make the target ambiguous."""
         zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION), live_year_rule(id="second")])
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("found 2 live rules", output)
         self.assertEqual(zone.patches(), [])
@@ -142,26 +145,71 @@ class GuardTest(unittest.TestCase):
     def test_failed_read_is_refused_with_codes_only(self):
         """A failed read stops the run and prints Cloudflare's error codes, not its messages."""
         zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)], read_status=403)
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("HTTP 403", output)
         self.assertIn("[10000]", output)
         self.assertNotIn(MESSAGE_MARKER, output)
 
 
+class ApprovalCodeTest(unittest.TestCase):
+    """Applying needs the code the dry run printed, so it writes only what was reviewed, onto the state that was reviewed."""
+
+    def test_code_changes_with_version_and_expression(self):
+        """The code pins both sides: a new ruleset version or a new repo expression each give a different code."""
+        code = update_rule.approval_code("7", "expression")
+        self.assertEqual(code, update_rule.approval_code("7", "expression"))
+        self.assertNotEqual(code, update_rule.approval_code("8", "expression"))
+        self.assertNotEqual(code, update_rule.approval_code("7", "other expression"))
+
+    def test_apply_without_code_is_refused_without_any_request(self):
+        """An apply that names no reviewed code is refused before it touches the zone."""
+        zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)])
+        code, output = run(zone, "--ref", YEAR_REF, "--mode", "apply")
+        self.assertEqual(code, 1)
+        self.assertIn("apply needs --approval-code", output)
+        self.assertEqual(zone.requests, [])
+
+    def test_changed_ruleset_is_refused(self):
+        """If the live ruleset changed after the dry run, its version moved, so the apply refuses instead of writing."""
+        zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)])
+        zone.version = "8"
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
+        self.assertEqual(code, 1)
+        self.assertIn("refusing: Cloudflare or the repo's rule changed since the dry run; run the dry run again", output)
+        self.assertNotIn(update_rule.approval_code("8", YEAR_RULE["expression"]), output)
+        self.assertEqual(zone.patches(), [])
+
+    def test_pasted_code_with_surrounding_whitespace_is_accepted(self):
+        """A code copied from the log with a stray space or newline still matches."""
+        zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)])
+        code, output = run(zone, "--ref", YEAR_REF, "--mode", "apply", "--approval-code", f" {APPROVAL_CODE}\n")
+        self.assertEqual(code, 0)
+        self.assertIn("verified", output)
+
+    def test_changed_repo_expression_is_refused(self):
+        """If main's expression changed after the dry run, the apply refuses rather than write text nobody reviewed."""
+        zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)])
+        reviewed = update_rule.approval_code("7", "the expression the dry run showed")
+        code, output = run(zone, "--ref", YEAR_REF, "--mode", "apply", "--approval-code", reviewed)
+        self.assertEqual(code, 1)
+        self.assertIn("run the dry run again", output)
+        self.assertEqual(zone.patches(), [])
+
+
 class DryRunTest(unittest.TestCase):
     """The dry run shows exactly what would change and changes nothing."""
 
     def test_dry_run_prints_both_expressions_and_only_reads(self):
-        """The reviewer sees the old and new expression and the rollback version before approving."""
+        """The reviewer sees the old and new expression, the rollback version and the code to apply with."""
         zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION), private_rule()])
         code, output = run(zone, "--ref", YEAR_REF)
         self.assertEqual(code, 0)
         self.assertEqual(set(zone.methods()), {"GET"})
         self.assertIn(f"old expression: {OLD_EXPRESSION}", output)
         self.assertIn(f"new expression: {YEAR_RULE['expression']}", output)
-        self.assertIn("ruleset version before: 7", output)
-        self.assertIn("dry run: nothing changed", output)
+        self.assertIn("ruleset version: 7", output)
+        self.assertIn(f"dry run: nothing changed; to apply, run again with mode apply and approval_code {APPROVAL_CODE}", output)
 
 
 class ApplyTest(unittest.TestCase):
@@ -171,7 +219,7 @@ class ApplyTest(unittest.TestCase):
         """The PATCH body is the live rule minus server fields with the repo expression, and the read-back must match."""
         live = live_year_rule(expression=OLD_EXPRESSION)
         zone = FakeZone([live, private_rule()])
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 0)
         expected_body = {key: value for key, value in live.items() if key not in ("id", "version", "last_updated")}
         expected_body["expression"] = YEAR_RULE["expression"]
@@ -184,7 +232,7 @@ class ApplyTest(unittest.TestCase):
     def test_rejected_patch_prints_codes_and_fails(self):
         """A refused write (for example a token without edit permission) fails with codes only and claims no change."""
         zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)], patch_status=403)
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("update: HTTP 403", output)
         self.assertIn("[10000]", output)
@@ -194,7 +242,7 @@ class ApplyTest(unittest.TestCase):
     def test_read_back_mismatch_fails(self):
         """If the live rule still differs after the PATCH, the run fails instead of reporting success."""
         zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION)], patch_applies=False)
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("read-back differs: expression", output)
         self.assertNotIn("verified", output)
@@ -205,7 +253,7 @@ class ApplyTest(unittest.TestCase):
             [live_year_rule(expression=OLD_EXPRESSION), private_rule()],
             patch_side_effect=lambda rules: rules.append(rules.pop(0)),
         )
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("read-back: rule order changed", output)
         self.assertNotIn("verified", output)
@@ -216,7 +264,7 @@ class ApplyTest(unittest.TestCase):
             [live_year_rule(expression=OLD_EXPRESSION), private_rule()],
             patch_side_effect=lambda rules: rules[1].update(enabled=False),
         )
-        code, output = run(zone, "--ref", YEAR_REF, "--apply")
+        code, output = run(zone, "--ref", YEAR_REF, *APPLY)
         self.assertEqual(code, 1)
         self.assertIn("read-back: other rules changed: private-live-rule", output)
         self.assertNotIn(PRIVATE_MARKER, output)
@@ -225,7 +273,7 @@ class ApplyTest(unittest.TestCase):
     def test_output_never_contains_secrets_ids_or_other_rules(self):
         """Token, zone id, ruleset and rule ids, descriptions and other live rules never reach the public log."""
         zone = FakeZone([live_year_rule(expression=OLD_EXPRESSION), private_rule()])
-        _, output = run(zone, "--ref", YEAR_REF, "--apply")
+        _, output = run(zone, "--ref", YEAR_REF, *APPLY)
         for marker in (TOKEN_MARKER, ZONE_MARKER, RULESET_ID, RULE_ID, PRIVATE_MARKER, "DESCRIPTION-MARKER"):
             self.assertNotIn(marker, output)
 
